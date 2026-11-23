@@ -170,6 +170,11 @@ export default function StockDashboardPage() {
       value: dashboard ? formatPrice(dashboard.stockValue) : financeErr ? '—' : '…',
       highlight: true,
       errMsg: financeErr,
+      // STORE-QA-9: 0.00 beside stock on hand is a missing cost price, not an empty shelf. Say so.
+      hint:
+        dashboard && dashboard.stockValue === 0 && (onHandCount ?? 0) > 0
+          ? t('stockValueNoCost')
+          : null,
     },
     {
       label: t('onHandSkus'),
@@ -240,6 +245,11 @@ export default function StockDashboardPage() {
               {kpi.errMsg && (
                 <p className="text-xs text-destructive-ink truncate" title={kpi.errMsg}>
                   {t('couldntLoad')}
+                </p>
+              )}
+              {'hint' in kpi && kpi.hint && (
+                <p className="text-xs text-muted-foreground" data-testid="stock-value-hint">
+                  {kpi.hint}
                 </p>
               )}
               {kpi.href && !kpi.errMsg && (

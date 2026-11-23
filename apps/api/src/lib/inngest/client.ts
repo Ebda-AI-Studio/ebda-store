@@ -1,4 +1,5 @@
 import { dispatchEvents } from '../jobs/dispatch';
+import { cfWaitUntil } from '../../cf/bindings';
 import { registerJob } from '../jobs/registry';
 import type { JobDef, JobEvent, JobHandler, JobOptions } from '../jobs/types';
 
@@ -39,6 +40,8 @@ type InvoiceEmailRequestedEvent = EventPayload & {
     orderId: string;
     storeId: string;
     to: string;
+    /** The invoice goes to the merchant's own configured address, not a customer: kept for a suspended store (Ruling SUSPEND-OUT-1). */
+    toMerchant?: boolean;
   };
 };
 
@@ -180,6 +183,17 @@ type InsightsRollupRequestedEvent = EventPayload & {
   data: {
     storeId: string;
     requestedBy?: string;
+  };
+};
+
+type InsightsFunnelBackfillRequestedEvent = EventPayload & {
+  name: 'insights/funnel-backfill-requested';
+  data: {
+    storeId: string;
+    /** How many Cairo days back to check (1..400, default 90). */
+    daysBack?: number;
+    /** false/absent = DRY RUN (report only); true = rewrite the days whose stored revenue differs. */
+    apply?: boolean;
   };
 };
 
@@ -424,6 +438,7 @@ export type AppEvent =
   | AccountingExpenseOcrProcessEvent
   | InstapayReceiptExtractEvent
   | InsightsRollupRequestedEvent
+  | InsightsFunnelBackfillRequestedEvent
   | PaymentWebhookReceivedEvent
   | ShipmentCreateRequestedEvent
   | BulkAiBalanceDescriptionsEvent
@@ -471,5 +486,13 @@ export interface JobClient {
 
 export const inngest: JobClient = {
   createFunction: (options, handler) => registerJob(options, handler as unknown as JobHandler),
-  send: payload => dispatchEvents(payload),
+  send: payload => {
+    const started = dispatchEvents(payload);
+    // On a Worker a promise nobody awaits is cancelled with the response. ~20 call sites send
+    // `inngest.send(..).catch(log)` without awaiting (COD "Mark paid" -> the accounting journal, status fan-outs,
+    // order/delivered): production lost the mark-paid event, so the sale never reached the GL (Amelia, 2026-11-23).
+    // Keep the start alive past the response; the caller still gets the same promise to await or `.catch`.
+    cfWaitUntil(started);
+    return started;
+  },
 };

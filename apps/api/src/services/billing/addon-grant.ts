@@ -94,7 +94,11 @@ export async function appendRenewalMarker(
   });
 }
 
-/** Running terms: succeeded, not refunded, `forPeriodEnd` still ahead. */
+/**
+ * Running terms: succeeded, not refunded, `forPeriodEnd` still ahead AND the term has started. A term bought while
+ * another runs is chained to start at the predecessor's end (`[end - ADDON_TERM_DAYS, end]`); counting it before that
+ * would give an additive AI pack 30 free days (B5).
+ */
 export async function activeAddons(tx: Tx, storeId: string, now: Date): Promise<ActiveAddon[]> {
   const rows = await tx.billingEvent.findMany({
     where: {
@@ -115,6 +119,7 @@ export async function activeAddons(tx: Tx, storeId: string, now: Date): Promise<
   for (const r of rows) {
     const sku = skuOfPlanCode(r.planCode);
     if (!sku || !r.forPeriodEnd) continue;
+    if (addDays(r.forPeriodEnd, -ADDON_TERM_DAYS) > now) continue; // chained term, not started yet
     out.push({
       eventId: r.id,
       sku,
@@ -246,7 +251,9 @@ async function grantTerm(
   let predId = latest?.id ?? 'none';
   let predEnd = latest?.forPeriodEnd ?? null;
   let gen = 0;
-  for (let i = 0; i < CHAIN_TRIES; i++) {
+  // Only a LOST slot spends a try. A dead-anchor skip (`gen++`) never does: it is bounded by the number of dead markers
+  // under this predecessor, and counting it would strand every later purchase after CHAIN_TRIES dead payments (B4).
+  for (let tries = 0; tries < CHAIN_TRIES; ) {
     const start = predEnd && predEnd.getTime() > now.getTime() ? predEnd : now;
     const end = addDays(start, ADDON_TERM_DAYS);
     // `gen` > 0 only after the slot was held by a REFUNDED payment (a dead anchor, see below).
@@ -265,7 +272,10 @@ async function grantTerm(
       where: { storeId: row.storeId, idempotencyKey: key },
       select: { relatedEventId: true, forPeriodEnd: true },
     });
-    if (!held?.forPeriodEnd || !held.relatedEventId) continue;
+    if (!held?.forPeriodEnd || !held.relatedEventId) {
+      tries++;
+      continue;
+    }
     if (held.relatedEventId === row.id) return setEnd(held.forPeriodEnd); // already granted by another settle
     // A REFUNDED payment must not anchor the chain (ADDON-CHAIN-2): its slot is dead, so take the next slot under the
     // same predecessor instead of starting after the refunded term's end (that would leave a gap). Only `refunded` is
@@ -277,8 +287,9 @@ async function grantTerm(
     });
     if (isDeadAnchor(heldPayment, now)) {
       gen++;
-      continue;
+      continue; // dead anchor: does not spend a try
     }
+    tries++;
     predId = held.relatedEventId;
     predEnd = held.forPeriodEnd;
   }
@@ -291,6 +302,49 @@ async function grantTerm(
   throw new Error(
     'ADDON_GRANT_CHAIN_CONTENDED: could not place the term, the settlement will be retried'
   );
+}
+
+/**
+ * A term that was queued behind another term of the same SKU (`start = predecessor.end`) must not keep waiting for a
+ * predecessor that is gone. After a refund, walk the sku's live terms in end order and pull every NOT-YET-STARTED one
+ * forward to start at max(now, the previous live term's end), keeping its full ADDON_TERM_DAYS (F1). A term only ever
+ * moves earlier (the update is guarded by `forPeriodEnd > newEnd`), so a replay or a race is a no-op and a started term
+ * is never touched.
+ */
+export async function replaceQueuedTerms(
+  tx: Tx,
+  storeId: string,
+  sku: string,
+  now: Date
+): Promise<void> {
+  const rows = await tx.billingEvent.findMany({
+    where: {
+      storeId,
+      type: 'upgrade',
+      status: 'succeeded',
+      planCode: `${ADDON_PLAN_PREFIX}${sku}`,
+      forPeriodEnd: { gt: now },
+    },
+    orderBy: { forPeriodEnd: 'asc' },
+    select: { id: true, forPeriodEnd: true },
+  });
+  let prevEnd: Date | null = null;
+  for (const r of [...rows].sort((a, b) => a.forPeriodEnd!.getTime() - b.forPeriodEnd!.getTime())) {
+    const end = r.forPeriodEnd!;
+    if (addDays(end, -ADDON_TERM_DAYS) <= now) {
+      prevEnd = end; // already running: untouched
+      continue;
+    }
+    const start: Date = prevEnd && prevEnd > now ? prevEnd : now;
+    const newEnd = addDays(start, ADDON_TERM_DAYS);
+    if (newEnd < end) {
+      await tx.billingEvent.updateMany({
+        where: { id: r.id, storeId, forPeriodEnd: { gt: newEnd } },
+        data: { forPeriodEnd: newEnd },
+      });
+      prevEnd = newEnd;
+    } else prevEnd = end;
+  }
 }
 
 export async function applyAddonGrant(

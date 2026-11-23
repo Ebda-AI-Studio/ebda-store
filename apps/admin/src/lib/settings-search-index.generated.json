@@ -653,7 +653,7 @@
     "kind": "page",
     "route": "/ai-tools",
     "access": "staff",
-    "en": "AI Tools",
+    "en": "AI tools",
     "ar": "أدوات الذكاء الاصطناعي",
     "synEn": "ai gemini translate seo autofill bulk",
     "synAr": "ذكاء اصطناعي ترجمة تعبئة تلقائية",
@@ -753,6 +753,17 @@
     "synEn": "facebook tiktok snapchat google ads tracking pixel",
     "synAr": "فيسبوك تيك توك سناب بكسل تتبع اعلانات",
     "feature": "marketing_pixels"
+  },
+  {
+    "id": "page:/product-feeds",
+    "kind": "page",
+    "route": "/product-feeds",
+    "access": "staff",
+    "en": "Product feeds",
+    "ar": "خلاصات المنتجات",
+    "synEn": "google merchant center shopping meta commerce manager facebook instagram tiktok catalog catalogue feed xml csv",
+    "synAr": "جوجل ميرتشنت شوبينج ميتا فيسبوك انستجرام تيك توك كتالوج خلاصة منتجات",
+    "feature": "product_feeds"
   },
   {
     "id": "page:/affiliates",
@@ -1309,6 +1320,18 @@
     "ar": "معدلات الضريبة",
     "synEn": "vat rate 14% add tax rate percentage",
     "synAr": "معدل الضريبة نسبة 14 اضافة ضريبة",
+    "pageEn": "Tax & VAT",
+    "pageAr": "الضريبة"
+  },
+  {
+    "id": "tax.change-request",
+    "kind": "setting",
+    "route": "/tax",
+    "access": "owner",
+    "en": "Change your VAT registration details",
+    "ar": "غيّر بيانات التسجيل الضريبي",
+    "synEn": "change tax number legal name vat registration verified update trn",
+    "synAr": "تغيير الرقم الضريبي الاسم القانوني التسجيل الضريبي تحديث",
     "pageEn": "Tax & VAT",
     "pageAr": "الضريبة"
   },

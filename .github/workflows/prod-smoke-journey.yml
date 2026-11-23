@@ -22,8 +22,8 @@ concurrency:
 
 jobs:
   journey:
-    # The repo-wide runner switch (CI-UMBRA-1); unset = GitHub-hosted ubuntu-24.04, which this journey wants.
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    # The repo-wide runner switch; unset = the Mac label (never a hosted runner, Ahmad 2026-11-16). The journey probes production over the public internet from the Mac.
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -31,13 +31,14 @@ jobs:
         with:
           node-version: '22'
       - name: Install Playwright only (no workspace install)
+        timeout-minutes: 10
         run: |
           v=$(node -p "require('./package.json').devDependencies['@playwright/test']")
           # RUNNER_TEMP, not /tmp: two runners share the Mac host (Ruling CI-MAC-RUNNER-1).
           PW="$RUNNER_TEMP/pw"
           mkdir -p "$PW" && cd "$PW" && npm init -y >/dev/null && npm i --no-audit --no-fund "@playwright/test@${v}"
           # macOS uses the runner's local browser cache (no apt); Linux pulls the system deps.
-          if [ "$(uname -s)" = Darwin ]; then npx playwright install chromium; else npx playwright install --with-deps chromium; fi
+          bash scripts/ci/install-chromium.sh
           # Resolve @playwright/test from the repo root without installing the whole workspace.
           ln -s "$PW/node_modules" "$GITHUB_WORKSPACE/node_modules"
           echo "PW_DIR=$PW" >> "$GITHUB_ENV"

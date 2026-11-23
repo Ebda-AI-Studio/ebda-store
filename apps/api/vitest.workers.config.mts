@@ -17,6 +17,7 @@ const apiVars = {
   NODE_ENV: 'development',
   JWT_SECRET: 'workers-test-jwt-secret-0123456789abcdef',
   SUITE_BUYER_KEY_SECRET: 'workers-test-suite-buyer-key-secret-0123456789',
+  ORDER_STATUS_LINK_SECRET: 'workers-test-order-status-link-secret-0123456789',
   ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000',
   TAP_API_KEY: 'k',
   TAP_SECRET_KEY: 's',
@@ -287,6 +288,9 @@ export default defineConfig(async () => {
       // The test worker bundles workspace packages from source (as wrangler.jsonc's alias block does for the API
       // Worker); without it `@ebda/shared` resolves to ./dist/index.js, which exists only after a build.
       alias: [
+        { find: '@ebda/shared/observe', replacement: here('../../packages/shared/src/observe-kit.ts') },
+        { find: '@ebda/shared/wa-v1', replacement: here('../../packages/shared/src/foundation/contracts/wa-v1.ts') },
+        { find: '@ebda/shared/request-guard', replacement: here('../../packages/shared/src/foundation/request-guard.ts') },
         { find: '@ebda/shared', replacement: here('../../packages/shared/src/index.ts') },
         // the same swap as wrangler.jsonc's alias block: the SDK's DOM-free XML parser (a Worker has no DOMParser).
         // Exact match only: the stub itself imports @aws-sdk/xml-builder/dist-es/* subpaths.

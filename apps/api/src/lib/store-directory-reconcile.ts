@@ -16,7 +16,7 @@
  *       re-opened by a repair), record it as `keptRestrictive` and alert for a human to rule on
  * Every correction and every kept-restrictive case is logged and alerted.
  *
- * NEON-ZERO (Ruling NZ-C-10): with no Postgres (no Hyperdrive binding, or the directory read fails) the Postgres side is SKIPPED, never
+ * NEON-ZERO (Ruling NZ-C-10): with no Postgres (no Postgres binding, or the directory read fails) the Postgres side is SKIPPED, never
  * thrown: the tick reconciles D1 against each `do` store's own StoreDO instead (slug and status of the DO record vs the D1 row). The
  * same restrictive rule applies: a DO that is stricter than D1 closes the D1 row (status only), anything else is alert-only. A DO
  * that cannot be read is alert-only. The report says `postgresSkipped`. Cost if wrong: a Postgres outage silences the Postgres
@@ -45,6 +45,7 @@ interface D1Row {
   name_ar: string | null;
   template: string | null;
   look: string | null;
+  billing_suspended_reason?: string | null;
 }
 interface D1Like {
   prepare(sql: string): {
@@ -101,13 +102,25 @@ type DoRecord = (id: string) => Promise<{
   nameAr?: string | null;
   template?: string | null;
   look?: string | null;
+  /** Entitlement copies (Ruling B1-PLAN-SOT-1): D1 is the authority, a stale DO copy is re-pushed. Absent = not compared. */
+  plan?: string;
+  billingSuspendedReason?: string | null;
 } | null>;
 const readDoRecord: DoRecord = async id => {
   const r = await (
     await storeDb(id)
   ).store.findUnique({
     where: { id },
-    select: { slug: true, status: true, name: true, nameAr: true, template: true, look: true },
+    select: {
+      slug: true,
+      status: true,
+      name: true,
+      nameAr: true,
+      template: true,
+      look: true,
+      plan: true,
+      billingSuspendedReason: true,
+    },
   });
   return r
     ? {
@@ -117,6 +130,8 @@ const readDoRecord: DoRecord = async id => {
         nameAr: r.nameAr ?? null,
         template: r.template ? String(r.template) : null,
         look: r.look ?? null,
+        plan: String(r.plan),
+        billingSuspendedReason: r.billingSuspendedReason ?? null,
       }
     : null;
 };
@@ -128,10 +143,20 @@ const readDoRecord: DoRecord = async id => {
  */
 type MirrorRepair = (id: string, fields: Record<string, unknown>) => Promise<void>;
 function mirrorDrift(
-  row: Pick<D1Row, 'name' | 'name_ar' | 'template' | 'look'>,
+  row: Pick<D1Row, 'name' | 'name_ar' | 'template' | 'look' | 'plan' | 'billing_suspended_reason'>,
   rec: NonNullable<Awaited<ReturnType<DoRecord>>>
 ): Record<string, string | null> {
   const drift: Record<string, string | null> = {};
+  // Ruling B1-PLAN-SOT-1: the plan tier and the billing suspension are ENTITLEMENT copies (NEVER-stale). A missed
+  // `syncStoreEntitlement` left ameliaaurum's DO on `professional` while D1 (and its Business subscription) said enterprise;
+  // nothing re-pushed it. D1 wins, both directions (a stale higher copy would fail open, a stale lower one locks paid features).
+  if (rec.plan !== undefined && row.plan && rec.plan !== row.plan) drift.plan = row.plan;
+  if (
+    rec.billingSuspendedReason !== undefined &&
+    row.billing_suspended_reason !== undefined &&
+    (rec.billingSuspendedReason ?? null) !== (row.billing_suspended_reason ?? null)
+  )
+    drift.billingSuspendedReason = row.billing_suspended_reason ?? null;
   if (rec.name !== undefined && rec.name !== row.name) drift.name = row.name;
   if (rec.nameAr !== undefined && (rec.nameAr ?? null) !== (row.name_ar ?? null))
     drift.nameAr = row.name_ar ?? null;
@@ -141,6 +166,36 @@ function mirrorDrift(
     drift.look = row.look ?? null;
   return drift;
 }
+
+/**
+ * The default DO mirror repair: push D1's values to the DO, then, when an ENTITLEMENT copy moved (plan, billing suspension),
+ * drop the cached feature map + public store payloads at once (NEVER-stale class, Ruling B1-PLAN-SOT-1): a repaired plan
+ * must not wait out the feature cache TTL.
+ */
+// pq-allow(unused-export): test seam, imported by tests/unit/store-mirror-repair-invalidates.test.ts
+export const repairDoMirror: MirrorRepair = async (id, fields) => {
+  await copyStoreSettings(id, fields);
+  if (!('plan' in fields || 'billingSuspendedReason' in fields)) return;
+  const invalidate = async () => {
+    const { featureService } = await import('../services/feature.service.js');
+    await featureService.invalidateCache(id); // feature cache first, then the public payloads (issue 2172's order)
+    const { bustStoreCachesById } = await import('../services/store.service.js');
+    await bustStoreCachesById(id);
+  };
+  // The copy already landed, so the next tick sees no drift: a failed invalidation would leave a stale entitlement in the
+  // cache until its TTL with nothing raised. Retry once, then throw: the reconciler reports it (P1 alert-only row).
+  try {
+    await invalidate();
+  } catch {
+    try {
+      await invalidate();
+    } catch (err) {
+      throw new Error(
+        `DO copy re-pushed but the entitlement caches could not be cleared (2 tries): ${(err as Error).message}`
+      );
+    }
+  }
+};
 
 /** D1 vs each live `do` store's own DO (the only reconciliation possible without Postgres). */
 async function reconcileDoSide(
@@ -178,10 +233,15 @@ async function reconcileDoSide(
         const freshRec = await doRecord(row.id);
         const { results: fresh } = await d1
           .prepare(
-            'SELECT name, name_ar, template, look FROM stores WHERE id = ? AND deleted_at IS NULL'
+            'SELECT name, name_ar, template, look, plan, billing_suspended_reason FROM stores WHERE id = ? AND deleted_at IS NULL'
           )
           .bind(row.id)
-          .all<Pick<D1Row, 'name' | 'name_ar' | 'template' | 'look'>>();
+          .all<
+            Pick<
+              D1Row,
+              'name' | 'name_ar' | 'template' | 'look' | 'plan' | 'billing_suspended_reason'
+            >
+          >();
         drift = fresh?.[0] && freshRec ? mirrorDrift(fresh[0], freshRec) : {};
         if (Object.keys(drift).length > 0) {
           await repair(row.id, drift);
@@ -235,7 +295,7 @@ export async function reconcileStoreDirectory(
     alert?: (title: string, body: string) => Promise<unknown> | unknown;
     /** Test seam: one `do` store's StoreDO record (slug, status, mirror columns). */
     doRecord?: DoRecord;
-    /** Test seam: push D1's mirror values to the store's DO (default: `copyStoreSettings`). */
+    /** Test seam: push D1's mirror values to the store's DO (default: `repairDoMirror`). */
     repairMirror?: MirrorRepair;
   } = {}
 ): Promise<ReconcileReport> {
@@ -277,7 +337,7 @@ export async function reconcileStoreDirectory(
   };
   const pgLive = deps.pgLive ?? (async () => storeDirectory(undefined, { postgresOnly: true }));
   const d1Select = `SELECT id, slug, status, plan, lower(domain) AS domain, lower(pending_domain) AS pending_domain, (domain IS NOT NULL) AS has_domain, (pending_domain IS NOT NULL) AS has_pending_domain,
-              (deleted_at IS NOT NULL) AS deleted, storage_backend AS backend, name, name_ar, template, look FROM stores`;
+              (deleted_at IS NOT NULL) AS deleted, storage_backend AS backend, name, name_ar, template, look, billing_suspended_reason FROM stores`;
   let all: Awaited<ReturnType<typeof pgAll>>;
   let live: Awaited<ReturnType<typeof pgLive>>;
   try {
@@ -301,7 +361,7 @@ export async function reconcileStoreDirectory(
       d1Rows ?? [],
       report,
       deps.doRecord ?? readDoRecord,
-      deps.repairMirror ?? copyStoreSettings
+      deps.repairMirror ?? repairDoMirror
     );
     await finish(report, alert);
     return report;
@@ -375,7 +435,7 @@ export async function reconcileStoreDirectory(
     [...d1ById.values()].filter(r => r.backend === 'do'),
     report,
     deps.doRecord ?? readDoRecord,
-    deps.repairMirror ?? copyStoreSettings,
+    deps.repairMirror ?? repairDoMirror,
     true
   );
   await finish(report, alert);

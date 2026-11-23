@@ -3,6 +3,7 @@
 import { focusFirstError } from '@/lib/focus-first-error';
 import { signedText } from '@/lib/bidi';
 import { randomUuid } from '@/lib/uuid';
+import { checkoutDeliveryEta } from '@/lib/delivery-estimate';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import dynamic from 'next/dynamic';
@@ -15,6 +16,8 @@ import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
+import { useAutoPromotionPreview } from '../../hooks/useAutoPromotionPreview';
+import { primaryDiscount as primaryDiscountOf } from '../../lib/auto-promotion';
 import {
   buildQuoteRequest,
   quoteKey,
@@ -51,6 +54,7 @@ import {
   daysAheadSchema,
   deliveryDateChoices,
   checkDeliveryPick,
+  catalogueItemId,
   fromMinor,
   REGION,
   isValidEgyptianMobile,
@@ -337,7 +341,9 @@ export default function CheckoutClient() {
     pixelFiredRef.current = true;
     trackInitiateCheckout({
       contentIds: [
-        ...cartContextItems.map(item => item.productId),
+        ...cartContextItems.map(item =>
+          catalogueItemId({ productId: item.productId, variantId: item.variantId })
+        ),
         ...cartContextBundles.map(b => b.bundleId),
       ],
       numItems:
@@ -431,7 +437,7 @@ export default function CheckoutClient() {
   // apply, and the customer was charged more than this page showed.
   // Identical to `cart.subtotal` for a cart with no bundle.
   const couponBasis = useMemo(() => couponQuoteBasis(cartContextItems), [cartContextItems]);
-  const [, setShippingZones] = useState<ShippingZone[]>([]);
+  const [shippingZones, setShippingZones] = useState<ShippingZone[]>([]);
   const [paymentProviders, setPaymentProviders] = useState<PaymentProvider[]>([]);
   // A FAILED payment-config load must not masquerade as "no payment methods
   // configured" (a transient network error is not a merchant misconfiguration).
@@ -586,6 +592,21 @@ export default function CheckoutClient() {
       : undefined,
     governorate: formData.governorate ? { en: formData.governorate, ar: reviewGov?.ar } : undefined,
   };
+
+  // CK2: the delivery option states its ETA when the store configured one (zone days, else store-wide).
+  const deliveryEta = checkoutDeliveryEta(
+    {
+      zones: shippingZones,
+      address: {
+        area: formData.area,
+        areaAr: reviewPlaceNames.area?.ar,
+        governorate: formData.governorate,
+        governorateAr: reviewPlaceNames.governorate?.ar,
+      },
+      storeDeliveryDays: (store?.settings as Record<string, unknown> | undefined)?.deliveryDays,
+    },
+    language === 'ar' ? 'ar' : 'en'
+  );
 
   const checkoutStorageKey = store?.id ? `force-checkout-form-${store.id}` : null;
   const promoStorageKey = store?.id ? `force-promo-${store.id}` : null;
@@ -1217,40 +1238,12 @@ export default function CheckoutClient() {
     };
   }, [isAuthenticated, store?.id]);
 
-  // Automatic promotion preview (no code required). Server-resolved from
-  // the cart's product ids + the shopper's typed phone/email — the
-  // storefront cart never carries category ids, so this can't be computed
-  // client-side (mirrors couponDiscount's shape: { id, discount } | null).
-  const [promotion, setPromotion] = useState<{ id: string; discount: number } | null>(null);
-  // Tracks the last signature we actually sent, so an unrelated re-render
-  // with the same items/phone/email doesn't refire the request.
-  const promotionSignatureRef = useRef<string>('');
-  useEffect(() => {
-    if (!store?.id || !cart || cart.items.length === 0) {
-      setPromotion(null);
-      promotionSignatureRef.current = '';
-      return;
-    }
-    const items = cart.items.map(item => ({ productId: item.productId, quantity: item.quantity }));
-    const phone = formData.phone.trim() || undefined;
-    const email = formData.email.trim() || undefined;
-    const signature = JSON.stringify({ storeId: store.id, items, phone, email });
-    if (signature === promotionSignatureRef.current) return;
-
-    // Debounce so typing a phone/email doesn't fire a request per keystroke
-    // (the endpoint is also rate-limited at 20/min/IP).
-    const timeoutId = setTimeout(() => {
-      promotionSignatureRef.current = signature;
-      api
-        .post<{ promotion: { id: string; discount: number } | null }>(
-          `/stores/public/${store.id}/promotions/preview`,
-          { items, phone, email }
-        )
-        .then(result => setPromotion(result.success ? (result.data?.promotion ?? null) : null))
-        .catch(() => setPromotion(null));
-    }, 400);
-    return () => clearTimeout(timeoutId);
-  }, [store?.id, cart, formData.phone, formData.email]);
+  // Automatic promotion preview (no code required): server-resolved, shared with the cart and PDP.
+  const promotion = useAutoPromotionPreview(
+    store?.id,
+    cart?.items.map(item => ({ productId: item.productId, quantity: item.quantity })) ?? [],
+    { phone: formData.phone.trim() || undefined, email: formData.email.trim() || undefined }
+  );
 
   // Calculate totals
   const subtotal = cart?.subtotal || 0;
@@ -1264,8 +1257,8 @@ export default function CheckoutClient() {
   // promotion wins ties), so we never show a promotion line for a discount
   // that wouldn't actually be the one applied.
   const promotionDiscount = promotion?.discount ?? 0;
-  const primaryDiscount = Math.max(couponDiscount, promotionDiscount);
-  const promotionAppliedDiscount = promotionDiscount >= couponDiscount ? promotionDiscount : 0;
+  const { discount: primaryDiscount, promotionApplied: promotionAppliedDiscount } =
+    primaryDiscountOf(couponDiscount, promotionDiscount);
 
   // Loyalty discount estimate — the server's computeRedemption, mirrored in
   // estimateLoyaltyRedemption so the summary matches what the API will apply:
@@ -1733,8 +1726,8 @@ export default function CheckoutClient() {
         orderId: order.id,
         provider: selectedProviderId,
         ...(selectedMethod ? { method: selectedMethod } : {}),
-        successUrl: `/checkout/success?orderId=${order.id}`,
-        errorUrl: `/checkout/error?orderId=${order.id}`,
+        successUrl: storeUrl(`/checkout/success?orderId=${order.id}`),
+        errorUrl: storeUrl(`/checkout/error?orderId=${order.id}`),
       });
 
       // Success clears the saved checkout form and promo code before leaving
@@ -2623,27 +2616,40 @@ export default function CheckoutClient() {
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-foreground">
-                              {t(
-                                'Standard delivery',
-                                '\u062a\u0648\u0635\u064a\u0644 \u0639\u0627\u062f\u064a'
-                              )}
-                            </span>
-                            <span className="text-sm font-medium text-foreground">
-                              {shippingToConfirm
-                                ? t('Delivery fee is set by the store', 'التوصيل بيتحدد مع المتجر')
-                                : freeShipping
-                                  ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
-                                  : shippingCost > 0
-                                    ? formatPrice(shippingCost)
-                                    : rateByArea.has(formData.area)
-                                      ? formatPrice(rateByArea.get(formData.area)!.deliveryFee)
-                                      : !storeHasAreaRates
-                                        ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
-                                        : t('Calculating...', 'بنحسب...')}
-                            </span>
-                          </div>
+                          <>
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-foreground">
+                                {t(
+                                  'Standard delivery',
+                                  '\u062a\u0648\u0635\u064a\u0644 \u0639\u0627\u062f\u064a'
+                                )}
+                              </span>
+                              <span className="text-sm font-medium text-foreground">
+                                {shippingToConfirm
+                                  ? t(
+                                      'Delivery fee is set by the store',
+                                      'التوصيل بيتحدد مع المتجر'
+                                    )
+                                  : freeShipping
+                                    ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
+                                    : shippingCost > 0
+                                      ? formatPrice(shippingCost)
+                                      : rateByArea.has(formData.area)
+                                        ? formatPrice(rateByArea.get(formData.area)!.deliveryFee)
+                                        : !storeHasAreaRates
+                                          ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
+                                          : t('Calculating...', 'بنحسب...')}
+                              </span>
+                            </div>
+                            {deliveryEta && (
+                              <p
+                                className="text-xs text-muted-foreground"
+                                data-testid="checkout-delivery-eta"
+                              >
+                                {deliveryEta}
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
 

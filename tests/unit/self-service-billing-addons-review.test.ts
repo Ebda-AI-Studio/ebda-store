@@ -76,10 +76,11 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('@api/lib/definer', () => ({ countAiUsage: vi.fn() }));
+// The AI pack capacity check (money-abuse audit P6) reads all three: base 450 + packs 0 + a 300 pack fits the 900 share.
 vi.mock('@api/lib/ai-quota', () => ({
-  storeAiAllowance: async () => ({ baseCap: 150 }),
+  storeAiAllowance: async () => ({ baseCap: 450, extra: 0, cap: 450, used: 0, remaining: 450 }),
   storeAiExtraRequests: async () => 0,
-  maxStoreDailyRequests: () => 5000,
+  maxStoreDailyRequests: () => 900,
   storeAiUsageByFeature: async () => [],
 }));
 vi.mock('@api/lib/money-idempotency', () => ({

@@ -10,12 +10,20 @@
 //     then enforced against DIR's baseline, not the PR's copy: the PR baseline may not contain an id DIR's lacks, no violation outside DIR's
 //     baseline is allowed, and none of the PR's eslint-suppressions.json may total more per rule than DIR's. DIR's .pr-quality.json also wins.
 //     A DIR with no baseline yet (the adoption PR) falls back to the plain check.
+//   --merge-base-root DIR  (CI; built by merge-base-tree.sh) a data tree of the ratchet files as of merge-base(base, PR head) plus `.mb-touched`, the
+//     files the PR changed since then. Rule for EVERY ratchet entry (slop id, eslint suppression entry, capability baseline id): the allowed value is the
+//     base TIP's. The ONE exception: an entry the PR leaves unchanged (same key, its source file NOT in `.mb-touched`) may keep its merge-base value, so
+//     a main that shrank after the PR branched does not fail it. Anything the PR touches is judged against the tip, so an OLD merge-base cannot
+//     resurrect an exemption on code the PR edits. merge-base-tree.sh refuses (no `.mb-touched` written => plain tip comparison) when the merge-base is
+//     more than 200 commits or 7 days behind the tip (MB_MAX_COMMITS / MB_MAX_DAYS).
 // Config (.pr-quality.json): { "roots": ["apps","packages"], "locales": ["apps/web/messages"], "baseline": ".pr-quality-baseline.json",
 //   "skip": ["generated"], "frameworkExports": ["extra names"], "ruleExemptions": [{ "rule": "unused-export", "path": "<foundation.lock.json dir>",
 //   "reason": "...", "requires": "<foundation.lock.json parity test>" }] }.  Ruling SLOP-VENDORED-1: the ONLY exemption that exists. It waives the
 //   `unused-export` rule (never another rule) for exactly the vendored foundation folder, and only while the lock proves every vendored file
 //   byte-matches the tagged release and its parity test exists. Any wider path, another rule or a failed proof = the exemption is OFF and the
 //   violations count again.   Inline escape on the same or previous line:  pq-allow(rule): reason
+//   duplicate-helper has its own narrow escape (Ruling SLOP-TWIN-1): `// pq-allow(duplicate-helper): twin of <path>` above BOTH copies, each pointing at the
+//   other; honoured only while the twin file exists, has the same function with an identical body, and points back.
 import { readFileSync, readdirSync, lstatSync, existsSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -80,16 +88,28 @@ function bodyAt(text, from) {
 }
 const normalise = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '').replace(/\s+/g, ' ').trim();
 
-function functions(text) {
+// Ruling SLOP-TWIN-1: `// pq-allow(duplicate-helper): twin of <path>` on the line directly above a function (or on its line).
+const TWIN = /pq-allow\(duplicate-helper\):\s*twin of\s+([^\s;,)]+)/;
+
+/** every function declaration: name, normalised-body hash + length, line count, and its twin annotation (path) when it has one */
+function allFunctions(text) {
   const out = [];
+  const lines = text.split('\n');
   const re = /(?:^|\n)\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*[<(]/g;
   for (let m; (m = re.exec(text)); ) {
     const body = bodyAt(text, m.index + m[0].length);
     if (!body) continue;
     const n = normalise(body);
-    if (n.length >= 160 && body.split('\n').length >= 5 && !FRAMEWORK.has(m[1])) out.push({ name: m[1], hash: h(n) });
+    const kw = m.index + m[0].indexOf('function');
+    const line = text.slice(0, kw).split('\n').length - 1;
+    const twin = TWIN.exec((lines[line - 1] ?? '') + '\n' + (lines[line] ?? ''))?.[1] ?? null;
+    out.push({ name: m[1], hash: h(n), len: n.length, nlines: body.split('\n').length, twin });
   }
   return out;
+}
+
+function functions(text) {
+  return allFunctions(text).filter((f) => f.len >= 160 && f.nlines >= 5 && !FRAMEWORK.has(f.name));
 }
 
 export function scan({ root, config = {} }) {
@@ -102,11 +122,27 @@ export function scan({ root, config = {} }) {
   const src = new Map(app.map((f) => [f, readFileSync(join(root, f), 'utf8')]));
   for (const [f, t] of src) lineRules(f, t, add);
 
+  // SLOP-TWIN-1: a deliberate byte-equal twin is accepted ONLY as a pair: (a) the named twin file exists, (b) it has the same
+  // function with an identical body, (c) it carries the matching annotation pointing back. Anything else still fails.
+  const all = new Map([...src].map(([f, t]) => [f, allFunctions(t)]));
+  const twinOk = (f, fn) => {
+    if (!fn.twin) return false;
+    const other = (all.get(fn.twin) ?? []).find((y) => y.name === fn.name);
+    return !!other && other.hash === fn.hash && other.twin === f;
+  };
+  for (const [f, fns] of all)
+    for (const fn of fns)
+      if (fn.twin && !twinOk(f, fn))
+        viol.set(`duplicate-helper|${f}|${fn.name}|twin-invalid`, `${f} duplicate-helper  ${fn.name} claims "twin of ${fn.twin}" but that file is missing, has no identical ${fn.name}, or does not point back`);
+
   const groups = new Map();
-  for (const [f, t] of src) for (const fn of functions(t)) groups.set(fn.hash, [...(groups.get(fn.hash) ?? []), { f, name: fn.name }]);
+  for (const [f, t] of src) for (const fn of functions(t)) groups.set(fn.hash, [...(groups.get(fn.hash) ?? []), { f, name: fn.name, fn }]);
   for (const [hash, g] of groups) {
     if (new Set(g.map((x) => x.f)).size < 2) continue;
-    for (const x of g) viol.set(`duplicate-helper|${x.f}|${x.name}|${hash}`, `${x.f} duplicate-helper  ${x.name} has the same body in ${g.filter((y) => y.f !== x.f).map((y) => y.f).join(', ')}`);
+    for (const x of g) {
+      if (twinOk(x.f, x.fn)) continue;
+      viol.set(`duplicate-helper|${x.f}|${x.name}|${hash}`, `${x.f} duplicate-helper  ${x.name} has the same body in ${g.filter((y) => y.f !== x.f).map((y) => y.f).join(', ')}`);
+    }
   }
 
   const idents = new Map();
@@ -143,6 +179,29 @@ export function scan({ root, config = {} }) {
   return viol;
 }
 
+/** the merge-base reference tree, or null when it is absent (no `.mb-touched` = disabled = tip comparison) */
+export function mergeBaseRef(dir) {
+  if (!dir || !existsSync(join(dir, '.mb-touched'))) return null;
+  const list = (f) => (existsSync(join(dir, f)) ? new Set(readFileSync(join(dir, f), 'utf8').split('\n').filter(Boolean)) : new Set());
+  // `.mb-paths` = every path in the merge-base tree; a missing list means no id can name a real file (fail closed: tip comparison)
+  return { dir, touched: list('.mb-touched'), paths: list('.mb-paths') };
+}
+/** the source file an id names (`rule|path|...`) ONLY when that path is a real file in the merge-base tree; otherwise null = no merge-base allowance
+ *  (route ids like `/dashboard`, dotted names like `analytics.dashboard` and ids with no path are judged against the base tip alone) */
+export const sourceOfId = (id, mb) => { const p = id.split('|')[1]; return p && mb.paths.has(p) ? p : null; };
+
+/** per ENTRY (`suppressions-file`, source key, rule) counts over every eslint-suppressions.json under root */
+export function eslintEntries(root, roots = ['apps', 'packages']) {
+  const rootFile = join(root, 'eslint-suppressions.json');
+  const names = [...(existsSync(rootFile) && lstatSync(rootFile).isFile() ? ['eslint-suppressions.json'] : []), ...walk(root, roots).filter((f) => f.endsWith('/eslint-suppressions.json'))];
+  const entries = new Map();
+  for (const f of names) {
+    const data = readJsonRegular(join(root, f));
+    for (const [src, rules] of Object.entries(data)) for (const [rule, v] of Object.entries(rules)) entries.set(JSON.stringify([f, src, rule]), { f, src, rule, n: v?.count ?? 0 });
+  }
+  return { entries, files: names.length };
+}
+
 /** sum of counts per `suppressions-file|rule` over every eslint-suppressions.json under root (a moved file keeps its total) */
 export function eslintTotals(root, roots = ['apps', 'packages']) {
   const rootFile = join(root, 'eslint-suppressions.json');
@@ -155,12 +214,27 @@ export function eslintTotals(root, roots = ['apps', 'packages']) {
   return { totals, files: names.length };
 }
 
-/** `file|rule` keys whose total grew over the base's. A base with no suppression files at all is the adoption PR: nothing to compare. */
-export function eslintGrowth(root, baseRoot, roots) {
-  const base = eslintTotals(baseRoot, roots);
+/** entries whose count exceeds the allowed one: the base TIP's, or (untouched source file, merge-base reference `mb`) the larger of tip and merge-base.
+ *  A base with no suppression files at all is the adoption PR: nothing to compare. Per ENTRY, never a per-file total: entries cannot be traded. */
+export function eslintGrowth(root, baseRoot, roots, mb = null) {
+  const base = eslintEntries(baseRoot, roots);
   if (base.files === 0) return [];
-  const cur = eslintTotals(root, roots);
-  return [...cur.totals].filter(([k, n]) => n > (base.totals.get(k) ?? 0)).map(([k, n]) => `${k} ${base.totals.get(k) ?? 0} -> ${n}`);
+  const cur = eslintEntries(root, roots);
+  const ref = mb ? eslintEntries(mb.dir, roots) : null;
+  const out = [];
+  for (const [k, e] of cur.entries) {
+    const tip = base.entries.get(k)?.n ?? 0;
+    let allowed = tip;
+    if (ref && ref.files > 0) {
+      const dir = e.f.includes('/') ? e.f.slice(0, e.f.lastIndexOf('/')) : '.';
+      const paths = [e.src, dir === '.' ? e.src : `${dir}/${e.src}`];
+      const real = paths.some((x) => mb.paths.has(x)); // the source must be a real file at the merge-base
+      const touched = paths.some((x) => mb.touched.has(x));
+      if (real && !touched) allowed = Math.max(tip, ref.entries.get(k)?.n ?? 0);
+    }
+    if (e.n > allowed) out.push(`${e.f}|${e.src}|${e.rule} ${tip} -> ${e.n}`);
+  }
+  return out;
 }
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
@@ -239,13 +313,19 @@ function main() {
   for (const id of added) { console.error(`slop-guard: NEW ${current.get(id)}`); bad++; }
   for (const id of stale) { console.error(`slop-guard: FIXED but still in the baseline: ${id}  (run: node ${relative(root, process.argv[1])} --update)`); bad++; }
   if (baseRoot) {
-    const bp = join(baseRoot, config.baseline ?? '.pr-quality-baseline.json');
+    const bpRel = config.baseline ?? '.pr-quality-baseline.json';
+    const bp = join(baseRoot, bpRel);
+    const mb = mergeBaseRef(arg('--merge-base-root', null));
+    const mbp = mb && join(mb.dir, bpRel);
+    const MB = new Set(mbp && existsSync(mbp) ? (readJsonRegular(mbp).ids ?? []).filter((id) => !waivedId(id)) : []);
+    // an id absent from the TIP is allowed only when the PR left it unchanged since the merge-base (in it, source file untouched)
+    const unchanged = (id) => { const src = mb && sourceOfId(id, mb); return MB.has(id) && !!src && !mb.touched.has(src); };
     if (existsSync(bp)) {
       const B = new Set((readJsonRegular(bp).ids ?? []).filter((id) => !waivedId(id)));
-      for (const id of baseline ?? []) if (!B.has(id)) { console.error(`slop-guard: the PR baseline holds an id the base branch's does not (it can only shrink): ${id}`); bad++; }
-      for (const id of current.keys()) if (!B.has(id)) { console.error(`slop-guard: NEW vs the base branch's baseline: ${current.get(id)}`); bad++; }
+      for (const id of baseline ?? []) if (!B.has(id) && !unchanged(id)) { console.error(`slop-guard: the PR baseline holds an id the base branch's does not (it can only shrink): ${id}`); bad++; }
+      for (const id of current.keys()) if (!B.has(id) && !unchanged(id)) { console.error(`slop-guard: NEW vs the base branch's baseline: ${current.get(id)}`); bad++; }
     }
-    for (const g of eslintGrowth(root, baseRoot, config.roots)) { console.error(`slop-guard: eslint suppressions grew vs the base branch (they can only shrink): ${g}`); bad++; }
+    for (const g of eslintGrowth(root, baseRoot, config.roots, mb)) { console.error(`slop-guard: eslint suppressions grew vs the base branch (they can only shrink): ${g}`); bad++; }
   }
   if (bad) {
     if (added.length) console.error('Fix the new violation, or justify it inline with  pq-allow(<rule>): <reason>');

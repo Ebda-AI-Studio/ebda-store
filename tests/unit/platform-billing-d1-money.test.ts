@@ -1,6 +1,7 @@
 /**
  * NEON-ZERO-1 N-10a money paths on the D1 branch: webhook claim, settle lease, manual payment batch, grants batch.
  */
+import { PLATFORM_MIGRATION_SQL } from '../helpers/platform-migrations';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -58,14 +59,7 @@ import {
   settleInTx,
 } from '../../apps/api/src/services/billing/subscription-billing.service';
 
-const MIG = ['0001_init.sql', '0002_invariants.sql']
-  .map(f =>
-    fs.readFileSync(
-      new URL(`../../packages/cf-schema/migrations/platform/${f}`, import.meta.url),
-      'utf8'
-    )
-  )
-  .join('\n');
+const MIG = PLATFORM_MIGRATION_SQL;
 
 const STORE = '11111111-1111-4111-8111-111111111111';
 const STORE2 = '22222222-2222-4222-8222-222222222222';
@@ -208,6 +202,47 @@ describe('webhook dedupe claim (a throw after the claim must not turn the retry 
     });
     db.prepare(`UPDATE billing_webhook_events SET received_at = ?`).run(Date.now() - 600_000);
     expect(await applyWebhookEvent('stub', hook())).toMatchObject({ outcome: 'processed' });
+  });
+});
+
+describe('BILLING-INTERVAL-PENDING-1: a settled card payment drops the InstaPay interval pick', () => {
+  const pendingOf = (db: DatabaseSync) =>
+    db
+      .prepare('SELECT billing_interval i, pending_billing_interval p FROM store_subscriptions')
+      .get() as {
+      i: string;
+      p: string | null;
+    };
+  it('a card renewal at the stored interval clears pending_billing_interval', async () => {
+    const db = rig();
+    const end = Date.now() + 86_400_000;
+    db.prepare(
+      `INSERT INTO store_subscriptions (id, store_id, plan_code, status, billing_interval, pending_billing_interval, current_period_start, current_period_end) VALUES ('s1', ?, 'basic', 'active', 'yearly', 'monthly', ?, ?)`
+    ).run(STORE, Date.now() - 364 * 86_400_000, end);
+    ledger(db, { type: 'renewal', billing_interval: 'yearly', for_period_end: end });
+    await settleInTx(
+      prisma as never,
+      EV,
+      { status: 'succeeded', providerRef: 'r' } as never,
+      new Date(),
+      []
+    );
+    expect(pendingOf(db)).toEqual({ i: 'yearly', p: null });
+  });
+  it('saving a card (card_setup) clears it: a card store renews at its stored interval', async () => {
+    const db = rig();
+    db.prepare(
+      `INSERT INTO store_subscriptions (id, store_id, plan_code, status, billing_interval, pending_billing_interval, current_period_start, current_period_end) VALUES ('s1', ?, 'basic', 'active', 'yearly', 'monthly', ?, ?)`
+    ).run(STORE, Date.now() - 1000, Date.now() + 86_400_000);
+    ledger(db, { type: 'card_setup', amount_minor: 0 });
+    await settleInTx(
+      prisma as never,
+      EV,
+      { status: 'succeeded', providerRef: 'r', cardToken: 'tok_1', cardLast4: '4242' } as never,
+      new Date(),
+      []
+    );
+    expect(pendingOf(db)).toEqual({ i: 'yearly', p: null });
   });
 });
 
@@ -535,6 +570,21 @@ describe('stuck leases and tier reconciliation', () => {
       data: { plan: 'professional' },
     });
     expect(vi.mocked(sendAlert).mock.calls[0][0]).toMatchObject({ level: 'p1' });
+  });
+
+  it('a CANCELED paid subscription is drift while stores.plan keeps the paid tier (#835: repaired to free)', async () => {
+    const db = rig();
+    // the prod qa-merchant-test shape: status canceled, plan_code growth, stores.plan professional
+    db.prepare(
+      `INSERT INTO store_subscriptions (id, store_id, plan_code, status) VALUES ('s1', ?, 'growth', 'canceled')`
+    ).run(STORE);
+    db.prepare(`UPDATE stores SET plan = 'professional' WHERE id = ?`).run(STORE);
+    expect(await planTierDriftD1(10)).toEqual([
+      { storeId: STORE, current: 'professional', tier: 'free' },
+    ]);
+    // and an already-free directory row of a canceled subscription is NOT drift
+    db.prepare(`UPDATE stores SET plan = 'free' WHERE id = ?`).run(STORE);
+    expect(await planTierDriftD1(10)).toEqual([]);
   });
 });
 

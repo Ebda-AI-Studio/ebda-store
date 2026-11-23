@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import { useToast } from '@ebda/ui';
+import { Modal, useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet } from '../../../../lib/api';
@@ -48,6 +48,9 @@ export default function ContentListPage() {
   const storeId = params?.id as string;
   const t = useT('content.list');
   const { error: toastError } = useToast();
+  const [newPageOpen, setNewPageOpen] = useState(false);
+  const [newSlug, setNewSlug] = useState('');
+  const [newSlugInvalid, setNewSlugInvalid] = useState(false);
 
   const [pages, setPages] = useState<StorePageRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,14 +73,21 @@ export default function ContentListPage() {
     fetchPages();
   }, [fetchPages]);
 
+  // In-app dialog, never window.prompt: a native prompt blocks the whole tab
+  // (and every automation driver) until answered, which read as a freeze.
   const handleNewPage = () => {
-    const raw = window.prompt(t('newPagePrompt'));
-    if (!raw) return;
-    const slug = raw.trim().toLowerCase();
+    setNewSlug('');
+    setNewSlugInvalid(false);
+    setNewPageOpen(true);
+  };
+
+  const submitNewPage = () => {
+    const slug = newSlug.trim().toLowerCase();
     if (!SLUG_REGEX.test(slug)) {
-      toastError(t('newPagePrompt'));
+      setNewSlugInvalid(true);
       return;
     }
+    setNewPageOpen(false);
     router.push(`/stores/${storeId}/content/${encodeURIComponent(slug)}`);
   };
 
@@ -96,6 +106,45 @@ export default function ContentListPage() {
         </Button>
       }
     >
+      <Modal
+        isOpen={newPageOpen}
+        onClose={() => setNewPageOpen(false)}
+        title={t('newPageTitle')}
+        size="md"
+      >
+        <form
+          onSubmit={e => {
+            e.preventDefault();
+            submitNewPage();
+          }}
+        >
+          <label className="block text-sm font-medium text-foreground">
+            {t('newPagePrompt')}
+            <input
+              value={newSlug}
+              onChange={e => {
+                setNewSlug(e.target.value);
+                setNewSlugInvalid(false);
+              }}
+              dir="ltr"
+              autoFocus
+              aria-invalid={newSlugInvalid}
+              className="mt-1 w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </label>
+          {newSlugInvalid && (
+            <p role="alert" className="mt-2 text-sm text-destructive-ink">
+              {t('newPageInvalid')}
+            </p>
+          )}
+          <div className="mt-6 flex justify-end gap-3">
+            <Button type="button" variant="outline" onClick={() => setNewPageOpen(false)}>
+              {t('newPageCancel')}
+            </Button>
+            <Button type="submit">{t('newPageConfirm')}</Button>
+          </div>
+        </form>
+      </Modal>
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
         <p className="mb-6 rounded-xl bg-muted/40 p-4 text-sm text-muted-foreground">
           {t('emptyHint')}{' '}

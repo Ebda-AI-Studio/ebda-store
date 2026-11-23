@@ -21,6 +21,7 @@ import {
   extraColumns,
   extraIndexes,
   extraModels,
+  latePrismaColumns,
 } from './cf-additions.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -51,6 +52,12 @@ export function build() {
   const addCols = m => {
     const c = clone(m);
     for (const col of extraColumns[m.name] ?? []) c.fields.push(clone(col));
+    for (const [fieldName, since] of Object.entries(latePrismaColumns[m.name] ?? {})) {
+      const field = c.fields.find(x => x.name === fieldName);
+      if (!field)
+        throw new Error(`latePrismaColumns: ${m.name}.${fieldName} is not in schema.prisma`);
+      field.cfSince = since;
+    }
     for (const [mn, cols] of extraIndexes)
       if (mn === m.name) c.indexes.push({ fields: cols.map(field => ({ field })), map: null });
     return c;
@@ -783,6 +790,8 @@ const ANALYTICS_STORE_TABLES = [
 const ANALYTICS_PLATFORM_TABLES = ['ai_usage'];
 // Ruling NZ-C-11: admin push devices (family ops), added after 0001 went live.
 const ONESIGNAL_PLATFORM_TABLES = ['onesignal_subscriptions'];
+// A13/A14/A16 trust requests, added after 0001 went live (a D1 that already ran 0001 never re-reads it).
+const TRUST_PLATFORM_TABLES = ['trust_requests'];
 const onlyTables = (db, names) => ({
   ...db,
   tables: db.tables.filter(t => names.includes(t.name)),
@@ -827,6 +836,10 @@ function main() {
     'migrations/platform/0006_onesignal_subscriptions.sql': emitSql(
       onlyTables(out.d1, ONESIGNAL_PLATFORM_TABLES),
       'D1 onesignal_subscriptions (Ruling NZ-C-11), for a D1 that already ran 0001'
+    ),
+    'migrations/platform/0012_trust_requests.sql': emitSql(
+      onlyTables(out.d1, TRUST_PLATFORM_TABLES),
+      'D1 trust_requests (A13/A14/A16), for a D1 that already ran 0001'
     ),
     ...Object.fromEntries(
       Object.entries(LATE_COLUMN_MIGRATIONS).map(([n, name]) => [

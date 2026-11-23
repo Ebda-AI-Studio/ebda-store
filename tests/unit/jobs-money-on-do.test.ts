@@ -5,6 +5,15 @@
  * apps/api/workers-do/jobs-money.test.ts; the DO ops themselves in packages/repo/test/do-job-ops.test.ts.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('@api/lib/store-operational', () => ({
+  STORE_NOT_OPERATIONAL: 'STORE_NOT_OPERATIONAL',
+  isStoreOperational: (s: unknown) => s === 'active',
+  storeOperational: async () => true,
+  storeMayMessageCustomers: async () => true,
+  assertStoreOperational: async () => undefined,
+  activeStoreIds: async () => ({ has: () => true }) as unknown as Set<string>,
+  requireOperationalStore: (_q: unknown, _r: unknown, next: () => void) => next(),
+}));
 import { readFileSync } from 'node:fs';
 
 const DO_STORE = '09b5dbd1-1774-49b5-b781-e06d0ee7b0fe';
@@ -22,6 +31,9 @@ const h = vi.hoisted(() => ({
     order: { findMany: vi.fn(), findUnique: vi.fn() },
     payment: { findMany: vi.fn() },
     paymentEvent: { findMany: vi.fn() },
+    // the sale posting looks for pre-sale refunds to replay (replayPreSaleRefunds): none here
+    journalEntry: { findFirst: vi.fn() },
+    orderEvent: { findMany: vi.fn() },
     storeWhatsAppLink: { findUnique: vi.fn() },
     storeWhatsAppConsent: { findMany: vi.fn() },
     warehouse: { findFirst: vi.fn() },

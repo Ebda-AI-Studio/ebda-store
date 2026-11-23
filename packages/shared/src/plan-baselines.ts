@@ -22,6 +22,7 @@ import { LOCKED_PUBLIC_PLANS, STORE_PLAN_TO_PLAN_CODE } from './schemas/plan-lim
 // alongside PLAN_BASELINE in one line.
 export type { StorePlan };
 
+// pq-allow(unused-export): test seam, imported by plan-baselines, b2b-plan-gate, ai-plan-eligibility, product-3d and plan-limits tests
 export const STORE_PLANS: readonly StorePlan[] = [
   'free',
   'starter',
@@ -70,6 +71,8 @@ const STARTER_CORE: FeatureKey[] = [
   // from the platform, not from gating the differentiator. Restrict a specific
   // client via a StoreFeature override, as with `staff_accounts`.
   'agent_feed',
+  // Product feeds (2026-11-14, Ruling FEEDS-1): same gate as agent_feed / marketing_pixels - every paid plan, off on free.
+  'product_feeds',
   'agent_checkout',
   // Answer-Engine Insights (Task 1, 2026-07-22): same AI-first rationale as
   // agent_feed above — default-ON for every paid plan, off on free.
@@ -244,6 +247,7 @@ export function isInBaseline(plan: StorePlan, key: FeatureKey): boolean {
  * they show up in proposals, contracts, and the merchant-facing
  * "Current plan: X" badge.
  */
+// pq-allow(unused-export): test seam, imported by tests/__tests__/plan-baselines.test.ts (the admin feature matrix now reads the plan name from billing)
 export const PLAN_LABELS: Record<StorePlan, { en: string; ar: string }> = {
   free: { en: 'Free', ar: 'مجاني' },
   starter: { en: 'Starter', ar: 'المبدئية' },

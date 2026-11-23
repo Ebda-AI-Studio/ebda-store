@@ -7,7 +7,7 @@ import { toCsv } from '@/lib/csv';
 import { useT } from '@/i18n/useT';
 import { DataTable } from '@/components/mobile/DataTable';
 import { apiGet, apiFetch } from '@/lib/api';
-import { minorToMajor } from '@/lib/format';
+import { minorToMajor, formatPrice } from '@/lib/format';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
 import { resolveStoreTimeZone, zonedIsoDay, zonedMonthStartDay } from '@ebda/shared';
@@ -15,16 +15,14 @@ import { resolveStoreTimeZone, zonedIsoDay, zonedMonthStartDay } from '@ebda/sha
 import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type TabKey = 'trialBalance' | 'pnl' | 'balanceSheet' | 'taxReport';
+import {
+  toTrialBalanceRows,
+  sumTrialBalance,
+  type ApiTrialBalanceRow,
+  type TrialBalanceRow,
+} from './trial-balance';
 
-interface TrialBalanceRow {
-  code: string;
-  nameEn: string;
-  nameAr: string | null;
-  debit: number;
-  credit: number;
-  balance: number;
-}
+type TabKey = 'trialBalance' | 'pnl' | 'balanceSheet' | 'taxReport';
 
 interface PnlSection {
   accounts: { code: string; nameEn: string; balance: number }[];
@@ -148,7 +146,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
     const isLatest = beginRequest();
     setLoading(true);
     setError(null);
-    apiGet<TrialBalanceRow[]>(
+    apiGet<ApiTrialBalanceRow[]>(
       `/api/v1/stores/${storeId}/finance/reports/trial-balance?asOf=${asOf}`
     )
       .then(({ data, error: apiError }) => {
@@ -157,7 +155,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
           // Never leave the previous period's figures on screen under an error.
           setRows(null);
           setError(apiError.message);
-        } else setRows(data ?? []);
+        } else setRows(toTrialBalanceRows(data ?? []));
       })
       .catch(() => {
         if (!isLatest()) return;
@@ -173,10 +171,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
     fetch();
   }, [fetch]);
 
-  const totals = (rows ?? []).reduce(
-    (acc, r) => ({ debit: acc.debit + r.debit, credit: acc.credit + r.credit }),
-    { debit: 0, credit: 0 }
-  );
+  const totals = sumTrialBalance(rows ?? []);
   const balanced = rows && rows.length > 0 && totals.debit === totals.credit;
 
   function exportCsv() {
@@ -425,9 +420,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                         {a.code}
                       </td>
                       <td className="px-3 py-2">{a.nameEn}</td>
-                      <td className="px-3 py-2 text-end font-mono">
-                        {major(a.balance)} {tc('egp')}
-                      </td>
+                      <td className="px-3 py-2 text-end font-mono">{formatPrice(a.balance)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -437,7 +430,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                       {tp('totalRevenue')}
                     </td>
                     <td className="px-3 py-2 text-end font-mono font-semibold text-green-700">
-                      {major(data.revenue.total)} {tc('egp')}
+                      {formatPrice(data.revenue.total)}
                     </td>
                   </tr>
                 </tfoot>
@@ -457,9 +450,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                         {a.code}
                       </td>
                       <td className="px-3 py-2">{a.nameEn}</td>
-                      <td className="px-3 py-2 text-end font-mono">
-                        {major(a.balance)} {tc('egp')}
-                      </td>
+                      <td className="px-3 py-2 text-end font-mono">{formatPrice(a.balance)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -469,7 +460,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                       {tp('totalExpenses')}
                     </td>
                     <td className="px-3 py-2 text-end font-mono font-semibold text-red-600">
-                      {major(data.expenses.total)} {tc('egp')}
+                      {formatPrice(data.expenses.total)}
                     </td>
                   </tr>
                 </tfoot>
@@ -486,7 +477,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
               }`}
             >
               {data.netIncome < 0 ? '−' : ''}
-              {major(Math.abs(data.netIncome))} {tc('egp')}
+              {formatPrice(Math.abs(data.netIncome))}
             </span>
           </div>
         </div>
@@ -583,9 +574,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-end font-mono">
-                    {major(a.balance)} {tc('egp')}
-                  </td>
+                  <td className="px-3 py-2 text-end font-mono">{formatPrice(a.balance)}</td>
                 </tr>
               ))}
             </tbody>
@@ -595,7 +584,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
                   {totalLabel}
                 </td>
                 <td className="px-3 py-2 text-end font-mono font-semibold">
-                  {major(section.total)} {tc('egp')}
+                  {formatPrice(section.total)}
                 </td>
               </tr>
             </tfoot>
@@ -804,13 +793,13 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
             <div className="rounded-xl border border-border p-4">
               <p className="text-xs text-muted-foreground mb-1">{tt('totalTaxableSales')}</p>
               <p className="text-2xl font-semibold font-mono">
-                {major(data.summary.totalTaxableSales)} {tc('egp')}
+                {formatPrice(data.summary.totalTaxableSales)}
               </p>
             </div>
             <div className="rounded-xl border border-border p-4 bg-warning/10 border-warning/30">
               <p className="text-xs text-muted-foreground mb-1">{tt('totalTaxCollected')}</p>
               <p className="text-2xl font-semibold font-mono text-warning-ink">
-                {major(data.summary.totalTaxCollected)} {tc('egp')}
+                {formatPrice(data.summary.totalTaxCollected)}
               </p>
             </div>
           </div>

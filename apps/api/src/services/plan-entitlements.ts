@@ -9,7 +9,9 @@
  * Resolution order:
  *   1. `store_subscriptions` row -> `plans` row. A `canceled` subscription falls
  *      back to the free plan's limits (the store keeps its data, loses the paid
- *      ceiling). `trialing`/`active`/`past_due`/`comped` use the plan's own limits.
+ *      ceiling), and so does a LAPSED InstaPay row (`past_due` whose grace ended,
+ *      `isLapsedManualSubscription`, #836). `trialing`/`active`/`past_due` (in its
+ *      grace) /`comped` use the plan's own limits.
  *   2. No subscription row (a store created before the migration, or by a path
  *      that has not been taught to create one) -> Ebda Store's legacy `Store.plan` enum
  *      mapped onto a plan code. The migration backfills every existing store, so
@@ -34,6 +36,7 @@ import {
   STORE_PLAN_TO_PLAN_CODE,
   planLimitsSchema,
   type PlanLimits,
+  type StorePlan,
   type SubscriptionStatus,
 } from '@ebda/shared';
 import logger from '../lib/logger';
@@ -49,6 +52,11 @@ export interface Entitlements {
   subscribedPlanCode: string;
   status: SubscriptionStatus | 'none';
   limits: PlanLimits;
+  /**
+   * The feature-baseline tier of the EFFECTIVE plan (`planCode`): what FeatureService's PLAN_BASELINE layer reads.
+   * A canceled subscription resolves to the free plan's tier here, whatever `stores.plan` still says (#835).
+   */
+  featureTier: StorePlan;
   planNameEn: string;
   planNameAr: string;
   /** True when no subscription row exists and the legacy enum decided the plan. */
@@ -63,6 +71,26 @@ export interface Entitlements {
   billingMethod: string | null;
   /** A card the trial-end/renewal job can charge is on file. */
   hasSavedCard: boolean;
+}
+
+/**
+ * An InstaPay subscription whose grace is over: `past_due` with the retry (= suspension date) already cleared. The
+ * billing cycle downgrades such a row to free / `canceled` (#836); until it runs (or for a row an earlier build left
+ * behind) it is entitled to the free plan, never to the plan it stopped paying for. A card row is never in this state
+ * (its dunning keeps a `nextRetryAt` until the downgrade).
+ */
+function isLapsedManualSubscription(
+  sub:
+    | { status: string; billingMethod?: string | null; nextRetryAt?: Date | null }
+    | null
+    | undefined
+): boolean {
+  return (
+    !!sub &&
+    sub.status === 'past_due' &&
+    sub.billingMethod === 'instapay' &&
+    sub.nextRetryAt == null
+  );
 }
 
 function seedFor(code: string) {
@@ -126,7 +154,10 @@ export async function getEntitlements(
     }
     const subscribedPlanCode = sub?.planCode ?? STORE_PLAN_TO_PLAN_CODE[plan0.plan];
     const status: SubscriptionStatus | 'none' = sub?.status ?? 'none';
-    const effectiveCode = status === 'canceled' ? FALLBACK_PLAN_CODE : subscribedPlanCode;
+    const effectiveCode =
+      status === 'canceled' || isLapsedManualSubscription(sub)
+        ? FALLBACK_PLAN_CODE
+        : subscribedPlanCode;
 
     const plan = fromD1
       ? await fromD1.plan.findUnique({ where: { code: effectiveCode } })
@@ -138,6 +169,7 @@ export async function getEntitlements(
       subscribedPlanCode,
       status,
       limits: plan ? parseLimits(plan.limits, effectiveCode) : seed.limits,
+      featureTier: (plan?.featureTier ?? seed.featureTier) as StorePlan,
       planNameEn: plan?.nameEn ?? seed.nameEn,
       planNameAr: plan?.nameAr ?? seed.nameAr,
       derivedFromLegacyPlan: !sub,
@@ -171,7 +203,7 @@ export async function getAutomationFlags(
       | 'brandingRemoval'
       | 'apiAccess'
       | 'wholesalePricing'
-    > & { mcpAccess: boolean })
+    > & { mcpAccess: boolean; featureTier: StorePlan })
   | null
 > {
   const e = await getEntitlements(storeId, tx, known);
@@ -185,6 +217,8 @@ export async function getAutomationFlags(
     // Merchant MCP (keys + read + write tools): Growth + Business (Ahmad 2026-10-14),
     // decided on the EFFECTIVE plan (a canceled Growth store falls back to free => off).
     mcpAccess: planIncludesMerchantMcp(e.planCode, e.limits),
+    // The tier PLAN_BASELINE is read for: the effective plan's, never the stale `stores.plan` column (#835).
+    featureTier: e.featureTier,
   };
 }
 

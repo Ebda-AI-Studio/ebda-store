@@ -198,6 +198,16 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
               )}
 
               {/* CTA buttons */}
+              {/* STORE-QA-25: a feature no sold plan unlocks has no upgrade path. Say so; offer contact only. */}
+              {!planLabel && !addonLink && (
+                <p
+                  className="text-sm font-medium text-foreground/80 mb-6"
+                  dir={isAr ? 'rtl' : 'ltr'}
+                  data-testid="no-sold-plan"
+                >
+                  {t('noSoldPlan')}
+                </p>
+              )}
               <div className="flex flex-col sm:flex-row gap-3">
                 {addonLink && (
                   <Link href={addonLink} className="flex-1" data-testid="get-addon-cta">
@@ -209,20 +219,22 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
                     </Button>
                   </Link>
                 )}
-                {/* Upgrade: the billing page plan picker (card + InstaPay) */}
-                <Link href={billingLink} className="flex-1">
-                  <Button
-                    type="button"
-                    variant={addonLink ? 'outline' : undefined}
-                    className={
-                      addonLink
-                        ? 'w-full'
-                        : 'w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 font-semibold'
-                    }
-                  >
-                    {planLabel ? t('upgradeCta', { plan: planLabel }) : t('seePlansCta')}
-                  </Button>
-                </Link>
+                {/* Upgrade: the billing page plan picker (card + InstaPay). Only when a sold plan unlocks the feature (STORE-QA-25). */}
+                {planLabel && (
+                  <Link href={billingLink} className="flex-1">
+                    <Button
+                      type="button"
+                      variant={addonLink ? 'outline' : undefined}
+                      className={
+                        addonLink
+                          ? 'w-full'
+                          : 'w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 font-semibold'
+                      }
+                    >
+                      {t('upgradeCta', { plan: planLabel })}
+                    </Button>
+                  </Link>
+                )}
 
                 {/* Talk to us: only for plan-only features (a buyable add-on never sends the owner to support) */}
                 {!addonLink && (
@@ -232,8 +244,12 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
                     rel="noopener noreferrer"
                     className="flex-1"
                   >
-                    <Button type="button" variant="outline" className="w-full">
-                      {t('contactCta')}
+                    <Button
+                      type="button"
+                      variant={planLabel ? 'outline' : 'default'}
+                      className="w-full"
+                    >
+                      {planLabel ? t('contactCta') : t('contactOnlyCta')}
                     </Button>
                   </a>
                 )}

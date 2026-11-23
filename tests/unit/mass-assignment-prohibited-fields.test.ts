@@ -114,6 +114,7 @@ vi.mock('@api/lib/logger', () => ({
 
 const prismaStub = {
   store: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+  trustRequest: { create: vi.fn().mockResolvedValue({}), updateMany: vi.fn() },
   storeFaq: { findMany: vi.fn(), create: vi.fn() },
   storeHowto: { findMany: vi.fn(), create: vi.fn() },
   product: { findMany: vi.fn(), findFirst: vi.fn() },
@@ -315,6 +316,7 @@ describe('mass assignment — prohibited fields never reach the write-service ca
   it('PATCH /stores/:id/status only ever sets status from a validated enum, and ignores a body-supplied id/storeId/ownerId', async () => {
     storeApp = await buildApp('@api/routes/store.routes', '/api/v1/stores');
     storeServiceSetStatus.mockResolvedValue({ id: STORE_ID, status: 'suspended' });
+    prismaStub.store.findUnique.mockResolvedValue({ status: 'active' });
 
     const res = await request(storeApp)
       .patch(`/api/v1/stores/${STORE_ID}/status`)
@@ -427,6 +429,9 @@ const ROUTE_INVENTORY: Record<string, Coverage> = {
   "store.routes.ts POST '/'": { tested: true },
   "store.routes.ts PUT '/:id'": { tested: true },
   "store.routes.ts PATCH '/:id/status'": { tested: true },
+  "store.routes.ts POST '/:id/suspension/appeal/reject'": {
+    exempt: 'reads no body at all; only the URL store id is used',
+  },
   "store.routes.ts PUT '/:id/template'": {
     exempt: 'destructures only `{ template }` from the body; every other key is ignored',
   },
@@ -567,6 +572,10 @@ const ROUTE_INVENTORY: Record<string, Coverage> = {
   "order.routes.ts POST '/:orderId/refund-match-claim'": {
     exempt:
       'strict zod body `{ claimId, providerRefundId }` only; storeId/orderId from the URL; needs orders:refund',
+  },
+  "order.routes.ts POST '/:orderId/partial-refund'": {
+    exempt:
+      'strict zod body `{ items: [{ orderItemId, quantity, restock? }], reason, refundMethod }` only; storeId/orderId from the URL; needs orders:refund',
   },
   "order.routes.ts POST '/:orderId/refund-via-provider'": {
     exempt: 'body schema is `{ amount?, reason? }` only — no entity identity fields',

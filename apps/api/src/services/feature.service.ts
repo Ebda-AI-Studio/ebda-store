@@ -156,6 +156,7 @@ class FeatureService {
       apiAccess: boolean;
       wholesalePricing: boolean;
       mcpAccess: boolean;
+      featureTier: StorePlan;
     } | null,
     addonKeys: readonly string[] = []
   ): Record<FeatureKey, boolean> {
@@ -164,8 +165,11 @@ class FeatureService {
       FeatureKey,
       boolean
     >;
-    // Layer 1: PLAN_BASELINE — what the plan includes by default.
-    const baseline = PLAN_BASELINE[plan] ?? [];
+    // Layer 1: PLAN_BASELINE — what the plan includes by default. Keyed on the EFFECTIVE plan's tier from the
+    // entitlements (a canceled subscription = free), not on `stores.plan`: that column is a directory mirror that a
+    // canceled Growth store kept on `professional`, which left the whole Growth baseline on (#835, money-abuse S3).
+    // `stores.plan` only decides when there is no plan decision at all (unknown store).
+    const baseline = PLAN_BASELINE[flags?.featureTier ?? plan] ?? [];
     for (const key of baseline) {
       if (FEATURE_KEYS_ARRAY.includes(key as FeatureKey)) {
         map[key as FeatureKey] = true;

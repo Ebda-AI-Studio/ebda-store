@@ -26,8 +26,16 @@ interface ProductsResponse {
   meta: { total: number };
 }
 
+interface VariantOption {
+  id: string;
+  title: string | null;
+  sku: string | null;
+  inventory: number;
+}
+
 interface ItemDraft {
   productId: string;
+  variantId?: string;
   newQty: string;
 }
 
@@ -73,7 +81,7 @@ const ADJUSTMENT_TYPES = [
   'return_to_supplier',
 ] as const;
 
-const EMPTY_ITEM: ItemDraft = { productId: '', newQty: '' };
+const EMPTY_ITEM: ItemDraft = { productId: '', variantId: '', newQty: '' };
 
 // ─── CSV Upload Component ─────────────────────────────────────────────────────
 
@@ -493,6 +501,22 @@ export default function NewStockAdjustmentPage() {
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // STORE-QA-59: a product with variants keeps its stock on the variants, so
+  // each line must name a variant. Rows are loaded when the product is chosen.
+  const [variantsByProduct, setVariantsByProduct] = useState<Record<string, VariantOption[]>>({});
+
+  async function loadVariants(productId: string) {
+    if (!productId || variantsByProduct[productId]) return;
+    const { data } = await apiGet<{ product?: { variants?: VariantOption[] } }>(
+      `/api/v1/stores/${storeId}/products/${productId}`
+    );
+    setVariantsByProduct(cur => ({ ...cur, [productId]: data?.product?.variants ?? [] }));
+  }
+
+  useEffect(() => {
+    if (prefillProductId) void loadVariants(prefillProductId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, prefillProductId]);
 
   useEffect(() => {
     if (!storeId) return;
@@ -518,19 +542,39 @@ export default function NewStockAdjustmentPage() {
       header: tNew('selectProduct'),
       primaryOnMobile: true,
       cell: (item, i) => (
-        <select
-          value={item.productId}
-          onChange={e => updateItem(i, { productId: e.target.value })}
-          className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
-        >
-          <option value="">— {tNew('selectProduct')} —</option>
-          {products.map(p => (
-            <option key={p.id} value={p.id}>
-              {p.sku ? `[${p.sku}] ` : ''}
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-col gap-1">
+          <select
+            value={item.productId}
+            onChange={e => {
+              updateItem(i, { productId: e.target.value, variantId: '' });
+              void loadVariants(e.target.value);
+            }}
+            className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+          >
+            <option value="">— {tNew('selectProduct')} —</option>
+            {products.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.sku ? `[${p.sku}] ` : ''}
+                {p.name}
+              </option>
+            ))}
+          </select>
+          {(variantsByProduct[item.productId]?.length ?? 0) > 0 && (
+            <select
+              value={item.variantId ?? ''}
+              onChange={e => updateItem(i, { variantId: e.target.value })}
+              aria-label={tNew('selectVariant')}
+              className="w-full border border-border rounded-md px-2 py-1 text-base sm:text-sm"
+            >
+              <option value="">— {tNew('selectVariant')} —</option>
+              {variantsByProduct[item.productId]!.map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.title ?? v.sku ?? v.id.slice(0, 8)} ({v.inventory})
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
       ),
     },
     {
@@ -575,6 +619,12 @@ export default function NewStockAdjustmentPage() {
       setError(tNew('itemsRequired'));
       return;
     }
+    if (
+      validItems.some(it => (variantsByProduct[it.productId]?.length ?? 0) > 0 && !it.variantId)
+    ) {
+      setError(tNew('variantRequired'));
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -584,6 +634,7 @@ export default function NewStockAdjustmentPage() {
         evidenceUrl: evidenceUrl || undefined,
         items: validItems.map(it => ({
           productId: it.productId,
+          ...(it.variantId ? { variantId: it.variantId } : {}),
           newQty: Math.max(0, parseInt(it.newQty) || 0),
         })),
       };
@@ -612,6 +663,12 @@ export default function NewStockAdjustmentPage() {
       setError(tNew('itemsRequired'));
       return;
     }
+    if (
+      validItems.some(it => (variantsByProduct[it.productId]?.length ?? 0) > 0 && !it.variantId)
+    ) {
+      setError(tNew('variantRequired'));
+      return;
+    }
     const ok = await askConfirm({
       object: tNew('postObject', { count: validItems.length }),
       consequence: tNew('postConsequence'),
@@ -628,6 +685,7 @@ export default function NewStockAdjustmentPage() {
         evidenceUrl: evidenceUrl || undefined,
         items: validItems.map(it => ({
           productId: it.productId,
+          ...(it.variantId ? { variantId: it.variantId } : {}),
           newQty: Math.max(0, parseInt(it.newQty) || 0),
         })),
       };

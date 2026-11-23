@@ -280,3 +280,21 @@ failure alerts on main and cron runs; without them the notify jobs skip.
   did not happen and nothing retries it. `deploy-plan.mjs` needs only trees (`diff --name-only`) plus two lazy
   `git show` of `package-lock.json`, and already deploys when that read fails. Cost if wrong: a blob fetched lazily
   per `git show` on a slow link; worst case the plan deploys when it could have skipped.
+
+## G56: PR head with no `CI` / gitleaks / blast-radius run
+
+Symptom: `AI review` and `PR quality` (both `pull_request_target`) ran on a head, but nothing triggered by `pull_request` did, so
+`ops/merge-gate.sh` waits for required checks that never report. Seen on #776, #804, #865, #872. Config is not the cause (the
+workflows' triggers, paths and concurrency are fine; every missing run is a `pull_request` event, none a `push` or target event),
+so GitHub dropped the `pull_request` event for that push. Closing and reopening always emits a fresh one.
+Self-heal: `node scripts/ci/reopen-ciless-prs.mjs [--dry-run] [--minutes 10]` closes + reopens every open non-draft PR into main
+whose head is older than N minutes and has zero `CI` runs. Run it from the drain loop before the gate gives up.
+
+## Merge-group scope (MQ-SCOPE-1)
+
+A merge group runs the heavy-only jobs (Build, Orphan test coverage, Integration, E2E, Builder E2E, workerd integration) only when
+`scripts/ci/mq-scope.mjs` says `heavy=true`. It diffs `merge_group.base_sha..head_sha` with `scripts/ci-affected.mjs` and answers
+`heavy=false` only when every changed file is docs or inside `apps/marketing|docs|help|status`. Rails (package.json, lockfile,
+`packages/shared|repo|database`, migrations, `.github/`, `scripts/`, `tests/`) and the `ci:full` PR label force the full tier; any error fails
+closed to full. Unit shards, Security Audit, the marketing dry-run, `Repo guards` and `API Worker boots on workerd` always run. The
+`Merge queue gate` accepts `skipped` for exactly the heavy-only jobs and only when heavy=false. The nightly and main-push full lanes are unchanged.

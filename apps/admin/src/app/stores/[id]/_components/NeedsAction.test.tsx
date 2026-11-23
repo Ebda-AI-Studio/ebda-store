@@ -46,6 +46,32 @@ describe('dashboard "needs action" row', () => {
     );
   });
 
+  it('STORE-QA-29: an active store with empty SEO fields gets an SEO tile linking to /seo', async () => {
+    apiGet.mockImplementation((url: string) =>
+      url.endsWith('/seo')
+        ? ok({
+            seo: { metaTitle: '', metaTitleAr: '', metaDescription: '', metaDescriptionAr: '' },
+          })
+        : ok({ meta: { total: 0 }, products: [], stats: { pending: 0 } })
+    );
+    render(<NeedsAction storeId="s1" />);
+    await waitFor(() => expect(screen.getByText('seoMissing')).toBeTruthy());
+    expect(screen.getByText('seoMissing').closest('a')?.getAttribute('href')).toBe(
+      '/stores/s1/seo'
+    );
+  });
+
+  it('no SEO tile once a title exists', async () => {
+    apiGet.mockImplementation((url: string) =>
+      url.endsWith('/seo')
+        ? ok({ seo: { metaTitleAr: 'متجري' } })
+        : ok({ meta: { total: 0 }, products: [], stats: { pending: 0 } })
+    );
+    render(<NeedsAction storeId="s1" />);
+    await waitFor(() => expect(screen.getByText('allClear')).toBeTruthy());
+    expect(screen.queryByText('seoMissing')).toBeNull();
+  });
+
   it('says all clear when every count is zero', async () => {
     apiGet.mockImplementation(() =>
       ok({ meta: { total: 0 }, products: [], stats: { pending: 0 } })

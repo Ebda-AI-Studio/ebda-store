@@ -50,7 +50,7 @@ import {
   ledgerTaxFieldsD1,
 } from '../platform/billing-d1';
 import { isFamilyFrozen } from '../platform/cutover';
-import { cfBindings } from '../../cf/bindings';
+import { cfBindings, cfWaitUntil } from '../../cf/bindings';
 import { encryption } from '../encryption.service';
 import {
   BillingProviderError,
@@ -90,8 +90,8 @@ import {
   sweepFreeMonthGrants,
 } from './grants.service';
 import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
-import { applyAddonGrant } from './addon-grant';
-import { ADDON_MARKER_PREFIX, ADDON_PLAN_PREFIX } from './addon-catalog';
+import { applyAddonGrant, replaceQueuedTerms } from './addon-grant';
+import { ADDON_MARKER_PREFIX, ADDON_PLAN_PREFIX, skuOfPlanCode } from './addon-catalog';
 import { SETTLE_LEASE, SETTLE_LEASE_MS } from './settle-lease';
 import { renewDueAddons } from './addon-renewal';
 import { auditLog } from '../../middleware/security';
@@ -165,6 +165,8 @@ interface ClaimInput {
   provider: string;
   idempotencyKey: string;
   relatedEventId?: string | null;
+  /** Operator choices that must survive until the row settles (e.g. a refund's keepAccess). */
+  raw?: Record<string, unknown>;
 }
 
 /**
@@ -213,6 +215,7 @@ export async function claimEvent(input: ClaimInput): Promise<string | null> {
       relatedEventId: input.relatedEventId ?? null,
       vatMinor,
       vat,
+      raw: input.raw ?? null,
     });
     return won ? id : null;
   }
@@ -234,6 +237,7 @@ export async function claimEvent(input: ClaimInput): Promise<string | null> {
           idempotencyKey: input.idempotencyKey,
           status: 'pending',
           relatedEventId: input.relatedEventId ?? null,
+          ...(input.raw ? { raw: input.raw as Prisma.InputJsonValue } : {}),
           ...vatColumns(input.charge),
         },
       ],
@@ -305,6 +309,14 @@ function isAddonRow(row: { type: string; planCode: string | null }): boolean {
   return row.type === 'upgrade' && !!row.planCode?.startsWith(ADDON_PLAN_PREFIX);
 }
 
+/**
+ * Zero-amount bookkeeping rows (`addon-cancel:` / `addon-resume:` here; `addon-grant:` / `addon-overlap:` up the stack)
+ * share `type: 'upgrade'` + `status: 'succeeded'` but are NOT payments: they must never read as a newer plan charge (B2).
+ */
+function isAddonMarkerRow(row: { planCode: string | null }): boolean {
+  return !!row.planCode?.startsWith(ADDON_MARKER_PREFIX);
+}
+
 async function applySuccess(
   tx: Tx,
   row: LedgerRow,
@@ -344,6 +356,7 @@ async function applySuccess(
       billingAnchorDay: now.getUTCDate(), // the cycle restarts today (M-125)
       cancelAtPeriodEnd: false,
       pendingPlanCode: null,
+      pendingBillingInterval: null,
       dunningAttempts: 0,
       nextRetryAt: null,
       provider: row.provider,
@@ -412,6 +425,8 @@ async function applySuccess(
         billingAnchorDay: anchor,
         trialEndsAt: null,
         pendingPlanCode: null,
+        // a renewal at the stored interval settles any pick: the old pick must not outlive it
+        pendingBillingInterval: null,
         dunningAttempts: 0,
         nextRetryAt: null,
       },
@@ -450,6 +465,8 @@ async function applyCardSaved(tx: Tx, row: LedgerRow, o: Outcome, now: Date): Pr
     data: {
       provider: row.provider,
       billingMethod: 'card',
+      // a card store renews at its stored interval: an InstaPay checkout pick no longer applies
+      pendingBillingInterval: null,
       providerPaymentMethodRef: encryption.encrypt(o.cardToken),
       paymentMethodLast4: last4,
       paymentMethodBrand: o.cardBrand ? o.cardBrand.slice(0, 32) : null,
@@ -1090,6 +1107,11 @@ async function renewSubscriptionInner(
     return { action: 'canceled' };
   }
 
+  // An InstaPay row whose grace already ended (`nextRetryAt` cleared) but that an earlier build never downgraded (#836).
+  if (sub.billingMethod === 'instapay' && sub.status === 'past_due' && !sub.nextRetryAt) {
+    return lapseManualSubscription(sub, now);
+  }
+
   const attempt = sub.status === 'past_due' ? sub.dunningAttempts : 0;
   const due =
     sub.status === 'past_due'
@@ -1179,10 +1201,15 @@ type SubRow = NonNullable<Awaited<ReturnType<typeof loadSub>>>;
 /**
  * One step of the manual-payment policy (no money moves, so no ledger row):
  *  - due day, not yet past_due  -> past_due, retry (= suspension) at due + grace;
- *  - grace over, still unpaid   -> store suspended (`unpaid`), retry cleared.
+ *  - grace over, still unpaid   -> store suspended (`unpaid`) AND downgraded to free / `canceled`
+ *    (`downgradeToFree(..., 'dunning')`, same end state as a card's third failed retry).
  * Both are compare-and-set on the row's state, so a second run the same day is
  * a no-op. A recorded payment (manual or card) makes the row active again and
- * lifts the suspension (reconcileStoreAccess).
+ * lifts the suspension (reconcileStoreAccess; `recordManualPayment` accepts a canceled row).
+ *
+ * Before #836 the grace step only cleared `nextRetryAt` and suspended: the row stayed `past_due` on its paid plan
+ * forever (the due scan never selected it again), so the merchant kept the paid plan's admin features and AI after
+ * the storefront went down.
  */
 async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<RenewalResult> {
   if (sub.status !== 'past_due') {
@@ -1220,8 +1247,39 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
     })
   );
   if (count === 0) return { action: 'skipped', reason: 'already_advanced' };
+  return lapseManualSubscription(sub, now);
+}
+
+/**
+ * The grace is over on an InstaPay subscription: suspend the store (`unpaid`) and downgrade the row to free /
+ * `canceled`. Also the self-heal for rows an earlier build left `past_due` with `nextRetryAt = null` (the due scan
+ * selects them; see findDueSubscriptionIds). Idempotent: the downgrade only applies to a row that is still the same
+ * InstaPay `past_due` subscription, and suspendForBilling is compare-and-set.
+ */
+async function lapseManualSubscription(sub: SubRow, now: Date): Promise<RenewalResult> {
+  const effects: BillingEffect[] = [];
+  const downgraded = await withStore(sub.storeId, async tx => {
+    const cur = await tx.storeSubscription.findUnique({ where: { storeId: sub.storeId } });
+    if (!cur || cur.id !== sub.id || cur.status !== 'past_due' || cur.billingMethod !== 'instapay')
+      return false;
+    await downgradeToFree(tx, sub.storeId, 'dunning', effects);
+    return true;
+  });
+  if (!downgraded) return { action: 'skipped', reason: 'already_advanced' };
+  // Suspend BEFORE the downgrade effects run: the `downgraded` effect calls reconcileStoreAccess, which must find the
+  // store already suspended (a canceled row never lifts an `unpaid` suspension) and drops every feature cache layer.
   const suspended = await suspendForBilling(sub.storeId, 'unpaid', now);
-  await runBillingEffects([{ kind: 'store_suspended', storeId: sub.storeId, applied: suspended }]);
+  await auditLog({
+    action: 'billing.manual_payment_lapsed',
+    resourceType: 'store_subscription',
+    resourceId: sub.id,
+    storeId: sub.storeId,
+    details: { planCode: sub.planCode, graceDays: INSTAPAY_GRACE_DAYS },
+  });
+  await runBillingEffects([
+    { kind: 'store_suspended', storeId: sub.storeId, applied: suspended },
+    ...effects,
+  ]);
   return { action: 'suspended' };
 }
 
@@ -1262,6 +1320,8 @@ export async function findDueSubscriptionIds(
             },
             { status: 'trialing', trialEndsAt: { lte: now } },
             { status: 'past_due', nextRetryAt: { lte: now } },
+            // a lapsed InstaPay row left past_due with no retry by an earlier build (#836 self-heal)
+            { status: 'past_due', billingMethod: 'instapay', nextRetryAt: null },
           ],
         },
         select: { id: true, currentPeriodEnd: true },
@@ -1884,7 +1944,7 @@ export async function handleBillingWebhook(
     });
     return { duplicate: false, outcome: 'deferred', detail: 'family_frozen' };
   }
-  void drainDeferredSoon();
+  cfWaitUntil(drainDeferredSoon()); // a bare `void` dies with the response on a Worker
   return confirmAndApplyWebhook(provider, event);
 }
 
@@ -2027,13 +2087,53 @@ async function confirmAndApplyWebhook(
 
 // ───────────────────────────── refunds ────────────────────────────────────
 
+/**
+ * R-REFUND-PERIOD-1 (amended): a FULL refund of the latest paid charge (checkout / renewal / upgrade) that bought the
+ * CURRENT period ends that access at once: the subscription moves to free / `canceled` (`downgradeToFree`), with no
+ * provider and no saved card, so NO automatic charge ever follows the refund. Putting the store into dunning instead
+ * would charge the same card again ~3 days after the money went back. `keepAccess` (goodwill refund) skips it; a
+ * partial refund never changes the plan; an older charge (a newer paid charge exists) bought a period already used.
+ */
+async function endAccessForRefund(
+  tx: Tx,
+  charge: { id: string; storeId: string; type: string; createdAt: Date; planCode?: string | null },
+  keepAccess: boolean,
+  now: Date,
+  effects: BillingEffect[]
+): Promise<void> {
+  if (keepAccess || !['checkout', 'renewal', 'upgrade'].includes(charge.type)) return;
+  // An add-on / AI-pack payment (`upgrade` + `addon:<sku>`) bought no plan period: refunding it never touches the plan
+  // (its entitlement is revoked by settleRefundInTx), and it is never the "newer charge" that owns the period.
+  if (isAddonRow({ type: charge.type, planCode: charge.planCode ?? null })) return;
+  const { storeId } = charge;
+  const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
+  if (!sub || !['active', 'past_due', 'trialing'].includes(sub.status)) return;
+  if (sub.planCode === FREE_PLAN_CODE || isGrantedPlan(sub.planCode)) return;
+  // only the NEWEST paid charge can own the current period: an older one bought a period already used up
+  const newerRows = await tx.billingEvent.findMany({
+    where: {
+      storeId,
+      id: { not: charge.id },
+      type: { in: ['checkout', 'renewal', 'upgrade'] },
+      status: { in: ['succeeded', 'refunded'] },
+      createdAt: { gt: charge.createdAt },
+    },
+    select: { id: true, type: true, planCode: true },
+  });
+  if (newerRows.some(r => !isAddonRow(r) && !isAddonMarkerRow(r))) return;
+  // the free months this payment earned go too (FOUNDING-3)
+  await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', now, storeId);
+  await downgradeToFree(tx, storeId, 'canceled', effects);
+}
+
 async function settleRefundInTx(
   tx: Tx,
   storeId: string,
   refundId: string,
   succeeded: boolean,
-  reason?: string,
-  effects?: BillingEffect[]
+  reason: string | undefined,
+  /** a full refund that ends access pushes its `downgraded` effect here; the caller runs it after the tx */
+  effects: BillingEffect[]
 ): Promise<void> {
   const upd = await tx.billingEvent.updateMany({
     where: { id: refundId, storeId, status: 'pending' },
@@ -2057,23 +2157,36 @@ async function settleRefundInTx(
       where: { id: charge.id, storeId, status: 'succeeded' },
       data: { status: 'refunded' },
     });
+    // R-REFUND-PERIOD-1: a full refund of the charge that paid the current period takes the period back.
+    if (flipped.count > 0) {
+      const keep = (refund.raw as { keepAccess?: unknown } | null)?.keepAccess === true;
+      await endAccessForRefund(tx, charge, keep, new Date(), effects);
+    }
     // FOUNDING-3: the payment behind any free month is gone, so the free months go too (own store inline; a
     // referrer in another tenant is restored by restoreRevokedGrants / the daily sweep).
     if (flipped.count === 1) {
       await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', new Date(), storeId);
       // A refunded add-on stops being an entitlement AT ONCE: drop the cached feature map (NEVER-stale class).
-      if (isAddonRow(charge)) effects?.push({ kind: 'addon_granted', storeId });
+      if (isAddonRow(charge)) {
+        // A term queued behind the refunded one starts now instead of waiting for its end (F1).
+        const sku = skuOfPlanCode(charge.planCode);
+        if (sku) await replaceQueuedTerms(tx, storeId, sku, new Date());
+        effects?.push({ kind: 'addon_granted', storeId });
+      }
     }
   }
 }
 
 /**
- * Refund (part of) a succeeded charge. Super-admin only (route). Does NOT
- * change the subscription — plan changes are separate decisions.
+ * Refund (part of) a succeeded charge. Super-admin only (route). A FULL refund of the charge that paid the
+ * current period also rolls that period back unless `keepAccess` (R-REFUND-PERIOD-1); a partial refund never
+ * touches the subscription — plan changes are separate decisions.
  */
 export async function refundCharge(args: {
   eventId: string;
   amountMinor?: number;
+  /** Goodwill refund: money goes back, the paid period stays (R-REFUND-PERIOD-1). */
+  keepAccess?: boolean;
   provider?: BillingProvider;
 }): Promise<{ refundEventId: string; status: 'succeeded' | 'failed' | 'pending' }> {
   const provider = args.provider ?? getBillingProvider();
@@ -2129,19 +2242,27 @@ export async function refundCharge(args: {
     provider: charge.provider,
     idempotencyKey: key,
     relatedEventId: charge.id,
+    // stored at claim time, so an async (webhook) confirmation applies the same choice (R-REFUND-PERIOD-1)
+    raw: { keepAccess: args.keepAccess === true },
   });
   if (!refundId) throw new AppError(409, 'REFUND_IN_PROGRESS', 'A refund is already in progress');
+  const effects: BillingEffect[] = [];
   try {
     const res = await provider.refund({
       chargeId: charge.providerRef,
       amountMinor: amount,
       idempotencyKey: key,
     });
-    const refundEffects: BillingEffect[] = [];
     await withStore(charge.storeId, async tx => {
       await tx.billingEvent.updateMany({
         where: { id: refundId, storeId: charge.storeId, status: 'pending' },
-        data: { providerRef: res.refundId ?? undefined, raw: res.raw as Prisma.InputJsonValue },
+        data: {
+          providerRef: res.refundId ?? undefined,
+          raw: {
+            ...((res.raw ?? {}) as object),
+            keepAccess: args.keepAccess === true,
+          } as Prisma.InputJsonValue,
+        },
       });
       if (res.status !== 'pending') {
         await settleRefundInTx(
@@ -2150,11 +2271,11 @@ export async function refundCharge(args: {
           refundId,
           res.status === 'succeeded',
           res.failureReason,
-          refundEffects
+          effects
         );
       }
     });
-    await runBillingEffects(refundEffects);
+    await runBillingEffects(effects);
     // the referrer's side of a revoked grant lives in another tenant: take it back now, the sweep retries a miss
     await restoreRevokedGrants().catch(() => undefined);
     return { refundEventId: refundId, status: res.status };
@@ -2387,7 +2508,9 @@ type BillingStateSub = {
 export function nextChargeOf(
   sub: BillingStateSub | null,
   plans: Array<{ code: string; priceMonthlyMinor: number | null; priceYearlyMinor: number | null }>,
-  vat: PlatformVat
+  vat: PlatformVat,
+  /** Price at this interval instead of the stored one (the InstaPay payment for a pending switch). */
+  intervalOverride?: BillingInterval
 ): {
   at: Date;
   planCode: string;
@@ -2414,9 +2537,8 @@ export function nextChargeOf(
   if (!at) return null;
   const planCode = sub.pendingPlanCode ?? sub.planCode;
   const plan = plans.find(p => p.code === planCode);
-  const interval: BillingInterval = isInterval(sub.billingInterval)
-    ? sub.billingInterval
-    : 'monthly';
+  const interval: BillingInterval =
+    intervalOverride ?? (isInterval(sub.billingInterval) ? sub.billingInterval : 'monthly');
   const price = plan ? priceFor(plan, interval) : null;
   if (price === null) return { at, planCode, amountMinor: null, vat: null };
   const charge = subscriptionChargeAmount(price, vat);
@@ -2454,12 +2576,19 @@ export async function getSubscriptionBillingState(storeId: string) {
   );
   const vat = await resolvePlatformVat();
   const next = nextChargeOf(sub, plans, vat);
+  // BILLING-INTERVAL-PENDING-1: `next` (the renewal quote) always uses the CURRENT interval; what the merchant must
+  // transfer for a pending switch is priced at the picked interval, the same one instapayDetails puts in the claim.
+  const pendingInterval = isInterval(sub?.pendingBillingInterval)
+    ? sub.pendingBillingInterval
+    : null;
+  const payQuote = pendingInterval ? nextChargeOf(sub, plans, vat, pendingInterval) : next;
   const now = Date.now();
   const daysLeft = next ? Math.ceil((next.at.getTime() - now) / 86_400_000) : null;
   const handle = instapayHandle();
   const support = supportContact();
   return {
     billingInterval: sub?.billingInterval ?? 'monthly',
+    pendingBillingInterval: pendingInterval,
     pendingPlanCode: sub?.pendingPlanCode ?? null,
     nextRetryAt: sub?.nextRetryAt ?? null,
     dunningAttempts: sub?.dunningAttempts ?? 0,
@@ -2472,9 +2601,9 @@ export async function getSubscriptionBillingState(storeId: string) {
       available: !!handle,
       handle,
       reference: sub?.paymentReference ?? null,
-      amountMinor: next?.amountMinor ?? null,
+      amountMinor: payQuote?.amountMinor ?? null,
       /** Ebda VAT inside the amount + Ebda's TRN/legal name; null = no VAT line. */
-      vat: next?.vat ?? null,
+      vat: payQuote?.vat ?? null,
       /** Ebda's InstaPay QR image (EBDA_INSTAPAY_QR_URL); null = no QR shown. */
       qrUrl: handle ? instapayQrUrl() : null,
       pendingClaims,
@@ -2565,6 +2694,7 @@ export async function listSubscriptionsForAdmin(
       planCode: sub.planCode,
       chosenPlanCode: sub.pendingPlanCode,
       billingInterval: sub.billingInterval,
+      pendingBillingInterval: sub.pendingBillingInterval,
       status: sub.status,
       trialEndsAt: sub.status === 'trialing' ? sub.trialEndsAt : null,
       card: sub.providerPaymentMethodRef
@@ -2582,6 +2712,9 @@ export async function listSubscriptionsForAdmin(
       nextRetryAt: sub.nextRetryAt,
       currentPeriodEnd: sub.currentPeriodEnd,
       nextCharge: nextChargeOf(sub, plans, vat),
+      pendingNextCharge: isInterval(sub.pendingBillingInterval)
+        ? nextChargeOf(sub, plans, vat, sub.pendingBillingInterval)
+        : null,
     }));
 }
 

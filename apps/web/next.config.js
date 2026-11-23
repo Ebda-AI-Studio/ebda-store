@@ -10,6 +10,8 @@ const IMAGE_VARIANTS = process.env.NEXT_PUBLIC_IMAGE_VARIANTS === '1';
 const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAGES;
 
 /** @type {import('next').NextConfig} */
+const { authRedirects } = require('./auth-redirects');
+
 const nextConfig = {
   reactStrictMode: true,
   // Dev only: hosts (comma separated) allowed to load /_next dev assets, e.g. when a demo store host is
@@ -105,8 +107,28 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
   },
 
+  // Ruling WEB-COLD-3 (sentry-worker-stub.ts): Cloudflare build only, the Worker's server graph gets a no-op stand-in
+  // for @sentry/nextjs (3.7 MB of script every cold isolate compiles); the browser bundle keeps the real SDK.
+  ...(IS_CLOUDFLARE
+    ? {
+        turbopack: {
+          resolveAlias: {
+            '@sentry/nextjs': {
+              browser: '@sentry/nextjs',
+              default: './src/lib/sentry-worker-stub.ts',
+            },
+          },
+        },
+      }
+    : {}),
+
   experimental: {
     optimizePackageImports: ['@ebda/shared', '@ebda/ui'],
+  },
+
+  // /account/register, /signup, /login ... -> the real /auth/* pages (auth-redirects.js)
+  async redirects() {
+    return authRedirects();
   },
 
   // Security headers

@@ -13,8 +13,18 @@ export const DEEP_LINK_ONLY: Record<string, { secret: string }> = {
   'account.staff-accept-invite': { secret: 'invite token and new password' },
   'onboarding.signup': { secret: 'password / one-time code' },
   'billing.pay-card': { secret: 'card details' },
+  'billing.addons': { secret: 'card details on the hosted checkout' },
+  'billing.ai-topup': { secret: 'card details on the hosted checkout' },
+  'tax.change-request': {
+    secret:
+      'the tax card / certificate FILE upload and a single-use confirm token (a document is never attached in chat)',
+  },
   'payment.card-providers': { secret: 'provider API keys' },
   'payment.instapay-merchant': { secret: 'provider credentials' },
+  'onboarding.slug-claim': {
+    secret:
+      'proof-of-ownership evidence (document link) for a protected address; filed before a store exists, so it has no store for the assistant to act in',
+  },
 };
 
 /** Capabilities another plan owns on this same engine, with who owns them. Not a hole: the owning plan registers the tools. */

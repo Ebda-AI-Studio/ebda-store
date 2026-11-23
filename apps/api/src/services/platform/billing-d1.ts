@@ -187,10 +187,12 @@ export async function claimBillingEventD1(r: {
   relatedEventId: string | null;
   vatMinor: number;
   vat: unknown | null;
+  /** Stored at claim time (a refund's `keepAccess`): an async webhook settle reads it back (B3). */
+  raw?: unknown | null;
 }): Promise<boolean> {
   const changes = await d1Run(
-    `INSERT INTO billing_events (id, store_id, subscription_id, type, plan_code, billing_interval, for_period_end, attempt, amount_minor, currency, provider, idempotency_key, status, related_event_id, vat_minor, vat)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'EGP', ?10, ?11, 'pending', ?12, ?13, ?14)
+    `INSERT INTO billing_events (id, store_id, subscription_id, type, plan_code, billing_interval, for_period_end, attempt, amount_minor, currency, provider, idempotency_key, status, related_event_id, vat_minor, vat, raw)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'EGP', ?10, ?11, 'pending', ?12, ?13, ?14, ?15)
      ON CONFLICT (idempotency_key) DO NOTHING`,
     r.id,
     r.storeId,
@@ -205,7 +207,8 @@ export async function claimBillingEventD1(r: {
     r.idempotencyKey,
     r.relatedEventId,
     r.vatMinor,
-    r.vat === null || r.vat === undefined ? null : JSON.stringify(r.vat)
+    r.vat === null || r.vat === undefined ? null : JSON.stringify(r.vat),
+    r.raw === null || r.raw === undefined ? null : JSON.stringify(r.raw)
   );
   // `changes` includes the AFTER INSERT tax triggers' own writes (2 for one real insert, 0 for a skipped one)
   return changes > 0;
@@ -376,7 +379,7 @@ export async function commitManualPaymentD1(
             ON CONFLICT (store_id) DO UPDATE SET
               plan_code = excluded.plan_code, status = 'active', billing_interval = excluded.billing_interval,
               current_period_start = excluded.current_period_start, current_period_end = excluded.current_period_end,
-              billing_anchor_day = excluded.billing_anchor_day, trial_ends_at = NULL, pending_plan_code = NULL,
+              billing_anchor_day = excluded.billing_anchor_day, trial_ends_at = NULL, pending_plan_code = NULL, pending_billing_interval = NULL,
               cancel_at_period_end = 0, dunning_attempts = 0, next_retry_at = NULL,
               billing_method = excluded.billing_method, updated_at = excluded.updated_at`,
       params: [
@@ -505,16 +508,23 @@ export async function idempotencyKeyStoreD1(key: string): Promise<string | null>
   return rows[0]?.store_id ?? null;
 }
 
-/** Stores whose directory tier (`stores.plan`) differs from the tier of the plan their subscription names. */
+/**
+ * Stores whose directory tier (`stores.plan`) differs from the tier the subscription ENTITLES: the named plan's tier,
+ * or `free` when the subscription is canceled (getEntitlements falls back to the free plan then). Ignoring the status
+ * let a canceled Growth row on `professional` read as "no drift" (#835).
+ */
 export async function planTierDriftD1(
   limit: number
 ): Promise<Array<{ storeId: string; current: string; tier: string }>> {
   return d1All<{ storeId: string; current: string; tier: string }>(
-    `SELECT s.id AS storeId, s.plan AS current, p.feature_tier AS tier
-       FROM store_subscriptions ss
-       JOIN stores s ON s.id = ss.store_id
-       JOIN plans p ON p.code = ss.plan_code
-      WHERE s.deleted_at IS NULL AND s.plan <> p.feature_tier
+    `SELECT storeId, current, tier FROM (
+       SELECT s.id AS storeId, s.plan AS current,
+              CASE WHEN ss.status = 'canceled' THEN 'free' ELSE p.feature_tier END AS tier
+         FROM store_subscriptions ss
+         JOIN stores s ON s.id = ss.store_id
+         JOIN plans p ON p.code = ss.plan_code
+        WHERE s.deleted_at IS NULL
+     ) WHERE current <> tier
       LIMIT ?1`,
     limit
   );

@@ -3,6 +3,7 @@
  * raw-SQL corners (caps, claims) against the platform migrations on node:sqlite wrapped as an async D1.
  * The Postgres side is never reached: a D1-served call must not need a Postgres client.
  */
+import { PLATFORM_MIGRATION_SQL } from '../helpers/platform-migrations';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -65,14 +66,7 @@ import {
   syncSubscriptionFromLegacyPlan,
 } from '../../apps/api/src/services/platform/subscriptions';
 
-const MIG = ['0001_init.sql', '0002_invariants.sql']
-  .map(f =>
-    fs.readFileSync(
-      new URL(`../../packages/cf-schema/migrations/platform/${f}`, import.meta.url),
-      'utf8'
-    )
-  )
-  .join('\n');
+const MIG = PLATFORM_MIGRATION_SQL;
 
 const STORE = '11111111-1111-4111-8111-111111111111';
 const STORE2 = '22222222-2222-4222-8222-222222222222';
@@ -409,6 +403,7 @@ describe('cutover switch', () => {
         'providerVerification',
         'providerVerificationEvent',
         'providerActivationRequest',
+        'trustRequest',
         'merchantApiKey',
         'slugRedirect',
         'webhookEvent',
