@@ -28,7 +28,7 @@ import crypto from 'crypto';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
 
-import { fromMinor, REGION } from '@ebda/shared';
+import { catalogueItemId, fromMinor, REGION } from '@ebda/shared';
 // ─── Hashing helpers ─────────────────────────────────────────────────────────
 
 /**
@@ -82,6 +82,30 @@ export interface PurchaseOrderData {
     phone?: string | null;
   } | null;
   shippingAddress?: Record<string, unknown> | null;
+  /**
+   * The order lines. Each is reported under THE catalogue item id (`catalogueItemId`: the variant id for a variant, else the
+   * product id) so a server-side Purchase matches the Google/Meta/TikTok feed item for dynamic retargeting (Ruling FEEDS-2).
+   * Optional: an order read without lines still sends the value-only event it always did.
+   */
+  items?: Array<{
+    productId: string;
+    variantId?: string | null;
+    quantity: number;
+    price: number;
+  }> | null;
+}
+
+/** Order lines as catalogue contents, in decimal major units. Empty when the order carries no lines. */
+// pq-allow(unused-export): test seam - the id contract test asserts the CAPI line ids
+export function purchaseContents(
+  order: PurchaseOrderData
+): Array<{ id: string; quantity: number; price: number }> {
+  const currency = order.currency || REGION.currency;
+  return (order.items ?? []).map(i => ({
+    id: catalogueItemId({ productId: i.productId, variantId: i.variantId }),
+    quantity: i.quantity,
+    price: fromMinor(i.price, currency),
+  }));
 }
 
 /**
@@ -123,6 +147,10 @@ interface MetaCAPIPayload {
     custom_data: {
       currency: string;
       value: number;
+      content_type?: 'product';
+      content_ids?: string[];
+      contents?: Array<{ id: string; quantity: number; item_price: number }>;
+      num_items?: number;
     };
   }>;
   test_event_code?: string;
@@ -157,6 +185,7 @@ async function sendMetaCAPI(
   // total is stored in minor units (piastres: 5000 = EGP 50.00); Meta wants the
   // decimal major value.
   const value = fromMinor(order.total, order.currency || REGION.currency);
+  const contents = purchaseContents(order);
 
   const payload: MetaCAPIPayload = {
     data: [
@@ -170,6 +199,18 @@ async function sendMetaCAPI(
         custom_data: {
           currency: order.currency || REGION.currency,
           value,
+          ...(contents.length
+            ? {
+                content_type: 'product' as const,
+                content_ids: contents.map(c => c.id),
+                contents: contents.map(c => ({
+                  id: c.id,
+                  quantity: c.quantity,
+                  item_price: c.price,
+                })),
+                num_items: contents.reduce((n, c) => n + c.quantity, 0),
+              }
+            : {}),
         },
       },
     ],
@@ -234,6 +275,8 @@ interface TikTokEventPayload {
   properties: {
     currency: string;
     value: number;
+    content_type?: 'product';
+    contents?: Array<{ content_id: string; quantity: number; price: number }>;
   };
   context: {
     user?: {
@@ -275,6 +318,7 @@ async function sendTikTokCAPI(
   if (phone && phone.trim()) user.phone_number = hashPhone(phone);
 
   const value = fromMinor(order.total, order.currency || REGION.currency);
+  const tiktokContents = purchaseContents(order);
 
   const payload: TikTokEventPayload = {
     pixel_code: pixelId,
@@ -284,6 +328,16 @@ async function sendTikTokCAPI(
     properties: {
       currency: order.currency || REGION.currency,
       value,
+      ...(tiktokContents.length
+        ? {
+            content_type: 'product' as const,
+            contents: tiktokContents.map(c => ({
+              content_id: c.id,
+              quantity: c.quantity,
+              price: c.price,
+            })),
+          }
+        : {}),
     },
     context: {
       user,
