@@ -10,13 +10,13 @@ export const CLOSURE_REFUSALS: Record<string, { en: string; ar: string }> = {
   },
   ACCOUNT_HAS_OPEN_RETURN: {
     en: 'You still have a return or refund in progress. Close your account once it is settled.',
-    ar: 'لسه عندك مرتجع أو استرداد جاري. اقفل حسابك بعد ما يخلص.',
+    ar: 'لسه عندك مرتجع أو استرداد شغال. اقفل حسابك بعد ما يخلص.',
   },
 };
 
 export const ERASURE_INCOMPLETE_MESSAGE = {
   en: 'We could not finish closing your account. It is locked and the closure will be completed shortly. Contact support if it is not.',
-  ar: 'معرفناش نكمّل قفل حسابك. الحساب اتقفل مؤقتًا وهنكمّل القفل خلال وقت قصير. كلّم الدعم لو ما اتكملش.',
+  ar: 'معرفناش نكمّل قفل حسابك. الحساب اتقفل مؤقتًا وهنكمّل القفل خلال وقت قصير. كلّم الدعم لو ماخلصش.',
 };
 
 const both = (m: { en: string; ar: string }) => `${m.en} | ${m.ar}`;

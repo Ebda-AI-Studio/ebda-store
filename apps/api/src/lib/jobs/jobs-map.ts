@@ -75,6 +75,7 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
     alarm: true,
   },
   'r2-orphan-sweep': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
+  'pending-erasure-sweep-daily': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'search-log-purge-daily': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'soft-deleted-user-anonymize-monthly': {
     group: '2-housekeeping',

@@ -272,12 +272,12 @@ export default function SettingsClient() {
       case 'ACCOUNT_HAS_OPEN_RETURN':
         return t(
           'You still have a return or refund in progress. Close your account once it is settled.',
-          'لسه عندك مرتجع أو استرداد جاري. اقفل حسابك بعد ما يخلص.'
+          'لسه عندك مرتجع أو استرداد شغال. اقفل حسابك بعد ما يخلص.'
         );
       case 'ERASURE_INCOMPLETE':
         return t(
           'We could not finish closing your account. It is locked and the closure will be completed shortly. Contact support if it is not.',
-          'معرفناش نكمّل قفل حسابك. الحساب اتقفل مؤقتًا وهنكمّل القفل خلال وقت قصير. كلّم الدعم لو ما اتكملش.'
+          'معرفناش نكمّل قفل حسابك. الحساب اتقفل مؤقتًا وهنكمّل القفل خلال وقت قصير. كلّم الدعم لو ماخلصش.'
         );
       default:
         return t('Failed to delete account. Please try again.', 'حذف الحساب منفعش. جرّب تاني.');
