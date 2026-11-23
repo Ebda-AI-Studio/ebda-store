@@ -3,7 +3,7 @@
   "version": "0.3.2",
   "foundationCommit": "3ef654b3689e7835299e691c42c599626ad5aee5",
   "private": true,
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "UNLICENSED",
   "exports": {
     "./brand": "./brand.ts",
     "./buyer": "./buyer.ts",
