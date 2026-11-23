@@ -2109,7 +2109,7 @@
       "source": "apps/api/src/services/plan-limit.service.ts",
       "find": "  if (row.isDemo) {\n    throw new AppError(403, 'DEMO_STORE', 'This is a demo store; orders are disabled', {",
       "replace": "  if (false) {\n    throw new AppError(403, 'DEMO_STORE', 'This is a demo store; orders are disabled', {",
-      "test": "tests/integration/demo-store.test.ts"
+      "test": "apps/api/workers-test/demo-store.test.ts"
     },
     {
       "id": "demo-store-every-order-path-gated",
@@ -2129,7 +2129,7 @@
       "source": "apps/api/src/services/plan-limit.service.ts",
       "find": "  if (row?.isDemo) {",
       "replace": "  if (false) {",
-      "test": "tests/integration/demo-store.test.ts"
+      "test": "apps/api/workers-test/demo-store.test.ts"
     },
     {
       "id": "demo-owner-never-mailed",
