@@ -21,8 +21,9 @@ name: CI
 #     updates ONE GitHub issue labelled `ci-main-red`; the next green full run closes it.
 #
 # Every `runs-on` reads a repo variable (EBDA_RUNS_ON for the heavy Mac pool, EBDA_LIGHT_RUNS_ON then EBDA_RUNS_ON for light jobs) and falls back
-# to a Mac label (`["self-hosted","ebda-mac"]` heavy, `["ebda-mac-light"]` light), NEVER a GitHub-hosted runner (Ahmad 2026-11-16: no hosted minutes).
-# tests/unit/workflow-hosted-runners-only.test.ts pins that.
+# to a Mac label (`["self-hosted","ebda-mac"]` heavy, `["ebda-mac-light"]` light), never a hard-coded hosted label (Ahmad 2026-11-16: no PAID hosted minutes).
+# tests/unit/workflow-hosted-runners-only.test.ts pins that. Once the repo is PUBLIC (Ahmad 2026-11-23) hosted minutes are free: the repo
+# variables are set to ["ubuntu-latest"] and the Mac runner groups refuse public repos, so the Mac fallback only applies while private.
 #
 # No setup-node here has a `cache:` input: it restores/saves the GitHub Actions cache over the network (1.5-2.5 min per restore, a 10 min hanging
 # post-step save, 14 GB pulled once), while ~/.npm already persists locally on the Mac runners.
