@@ -16,6 +16,7 @@ import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
 import { validateFaqGrounding } from './faq-grounding-validator';
 import { recordUsage } from '../../services/ai.service';
+import { assertAiQuota } from '../ai-quota';
 import logger from '../logger';
 import { EGYPTIAN_ARABIC_REGISTER } from './arabic-register';
 
@@ -55,6 +56,8 @@ export interface GenerateProductFaqsInput {
   };
   /** How many FAQ pairs to draft (1..10). */
   count: number;
+  /** A background sweep: budgeted against the bulk ceiling (keeps the interactive reserve). */
+  bulk?: boolean;
 }
 
 /**
@@ -132,6 +135,8 @@ export async function generateProductFaqs(
   apiKey: string,
   modelName: string
 ): Promise<GeneratedProductFaq[]> {
+  // The budget lives HERE, not in the callers (#838): POST /ai/product-faqs/draft reached Gemini with no quota check.
+  await assertAiQuota({ storeId: input.storeId, bulk: input.bulk === true });
   const genai = new GeminiFailoverClient(apiKey);
   const model = genai.getGenerativeModel({ model: modelName });
 

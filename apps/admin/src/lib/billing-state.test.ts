@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { billingDisplayStatus, trialDaysLeft } from './billing-state';
+import { billingDisplayStatus, showPeriodEnd, trialDaysLeft } from './billing-state';
 
 describe('billingDisplayStatus (QA-88)', () => {
   it('"active" with a payment due reads as awaiting payment, not active', () => {
@@ -22,5 +22,20 @@ describe('trialDaysLeft', () => {
     expect(trialDaysLeft('2026-11-23T11:00:00Z', now)).toBe(3);
     expect(trialDaysLeft('2026-11-19T00:00:00Z', now)).toBeNull();
     expect(trialDaysLeft(null, now)).toBeNull();
+  });
+});
+
+describe('showPeriodEnd', () => {
+  it('no renewal date while payment is awaited, none or canceled', () => {
+    expect(showPeriodEnd('awaiting_payment', false)).toBe(false);
+    expect(showPeriodEnd('none', false)).toBe(false);
+    expect(showPeriodEnd('canceled', false)).toBe(false);
+    expect(showPeriodEnd('awaiting_payment', true)).toBe(false);
+  });
+  it('shows it for a paid, trialing or comped plan, and the end date of a scheduled cancel', () => {
+    expect(showPeriodEnd('active', false)).toBe(true);
+    expect(showPeriodEnd('trialing', false)).toBe(true);
+    expect(showPeriodEnd('comped', false)).toBe(true);
+    expect(showPeriodEnd('active', true)).toBe(true);
   });
 });
