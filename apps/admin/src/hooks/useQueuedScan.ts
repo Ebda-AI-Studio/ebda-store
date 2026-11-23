@@ -4,13 +4,14 @@ import { useCallback, useState } from 'react';
 import { useToast } from '@ebda/ui';
 import { apiPost } from '@/lib/api';
 
-export const SCAN_POLL_MS = 3000;
-export const SCAN_MAX_POLLS = 10;
+const SCAN_POLL_MS = 3000;
+const SCAN_MAX_POLLS = 10;
 
 /**
  * QA-117: a "scan now" button POSTs a job that answers 202 and runs in the background. Polls `reload` (which returns the
  * newest scan stamp) until it differs from `before`, up to `maxPolls` tries. True = a new scan landed.
  */
+// pq-allow(unused-export): test seam, imported by hooks/__tests__/useQueuedScan.test.ts
 export async function pollForNewStamp(opts: {
   reload: () => Promise<string | null>;
   before: string | null;

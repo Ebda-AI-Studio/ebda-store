@@ -81,7 +81,7 @@ async function readStoreMode(storeId: string): Promise<Mode> {
 }
 
 /** Why the assistant is off for a store (QA-112): the ONE explanation both the merchant `/status` and the super-admin card read. */
-export type AssistantOffReason =
+type AssistantOffReason =
   | 'global_kill'
   | 'product_kill'
   | 'platform_cap_off'
@@ -89,7 +89,7 @@ export type AssistantOffReason =
   | 'store_mode_off'
   | 'unreadable';
 
-export interface AssistantState {
+interface AssistantState {
   controls: Controls;
   enabled: boolean;
   /** null when the assistant is on. */
