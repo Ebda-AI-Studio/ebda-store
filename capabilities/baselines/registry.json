@@ -1,5 +1,6 @@
 {
   "ids": [
+    "operator-reason|store.delete-custom-page",
     "policy-free-writes|account.multi-store",
     "policy-free-writes|onboarding.setup-guide",
     "policy-free-writes|payment.events",

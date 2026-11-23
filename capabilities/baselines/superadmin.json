@@ -7,7 +7,6 @@
     "operator-reason-invalid|platform.store-delete",
     "superadmin-route-unreasoned|DELETE /admin/stores/:id/features",
     "superadmin-route-unreasoned|DELETE /admin/stores/:id/features/:featureKey",
-    "superadmin-route-unreasoned|DELETE /stores/:id",
     "superadmin-route-unreasoned|DELETE /stores/:storeId/pages/:slug",
     "superadmin-route-unreasoned|DELETE /stores/stores/:id/features",
     "superadmin-route-unreasoned|DELETE /stores/stores/:id/features/:featureKey",

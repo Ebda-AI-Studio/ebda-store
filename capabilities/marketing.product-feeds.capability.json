@@ -7,10 +7,10 @@
   "versionDate": "2026-11-14",
   "titleAr": "ملفات المنتجات لجوجل وميتا وتيك توك",
   "titleEn": "Product catalogue feeds for Google Merchant, Meta Catalog, TikTok",
-  "screens": ["/stores/[id]/marketing-pixels"],
-  "api": ["GET /feeds/google.xml", "GET /feeds/meta.xml", "GET /feeds/tiktok.csv"],
+  "screens": ["/stores/[id]/product-feeds"],
+  "api": ["GET /stores/:storeId/product-feeds/health"],
   "mcpTool": null,
-  "planGate": "agent_feed (existing AI feed) ",
+  "planGate": "product_feeds",
   "roles": ["owner", "super_admin"],
   "policy": "free",
   "undo": {
@@ -23,12 +23,14 @@
     "en": ["Do you have a Google Shopping / Meta catalogue feed?"]
   },
   "steps": [
-    "Not live: assistant says feeds are coming; today only /feeds/products.json for AI agents."
+    "Merchant opens Product feeds, copies the Google Merchant / Meta Catalog / TikTok link (public /feeds/google.xml, /feeds/meta.xml, /feeds/tiktok.csv), and reads the feed health report of what is left out and why."
   ],
   "edgeCases": [
     "Variants one item each + item_group_id; 5,000/part; ?lang=ar|en",
     "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
     "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle"
   ],
-  "gaps": ["Not merged; no merchant UI listing the feed URLs"]
+  "gaps": [
+    "Not merged yet (in PR); the public feed files are not capability api rows (public routes are outside coverage)"
+  ]
 }
