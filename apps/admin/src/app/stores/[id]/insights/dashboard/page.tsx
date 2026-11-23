@@ -1,5 +1,6 @@
 'use client';
 
+import { formatPrice } from '@/lib/format';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -234,7 +235,7 @@ export default function InsightsDashboardPage() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {t('topSegmentCustomers', { count: data.topSegment.count })} ·{' '}
-                  {major(data.topSegment.revenueContributionFils)} {tc('egp')}
+                  {formatPrice(data.topSegment.revenueContributionFils)}
                 </p>
               </>
             ) : (

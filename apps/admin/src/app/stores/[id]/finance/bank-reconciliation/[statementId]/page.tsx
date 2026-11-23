@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { apiGet, apiGetPage, apiPost, apiPatch, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
-import { minorToMajor, intlLocaleForUi } from '@/lib/format';
+import { minorToMajor, intlLocaleForUi, formatPrice } from '@/lib/format';
 import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -142,7 +142,6 @@ function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function StatementDetailPage() {
-  const tc = useT('common');
   const params = useParams();
   const storeId = params?.id as string;
   const statementId = params?.statementId as string;
@@ -329,11 +328,11 @@ export default function StatementDetailPage() {
               { label: t('summary.ignored'), value: summary.ignored },
               {
                 label: t('summary.matchedAmount'),
-                value: `EGP ${major(summary.matchedAmountFils)}`,
+                value: formatPrice(summary.matchedAmountFils),
               },
               {
                 label: t('summary.unmatchedAmount'),
-                value: `EGP ${major(summary.unmatchedAmountFils)}`,
+                value: formatPrice(summary.unmatchedAmountFils),
               },
             ].map(card => (
               <div
@@ -378,7 +377,7 @@ export default function StatementDetailPage() {
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
                   <SignedNumber
                     value={difference.bankBalanceFils}
-                    format={abs => `${tc('egp')} ${major(abs)}`}
+                    format={abs => formatPrice(abs)}
                   />
                 </p>
               </div>
@@ -389,7 +388,7 @@ export default function StatementDetailPage() {
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
                   <SignedNumber
                     value={difference.ledgerBalanceFils}
-                    format={abs => `${tc('egp')} ${major(abs)}`}
+                    format={abs => formatPrice(abs)}
                   />
                 </p>
               </div>
@@ -417,7 +416,7 @@ export default function StatementDetailPage() {
                   <SignedNumber
                     value={difference.differenceFils}
                     plus
-                    format={abs => `${tc('egp')} ${major(abs)}`}
+                    format={abs => formatPrice(abs)}
                   />
                 </p>
               </div>
@@ -431,7 +430,7 @@ export default function StatementDetailPage() {
                     {t('difference.unmatchedBankSide')}
                   </p>
                   <p className="mt-0.5 text-sm font-semibold text-warning-ink font-mono">
-                    {tc('egp')} {major(difference.unmatchedBankFils)}
+                    {formatPrice(difference.unmatchedBankFils)}
                   </p>
                   <p className="mt-0.5 text-xs text-warning-ink">
                     {summary?.unmatched ?? 0} {t('difference.bankLines')}
@@ -444,7 +443,7 @@ export default function StatementDetailPage() {
                   <p className="mt-0.5 text-sm font-semibold text-info-ink font-mono">
                     <SignedNumber
                       value={difference.unmatchedLedgerFils}
-                      format={abs => `${tc('egp')} ${major(abs)}`}
+                      format={abs => formatPrice(abs)}
                     />
                   </p>
                   <p className="mt-0.5 text-xs text-info-ink">

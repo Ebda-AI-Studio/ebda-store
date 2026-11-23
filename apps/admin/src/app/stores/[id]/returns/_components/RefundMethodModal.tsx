@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../lib/api';
 
-import { formatMoney, tryToMinor } from '@ebda/shared';
+import { tryToMinor } from '@ebda/shared';
+import { formatPrice } from '@/lib/format';
 type RefundMethod = 'original' | 'store_credit' | 'bank_transfer' | 'manual';
 
 // 'manual' ("Already refunded — record only") is offered ONLY when a refund for
@@ -75,7 +76,7 @@ const KNOWN_GATEWAY_REASONS = new Set([
 ]);
 
 function formatCurrency(piastres: number) {
-  return formatMoney(piastres, 'en', { fixedDecimals: true });
+  return formatPrice(piastres);
 }
 
 interface RefundMethodModalProps {

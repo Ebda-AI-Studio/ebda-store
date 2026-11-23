@@ -95,7 +95,7 @@ describe('stock count: close and reconcile confirmations', () => {
     fireEvent.click(await screen.findByText('counting.reconcile'));
     await waitFor(() => expect(askConfirm).toHaveBeenCalledTimes(1));
     expect(askConfirm.mock.calls[0][0].object).toBe(
-      'counting.reconcileObject|{"count":2,"units":"-3"}'
+      'counting.reconcileObject|{"count":2,"units":"\u2066\u22123\u2069"}' // SIGN-1: the bidi-isolated true minus sign, not a hyphen
     );
     await waitFor(() =>
       expect(apiPost).toHaveBeenCalledWith(

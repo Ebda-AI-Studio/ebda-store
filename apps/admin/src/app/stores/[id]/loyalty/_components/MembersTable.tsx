@@ -61,11 +61,22 @@ export function MembersTable({
     },
     {
       header: t('columns.balance'),
-      cell: member => (
-        <span className="font-medium text-foreground">
-          {member.points.toLocaleString(undefined, withNumerals())}
-        </span>
-      ),
+      // #631: a refund can leave a debt; show 0 plus "owes N", never a bare negative (RTL-safe <bdi>)
+      cell: member =>
+        member.points < 0 ? (
+          <span className="flex flex-col">
+            <span className="font-medium text-foreground">
+              {(0).toLocaleString(undefined, withNumerals())}
+            </span>
+            <span data-testid="points-owed" className="text-xs text-warning-ink">
+              {t('owed', { count: (-member.points).toLocaleString(undefined, withNumerals()) })}
+            </span>
+          </span>
+        ) : (
+          <span className="font-medium text-foreground">
+            {member.points.toLocaleString(undefined, withNumerals())}
+          </span>
+        ),
     },
     {
       header: t('columns.totalEarned'),

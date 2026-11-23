@@ -1,5 +1,6 @@
 'use client';
 
+import { useLocale } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -9,7 +10,8 @@ import { apiGet, apiGetPage } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
-import { reportRangeQueryString, minorToDecimalString, withNumerals } from '@ebda/shared';
+import { reportRangeQueryString, withNumerals } from '@ebda/shared';
+import { formatPrice } from '@/lib/format';
 
 import { Button } from '@/components/ui/Button';
 import { SignedNumber } from '@ebda/ui';
@@ -63,9 +65,10 @@ interface SalesStats {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+// STORE-QA-10: the ONE admin money format (grouped, with the currency, per locale), not a bare decimal + a separate currency line.
 function major(piastres: number | null | undefined): string {
-  if (typeof piastres !== 'number' || !Number.isFinite(piastres)) return '0.00';
-  return minorToDecimalString(piastres);
+  if (typeof piastres !== 'number' || !Number.isFinite(piastres)) return formatPrice(0);
+  return formatPrice(piastres);
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -75,6 +78,7 @@ export default function FinanceDashboardPage() {
   const router = useRouter();
   const storeId = params?.id as string;
   const t = useT('finance.dashboard');
+  const adminLocale = useLocale() === 'ar' ? 'ar' : 'en';
   const tc = useT('common');
 
   const [period, setPeriod] = useState<Period>('this_month');
@@ -199,16 +203,8 @@ export default function FinanceDashboardPage() {
     {
       header: '',
       primaryOnMobile: true,
-      cell: row => (
-        <>
-          {row.nameEn}
-          {row.nameAr && (
-            <span className="text-muted-foreground ms-2 text-xs" dir="rtl">
-              — {row.nameAr}
-            </span>
-          )}
-        </>
-      ),
+      // STORE-QA-11: one name in the page language, never "English— Arabic" glued together.
+      cell: row => <>{(adminLocale === 'ar' && row.nameAr) || row.nameEn}</>,
     },
     {
       header: '',
@@ -226,7 +222,7 @@ export default function FinanceDashboardPage() {
                 !
               </span>
             )}
-            {major(row.balance)} {tc('egp')}
+            {major(row.balance)}
           </span>
         );
       },
@@ -275,9 +271,7 @@ export default function FinanceDashboardPage() {
                   <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                     {t('couldntLoad')}
                   </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
-                )}
+                ) : null}
               </div>
 
               {/* Expenses */}
@@ -297,9 +291,7 @@ export default function FinanceDashboardPage() {
                   <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                     {t('couldntLoad')}
                   </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
-                )}
+                ) : null}
               </div>
 
               {/* Net Income */}
@@ -327,9 +319,7 @@ export default function FinanceDashboardPage() {
                   <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                     {t('couldntLoad')}
                   </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
-                )}
+                ) : null}
               </div>
             </div>
           </section>
@@ -360,7 +350,6 @@ export default function FinanceDashboardPage() {
                   <p className="text-2xl font-semibold font-mono text-green-700">
                     {major(salesStats.totalRevenue)}
                   </p>
-                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
                 </div>
                 <div className="rounded-xl border border-border p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
@@ -393,9 +382,7 @@ export default function FinanceDashboardPage() {
                     <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                       {t('couldntLoad')}
                     </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">{tc('egp')}</p>
-                  )}
+                  ) : null}
                   {!dashboardErr &&
                     disabledVariantStockValue !== null &&
                     disabledVariantStockValue > 0 && (
@@ -460,9 +447,7 @@ export default function FinanceDashboardPage() {
                       <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                         {t('couldntLoad')}
                       </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">{tc('egp')}</p>
-                    )}
+                    ) : null}
                   </div>
                 ))}
               </div>
