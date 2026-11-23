@@ -227,7 +227,7 @@ export function analyticsLowStockOp(db: SyncSql, storeId: string, a: Record<stri
       ELSE p.inventory END`;
   return db
     .all(
-      `SELECT p.id AS id, p.name AS name, p.slug AS slug, p.sku AS sku, ${onHand} AS inventory,
+      `SELECT p.id AS id, p.name AS name, p.name_ar AS nameAr, p.slug AS slug, p.sku AS sku, ${onHand} AS inventory,
               (SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.position ASC LIMIT 1) AS imageUrl
          FROM products p
         WHERE p.store_id = ?1 AND p.status = 'active' AND p.track_inventory = 1
@@ -238,6 +238,7 @@ export function analyticsLowStockOp(db: SyncSql, storeId: string, a: Record<stri
     .map(r => ({
       id: String(r.id),
       name: String(r.name),
+      nameAr: (r.nameAr as string | null) ?? null,
       slug: String(r.slug),
       sku: (r.sku as string | null) ?? null,
       inventory: num(r.inventory),

@@ -132,7 +132,7 @@
   "stores": {
     "dashboard": {
       "editStore": "Edit Store",
-      "loadingTitle": "Store Details",
+      "loadingTitle": "Store",
       "loadingSubtitle": "Loading...",
       "notFoundTitle": "Store Not Found",
       "notFoundSubtitle": "The requested store could not be found",
@@ -1330,7 +1330,7 @@
   },
   "orders": {
     "list": {
-      "title": "Store Orders",
+      "title": "Orders",
       "subtitle": "View and manage orders for this store",
       "backToStore": "Back to Store",
       "search": {
@@ -8089,6 +8089,22 @@
       },
       "perStoreBreakdown": "Per-store breakdown",
       "storesCount": "{count} stores"
+    },
+    "featureNames": {
+      "translate": "Translation",
+      "seo": "SEO",
+      "categorize": "Product categorising",
+      "deadstock-scan": "Dead-stock scan",
+      "expense-ocr": "Expense receipt reading",
+      "insights-narration-cohort": "Cohort insight narration",
+      "insights-narration-funnel": "Funnel insight narration",
+      "insights-narration-segment": "Segment insight narration",
+      "product-excerpt": "Product excerpt",
+      "product-faq": "Product FAQ",
+      "product-meta-aeo": "Product answer-engine description",
+      "product-tags": "Product tags",
+      "profit-anomaly": "Profit anomaly",
+      "reorder-scan": "Reorder scan"
     }
   },
   "featureUpgrade": {
@@ -10075,7 +10091,7 @@
     "subtitle": "Every subscription charge, renewal retry, upgrade and refund. Rows are append-only.",
     "loading": "Loading ledger…",
     "failedToLoad": "Failed to load the billing ledger.",
-    "empty": "No billing events yet.",
+    "empty": "No billing events yet. Every subscription payment, renewal, upgrade and refund will appear here as it happens.",
     "refresh": "Refresh",
     "all": "All",
     "statusFilter": "Status",
@@ -11199,7 +11215,7 @@
     "subtitle": "Merchants' requests to activate a provider for their store. Run the test, then activate or reject.",
     "loading": "Loading…",
     "loadFailed": "Could not load the requests.",
-    "empty": "No requests in this view.",
+    "empty": "No verification requests in this view. Requests merchants submit for review appear here; try another filter above.",
     "status": {
       "requested": "Pending",
       "activated": "Activated",
@@ -11858,7 +11874,7 @@
   },
   "providerVerification": {
     "title": "Provider verification",
-    "subtitle": "No test accounts: the first merchants' real credentials verify each provider. A provider becomes READY when enough different stores settled real live operations; only you confirm it, and until then the first-use and failure alerts keep firing.",
+    "subtitle": "Track the verification status of each payment and shipping provider here. A provider becomes READY when enough different stores settled real live operations; only you confirm it. Until then, first-use and failure alerts work as normal.",
     "loading": "Loading…",
     "loadFailed": "Could not load provider verification.",
     "verifiedCatalog": "Verified (catalog)",

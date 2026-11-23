@@ -141,13 +141,10 @@ function SuggestionCard({
         <UrgencyBadge days={item.urgencyDays} t={t} />
       </div>
 
-      {/* Bilingual reasoning */}
-      <p className="text-sm text-muted-foreground leading-relaxed">{item.reasoningEn}</p>
-      {item.reasoningAr && (
-        <p className="text-sm text-muted-foreground leading-relaxed" dir="rtl">
-          {item.reasoningAr}
-        </p>
-      )}
+      {/* STORE-QA-39: the rationale in the page language only (it used to print English then Arabic). */}
+      <p className="text-sm text-muted-foreground leading-relaxed" dir={isAr ? 'rtl' : 'ltr'}>
+        {(isAr && item.reasoningAr) || item.reasoningEn}
+      </p>
 
       {/* Details row */}
       <div className="grid grid-cols-2 gap-2 text-xs">

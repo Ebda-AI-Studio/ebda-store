@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
 import type { LowStockProduct } from './types';
 
 interface LowStockAlertsCardProps {
@@ -15,6 +16,9 @@ interface LowStockAlertsCardProps {
  */
 export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
   const t = useT('analytics.lowStock');
+  const isAr = useLocale() === 'ar';
+  // STORE-QA-8: the product's name in the page language, the same one the products list shows.
+  const nameOf = (p: { name: string; nameAr?: string | null }) => (isAr && p.nameAr) || p.name;
 
   return (
     <div className="bg-card rounded-xl border p-6 shadow-sm">
@@ -43,7 +47,7 @@ export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
               {product.images?.[0]?.url ? (
                 <Image
                   src={product.images[0].url}
-                  alt={product.name}
+                  alt={nameOf(product)}
                   width={40}
                   height={40}
                   className="w-10 h-10 rounded object-cover"
@@ -66,7 +70,7 @@ export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
+                <p className="text-sm font-medium text-foreground truncate">{nameOf(product)}</p>
                 <p className="text-xs text-muted-foreground">{product.sku}</p>
                 {/* Backorder enrichment — shown when Batch 2 data is present */}
                 <div className="flex flex-wrap gap-1 mt-1">

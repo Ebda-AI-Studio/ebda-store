@@ -1007,6 +1007,7 @@ export interface MoneyClient {
     Array<{
       id: string;
       name: string;
+      nameAr?: string | null;
       slug: string;
       sku: string | null;
       inventory: number;

@@ -187,6 +187,7 @@ describe('AnalyticsService on a DO store (Postgres throws)', () => {
     expect(low[0]).toEqual({
       id: 'p1',
       name: 'Lamp',
+      nameAr: null,
       slug: 'lamp',
       sku: null,
       inventory: 3,
