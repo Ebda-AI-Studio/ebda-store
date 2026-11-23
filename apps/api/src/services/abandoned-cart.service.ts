@@ -16,6 +16,7 @@ import { primeCustomerAuthRoutes } from '../lib/customer-auth';
 import { withBackendBatch } from '../lib/store-backend';
 import {
   prisma,
+  Prisma,
   acrossStoresFlat,
   currentStoreId,
   runInStoreScope,
@@ -23,6 +24,14 @@ import {
   withStore,
 } from '@ebda/database';
 import { storefrontOrigin } from '@ebda/shared';
+import {
+  latestPaymentIsOnline,
+  netOrderRevenueMinor,
+  orderNetRevenueSql,
+  refundJoinsSql,
+  revenueOrderPredicateSql,
+} from '../lib/revenue-sql';
+import { refundedMinorByOrder } from '../lib/order-refunds';
 import { PriceResolver } from './price-resolver.service';
 import { buyerFromCartOwner } from '../lib/buyer-identity';
 import { redis } from './redis.service';
@@ -815,15 +824,15 @@ class AbandonedCartService {
     const revenueRows = onDo
       ? [{ revenue: await doRecoveredRevenue(repo.db, storeId) }]
       : await prisma.$queryRaw<Array<{ revenue: bigint | null }>>`
-      SELECT COALESCE(SUM(o.total), 0)::bigint AS revenue
+      SELECT COALESCE(SUM(${Prisma.raw(orderNetRevenueSql('o', 'pg'))}), 0)::bigint AS revenue
       FROM public.abandoned_carts ac
       JOIN public.orders o ON o.id = ac.recovered_order_id
+      ${Prisma.raw(refundJoinsSql('o', 'pg'))}
       WHERE ac.store_id = ${storeId}
         AND ac.status = 'recovered'
         AND o.store_id = ${storeId}
         AND o.deleted_at IS NULL
-        AND o.status NOT IN ('cancelled', 'refunded', 'awaiting_payment_confirmation')
-        AND o.payment_status <> 'failed'
+        AND ${Prisma.raw(revenueOrderPredicateSql('o', 'pg'))}
     `;
     const recoveredRevenue = Number(revenueRows[0]?.revenue ?? 0);
 
@@ -967,17 +976,34 @@ async function doRecoveredRevenue(db: StoreReads, storeId: string): Promise<numb
   });
   const ids = recovered.map(r => r.recoveredOrderId).filter((x): x is string => !!x);
   if (ids.length === 0) return 0;
+  // The ONE revenue definition (lib/revenue-sql.ts): the exclusions AND the partial-refund netting, in TS.
   const orders = await db.order.findMany({
-    where: {
-      id: { in: ids },
-      storeId,
-      deletedAt: null,
-      status: { notIn: ['cancelled', 'refunded', 'awaiting_payment_confirmation'] },
-      paymentStatus: { not: 'failed' },
+    where: { id: { in: ids }, storeId, deletedAt: null },
+    select: {
+      id: true,
+      total: true,
+      status: true,
+      paymentStatus: true,
+      payments: { select: { id: true, provider: true, createdAt: true } },
     },
-    select: { total: true },
   });
-  return orders.reduce((n, o) => n + o.total, 0);
+  const refunded = await refundedMinorByOrder(
+    db as Parameters<typeof refundedMinorByOrder>[0],
+    storeId,
+    ids
+  );
+  return orders.reduce(
+    (n, o) =>
+      n +
+      netOrderRevenueMinor({
+        total: o.total,
+        status: o.status,
+        paymentStatus: o.paymentStatus,
+        refundedMinor: refunded.get(o.id) ?? 0,
+        hasOnlinePayment: latestPaymentIsOnline(o.payments ?? []),
+      }),
+    0
+  );
 }
 
 /** `AbandonedCart.customer` (a platform `User`) for rows read from a DO. */
