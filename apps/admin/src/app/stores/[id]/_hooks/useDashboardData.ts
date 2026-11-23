@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { apiPatch, apiPut } from '../../../../lib/api';
+import { apiPut } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
 import type { Store, StoreEditForm, StoreFormErrors } from '../_components/types';
 
@@ -13,7 +13,6 @@ export interface DashboardData {
   storeError: StoreLoadError;
   isEditing: boolean;
   isSaving: boolean;
-  isChangingStatus: boolean;
   editForm: StoreEditForm;
   formErrors: StoreFormErrors;
   setIsLoading: (loading: boolean) => void;
@@ -22,7 +21,6 @@ export interface DashboardData {
   setFormErrors: React.Dispatch<React.SetStateAction<StoreFormErrors>>;
   fetchStore: () => Promise<void>;
   handleSave: (translateError: (key: string) => string) => Promise<void>;
-  handleStatusChange: (newStatus: string) => Promise<void>;
   resetEditForm: () => void;
 }
 
@@ -41,7 +39,6 @@ export function useDashboardData(storeId: string): DashboardData {
   const [storeError, setStoreError] = useState<StoreLoadError>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [editForm, setEditForm] = useState<StoreEditForm>({
     name: '',
     slug: '',
@@ -142,19 +139,6 @@ export function useDashboardData(storeId: string): DashboardData {
     [storeId, editForm]
   );
 
-  const handleStatusChange = useCallback(
-    async (newStatus: string) => {
-      setIsChangingStatus(true);
-      try {
-        await apiPatch(`/api/v1/stores/${storeId}/status`, { status: newStatus });
-        await fetchStore();
-      } finally {
-        setIsChangingStatus(false);
-      }
-    },
-    [storeId, fetchStore]
-  );
-
   const resetEditForm = useCallback(() => {
     setFormErrors({});
     if (store) {
@@ -173,7 +157,6 @@ export function useDashboardData(storeId: string): DashboardData {
     storeError,
     isEditing,
     isSaving,
-    isChangingStatus,
     editForm,
     formErrors,
     setIsLoading,
@@ -182,7 +165,6 @@ export function useDashboardData(storeId: string): DashboardData {
     setFormErrors,
     fetchStore,
     handleSave,
-    handleStatusChange,
     resetEditForm,
   };
 }

@@ -309,4 +309,16 @@ describe('policy updates page', () => {
       expect(screen.queryByText('actionFailed')).toBeNull();
     }
   );
+
+  it('explains in the page how a version is published, and a non-material version has no Send notice', async () => {
+    apiGet.mockResolvedValue({
+      data: { policies: [row('privacy', false)] },
+      error: null,
+    });
+    render(<PolicyUpdatesPage />);
+    expect(await screen.findByText('howToTitle')).toBeTruthy();
+    expect(screen.getByText('howToStep1')).toBeTruthy();
+    expect(screen.getByText('howToNotMaterial')).toBeTruthy();
+    expect(screen.queryByText('sendNotice')).toBeNull();
+  });
 });

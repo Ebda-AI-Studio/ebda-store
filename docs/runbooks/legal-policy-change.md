@@ -53,6 +53,8 @@ Merge. `cf-marketing-deploy.yml` republishes ebda.app. The API must also run the
 
 ## 3. Announce (material versions only) — the SAME day it deploys
 
+The page has no "publish a version" control on purpose (no policy CMS): the version is the code you just deployed. A version with `material: false` shows no **Send notice** button; if you decide to announce it, set `material: true` in `LEGAL_POLICIES` and redeploy the API. The page explains this in a card at its top (QA-80).
+
 Super admin -> **Policy updates** (`store.ebda.app/policy-updates`) -> the document shows the new
 version with **Send notice** -> confirm. This emails every store owner once (owners of non-deleted,
 non-demo stores, role store_admin; suspended/inactive owners included) and shows a banner in their

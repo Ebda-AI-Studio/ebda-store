@@ -182,10 +182,10 @@ describe('super-admin delete store', () => {
       return (
         <>
           <DangerZone
+            storeId={store.id}
+            storeName={store.name}
             status="active"
-            isChangingStatus={false}
-            onRequestSuspend={() => {}}
-            onActivate={() => {}}
+            onStatusChanged={() => {}}
             onRequestDelete={() =>
               requestDelete({ id: store.id, name: store.name, slug: store.slug })
             }

@@ -3,13 +3,12 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
-import { Modal, useToast } from '@ebda/ui';
-import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { useAuth } from '../../../../lib/auth';
 import { useT } from '@/i18n/useT';
-import { apiGet, apiPatch } from '../../../../lib/api';
+import { apiGet } from '../../../../lib/api';
+import { StoreStatusControl } from '../../../../components/store-status/StoreStatusControl';
 import { SubscriptionPlanRow } from '../../../../components/billing/SubscriptionPlanRow';
 import { SettingsSearch } from '../../../../components/SettingsSearch';
 import { SETTINGS_GROUPS } from '../../../../lib/settings-groups';
@@ -118,15 +117,9 @@ export default function StoreSettingsPage() {
   const isSuperAdmin = user?.role === 'super_admin';
   const t = useT('settings');
   const tCards = useT('settings.cards');
-  const tCommon = useT('common');
-  const { success: toastSuccess, error: toastError } = useToast();
 
   // Store info (plan + status) — needed for super_admin danger zone
   const [storeInfo, setStoreInfo] = useState<StoreBasicInfo | null>(null);
-
-  // Suspend modal
-  const [suspendModalOpen, setSuspendModalOpen] = useState(false);
-  const [statusChanging, setStatusChanging] = useState(false);
 
   const fetchStore = useCallback(async () => {
     if (!isSuperAdmin || !storeId) return;
@@ -137,28 +130,6 @@ export default function StoreSettingsPage() {
   useEffect(() => {
     fetchStore();
   }, [fetchStore]);
-
-  const handleStatusChange = useCallback(async () => {
-    if (!storeInfo) return;
-    setStatusChanging(true);
-    const newStatus = storeInfo.status === 'suspended' ? 'active' : 'suspended';
-    const { error: apiErr } = await apiPatch(`/api/v1/stores/${storeId}/status`, {
-      status: newStatus,
-    });
-    if (apiErr) {
-      toastError(t('superadmin.statusChangeFailed'), apiErr.message);
-    } else {
-      toastSuccess(
-        newStatus === 'suspended' ? t('superadmin.suspended') : t('superadmin.reactivated'),
-        newStatus === 'suspended'
-          ? t('superadmin.suspendedBody', { name: storeInfo.name })
-          : t('superadmin.reactivatedBody', { name: storeInfo.name })
-      );
-      await fetchStore();
-    }
-    setStatusChanging(false);
-    setSuspendModalOpen(false);
-  }, [storeInfo, storeId, fetchStore, toastSuccess, toastError, t]);
 
   const cards: SettingsCard[] = [
     {
@@ -595,74 +566,18 @@ export default function StoreSettingsPage() {
               {t('superAdmin.dangerZoneTitle')}
             </h2>
             <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    {storeInfo?.status === 'suspended'
-                      ? t('superAdmin.reactivateTitle')
-                      : t('superAdmin.suspendTitle')}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {storeInfo?.status === 'suspended'
-                      ? t('superAdmin.reactivateDesc')
-                      : t('superAdmin.suspendDesc')}
-                  </p>
-                </div>
-                <div className="shrink-0">
-                  <Button
-                    variant={storeInfo?.status === 'suspended' ? 'default' : 'destructive'}
-                    onClick={() => setSuspendModalOpen(true)}
-                    disabled={statusChanging || !storeInfo}
-                  >
-                    {storeInfo?.status === 'suspended'
-                      ? t('superAdmin.reactivateTitle')
-                      : t('superAdmin.suspendTitle')}
-                  </Button>
-                </div>
-              </div>
+              {storeInfo && (
+                <StoreStatusControl
+                  storeId={storeId}
+                  storeName={storeInfo.name}
+                  status={storeInfo.status}
+                  onChanged={fetchStore}
+                />
+              )}
             </div>
           </div>
         </div>
       )}
-
-      {/* ── Modals ─────────────────────────────────────────────────────────── */}
-
-      {/* Suspend / reactivate confirm */}
-      <Modal
-        isOpen={suspendModalOpen}
-        onClose={() => setSuspendModalOpen(false)}
-        title={
-          storeInfo?.status === 'suspended'
-            ? t('superAdmin.reactivateTitle')
-            : t('superAdmin.suspendTitle')
-        }
-        size="sm"
-      >
-        <p className="text-sm text-muted-foreground">
-          {storeInfo?.status === 'suspended'
-            ? t('superAdmin.reactivateModalBody', { name: storeInfo?.name ?? 'this store' })
-            : t('superAdmin.suspendModalBody', { name: storeInfo?.name ?? 'this store' })}
-        </p>
-        <div className="mt-6 flex justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={() => setSuspendModalOpen(false)}
-            disabled={statusChanging}
-          >
-            {tCommon('cancel')}
-          </Button>
-          <Button
-            variant={storeInfo?.status === 'suspended' ? 'default' : 'destructive'}
-            onClick={handleStatusChange}
-            disabled={statusChanging}
-            isLoading={statusChanging}
-          >
-            {storeInfo?.status === 'suspended'
-              ? t('superAdmin.reactivateButton')
-              : t('superAdmin.suspendButton')}
-          </Button>
-        </div>
-      </Modal>
     </AdminLayout>
   );
 }

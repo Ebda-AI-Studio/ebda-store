@@ -662,8 +662,29 @@ describe.skipIf(e.E2E_DB === '1')(
       const sus = await call('store suspend', `/stores/${storeId}/status`, {
         method: 'PATCH',
         headers: suH,
-        body: { status: 'suspended' },
+        body: { status: 'suspended', reason: 'QA-81 policy breach' },
       });
+      // QA-81: the reason the super-admin UI now requires reaches the merchant, who can appeal, and the appeal is listed
+      const seen = await call('merchant reads suspension', `${S}/suspension`);
+      expect
+        .soft([seen.status, seen.json?.data?.reason], steps.join('\n'))
+        .toEqual([200, 'QA-81 policy breach']);
+      const appeal = await call('merchant appeals', `${S}/suspension/appeal`, {
+        method: 'POST',
+        body: { message: 'we fixed it, please reinstate' },
+      });
+      expect.soft(appeal.status, steps.join('\n')).toBe(201);
+      const listed = await call(
+        'super admin lists the appeal',
+        `/admin/trust-requests?kind=suspension_appeal&storeId=${storeId}`,
+        { headers: suH }
+      );
+      expect
+        .soft(
+          (listed.json?.data?.rows ?? []).map((r: { kind: string }) => r.kind),
+          steps.join('\n')
+        )
+        .toEqual(['suspension_appeal']);
       const act = await call('store reactivate', `/stores/${storeId}/status`, {
         method: 'PATCH',
         headers: suH,

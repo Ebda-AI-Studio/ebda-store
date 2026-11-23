@@ -27,7 +27,6 @@ import { AcquisitionCard } from './_components/AcquisitionCard';
 import { AssistantModeCard } from './_components/AssistantModeCard';
 import { QuickActions } from './_components/QuickActions';
 import { SettingsLink } from './_components/SettingsLink';
-import { SuspendStoreModal } from './_components/SuspendStoreModal';
 import { DangerZone } from './_components/DangerZone';
 import { useDeleteStore } from '../_components/useDeleteStore';
 import { StoreLoadingSkeleton } from './_components/StoreLoadingSkeleton';
@@ -53,7 +52,6 @@ export default function StoreDetailPage() {
     storeError,
     isEditing,
     isSaving,
-    isChangingStatus,
     editForm,
     formErrors,
     setIsLoading,
@@ -62,11 +60,9 @@ export default function StoreDetailPage() {
     setFormErrors,
     fetchStore,
     handleSave,
-    handleStatusChange,
     resetEditForm,
   } = useDashboardData(storeId);
 
-  const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [period, setPeriod] = useState<PulsePeriod>('last_7');
   const { pulse, reload: reloadPulse } = useStorePulse(storeId, period);
   const { requestDelete, dialog: deleteDialog } = useDeleteStore(
@@ -180,23 +176,12 @@ export default function StoreDetailPage() {
           onRequestDelete={() =>
             requestDelete({ id: store.id, name: store.name, slug: store.slug })
           }
+          storeId={store.id}
+          storeName={store.name}
           status={store.status}
-          isChangingStatus={isChangingStatus}
-          onRequestSuspend={() => setShowSuspendModal(true)}
-          onActivate={() => handleStatusChange('active')}
+          onStatusChanged={fetchStore}
         />
       )}
-
-      <SuspendStoreModal
-        isOpen={showSuspendModal}
-        storeName={store.name}
-        isChangingStatus={isChangingStatus}
-        onClose={() => setShowSuspendModal(false)}
-        onConfirm={() => {
-          setShowSuspendModal(false);
-          handleStatusChange('suspended');
-        }}
-      />
 
       {isSuperAdmin && deleteDialog}
     </AdminLayout>

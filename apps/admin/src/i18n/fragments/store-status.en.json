@@ -1,0 +1,22 @@
+{
+  "storeStatus": {
+    "suspendTitle": "Suspend store",
+    "suspendDescription": "Customers cannot open or buy from the store, and messages to customers and payouts pause. Nothing is deleted.",
+    "reinstateTitle": "Reinstate store",
+    "reinstateDescription": "The store opens to customers again, and the merchant's open appeal is marked resolved.",
+    "appealsLink": "Open the appeals and requests from merchants",
+    "suspendBody": "Suspend {name}? The merchant sees your reason in a banner on every page of their dashboard, and can appeal once.",
+    "reasonLabel": "Reason (the merchant reads this)",
+    "reasonHint": "Write it the way you would say it to them. Up to 500 characters.",
+    "reasonRequired": "Write the reason first. The merchant needs to know why.",
+    "reinstateBody": "Reinstate {name}? Customers can open and buy from it again straight away.",
+    "cancel": "Cancel",
+    "suspendConfirm": "Suspend store",
+    "reinstateConfirm": "Reinstate store",
+    "failed": "The change did not go through. Nothing was changed. Try again.",
+    "suspendedToast": "Store suspended",
+    "suspendedToastBody": "{name} is suspended. The merchant can see the reason and appeal.",
+    "reinstatedToast": "Store reinstated",
+    "reinstatedToastBody": "{name} is open to customers again."
+  }
+}
