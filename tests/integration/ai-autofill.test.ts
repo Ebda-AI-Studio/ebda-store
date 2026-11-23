@@ -47,7 +47,6 @@ vi.mock('../../apps/api/src/lib/ai/gemini-keys', () => ({
       }),
     };
   }),
-  geminiKeyCount: () => 1,
 }));
 vi.mock('../../apps/api/src/config', async importOriginal => {
   const mod = await importOriginal<typeof import('../../apps/api/src/config')>();
