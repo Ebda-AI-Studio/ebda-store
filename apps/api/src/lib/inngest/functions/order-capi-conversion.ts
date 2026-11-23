@@ -117,6 +117,8 @@ export const orderCapiConversion: JobDef = inngest.createFunction(
               currency: true,
               shippingAddress: true,
               customerId: true,
+              // the lines, reported under the catalogue item id (Ruling FEEDS-2)
+              items: { select: { productId: true, variantId: true, quantity: true, price: true } },
             },
           })
         ).catch(() => null);
@@ -162,6 +164,7 @@ export const orderCapiConversion: JobDef = inngest.createFunction(
           currency: order.currency,
           customer: order.customer,
           shippingAddress: order.shippingAddress as Record<string, unknown> | null,
+          items: order.items,
         },
         storeUrl
       )

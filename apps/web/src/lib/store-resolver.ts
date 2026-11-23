@@ -554,7 +554,7 @@ async function fetchStoreByDomain(
 /**
  * Resolve store from cache or API
  */
-async function resolveStoreByDomain(
+export async function resolveStoreByDomain(
   domain: string,
   builderToken?: string | null
 ): Promise<ResolvedStore | null> {
