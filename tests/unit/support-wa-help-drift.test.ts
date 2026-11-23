@@ -26,7 +26,7 @@ const PINNED_SHA256: Record<string, string> = {
   'ar/08-campaigns-and-opt-out.md':
     '2b059c59937e0b71b09bdc88198224829e38787cb175fac36a7582a196d4b6f0',
   'ar/09-wallet-top-ups-and-refunds.md':
-    '8af45b9a4f5c5965b03f06408e8f067cf2696b617cee09772bbf7141bff87f6d',
+    '2261cb53a55ea63f7775d9d52c7343332d744c858cca5b96da920a5ecf9c6bab',
   'ar/10-meta-fees-explained.md':
     'a91a05bbb7ddbdc236b6b4f5c0557d5e8f763a43fae09c450498b90750a0659f',
   'ar/11-service-menu-hours-and-location.md':
@@ -36,7 +36,7 @@ const PINNED_SHA256: Record<string, string> = {
   'ar/13-your-customers-data.md':
     '70c99e0bc2e321ad79bd6a6001ea2f921c0a2c48432b977f5f98badbd24a2c44',
   'ar/14-team-members-and-seats.md':
-    '9a81c3d534f72f4c269f8a5a9d2a5ff3680d76aeac56fe3326377fc26503342b',
+    '6a22ae8f86847eb1f0d54cf89df486a2aae1509eef2b02d0a8cd1cf6773811b3',
   'en/01-verify-your-business-on-meta.md':
     '3de91aea62cd457aa08d7bed246781d1d7908c8208b643dbfa3a30eff3b5e8b2',
   'en/02-connect-your-own-number.md':
@@ -52,7 +52,7 @@ const PINNED_SHA256: Record<string, string> = {
   'en/08-campaigns-and-opt-out.md':
     '380b45e446e026e57e4c3d03f9ba1b5eff4c5b4a9d8bb0adb522434aef467f32',
   'en/09-wallet-top-ups-and-refunds.md':
-    '9ab15f3fa80da14c19c814d6fb870e5aad240a9624dd533ea6734d9f38532667',
+    'f22ebefd8ee916b56677b0f9905f08a75ae275e743caf705c2f78af77ffd8541',
   'en/10-meta-fees-explained.md':
     '2f79f146fa6fc55f8c137d8a5af96dfcec0e50612f16062b15c69246aadd7693',
   'en/11-service-menu-hours-and-location.md':
@@ -62,7 +62,7 @@ const PINNED_SHA256: Record<string, string> = {
   'en/13-your-customers-data.md':
     'd1e2b534f7016ffec835b5ef4dc1925fe2f99fc401f9061896f815b86b060bd7',
   'en/14-team-members-and-seats.md':
-    '0d35bc89db69ec5fe8ca3351336280486efeb635baabfb1fcdc22320e95c6122',
+    'bf6360df3c3bf00f2bcad5ad98ee69fd7bb18dfe2aade7cfed6170874d76d131',
 };
 const tokens = (t: string) => t.match(/[\p{L}\p{N}]+/gu) ?? [];
 const noTargets = (t: string) => t.replace(/\]\([^)]*\)/g, ']');
