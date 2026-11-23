@@ -225,6 +225,31 @@ const ALLOW: Record<string, AllowEntry> = {
     reason: 'declared value from persisted lines',
     reads: { createShipmentForOrder: 1 },
   },
+  'lib/catalogue-feed/build.ts': {
+    category: 'retail-display',
+    reason: 'public ad feeds (Google/Meta/TikTok): retail price, anonymous-safe',
+    reads: { buildProductItems: 3, buildBundleItems: 4 },
+  },
+  'lib/catalogue-feed/load.ts': {
+    category: 'retail-display',
+    reason: 'public ad feeds: retail price select, public-audience products only',
+    reads: { '<module>': 2 },
+  },
+  'lib/catalogue-feed/service.ts': {
+    category: 'retail-display',
+    reason: 'public ad feeds: purchasable bundle price',
+    reads: { getMeta: 1 },
+  },
+  'lib/inngest/functions/order-capi-conversion.ts': {
+    category: 'persisted',
+    reason: 'server-side Purchase lines from persisted order items',
+    reads: { '<module>': 1 },
+  },
+  'services/pixels-capi.service.ts': {
+    category: 'persisted',
+    reason: 'server-side Purchase lines from persisted order items',
+    reads: { purchaseContents: 1, sendMetaCAPI: 1, sendTikTokCAPI: 1 },
+  },
   'lib/product-feed.ts': {
     category: 'retail-display',
     reason: 'public feed: retail price, anonymous-safe',
@@ -274,7 +299,9 @@ const ALLOW: Record<string, AllowEntry> = {
       getFilterOptions: 4,
       getSearchSuggestions: 1,
       getSuggestSuggestions: 2,
-      listPublic: 5, // +1: the `sort=on_sale` raw SQL ranks by the retail compare-at drop (ordering only; the card price still goes through b2bPublicFields), B2-28
+      listPublic: 1, // the `sort=on_sale` raw SQL ranks by the retail compare-at drop (ordering only; the card price still goes through b2bPublicFields), B2-28. PL1 moved the min/max price filter out into priceRangeWhere (-4 reads)
+      // PL1: the price filter's slider ceiling = the store's highest retail list / variant price, a display bound for the filter UI; never a charged price
+      catalogueMaxPrice: 4,
       // the DO twin of the `sort=on_sale` statement: ranks by the retail compare-at drop (ordering only, the card price still
       // goes through b2bPublicFields), P1 2026-11-09
       onSaleIdsFromDo: 4,

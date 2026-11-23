@@ -20,6 +20,7 @@ import customersRoutes from './customers.routes';
 import reviewRoutes from './review.routes';
 import analyticsRoutes from './analytics.routes';
 import answerEngineRoutes from './answer-engine.routes';
+import productFeedsRoutes from './product-feeds.routes';
 import returnRoutes from './return.routes';
 import publicRoutes from './public.routes';
 import paymentRoutes from './payment.routes';
@@ -107,6 +108,7 @@ import lifecycleEmailsRoutes from './lifecycle-emails.routes';
 import whatsappLinkRoutes from './whatsapp-link.routes';
 import lifecycleEmailsPublicRoutes from './lifecycle-emails-public.routes';
 import contactEnquiryPublicRoutes from './contact-enquiry-public.routes';
+import orderStatusPublicRoutes from './order-status-public.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
 import realtimeRoutes from './realtime.routes';
@@ -331,6 +333,7 @@ router.use('/stores/:storeId', tenantContext, customersRoutes);
 router.use('/stores/:storeId/reviews', tenantContext, reviewRoutes);
 router.use('/stores/:storeId/analytics', tenantContext, analyticsRoutes);
 router.use('/stores/:storeId/answer-engine', tenantContext, answerEngineRoutes);
+router.use('/stores/:storeId/product-feeds', tenantContext, productFeedsRoutes);
 router.use('/stores/:storeId/returns', tenantContext, returnRoutes);
 
 // Store-scoped routes mounted under /stores (storeId in sub-route params).
@@ -582,6 +585,8 @@ router.use('/stores/:storeId/whatsapp-link', tenantContext, whatsappLinkRoutes);
 router.use('/public/lifecycle-emails', lifecycleEmailsPublicRoutes);
 // Studio enquiry form on the marketing site (Ruling CONTACT-FORM-1): nothing stored, mail only.
 router.use('/public/contact', contactEnquiryPublicRoutes);
+// Guest-safe read-only order summary behind the COD WhatsApp button (Ruling WA-COD-V2-2).
+router.use('/public/order-status', orderStatusPublicRoutes);
 
 // Wishlist routes (user-scoped; store comes from an x-store-id header, not
 // the URL, so `tenantContext` can't reach it via a mount-path param). RLS

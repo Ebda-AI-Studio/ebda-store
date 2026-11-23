@@ -145,6 +145,8 @@ const refundTx: any = {
     aggregate: async () => ({ _sum: { amountMinor: 9900 } }),
   },
   billingGrant: { findMany: async () => [], updateMany: async () => ({ count: 0 }) },
+  // R-REFUND-PERIOD-1 (main): a full plan refund reads the subscription to decide whether access ends.
+  storeSubscription: { findUnique: vi.fn(async () => null) },
 };
 
 describe('refund of an add-on payment', () => {
@@ -166,6 +168,7 @@ describe('refund of an add-on payment', () => {
   beforeEach(() => {
     inv.entity.mockResolvedValue('s1');
     refundTx.billingEvent.findUnique.mockReset();
+    refundTx.storeSubscription.findUnique.mockClear();
   });
   it('drops the cached feature map as soon as the refund settles', async () => {
     refundTx.billingEvent.findUnique.mockImplementation(async ({ where }: any) =>
@@ -175,6 +178,8 @@ describe('refund of an add-on payment', () => {
     );
     await refundCharge({ eventId: 'c1', provider });
     expect(inv.invalidate).toHaveBeenCalledWith('s1');
+    // an add-on refund never goes near the plan period (R-REFUND-PERIOD-1 must not downgrade the store)
+    expect(refundTx.storeSubscription.findUnique).not.toHaveBeenCalled();
   });
   it('a plan refund does not touch the feature cache from this path', async () => {
     refundTx.billingEvent.findUnique.mockImplementation(async ({ where }: any) =>
