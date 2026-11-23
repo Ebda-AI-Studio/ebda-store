@@ -17,6 +17,7 @@ import { useT } from '@/i18n/useT';
 import { LegalAcceptancesPanel } from '../../../components/legal/LegalAcceptancesPanel';
 import { PasskeysPanel } from '../../../components/account/PasskeysPanel';
 import { PhonePanel } from '../../../components/account/PhonePanel';
+import { CloseAccountPanel } from '../../../components/account/CloseAccountPanel';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -678,6 +679,10 @@ export default function SecurityPage() {
         )}
         {status && <PhonePanel mfaEnabled={status.mfaEnabled} />}
         <LegalAcceptancesPanel />
+        {/* platform administrators are removed by the operator only (docs/privacy/erasure-export.md) */}
+        {user && user.role !== 'super_admin' && (
+          <CloseAccountPanel onClosed={() => void logout()} />
+        )}
       </div>
     </AdminLayout>
   );
