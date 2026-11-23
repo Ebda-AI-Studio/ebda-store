@@ -22,7 +22,7 @@ Counsel has NOT verified 5 vs 7 years or the Egyptian article numbers; the rulin
 
 ## Review fixes (#1109)
 
-- BLOCKER: the directory step no longer hard-deletes `stores`. Platform tables (billing_events = Ebda's own invoices, instapay_receipts, manual_payment_claims, billing_reminders, store_subscriptions, trust_requests, ai_usage) reference it ON DELETE CASCADE. A tombstone row stays (slug `purged-<id>`, personal columns NULL, soft-deleted); only store_staff, merchant_api_keys, staff_invites and SlugRedirect rows are deleted. `lib/store-tombstone.ts`, proven on the real D1 schema with foreign keys on (including a control showing a plain DELETE cascades).
+- BLOCKER: the directory step no longer hard-deletes `stores`. Platform tables (billing_events = Ebda's own invoices, instapay_receipts, manual_payment_claims, billing_reminders, store_subscriptions, trust_requests, ai_usage) reference it ON DELETE CASCADE. A tombstone row stays (slug `~purged~<id>`, personal columns NULL, soft-deleted); only store_staff, merchant_api_keys, staff_invites and SlugRedirect rows are deleted. `lib/store-tombstone.ts`, proven on the real D1 schema with foreign keys on (including a control showing a plain DELETE cascades).
 - Crash mid-wipe: `wipeStartedAt` is written to the ledger before the wipe; a rerun resumes at the wipe, and an already-empty Durable Object counts as wiped (`resume`, refused for any store that still has a profile).
 - Archive and ledger are per closure (`fiscal-<closedAt>.ndjson`, `ledger-<closedAt>.json`); a ledger of another closure is ignored.
 - Runbook `docs/runbooks/closed-store-purge.md` incl. the R2 retention lock on `closed-store-archive/` (written, NOT applied).

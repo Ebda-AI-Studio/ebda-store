@@ -74,7 +74,7 @@ export function closedStorePurgePorts(): PurgePorts {
   return {
     async listClosed(): Promise<ClosedStore[]> {
       const rows = await d1All<{ id: string; deleted_at: number }>(
-        `SELECT "id", "deleted_at" FROM "stores" WHERE "deleted_at" IS NOT NULL AND "storage_backend" = 'do' AND "slug" NOT LIKE 'purged-%' ORDER BY "deleted_at" LIMIT 500`
+        `SELECT "id", "deleted_at" FROM "stores" WHERE "deleted_at" IS NOT NULL AND "storage_backend" = 'do' AND "slug" NOT LIKE '~purged~%' ORDER BY "deleted_at" LIMIT 500`
       );
       return rows.map(r => ({ storeId: r.id, closedAt: Number(r.deleted_at) }));
     },

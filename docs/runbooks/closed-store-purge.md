@@ -12,7 +12,7 @@ The wipe is irreversible. This runbook is what to do before the first live run, 
 
 ## What the job keeps for ever (not purged)
 
-- The `stores` row stays as a TOMBSTONE (slug `purged-<id>`, name `[purged]`, domain / logo / contact columns NULL, soft-deleted). Ebda's own billing_events, instapay_receipts, manual_payment_claims, billing_reminders, store_subscriptions, trust_requests and ai_usage reference `stores(id)` ON DELETE CASCADE, so the row is never deleted (`lib/store-tombstone.ts`).
+- The `stores` row stays as a TOMBSTONE (slug `~purged~<id>`, name `[purged]`, domain / logo / contact columns NULL, soft-deleted). Ebda's own billing_events, instapay_receipts, manual_payment_claims, billing_reminders, store_subscriptions, trust_requests and ai_usage reference `stores(id)` ON DELETE CASCADE, so the row is never deleted (`lib/store-tombstone.ts`).
 - The archive `closed-store-archive/<store>/fiscal-<closedAt>.ndjson` and the per-closure ledger `closed-store-purge/<store>/ledger-<closedAt>.json` in the private bucket.
 - The 7-year clock counts the later of the last fiscal document and the last billing_event / instapay_receipt / manual_payment_claim of the store.
 
