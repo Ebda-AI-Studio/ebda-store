@@ -49,6 +49,7 @@ import { maskEmail } from '../lib/pii-mask';
 import logger from '../lib/logger';
 import { passwordSchema } from '../services/merchant-signup.service';
 import { assertNotDemoStore } from '../services/plan-limit.service';
+import { WalletService } from '../services/wallet.service';
 import { closeNonCustomerAccount } from '../services/account-closure.service';
 import { closureDeps } from '../services/account-closure.wiring';
 import {
@@ -977,6 +978,23 @@ router.delete(
         success: true,
         data: { message: 'Account deleted successfully' },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /auth/me/closure-preview - what closing the account will cost the shopper, read from the server whatever the store's wallet
+// feature flag says (the erase forfeits a remaining balance either way, so the confirm dialog must always be able to show it).
+router.get(
+  '/me/closure-preview',
+  authenticate,
+  rejectAdminOnMerchantOrigin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId, storeId } = req.user!;
+      const walletBalance = storeId ? await WalletService.getBalance(storeId, userId) : 0;
+      res.json({ success: true, data: { walletBalance } });
     } catch (error) {
       next(error);
     }

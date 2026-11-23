@@ -7,7 +7,6 @@ import { api, type SmsConsentResponse } from '@/lib/api';
 import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 import PasskeysCard from '../../../components/PasskeysCard';
-import { useWallet } from '../../../hooks/useWallet';
 import { useLocalePrice } from '../../../hooks/useLocalePrice';
 
 interface User {
@@ -22,9 +21,11 @@ export default function SettingsClient() {
   const router = useRouter();
   const { t } = useLanguage();
   const storeUrl = useStoreUrl();
-  const { wallet } = useWallet();
   const money = useLocalePrice();
-  const walletBalance = wallet?.balance ?? 0;
+  // Read from the SERVER at the moment the dialog opens, whatever the store's wallet feature flag says: the erase forfeits a
+  // remaining balance either way, so the shopper must always see it.
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [previewLoaded, setPreviewLoaded] = useState(false);
   const [forfeitAck, setForfeitAck] = useState(false);
   const [, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -587,7 +588,14 @@ export default function SettingsClient() {
               variant="destructive"
               onClick={() => {
                 setForfeitAck(false);
+                setPreviewLoaded(false);
+                setWalletBalance(0);
                 setShowDeleteConfirm(true);
+                void api
+                  .get<{ walletBalance: number }>('/auth/me/closure-preview')
+                  .then(r => setWalletBalance(r.success ? (r.data?.walletBalance ?? 0) : 0))
+                  .catch(() => undefined)
+                  .finally(() => setPreviewLoaded(true));
               }}
               isLoading={isDeleting}
             >
@@ -639,7 +647,7 @@ export default function SettingsClient() {
                 variant="destructive"
                 onClick={handleDeleteAccount}
                 isLoading={isDeleting}
-                disabled={walletBalance > 0 && !forfeitAck}
+                disabled={!previewLoaded || (walletBalance > 0 && !forfeitAck)}
               >
                 {t('Delete Account', 'حذف الحساب')}
               </Button>

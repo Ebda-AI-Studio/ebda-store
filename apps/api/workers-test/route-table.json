@@ -120,6 +120,7 @@
   "GET /admin/users/:userId/legal-acceptances",
   "GET /admin/webhook-events",
   "GET /auth/me",
+  "GET /auth/me/closure-preview",
   "GET /auth/me/export",
   "GET /auth/me/sms-consent/",
   "GET /auth/merchant/signup-token",
