@@ -12,6 +12,7 @@ import {
   sendStaffInviteEmail,
   sendFactorEnrolCodeEmail,
   sendFactorAddedNoticeEmail,
+  sendRecoveryCodesChangedNoticeEmail,
   sendMerchantVerificationEmail,
 } from '../services/platform-mailer';
 
@@ -136,17 +137,22 @@ export async function sendCodeMail(m: CodeMail): Promise<void> {
   }
 }
 
-export interface NoticeMail {
-  to: string;
-  kind: 'factor_added';
-  factor: 'totp' | 'passkey';
-  language: 'en' | 'ar';
-  firstName: string;
-}
+export type NoticeMail =
+  | {
+      to: string;
+      kind: 'factor_added';
+      factor: 'totp' | 'passkey';
+      language: 'en' | 'ar';
+      firstName: string;
+    }
+  | { to: string; kind: 'recovery_codes_changed'; language: 'en' | 'ar'; firstName: string };
 
 /** Security notices from the identity service that carry no code. */
 export async function sendNoticeMail(m: NoticeMail): Promise<void> {
-  if (m.kind !== 'factor_added') throw new Error('sendNoticeMail: unknown kind');
+  if (m.kind === 'recovery_codes_changed') {
+    await sendRecoveryCodesChangedNoticeEmail({ email: m.to, name: m.firstName }, m.language, true);
+    return;
+  }
   await sendFactorAddedNoticeEmail(
     { email: m.to, name: m.firstName, factor: m.factor },
     m.language,
