@@ -30,6 +30,7 @@
   },
   "steps": ["Analytics page / dashboard."],
   "edgeCases": [
+    "Revenue = net sales (REVENUE-DEF-1): all orders except cancelled, refunded and failed/refunded payments, net of refunds, INCLUDING unpaid COD; it is sales, not cash collected",
     "Timezone Cairo day key",
     "Abandoned tile summed backlog (#752)",
     "performance/cashflow need accounting.basic",
