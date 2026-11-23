@@ -29,6 +29,7 @@ interface AiSlice {
 }
 
 /** Pure: billing `limits` + `usage` (the same payload the billing page meters) -> the meters at >= 80%. */
+// pq-allow(unused-export): unit-tested directly (PlanLimitNotice.test.tsx)
 export function billingMeters(data: BillingSlice, keys: readonly MeterKey[]): PlanMeter[] {
   const out: PlanMeter[] = [];
   for (const key of keys) {
@@ -44,6 +45,7 @@ export function billingMeters(data: BillingSlice, keys: readonly MeterKey[]): Pl
 }
 
 /** Pure: the AI quota summary (the same payload AiUsageSummaryCard meters) -> a meter when either cap is >= 80%. */
+// pq-allow(unused-export): unit-tested directly (PlanLimitNotice.test.tsx)
 export function aiMeter(s: AiSlice): PlanMeter | null {
   const caps: Array<['daily' | 'monthly', number, number]> = [];
   if (s.dailyCap > 0) caps.push(['daily', s.today, s.dailyCap]);
