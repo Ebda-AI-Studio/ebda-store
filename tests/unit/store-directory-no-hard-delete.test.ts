@@ -4,6 +4,7 @@
  * ai_usage reference it ON DELETE CASCADE. Proven on the real D1 schema with foreign keys on, and by a source scan of the directory modules.
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
@@ -89,16 +90,87 @@ describe("a store removed from the directory keeps Ebda's billing records", () =
   });
 });
 
-describe('source scan: no directory module deletes a stores row', () => {
-  it.each([
-    'apps/api/src/lib/store-directory-sync.ts',
-    'apps/api/src/lib/store-directory-reconcile.ts',
-  ])('%s has no DELETE FROM stores and uses the tombstone', rel => {
-    const src = read(rel);
-    expect(src).not.toMatch(/DELETE FROM "?stores"?/i);
-    expect(src).toMatch(/tombstoneStoreDirectoryRow/);
+/**
+ * Source scan over every place that could remove a `stores` row: apps/api/src, apps/api/scripts, scripts/. A new hard delete anywhere
+ * fails here. Allowed: the rollback of a store created seconds ago (no billing exists yet), the local seed file, and one Postgres-only
+ * maintenance script for TEST stores (Prisma over the removed Postgres; it never touches the D1 platform database).
+ */
+const HARD_DELETE = [/DELETE FROM "?stores"?\b/i, /\.store\.delete(Many)?\(/];
+const ALLOWED: Record<string, string> = {
+  'apps/api/src/lib/store-create-do.ts':
+    'rollbackDoStore: creation rollback of a store made seconds ago, no billing exists yet',
+  'apps/api/scripts/cf-seed.sql': 'local seed data reset, not a deployed path',
+  'scripts/admin-test-store-cleanup.mjs':
+    'manual Postgres-only cleanup of TEST stores (Prisma over Postgres, removed in prod); never runs against D1',
+};
+const EXT = /\.(ts|tsx|mjs|js|cjs|sql|sh)$/;
+
+function walk(dir: string, out: string[] = []): string[] {
+  if (!fs.existsSync(dir)) return out;
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      if (e.name !== 'node_modules') walk(p, out);
+    } else if (
+      EXT.test(e.name) &&
+      !/\.(test|spec)\.(ts|tsx|mjs|js)$/.test(e.name) &&
+      !e.name.endsWith('.d.ts')
+    )
+      out.push(p);
+  }
+  return out;
+}
+export function findHardDeletes(roots: string[], base: string): string[] {
+  const hits: string[] = [];
+  for (const root of roots)
+    for (const f of walk(path.join(base, root))) {
+      const rel = path.relative(base, f).split(path.sep).join('/');
+      if (rel in ALLOWED) continue;
+      const text = fs.readFileSync(f, 'utf8');
+      for (const re of HARD_DELETE) if (re.test(text)) hits.push(`${rel} ~ ${re}`);
+    }
+  return hits;
+}
+const ROOTS = ['apps/api/src', 'apps/api/scripts', 'scripts'];
+
+describe('source scan: no code path deletes a stores row', () => {
+  it('apps/api/src, apps/api/scripts and scripts/ contain no DELETE FROM stores / store.delete outside the allowlist', () => {
+    expect(findHardDeletes(ROOTS, ROOT)).toEqual([]);
   });
-  it('the one intentional hard delete left is the rollback of a store created a moment ago (no billing exists yet)', () => {
-    expect(read('apps/api/src/lib/store-create-do.ts')).toMatch(/DELETE FROM "stores"/);
+  it('the scan sees the allowed files (a scanner that sees nothing would pass anything)', () => {
+    for (const rel of Object.keys(ALLOWED)) {
+      const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+      expect(
+        HARD_DELETE.some(re => re.test(text)),
+        rel
+      ).toBe(true);
+    }
+    expect(ROOTS.flatMap(r => walk(path.join(ROOT, r))).length).toBeGreaterThan(200);
+  });
+  it('MUTATION: a hard delete planted anywhere in the scanned roots is caught (raw SQL and Prisma shapes)', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hard-delete-scan-'));
+    try {
+      fs.mkdirSync(path.join(tmp, 'apps/api/src/lib'), { recursive: true });
+      fs.mkdirSync(path.join(tmp, 'scripts'), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmp, 'apps/api/src/lib/evil.ts'),
+        'await db.prepare(\'DELETE FROM "stores" WHERE "id" = ?\').bind(id).run();'
+      );
+      fs.writeFileSync(
+        path.join(tmp, 'scripts/evil.mjs'),
+        'await tx.store.deleteMany({ where: { id } });'
+      );
+      fs.writeFileSync(
+        path.join(tmp, 'scripts/fine.mjs'),
+        "await db.prepare('DELETE FROM store_staff WHERE store_id = ?');"
+      );
+      const hits = findHardDeletes(['apps/api/src', 'scripts'], tmp);
+      expect(hits.map(h => h.split(' ~ ')[0]).sort()).toEqual([
+        'apps/api/src/lib/evil.ts',
+        'scripts/evil.mjs',
+      ]);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
