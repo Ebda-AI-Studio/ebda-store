@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 
-const m = vi.hoisted(() => ({ optOut: vi.fn(), list: vi.fn() }));
+const m = vi.hoisted(() => ({ optOut: vi.fn(), list: vi.fn(), testSend: vi.fn() }));
 
 vi.mock('@api/config', () => ({
   config: {
@@ -27,10 +27,13 @@ vi.mock('@api/middleware/store-access', () => ({
 }));
 vi.mock('@api/middleware/security', () => ({
   publicLimiter: (_req: any, _res: any, next: any) => next(),
+  writeLimiter: (_req: any, _res: any, next: any) => next(),
+  auditLog: vi.fn(),
 }));
 vi.mock('@api/services/lifecycle-emails.service', () => ({
   optOut: m.optOut,
   listLifecycleLog: m.list,
+  sendLifecycleTestEmail: m.testSend,
 }));
 
 const STORE = '11111111-1111-4111-8111-111111111111';
@@ -41,6 +44,7 @@ beforeAll(async () => {
   const { default: pub } = await import('@api/routes/lifecycle-emails-public.routes');
   const { signLifecycleUnsubscribeToken } = await import('@api/lib/lifecycle-unsubscribe-token');
   app = express();
+  app.use(express.json());
   app.use('/stores/:storeId/lifecycle-emails', admin);
   app.use('/public/lifecycle-emails', pub);
   (app as any).token = signLifecycleUnsubscribeToken(STORE);
@@ -49,6 +53,7 @@ beforeAll(async () => {
 beforeEach(() => {
   m.optOut.mockReset();
   m.list.mockReset();
+  m.testSend.mockReset();
 });
 
 describe('GET /stores/:storeId/lifecycle-emails', () => {
@@ -59,6 +64,45 @@ describe('GET /stores/:storeId/lifecycle-emails', () => {
     expect(res.body).toEqual({ success: true, data: { optedOut: false, entries: [] } });
     expect(m.list).toHaveBeenCalledWith(STORE);
     expect(res.headers['cache-control']).toBe('no-store');
+  });
+});
+
+describe('POST /stores/:storeId/lifecycle-emails/test-send', () => {
+  const post = (body: unknown) =>
+    request(app)
+      .post(`/stores/${STORE}/lifecycle-emails/test-send`)
+      .send(body as object);
+
+  it('sends to the owner for the caller and names only the owner address back', async () => {
+    m.testSend.mockResolvedValue({ status: 'sent', to: 'owner@example.com' });
+    const res = await post({ kind: 'trial_recap' });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      success: true,
+      data: { kind: 'trial_recap', to: 'owner@example.com' },
+    });
+    expect(m.testSend).toHaveBeenCalledWith(STORE, 'trial_recap', 'u1');
+  });
+
+  it('a body cannot choose a recipient: unknown keys and unknown kinds are rejected before any send', async () => {
+    for (const body of [{ kind: 'trial_recap', to: 'victim@example.com' }, { kind: 'nope' }, {}]) {
+      const res = await post(body);
+      expect(res.status).toBeGreaterThanOrEqual(400);
+    }
+    expect(m.testSend).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['not_owner', 403, 'OWNER_ONLY'],
+    ['not_found', 404, 'STORE_NOT_FOUND'],
+    ['no_recipient', 409, 'NO_OWNER_EMAIL'],
+    ['failed', 502, 'ENQUEUE_FAILED'],
+  ])('%s -> %i %s, never a success', async (status, code, errCode) => {
+    m.testSend.mockResolvedValue({ status, reason: 'x' });
+    const res = await post({ kind: 'add_products' });
+    expect(res.status).toBe(code);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe(errCode);
   });
 });
 
