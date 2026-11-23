@@ -59,6 +59,11 @@ vi.mock('@api/lib/repo-factory', () => ({
   storeDb: async () => mockPrisma,
   storeMoney: async () => null,
 }));
+// REVENUE-DEF-1: the 30d / previous-30d revenue totals come from the shared net-revenue read (proven in revenue-definition.test.ts
+// and packages/repo/test/do-analytics-reads.test.ts); these cases are about the derived rates, so the totals are zero here
+vi.mock('@api/services/revenue.service', () => ({
+  netRevenue: async () => ({ revenue: 0, orders: 0 }),
+}));
 vi.mock('@api/lib/store-scoped-read', () => ({
   readInStoreContext: (_storeId: string, fn: () => unknown) => fn(),
 }));
