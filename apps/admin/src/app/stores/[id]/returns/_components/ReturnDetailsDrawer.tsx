@@ -148,9 +148,11 @@ export function ReturnDetailsDrawer({
           <div>
             <h3 className="font-medium text-foreground mb-2">{t('customer')}</h3>
             <p className="text-sm text-muted-foreground">
-              {record.customer.firstName} {record.customer.lastName}
+              {record.customer
+                ? `${record.customer.firstName} ${record.customer.lastName}`.trim()
+                : '-'}
             </p>
-            <p className="text-sm text-muted-foreground">{record.customer.email}</p>
+            <p className="text-sm text-muted-foreground">{record.customer?.email}</p>
           </div>
 
           {/* Reason */}
