@@ -6,7 +6,6 @@
     "operator-reason|platform.scans-rollups",
     "operator-reason|platform.store-delete",
     "operator-reason|store.delete-custom-page",
-    "operator-reason|team.audit-log",
     "policy-free-writes|account.login",
     "policy-free-writes|account.multi-store",
     "policy-free-writes|account.staff-accept-invite",
