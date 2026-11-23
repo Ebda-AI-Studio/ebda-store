@@ -14,15 +14,18 @@ const h = vi.hoisted(() => {
   };
   return { ...state, rec };
 });
-vi.mock('@ebda/database', () => ({
-  prisma: {
+vi.mock('@ebda/database', () => {
+  const tx = {
     storeSubscription: { findUnique: h.rec('sub', null) },
     manualPaymentClaim: { count: h.rec('claim', 1) },
-    storeTaxProfile: { findUnique: h.rec('tax', null) },
-    storeWhatsAppLink: { findUnique: h.rec('wa', null) },
-    staffInvite: { count: h.rec('invite', 0) },
+  };
+  return { prisma: {}, withStore: async (_id: string, fn: (t: typeof tx) => unknown) => fn(tx) };
+});
+vi.mock('../../apps/api/src/services/staff-invite.service', () => ({
+  countPendingInvites: async (id: string) => {
+    h.calls.push({ model: 'invite', where: { storeId: id } });
+    return 0;
   },
-  withStore: vi.fn(),
 }));
 vi.mock('../../apps/api/src/lib/repo-factory', () => ({
   storeDb: async () => ({
@@ -33,6 +36,8 @@ vi.mock('../../apps/api/src/lib/repo-factory', () => ({
       ]),
     },
     product: { count: h.rec('product', 2) },
+    storeTaxProfile: { findUnique: h.rec('tax', null) },
+    storeWhatsAppLink: { findUnique: h.rec('wa', null) },
     shippingZone: { count: h.rec('zone', 0) },
     shippingAreaRate: { count: h.rec('rate', 0) },
   }),

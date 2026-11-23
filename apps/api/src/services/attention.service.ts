@@ -9,12 +9,13 @@
  *
  * Must run inside the store's tenant context (the routes mount it behind `tenantContext`).
  */
-import { prisma } from '@ebda/database';
+import { withStore } from '@ebda/database';
 import type { AttentionResponse } from '@ebda/shared';
 import { countActionItems } from '@ebda/shared';
 import { storeDb } from '../lib/repo-factory';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
+import { countPendingInvites } from './staff-invite.service';
 import { computeAttention, type GatewayFact } from './attention.rules';
 
 function testOk(connectionTest: unknown): boolean | null {
@@ -63,16 +64,18 @@ export class AttentionService {
       db.product.count({ where: { storeId, deletedAt: null } }),
       db.shippingZone.count({ where: { storeId, isActive: true } }),
       db.shippingAreaRate.count({ where: { storeId, isActive: true } }),
-      prisma.storeSubscription.findUnique({
-        where: { storeId },
-        select: { status: true, ordersOverLimitMonth: true },
-      }),
-      prisma.manualPaymentClaim.count({ where: { storeId, status: 'pending' } }),
-      prisma.storeTaxProfile.findUnique({ where: { storeId }, select: { status: true } }),
-      prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: { linked: true } }),
-      prisma.staffInvite.count({
-        where: { storeId, status: 'pending', expiresAt: { gt: new Date() } },
-      }),
+      withStore(storeId, tx =>
+        tx.storeSubscription.findUnique({
+          where: { storeId },
+          select: { status: true, ordersOverLimitMonth: true },
+        })
+      ),
+      withStore(storeId, tx =>
+        tx.manualPaymentClaim.count({ where: { storeId, status: 'pending' } })
+      ),
+      db.storeTaxProfile.findUnique({ where: { storeId }, select: { status: true } }),
+      db.storeWhatsAppLink.findUnique({ where: { storeId }, select: { linked: true } }),
+      countPendingInvites(storeId),
       featureService.isFeatureEnabled(storeId, 'tax'),
       featureService.isFeatureEnabled(storeId, 'whatsapp'),
       featureService.isFeatureEnabled(storeId, 'staff_accounts'),
