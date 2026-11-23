@@ -5,7 +5,7 @@ import { FIRST_PAID_ORDERS_GOAL, type SetupGuideState } from '@ebda/shared';
  * (no second calculation): while a required step is open it counts steps (same done/total as the card), then it
  * counts paid orders toward the first-5 goal, then it is gone.
  */
-export type LaunchProgress =
+type LaunchProgress =
   | { phase: 'steps'; done: number; total: number }
   | { phase: 'orders'; done: number; total: number }
   | { phase: 'done' };

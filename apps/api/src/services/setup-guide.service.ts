@@ -98,6 +98,7 @@ async function patchGuide(
  * cash-on-delivery order that was delivered (the courier collected the cash even if the merchant has not marked it paid yet).
  * Cancelled / refunded orders never count, and neither does a fully refunded payment.
  */
+// pq-allow(unused-export): the clause is unit-tested directly (tests/unit/setup-guide-write.test.ts)
 export function paidOrDeliveredCodWhere(storeId: string) {
   return {
     storeId,
