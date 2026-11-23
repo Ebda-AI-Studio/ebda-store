@@ -103,6 +103,7 @@ import {
   ownerHasUsedTrial,
   releaseOwnerTrial,
 } from './billing/trial-eligibility';
+import { netRevenue } from './revenue.service';
 
 /**
  * Bust every public-cache entry that depends on a store record. The
@@ -1417,16 +1418,10 @@ export class StoreService {
         db.product.count({ where: { storeId, status: 'active' } }),
         db.order.count({ where: { storeId } }),
         db.customer.count({ where: { storeId } }),
-        db.order.aggregate({
-          where: {
-            storeId,
-            OR: [
-              { status: { in: ['confirmed', 'processing', 'shipped', 'delivered'] } },
-              { paymentStatus: 'paid' },
-            ],
-          },
-          _sum: { total: true },
-        }),
+        // The ONE revenue definition (services/revenue.service.ts, STORE-QA-7): refunded / cancelled / failed-payment orders
+        // drop out and partial refunds are netted. (Was: status confirmed..delivered OR paid, which counted a delivered +
+        // refunded order as sales.)
+        netRevenue(storeId),
         // No `include: { customer }`: on a DO store the order is in the StoreDO and the customer is not
         // (prisma-lite: "Order.customer lives in another database"), so the five customers are read in one query below.
         db.order.findMany({
@@ -1466,7 +1461,7 @@ export class StoreService {
       productCount,
       orderCount,
       customerCount,
-      totalRevenue: totalRevenue._sum.total || 0,
+      totalRevenue: totalRevenue.revenue,
       recentOrders,
     };
   }
