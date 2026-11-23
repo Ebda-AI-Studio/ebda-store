@@ -6,8 +6,8 @@
 --   [ \t\n\r U+00A0]+ to U+0020, trim U+0020. Twin of foldArabicHamza (packages/shared/src/foundation/text.ts, vendored from ebda-foundation): the
 --   translate() strings below ARE AR_FOLD_H_FROM / AR_FOLD_H_TO byte for byte (tests/integration/search-normalize-parity.test.ts reads THIS file).
 --   Also new: ebda_product_search_doc_h / ebda_product_name_doc_h, two trigram GIN expression indexes on them, and
---   ebda_product_search_ids_h (the SECURITY DEFINER candidate function of 20261024000300, over the fold-A docs, no SKU arm: the SKU stays on fold B).
---   The app runs BOTH functions and ORs the ids (productSearchSql): a query word matches under fold B OR under fold A.
+--   ebda_product_search_ids_h (the SECURITY DEFINER candidate function of 20261024000300 over BOTH folds: per query word, (fold B doc LIKE b-pattern OR
+--   fold A doc LIKE a-pattern, plus the SKU arm on fold B), ANDed across words: a word matches under fold B OR under fold A, each word on its own).
 -- WHY: Egyptian shoppers write مسئول and مسؤول interchangeably (fold A) AND ي for ئ (سايل for سائل, fold B). No single fold has both.
 --   normalize(text, NFKC) is IMMUTABLE (pg_proc.provolatile = 'i', verified on PostgreSQL 17.11) and needs a UTF8 database (Neon is).
 -- LOCK: the two indexes below are plain CREATE INDEX IF NOT EXISTS because Prisma runs this file in one transaction (SHARE lock on `products` while they
@@ -60,7 +60,8 @@ CREATE OR REPLACE FUNCTION public.ebda_product_search_ids_h(
   p_only_active boolean,
   p_include_deleted boolean,
   p_word_start boolean,
-  p_patterns text[]
+  p_patterns_b text[],
+  p_patterns_a text[]
 )
 RETURNS SETOF text
 LANGUAGE plpgsql STABLE SECURITY DEFINER ROWS 500
@@ -68,12 +69,13 @@ SET search_path = pg_catalog, public, pg_temp
 AS $fn$
 DECLARE
   doc text;
+  docb text;
   v_scope text;
   arm text;
   b text;
   v_bounds text[] := ARRAY['', '% ', '%/', '%(', '%-', '%,', '%.', 'ا', '% ا', 'ال', '% ال'];
   arms text := '';
-  n int := coalesce(array_length(p_patterns, 1), 0);
+  n int := coalesce(array_length(p_patterns_b, 1), 0);
   i int;
 BEGIN
   -- The store comes ONLY from the scoped session (app.current_store_id, set transaction-locally by
@@ -89,12 +91,14 @@ BEGIN
     RETURN;
   END IF;
   -- searchTokens() caps a query at 8 words; refuse anything else rather than build a huge AND.
-  IF n < 1 OR n > 8 THEN
+  IF n < 1 OR n > 8 OR n IS DISTINCT FROM coalesce(array_length(p_patterns_a, 1), 0) THEN
     RETURN;
   END IF;
   IF p_field = 'name' THEN
+    docb := 'public.ebda_product_name_doc(p.name, p.name_ar, p.search_terms)';
     doc := 'public.ebda_product_name_doc_h(p.name, p.name_ar, p.search_terms)';
   ELSIF p_field = 'all' THEN
+    docb := 'public.ebda_product_search_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)';
     doc := 'public.ebda_product_search_doc_h(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)';
   ELSE
     RETURN;
@@ -108,26 +112,30 @@ BEGIN
   -- plain alef). Each boundary is one LIKE arm; pg_trgm treats punctuation and spaces alike, so
   -- every arm extracts the same word-start trigrams and the same GIN index serves all of them
   -- (BitmapOr). Review I-1. Other prefixes and other punctuation are a residual, see the ruling.
+  -- Per word: (fold B arms OR fold A arms), ANDed across words ($1 = B patterns, $3 = A patterns).
   FOR i IN 1..n LOOP
+    arm := '';
     IF coalesce(p_word_start, false) THEN
-      arm := '';
       FOREACH b IN ARRAY v_bounds LOOP
         arm := arm || CASE WHEN arm = '' THEN '' ELSE ' OR ' END
-                   || format('%s LIKE (%L || $1[%s])', doc, b, i);
+                   || format('%s LIKE (%L || $1[%s]) OR %s LIKE (%L || $3[%s])', docb, b, i, doc, b, i);
       END LOOP;
-      arms := arms || ' AND (' || arm || ')';
     ELSE
-      arms := arms || format(' AND %s LIKE $1[%s]', doc, i);
+      arm := format('%s LIKE $1[%s] OR %s LIKE $3[%s]', docb, i, doc, i);
     END IF;
+    IF coalesce(p_with_sku, false) THEN
+      arm := arm || format(' OR public.ebda_ar_norm(coalesce(p.sku, '''')) LIKE $1[%s]', i);
+    END IF;
+    arms := arms || ' AND (' || arm || ')';
   END LOOP;
   RETURN QUERY EXECUTE
     'SELECT p.id FROM public.products p WHERE p.store_id = $2'
     || CASE WHEN coalesce(p_only_active, false) THEN ' AND p.status = ''active''' ELSE '' END
     || CASE WHEN coalesce(p_include_deleted, false) THEN '' ELSE ' AND p.deleted_at IS NULL' END
     || arms
-    USING p_patterns, v_scope;
+    USING p_patterns_b, v_scope, p_patterns_a;
 END
 $fn$;
 
-REVOKE ALL ON FUNCTION public.ebda_product_search_ids_h(text, text, boolean, boolean, boolean, boolean, text[]) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.ebda_product_search_ids_h(text, text, boolean, boolean, boolean, boolean, text[]) TO ebda_app;
+REVOKE ALL ON FUNCTION public.ebda_product_search_ids_h(text, text, boolean, boolean, boolean, boolean, text[], text[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ebda_product_search_ids_h(text, text, boolean, boolean, boolean, boolean, text[], text[]) TO ebda_app;

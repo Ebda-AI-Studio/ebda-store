@@ -17,7 +17,7 @@ import {
   normalizeArabicHamza,
   normalizeArabicSearch,
   searchTokens,
-  searchTokensHamza,
+  searchWordPairs,
   stemSearchDoc,
   stemSearchToken,
 } from '../../../shared/src/search';
@@ -166,9 +166,9 @@ const buildProductStemNameDoc = (p: ProductDocFields): string =>
 export const buildProductNameDoc = (p: ProductDocFields): string =>
   normalizeArabicSearch(joinDoc(p.name, p.nameAr, p.searchTerms));
 /** Fold A twins (Ruling F7-HAMZA-2, `ebda_product_search_doc_h` / `ebda_product_name_doc_h`): the same joined text under the hamza fold. */
-export const buildProductDocHamza = (p: ProductDocFields): string =>
+const buildProductDocHamza = (p: ProductDocFields): string =>
   normalizeArabicHamza(joinDoc(p.name, p.nameAr, p.searchTerms, p.description, p.descriptionAr));
-export const buildProductNameDocHamza = (p: ProductDocFields): string =>
+const buildProductNameDocHamza = (p: ProductDocFields): string =>
   normalizeArabicHamza(joinDoc(p.name, p.nameAr, p.searchTerms));
 
 const clampLimit = (limit: number | undefined): number =>
@@ -322,16 +322,7 @@ export function searchProductIdSet(
   flushSearchIndex(db);
   const limit = clampLimit(opts.limit);
   const byId = new Map<string, Ranked>();
-  const folds: Array<'b' | 'a'> = /[\u0600-\u06FF]/.test(raw) ? ['b', 'a'] : ['b']; // Latin-only: A and B agree
-  for (const fold of folds)
-    for (const r of rankProductHits(db, storeId, raw, opts, fold)) {
-      const prev = byId.get(r.id);
-      if (!prev) byId.set(r.id, r);
-      else {
-        prev.exact = Math.max(prev.exact, r.exact);
-        prev.sim = Math.max(prev.sim, r.sim);
-      }
-    }
+  for (const r of rankProductHits(db, storeId, raw, opts)) byId.set(r.id, r);
   const ranked = [...byId.values()].sort((a, b) =>
     opts.order === 'featured'
       ? b.exact - a.exact || b.featured - a.featured || cmp(a.name, b.name) || cmp(a.id, b.id)
@@ -340,54 +331,71 @@ export function searchProductIdSet(
   return { ids: ranked.slice(0, limit).map(r => r.id), truncated: ranked.length > limit };
 }
 
-/** The hits of ONE fold. Fold A has no stem layer and no SKU arm (stems and SKUs stay on fold B). */
+/**
+ * The hits for every word under fold B OR fold A (Ruling F7-HAMZA-2), ANDed across words: word 1 may match only under A and word 2 only under B.
+ * Fold A has no stem layer and no SKU arm (stems and SKUs stay on fold B). A Latin-only query has no A arm (A and B agree).
+ */
 function rankProductHits(
   db: SyncSql,
   storeId: string,
   raw: string,
-  opts: ProductSearchOpts,
-  fold: 'b' | 'a'
+  opts: ProductSearchOpts
 ): Ranked[] {
-  const tokens = fold === 'b' ? searchTokens(raw) : searchTokensHamza(raw);
-  if (tokens.length === 0) return [];
+  const arabic = /[؀-ۿ]/.test(raw);
+  const pairs = searchWordPairs(raw);
+  if (pairs.length === 0) return [];
+  // a word whose two folds agree (one entry) is tried against BOTH docs, like the SQL function
+  const bTok = pairs.map(p => p[0]!);
+  const aTok = pairs.map(p => p[1] ?? p[0]!);
   const storefront = opts.scope === 'storefront';
-  const withSku = fold === 'b' && (opts.withSku ?? opts.scope === 'admin');
-  const nameCol = fold === 'b' ? 'name_doc' : 'name_doc_h';
-  const docCol = opts.field === 'name' ? nameCol : fold === 'b' ? 'doc' : 'doc_h';
+  const withSku = opts.withSku ?? opts.scope === 'admin';
+  const nameCol = 'name_doc';
+  const docCol = opts.field === 'name' ? 'name_doc' : 'doc';
+  const docColH = opts.field === 'name' ? 'name_doc_h' : 'doc_h';
   const stemCol = opts.field === 'name' ? 'stem_name_doc' : 'stem_doc';
-  const useStem = fold === 'b' && (opts.stem ?? storefront);
+  const useStem = opts.stem ?? storefront;
   // UTF-16 units, exactly like the Postgres caller's `t.length < 3`
-  const wordStart = tokens.every(t => t.length < 3);
+  const wordStart = [...bTok, ...(arabic ? aTok : [])].every(t => t.length < 3);
 
   const where: string[] = ['f.store_id = ?'];
   const params: unknown[] = [storeId];
   const match: string[] = [];
-  for (const t of tokens) {
-    const like = escapeLike(t);
+  for (let i = 0; i < bTok.length; i++) {
+    const tb = bTok[i]!;
+    const ta = aTok[i]!;
+    // [column, token, isSku] arms of this word
+    const cols: Array<[string, string, boolean]> = [[docCol, tb, false]];
+    if (arabic) cols.push([docColH, ta, false]);
+    if (withSku) cols.push(['sku', tb, true]);
     if (wordStart) {
       const arms: string[] = [];
-      for (const b of WORD_START_BOUNDS) {
-        arms.push(`f.${docCol} LIKE ? ESCAPE '\\'`);
-        params.push(`${b}${like}%`);
-      }
-      if (withSku) {
-        arms.push(`f.sku LIKE ? ESCAPE '\\'`);
-        params.push(`${like}%`);
+      for (const [col, t, isSku] of cols) {
+        const like = escapeLike(t);
+        if (isSku) {
+          arms.push(`f.sku LIKE ? ESCAPE '\\'`);
+          params.push(`${like}%`);
+          continue;
+        }
+        for (const b of WORD_START_BOUNDS) {
+          arms.push(`f.${col} LIKE ? ESCAPE '\\'`);
+          params.push(`${b}${like}%`);
+        }
       }
       where.push(`(${arms.join(' OR ')})`);
-    } else if ([...t].length >= 3) {
-      const literal = withSku ? `{${docCol} sku} : ${ftsPhrase(t)}` : `${docCol} : ${ftsPhrase(t)}`;
-      const stem = useStem ? stemSearchToken(t) : '';
-      match.push(
-        [...stem].length >= 3 ? `(${literal} OR ${stemCol} : ${ftsPhrase(stem)})` : literal
-      );
+    } else if ([...tb].length >= 3 && (!arabic || [...ta].length >= 3)) {
+      const parts: string[] = [
+        withSku ? `{${docCol} sku} : ${ftsPhrase(tb)}` : `${docCol} : ${ftsPhrase(tb)}`,
+      ];
+      if (arabic) parts.push(`${docColH} : ${ftsPhrase(ta)}`);
+      const stem = useStem ? stemSearchToken(tb) : '';
+      if ([...stem].length >= 3) parts.push(`${stemCol} : ${ftsPhrase(stem)}`);
+      match.push(parts.length > 1 ? `(${parts.join(' OR ')})` : parts[0]!);
     } else {
       // a short word beside long ones: a plain substring test on the (already narrowed) rows
-      const arms = [`f.${docCol} LIKE ? ESCAPE '\\'`];
-      params.push(`%${like}%`);
-      if (withSku) {
-        arms.push(`f.sku LIKE ? ESCAPE '\\'`);
-        params.push(`%${like}%`);
+      const arms: string[] = [];
+      for (const [col, t] of cols) {
+        arms.push(`f.${col} LIKE ? ESCAPE '\\'`);
+        params.push(`%${escapeLike(t)}%`);
       }
       where.push(`(${arms.join(' OR ')})`);
     }
@@ -401,18 +409,21 @@ function rankProductHits(
   const status = storefront ? "AND p.status = 'active' AND p.audience = 'public'" : '';
   const deleted = opts.includeDeleted && !storefront ? '' : 'AND p.deleted_at IS NULL';
   const rows = db.all(
-    `SELECT p.id AS id, p.name AS name, p.featured AS featured, f.${nameCol} AS name_doc, f.${docCol} AS hay, f.sku AS sku
+    `SELECT p.id AS id, p.name AS name, p.featured AS featured, f.${nameCol} AS name_doc, f.${docCol} AS hay, f.${docColH} AS hay_h, f.sku AS sku
        FROM product_search_fts f JOIN products p ON p.id = f.product_id AND p.store_id = ?
       WHERE ${where.join(' AND ')} ${status} ${deleted}`,
     [storeId, ...sqlParams]
   );
-  const q = fold === 'b' ? normalizeArabicSearch(raw) : normalizeArabicHamza(raw);
-  // A row that contains every word literally (or by SKU) ranks before one that matched only through a stem.
+  const q = normalizeArabicSearch(raw);
+  // A row that contains every word literally (either fold, or by SKU) ranks before one that matched only through a stem.
   const literalHit = (r: Row) =>
     !useStem ||
     wordStart ||
-    tokens.every(
-      t => String(r.hay ?? '').includes(t) || (withSku && String(r.sku ?? '').includes(t))
+    bTok.every(
+      (t, i) =>
+        String(r.hay ?? '').includes(t) ||
+        (arabic && String(r.hay_h ?? '').includes(aTok[i]!)) ||
+        (withSku && String(r.sku ?? '').includes(t))
     );
   return rows.map(r => ({
     id: r.id as string,

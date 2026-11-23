@@ -1,7 +1,7 @@
 import { prisma, Prisma } from '@ebda/database';
 import {
   searchTokens,
-  searchTokensHamza,
+  searchWordPairs,
   escapeLike,
   normalizeArabicSearch,
   isPersonalDataTerm,
@@ -103,19 +103,20 @@ export function productSearchSql(
   const matchB = Prisma.sql`p.id IN (SELECT public.ebda_product_search_ids(
         ${storeId}, ${field}, ${withSku}, ${storefront},
         ${opts.includeDeleted === true}, ${wordStart}, ${patterns}::text[]))`;
-  // Ruling F7-HAMZA-2: a word also matches under the hamza fold A (مسئول = مسؤول = سئوال's seat variants), against the A docs and their own
-  // trigram indexes (migration 20261123200000). Fold B above is untouched, so every old match still holds. Skipped for a query with no Arabic letter
-  // (A and B agree on Latin text), which keeps English searches at one lookup.
-  const hamzaTokens = /[\u0600-\u06FF]/.test(raw) ? searchTokensHamza(raw) : [];
+  // Ruling F7-HAMZA-2: each WORD matches under fold B OR under the hamza fold A (مسئول = مسؤول's seat variants), words ANDed: the `_h` function
+  // takes the B and A pattern of every word and builds (docB LIKE b OR docA LIKE a) per word, against the A docs' own trigram indexes
+  // (migration 20261123200000). A word whose two folds agree is tried against both docs. Skipped for a query with no Arabic letter
+  // (A and B agree on Latin text), which keeps English searches at one lookup on the original function.
   let match: Prisma.Sql = matchB;
-  if (hamzaTokens.length > 0) {
-    const wordStartH = hamzaTokens.every(t => t.length < 3);
-    const patternsH = hamzaTokens.map(t =>
-      wordStartH ? `${escapeLike(t)}%` : `%${escapeLike(t)}%`
-    );
-    match = Prisma.sql`(${matchB} OR p.id IN (SELECT public.ebda_product_search_ids_h(
-        ${storeId}, ${field}, ${false}, ${storefront},
-        ${opts.includeDeleted === true}, ${wordStartH}, ${patternsH}::text[])))`;
+  if (/[\u0600-\u06FF]/.test(raw)) {
+    const pairs = searchWordPairs(raw);
+    const bTok = pairs.map(p => p[0]!);
+    const aTok = pairs.map(p => p[1] ?? p[0]!);
+    const wordStartBoth = [...bTok, ...aTok].every(t => t.length < 3);
+    const like = (t: string) => (wordStartBoth ? `${escapeLike(t)}%` : `%${escapeLike(t)}%`);
+    match = Prisma.sql`p.id IN (SELECT public.ebda_product_search_ids_h(
+        ${storeId}, ${field}, ${withSku}, ${storefront},
+        ${opts.includeDeleted === true}, ${wordStartBoth}, ${bTok.map(like)}::text[], ${aTok.map(like)}::text[]))`;
   }
   // limit + 1: the extra row only says "there were more" (truncated).
   return Prisma.sql`SELECT p.id FROM products p

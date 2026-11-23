@@ -77,6 +77,10 @@
       "require": "./dist/qr/links.js",
       "default": "./src/qr/links.ts"
     },
+    "./request-guard": {
+      "types": "./src/foundation/request-guard.ts",
+      "default": "./src/foundation/request-guard.ts"
+    },
     "./wa-v1": {
       "types": "./src/foundation/contracts/wa-v1.ts",
       "default": "./src/foundation/contracts/wa-v1.ts"

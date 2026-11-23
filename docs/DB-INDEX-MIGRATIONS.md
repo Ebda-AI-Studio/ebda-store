@@ -71,7 +71,7 @@ refer to.
 ### Hamza fold indexes (`20261123200000_search_fold_hamza`, Ruling F7-HAMZA-2)
 
 The migration is ADDITIVE: the original fold B (`public.ebda_ar_norm` and every index on it) is untouched, so there is no reindex and no lock on existing
-objects. It adds `public.ebda_ar_norm_h`, the two `_h` doc functions, `public.ebda_product_search_ids_h` and two trigram GIN expression indexes
+objects. It adds `public.ebda_ar_norm_h`, the two `_h` doc functions, `public.ebda_product_search_ids_h` (both folds, per word: `(fold B OR fold A)` ANDed across words) and two trigram GIN expression indexes
 (`products_search_doc_h_trgm_idx`, `products_name_doc_h_trgm_idx`). Pre-launch or on a small `products` table the plain `CREATE INDEX IF NOT EXISTS`
 inside the migration is fine. Post-launch, off-peak, on `DIRECT_URL` in psql autocommit (no BEGIN), BEFORE the deploy that carries the code:
 

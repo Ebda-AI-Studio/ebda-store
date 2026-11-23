@@ -44,28 +44,3 @@ export const NORMALIZE_VECTORS: ReadonlyArray<readonly [string, string]> = [
   ['\u00A0 x\t\ny\r', 'x y'], // NBSP/tab/LF/CR collapse; trailing collapsed space trimmed
   ['\uFEFFx', '\uFEFFx'], // BOM is not whitespace here
 ];
-
-/**
- * Fold A (hamza fold, Ruling F7-HAMZA-2): [input, normalizeArabicHamza(input)]. Tested against `ebda_ar_norm_h` the same way as NORMALIZE_VECTORS is
- * against `ebda_ar_norm`. NFKC first; ء ئ ؤ all become و; a run of و collapses.
- */
-export const NORMALIZE_HAMZA_VECTORS: ReadonlyArray<readonly [string, string]> = [
-  ['مسئول', 'مسول'],
-  ['مسؤول', 'مسول'],
-  ['سؤال', 'سوال'],
-  ['سئوال', 'سوال'],
-  ['سائل', 'ساول'],
-  ['ساءل', 'ساول'],
-  ['رائع', 'راوع'],
-  ['سماء', 'سماو'],
-  ['أحذية', 'احذيه'],
-  ['مَسْئُول', 'مسول'],
-  ['\uFEFB تنسى', 'لا تنسي'], // lam-alef ligature (NFKC)
-  ['ﻣﺤﻤﺪ', 'محمد'], // Arabic presentation forms (NFKC)
-  ['１２٣', '123'], // fullwidth digits (NFKC)
-  ['\u2009x\u2009', 'x'], // thin space is a plain space after NFKC
-  ['\u3000x\u3000', 'x'],
-  ['عبـــاية', 'عبايه'],
-  ['مقاس ٤٢', 'مقاس 42'],
-  ['SHOES', 'shoes'],
-];

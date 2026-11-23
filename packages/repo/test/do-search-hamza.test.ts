@@ -80,6 +80,17 @@ describe('DO product search: fold B OR fold A (Ruling F7-HAMZA-2)', () => {
     expect(find(db, 'مسؤول')).toEqual(['seat1', 'seat2']);
     expect(find(db, 'مسول')).toEqual(expect.arrayContaining(['seat1', 'seat2'])); // (also stem-matches سوال: مفعل rule, old behaviour)
   });
+  it('per word: word 1 only matches under fold A and word 2 only under fold B still finds the product', () => {
+    const { db: d2 } = fx([
+      prod('mix', 'مسؤول سائل'),
+      prod('onlyA', 'مسؤول غسيل'),
+      prod('onlyB', 'مدير سائل'),
+    ]);
+    // مسئول = مسؤول under A only; سايل = سائل under B only
+    expect(find(d2, 'مسئول سايل')).toEqual(['mix']);
+    expect(find(d2, 'سايل مسئول')).toEqual(['mix']);
+    expect(find(d2, 'مسئول')).toEqual(['mix', 'onlyA']);
+  });
   it('سؤال = سوال = سئوال', () => {
     for (const q of ['سؤال', 'سوال', 'سئوال']) expect(find(db, q), q).toEqual(['q1']);
   });

@@ -14,9 +14,9 @@ import { AR_FOLD_FROM, AR_FOLD_TO, NORMALIZE_VECTORS, normalizeArabicSearch } fr
 import {
   AR_FOLD_H_FROM,
   AR_FOLD_H_TO,
-  NORMALIZE_HAMZA_VECTORS,
   normalizeArabicHamza,
 } from '../../packages/shared/src/search';
+import hamzaVectors from '../../packages/shared/src/foundation/vectors/arabic-hamza.json';
 import { hasDb } from '../helpers/bundle-fixtures';
 import { productSearchSql } from '../../apps/api/src/services/product-search.service';
 
@@ -255,13 +255,16 @@ describe('ebda_ar_norm_h migration mirrors the TS fold-A table', () => {
 });
 
 describe.skipIf(!hasDb)('ebda_ar_norm_h parity with normalizeArabicHamza', () => {
-  it.each(NORMALIZE_HAMZA_VECTORS)('SQL and TS agree on %j', async (input, expected) => {
-    const [row] = await prisma.$queryRaw<
-      Array<{ n: string | null }>
-    >`SELECT public.ebda_ar_norm_h(${input}) AS n`;
-    expect(row.n).toBe(normalizeArabicHamza(input));
-    expect(row.n).toBe(expected);
-  });
+  it.each(hamzaVectors.cases as Array<[string, string]>)(
+    'SQL and TS agree on %j',
+    async (input, expected) => {
+      const [row] = await prisma.$queryRaw<
+        Array<{ n: string | null }>
+      >`SELECT public.ebda_ar_norm_h(${input}) AS n`;
+      expect(row.n).toBe(normalizeArabicHamza(input));
+      expect(row.n).toBe(expected);
+    }
+  );
 
   it('SQL and TS agree on a 3000-string generated sample', async () => {
     const next = rng(20261123);
