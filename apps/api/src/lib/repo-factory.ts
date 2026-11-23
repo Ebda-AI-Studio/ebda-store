@@ -28,7 +28,7 @@
  * it is the `prisma` proxy (request transaction, tenant guard, RLS unchanged); on 'do' each call is ONE atomic `mutate`
  * RPC and `$transaction([...], { idempotencyKey })` ships the whole batch as one atomic, replay-safe unit.
  *
- * WHAT IS NOT HERE (PR D2): raw SQL, `$queryRaw`, interactive `$transaction`, row locks, money/stock
+ * WHAT IS NOT HERE (PR D2): raw SQL, interactive `$transaction`, row locks, money/stock
  * models. The types `StoreReads`/`StoreWrites` offer only what prisma-lite answers on the DO, and the DO re-checks the
  * allow-list, so a service that compiles against them cannot reach a money path on either backend.
  */
@@ -928,6 +928,19 @@ export interface MoneyClient {
     missingLines: number;
     missingRevenue: number;
   }>;
+  /** The ONE revenue definition's net total + order count (see packages/repo/src/revenue.ts); optional window, optional paid-only. */
+  analyticsNetRevenue(a: {
+    startMs?: number;
+    endMs?: number;
+    paidOnly?: boolean;
+    /** Whole-order totals (no partial-refund netting): only the GL reconciliation, whose credits are gross of partials. */
+    gross?: boolean;
+  }): Promise<{ revenue: number; orders: number }>;
+  /** The same, for many [fromMs, toMs) windows in ONE query (<= 400): one row per window, in order. */
+  analyticsNetRevenueDays(a: {
+    windows: Array<{ fromMs: number; toMs: number }>;
+    paidOnly?: boolean;
+  }): Promise<Array<{ revenue: number; orders: number }>>;
   analyticsSales(a: {
     startMs: number;
     endMs: number;
@@ -1612,6 +1625,8 @@ export function makeMoneyClient(
     analyticsImport: a => call('analyticsImport', a),
     analyticsImportFinish: a => call('analyticsImportFinish', a),
     analyticsPeriod: a => call('analyticsPeriod', a),
+    analyticsNetRevenue: a => call('analyticsNetRevenue', a),
+    analyticsNetRevenueDays: a => call('analyticsNetRevenueDays', a),
     analyticsSales: a => call('analyticsSales', a),
     analyticsItems: a => call('analyticsItems', a),
     analyticsOrdersBy: a => call('analyticsOrdersBy', a),
