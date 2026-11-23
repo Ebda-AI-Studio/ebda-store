@@ -36,11 +36,7 @@ const {
     return: { findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
     // create() counts units a backorder single-line cancel already took back.
     orderEvent: { findMany: vi.fn().mockResolvedValue([]) },
-    // create() takes the order's returns lock (pg_advisory_xact_lock).
-    $executeRaw: vi.fn().mockResolvedValue(1),
-    // create() takes the order's returns lock with the bounded
-    // pg_try_advisory_xact_lock poll (issues 2004 / 2030): report it granted.
-    $queryRaw: vi.fn().mockResolvedValue([{ locked: true }]),
+    // No raw SQL: create() takes no advisory lock any more (Ruling NZ-REFUND-LOCK-1).
   },
   runInTenantContextMock: vi.fn(
     async (_storeId: string | undefined, fn: () => Promise<unknown>, _userId?: string) => fn()

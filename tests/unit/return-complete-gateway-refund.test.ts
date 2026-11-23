@@ -37,7 +37,6 @@ const paymentFindFirst = vi.fn();
 const providerRefund = vi.fn();
 const applyRefundEffects = vi.fn();
 const getById = vi.fn();
-const executeRaw = vi.fn();
 const findOutstandingRefundClaims = vi.fn();
 // issue 2002: a non-gateway completion settles any open claim for its key.
 const reconcileOutstandingRefundClaims = vi.fn().mockResolvedValue([]);
@@ -56,8 +55,7 @@ vi.mock('@ebda/database', () => ({
     // Backorder single-line cancel markers — none in this file.
     orderEvent: { findMany: async () => [] },
     payment: { findFirst: (...a: unknown[]) => paymentFindFirst(...a) },
-    // The order-level returns lock (pg_advisory_xact_lock).
-    $executeRaw: (...a: unknown[]) => executeRaw(...a),
+    // No `$executeRaw`: the order-level advisory lock is gone (Ruling NZ-REFUND-LOCK-1), so any raw SQL here throws.
   },
   Prisma: {},
   ReturnStatus: {},
@@ -170,7 +168,6 @@ function setup({
     }
   );
   applyRefundEffects.mockResolvedValue(undefined);
-  executeRaw.mockResolvedValue(1);
   findOutstandingRefundClaims.mockResolvedValue([]);
   reconcileOutstandingRefundClaims.mockResolvedValue([]);
 }
@@ -699,24 +696,9 @@ describe('ReturnService.complete — one refund per return, one completion per o
     expect(req.refundKey).toBe(`return:${RETURN_ID}`);
   });
 
-  /**
-   * #1393. The claim is per Return row, so two DIFFERENT returns on one order
-   * both passed it and both read prior returns without the other. The order
-   * lock must be taken before the claim and before the prior-returns read.
-   */
-  it('takes the order-level returns lock before claiming or reading prior returns', async () => {
-    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
-
-    await ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'manual');
-
-    expect(executeRaw).toHaveBeenCalledOnce();
-    const sql = (executeRaw.mock.calls[0]?.[0] as TemplateStringsArray).join('?');
-    expect(sql).toMatch(/pg_advisory_xact_lock/);
-    expect(executeRaw.mock.calls[0]?.[1]).toBe(`return-order:${ORDER_ID}`);
-    const lockAt = executeRaw.mock.invocationCallOrder[0];
-    expect(lockAt).toBeLessThan(returnUpdateMany.mock.invocationCallOrder[0]);
-    expect(lockAt).toBeLessThan(returnFindMany.mock.invocationCallOrder[0]);
-  });
+  // #1393 (two DIFFERENT returns of one order completing together) is serialised by the StoreDO now, not by a Postgres
+  // advisory lock (Ruling NZ-REFUND-LOCK-1): apps/api/workers-do/returns.test.ts 'two different returns of one order
+  // completing together: one wins, the other is RETURN_ORDER_BUSY'.
 });
 
 describe('ReturnService.complete — the payment balance is not the order', () => {

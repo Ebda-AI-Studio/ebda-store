@@ -38,6 +38,8 @@ export const COMPLETE_ERROR_CODES = new Set([
   'PROVIDER_REFUND_INDETERMINATE',
   'REFUND_ALREADY_ISSUED',
   'RETURN_ALREADY_COMPLETING',
+  // Another return of the same order is being completed right now (the StoreDO claim refuses a sibling, Ruling CF-RETURNS-1).
+  'RETURN_ORDER_BUSY',
   'PARTIAL_REFUND_EXCEEDS_PAYMENT',
   'PARTIAL_REFUND_NOTHING_TO_REFUND',
   'PAYMENT_FULLY_REFUNDED',
