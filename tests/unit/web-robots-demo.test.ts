@@ -43,7 +43,10 @@ const NORMAL = {
   rules: {
     userAgent: '*',
     allow: '/',
-    disallow: ['/account/', '/checkout/', '/cart/', '/auth/', '/affiliate/'],
+    disallow: (() => {
+      const roots = ['/account/', '/checkout/', '/cart/', '/auth/', '/affiliate/'];
+      return [...roots, ...roots.map(p => `/ar${p}`), ...roots.map(p => `/en${p}`)];
+    })(),
   },
 };
 
