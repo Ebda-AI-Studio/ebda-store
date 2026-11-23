@@ -41,8 +41,8 @@ function fmt(iso: string | null): string {
 
 const STATUS_CLASS: Record<StatementStatus, string> = {
   pending: 'bg-warning/10 text-warning-ink',
-  reconciling: 'bg-blue-100 text-blue-700',
-  reconciled: 'bg-green-100 text-green-700',
+  reconciling: 'bg-info/10 text-info-ink',
+  reconciled: 'bg-success/10 text-success-ink',
 };
 
 const PER_PAGE = 50;

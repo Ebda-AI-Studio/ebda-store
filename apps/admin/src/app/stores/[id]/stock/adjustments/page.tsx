@@ -97,8 +97,8 @@ export default function StockAdjustmentsPage() {
         const isDraft = adj.status === 'draft';
         return (
           <span
-            className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-              isDraft ? 'bg-warning/10 text-warning-ink' : 'bg-green-100 text-green-800'
+            className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium ${
+              isDraft ? 'bg-warning/10 text-warning-ink' : 'bg-success/10 text-success-ink'
             }`}
           >
             {adj.status}
@@ -119,7 +119,7 @@ export default function StockAdjustmentsPage() {
         return (
           <span
             className={`font-mono text-xs font-semibold ${
-              adj.totalValueImpact < 0 ? 'text-red-600' : 'text-green-700'
+              adj.totalValueImpact < 0 ? 'text-destructive-ink' : 'text-success-ink'
             }`}
           >
             {impactStr}
