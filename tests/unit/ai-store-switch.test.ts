@@ -20,6 +20,7 @@ vi.mock('@api/lib/repo-factory', () => ({
 vi.mock('@api/lib/store-scoped-read', () => ({
   readInStoreContext: (_id: string, fn: () => Promise<unknown>) => fn(),
 }));
+vi.mock('@api/lib/ai-plan-gate', () => ({ assertStoreAiPlan: async () => undefined }));
 vi.mock('@api/lib/definer', () => ({ countAiUsage: m.countAiUsage }));
 
 import {
