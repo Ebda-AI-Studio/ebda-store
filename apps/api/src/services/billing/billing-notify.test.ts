@@ -37,7 +37,9 @@ vi.mock('./grants.service', () => ({ awardGrantsAfterPayment: vi.fn() }));
 vi.mock('./manual-config', () => ({
   supportContact: () => ({ whatsappUrl: 'https://wa.me/1', email: 's@example.com' }),
 }));
-vi.mock('@ebda/shared', () => ({
+vi.mock('@ebda/shared', async importOriginal => ({
+  // the add-on catalog (pulled in by billing-notify) reads the shared feature registry, so keep the real module
+  ...(await importOriginal<object>()),
   purchaseEventId: () => 'e',
   billingPaymentNumber: () => 'n',
   EBDA_BILLING_BARCODE_SHAPE: 'x',
