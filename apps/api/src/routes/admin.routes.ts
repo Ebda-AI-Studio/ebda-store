@@ -125,6 +125,7 @@ import {
 import { storeDb } from '../lib/repo-factory';
 import { closeClaimsOnSlugGrant } from '../services/trust-grants';
 import { customerRows } from '../lib/customer-directory';
+import { resolveAiCaps } from '../lib/usage-caps';
 import { netRevenue } from '../services/revenue.service';
 
 const router = Router();
@@ -2525,8 +2526,7 @@ router.get(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const dailyCap = parseInt(process.env.AI_DAILY_REQUEST_CAP ?? '450', 10);
-      const monthlyCap = parseInt(process.env.AI_MONTHLY_REQUEST_CAP ?? '20000', 10);
+      const { dailyCap, monthlyCap } = resolveAiCaps();
 
       const now = new Date();
       const startOfDay = new Date(now);
