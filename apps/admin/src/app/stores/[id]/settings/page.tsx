@@ -13,6 +13,7 @@ import { apiGet, apiPatch } from '../../../../lib/api';
 import { SubscriptionPlanRow } from '../../../../components/billing/SubscriptionPlanRow';
 import { SettingsSearch } from '../../../../components/SettingsSearch';
 import { SETTINGS_GROUPS } from '../../../../lib/settings-groups';
+import { ConnectChatCard } from './ConnectChatCard';
 
 /**
  * Fetches the store theme and surfaces the aiAutopilot flag as a small
@@ -510,6 +511,7 @@ export default function StoreSettingsPage() {
     <AdminLayout title={t('page.title')} subtitle={t('page.subtitle')}>
       <SettingsSearch />
       <div className="space-y-8">
+        <ConnectChatCard storeId={storeId} />
         {isLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 9 }).map((_, i) => (

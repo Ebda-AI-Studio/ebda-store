@@ -2,6 +2,7 @@
 // scoped by the `store_id` the DO holds, never by the caller.
 import { issueSaleDocument } from './fiscal';
 import { MoneyError, type SyncSql } from './sync-sql';
+import { orderNetRevenueSql, refundJoinsSql, revenueOrderPredicateSql } from '../revenue';
 import {
   DEFAULT_DAILY_CAP,
   commitVectorWork,
@@ -132,8 +133,8 @@ export function usageCountsOp(
       [storeId, start, end]
     ),
     revenueFils: one(
-      `SELECT COALESCE(SUM(total), 0) AS n FROM orders WHERE store_id = ? AND created_at >= ? AND created_at < ?
-         AND payment_status = 'paid' AND status NOT IN ('cancelled', 'refunded')`,
+      `SELECT COALESCE(SUM(${orderNetRevenueSql('o', 'sqlite')}), 0) AS n FROM orders o ${refundJoinsSql('o', 'sqlite')} WHERE o.store_id = ? AND o.created_at >= ? AND o.created_at < ?
+         AND ${revenueOrderPredicateSql('o', 'sqlite', { paidOnly: true })}`,
       [storeId, start, end]
     ),
     customers: one(
