@@ -357,6 +357,29 @@ describe('scan flows', () => {
   });
 });
 
+describe('count reconcile applies the variance as a delta (NZ-COUNT-DELTA-1)', () => {
+  it('a sale that lands mid-count is preserved: stock 10, count 8, sale of 3 -> 5', () => {
+    const r = rig();
+    const s = r.op('openCountSession', { createdBy: 'u1' });
+    expect(inv(r, 'p1')).toBe(10);
+    r.op('submitCountLine', { sessionId: s.id, productId: 'p1', countedQty: 8 });
+    r.q('UPDATE products SET inventory = inventory - 3 WHERE id = ?', 'p1');
+    r.op('closeCountSession', { sessionId: s.id });
+    r.op('reconcileCountSession', { sessionId: s.id, reconciledBy: 'u1' });
+    expect(inv(r, 'p1')).toBe(5); // absolute 8 would be wrong: it returns the 3 sold units
+  });
+
+  it('floors at 0 when the sale already took more than the variance leaves', () => {
+    const r = rig();
+    const s = r.op('openCountSession', { createdBy: 'u1' });
+    r.op('submitCountLine', { sessionId: s.id, productId: 'p1', countedQty: 4 }); // variance -6
+    r.q('UPDATE products SET inventory = 2 WHERE id = ?', 'p1');
+    r.op('closeCountSession', { sessionId: s.id });
+    r.op('reconcileCountSession', { sessionId: s.id });
+    expect(inv(r, 'p1')).toBe(0);
+  });
+});
+
 describe('bulk inventory', () => {
   it('sets or adjusts simple products only, floored at 0, and writes no history', () => {
     const r = rig();

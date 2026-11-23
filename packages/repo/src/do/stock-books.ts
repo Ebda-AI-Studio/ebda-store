@@ -968,6 +968,21 @@ export function closeCountSession(db: SyncSql, storeId: string, a: Args) {
   return { id, status: 'closed', closedAt: new Date(now) };
 }
 
+/** The live stock of a count line's product (or variant) right now; the reconcile applies the scan-time variance to it. */
+function currentInventory(db: SyncSql, storeId: string, l: Row): number {
+  const variantId = (l.variant_id as string | null) ?? null;
+  const row = variantId
+    ? db.all('SELECT inventory FROM product_variants WHERE id = ? AND product_id = ?', [
+        variantId,
+        l.product_id as string,
+      ])[0]
+    : db.all(
+        'SELECT inventory FROM products WHERE id = ? AND store_id = ? AND deleted_at IS NULL',
+        [l.product_id as string, storeId]
+      )[0];
+  return (row?.inventory as number | undefined) ?? 0;
+}
+
 /** reconcileCountSession: a cycle_count adjustment for every non-zero variance, posted at once, the session marked. */
 export function reconcileCountSession(db: SyncSql, storeId: string, a: Args) {
   const id = str(a.sessionId, 'sessionId');
@@ -993,7 +1008,10 @@ export function reconcileCountSession(db: SyncSql, storeId: string, a: Args) {
       items: nonZero.map(l => ({
         productId: l.product_id as string,
         variantId: (l.variant_id as string | null) ?? null,
-        newQty: l.counted_qty as number,
+        // NZ-COUNT-DELTA-1: the line carries the VARIANCE against the system quantity at scan time. Apply that delta to the
+        // stock as it is NOW, so a sale that landed between the scan and the reconcile is preserved (stock 10, count 8,
+        // sale of 3 -> 5). Posting the absolute counted quantity would put the 3 sold units back (8).
+        newQty: Math.max(0, currentInventory(db, storeId, l) + (l.variance as number)),
       })),
     });
     postAdjustmentIn(db, storeId, adj.id, reconciledBy);
