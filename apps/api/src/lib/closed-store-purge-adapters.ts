@@ -164,7 +164,7 @@ export function closedStorePurgePorts(): PurgePorts {
         belongsToStore: r2KeyBelongsToStore,
         onForeignKey: async info => {
           logger.error(
-            info,
+            { storeId: info.storeId, table: info.table, rowId: info.id, key: info.key },
             '[closed-store-purge] a proof key outside the store prefix was NOT deleted'
           );
           await sendAlert({
