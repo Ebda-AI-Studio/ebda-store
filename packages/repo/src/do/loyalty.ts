@@ -458,14 +458,15 @@ export function earnPointsFromPurchase(
 
 /**
  * Take back the points an order earned (refund / cancel). Idempotent through the tagged `adjust` row
- * (`refund-revoke:<earnTxId>`, unique index). Floors the points at the customer's balance (a customer who already
- * spent them cannot go negative); `total_earned` drops by the full earned amount (floored at 0) and the tier is
- * recomputed. `null` when the order earned nothing.
+ * (`refund-revoke:<earnTxId>`, unique index). The FULL earned amount is taken back (#631): points the customer already
+ * spent (e.g. redeemed as a discount on another order) are NOT forgiven, the balance goes negative and that debt is
+ * paid off by the next points earned (a negative balance can never redeem: the redeem gate needs `points >= n`).
+ * `total_earned` drops by the earned amount (floored at 0) and the tier is recomputed. `null` when the order earned nothing.
  */
 export function reverseEarnedPointsFromOrder(
   db: SyncSql,
   a: { storeId: string; orderId: string; now?: number }
-): { pointsReversed: number; newBalance: number; replayed: boolean } | null {
+): { pointsReversed: number; newBalance: number; debt?: number; replayed: boolean } | null {
   requireId(a.storeId, 'storeId');
   requireId(a.orderId, 'orderId');
   const now = a.now ?? Date.now();
@@ -492,8 +493,13 @@ export function reverseEarnedPointsFromOrder(
     const cfg = loadLoyaltyConfig(db, a.storeId);
     if (!cfg) return null;
     const earned = earn.points as number;
-    const toReverse = Math.min(earned, lp.points as number);
-    const newTotalEarned = Math.max(0, (lp.total_earned as number) - earned);
+    // #631: never floored at the balance (that let redeem-then-refund keep the discount for free). Partial refunds
+    // already took their share (`partialRevoked`); the whole-order reversal takes only what is left of the earn.
+    const toReverse = Math.max(
+      0,
+      earned - partialRevoked(db, a.storeId, a.orderId, earn.id as string)
+    );
+    const newTotalEarned = Math.max(0, (lp.total_earned as number) - toReverse);
     const newTier = calculateTier(newTotalEarned, cfg.settings);
 
     db.run(
@@ -516,6 +522,97 @@ export function reverseEarnedPointsFromOrder(
           customerId,
           a.orderId,
           `Tier ${lp.tier} → ${newTier} (from refund reverse)`,
+          now,
+        ]
+      );
+    return {
+      pointsReversed: toReverse,
+      newBalance: (lp.points as number) - toReverse,
+      debt: Math.max(0, toReverse - Math.max(0, lp.points as number)),
+      replayed: false,
+    };
+  });
+}
+
+/** Points already taken back from one earn by PARTIAL refunds (`refund-revoke:<earnId>:p:<refundKey>` rows, stored negative). */
+function partialRevoked(db: SyncSql, storeId: string, orderId: string, earnId: string): number {
+  const r = db.all(
+    `SELECT COALESCE(-SUM(points), 0) AS s FROM loyalty_transactions
+      WHERE store_id = ? AND order_id = ? AND type = 'adjust' AND description LIKE ? ESCAPE '\\'`,
+    [storeId, orderId, `refund-revoke:${earnId}:p:%`]
+  )[0];
+  return Number(r?.s ?? 0);
+}
+
+/**
+ * A PARTIAL refund (amount, returned lines or store credit) takes back the matching share of the points the order earned:
+ * `floor(earned * refundedValue / orderTotal)`, at most what is still left of the earn (partials plus a whole reversal can
+ * never take more than was earned). Money rule: an external fact is never rejected, an over-large refunded value is clamped
+ * here. Like the whole reversal it is not floored at the balance (spent points become debt). Idempotent per `refundKey`
+ * through the tagged `adjust` row. `null` when the order earned nothing or has no points row.
+ */
+export function reverseEarnedPointsPartial(
+  db: SyncSql,
+  a: { storeId: string; orderId: string; refundKey: string; value: number; now?: number }
+): { pointsReversed: number; newBalance: number; replayed: boolean } | null {
+  requireId(a.storeId, 'storeId');
+  requireId(a.orderId, 'orderId');
+  const now = a.now ?? Date.now();
+  return db.transactionSync(() => {
+    const order = requireOrder(db, a.storeId, a.orderId);
+    const earn = db.all(
+      `SELECT id, customer_id, points FROM loyalty_transactions WHERE store_id = ? AND order_id = ? AND type = 'earn_purchase'`,
+      [a.storeId, a.orderId]
+    )[0];
+    if (!earn || (earn.points as number) <= 0) return null;
+    const customerId = earn.customer_id as string;
+    const lp = db.all(
+      'SELECT points, total_earned, tier FROM loyalty_points WHERE store_id = ? AND customer_id = ?',
+      [a.storeId, customerId]
+    )[0];
+    if (!lp) return null;
+    const tag = `refund-revoke:${earn.id as string}:p:${a.refundKey}`;
+    const done = db.all(
+      `SELECT id FROM loyalty_transactions WHERE store_id = ? AND order_id = ? AND type = 'adjust' AND description = ?`,
+      [a.storeId, a.orderId, tag]
+    )[0];
+    if (done) return { pointsReversed: 0, newBalance: lp.points as number, replayed: true };
+    const cfg = loadLoyaltyConfig(db, a.storeId);
+    if (!cfg) return null;
+
+    const earned = earn.points as number;
+    const total = Number(order.total);
+    const share = total > 0 ? Math.min(1, Math.max(0, a.value) / total) : 0;
+    const whole = db.all(
+      `SELECT id FROM loyalty_transactions WHERE store_id = ? AND order_id = ? AND type = 'adjust' AND description = ?`,
+      [a.storeId, a.orderId, `refund-revoke:${earn.id as string}`]
+    )[0];
+    const left = whole ? 0 : earned - partialRevoked(db, a.storeId, a.orderId, earn.id as string);
+    const toReverse = Math.min(Math.max(0, left), Math.floor(earned * share));
+    if (toReverse <= 0)
+      return { pointsReversed: 0, newBalance: lp.points as number, replayed: false };
+    const newTotalEarned = Math.max(0, (lp.total_earned as number) - toReverse);
+    const newTier = calculateTier(newTotalEarned, cfg.settings);
+    db.run(
+      `INSERT INTO loyalty_transactions (id, store_id, customer_id, order_id, type, points, description, created_at)
+       VALUES (?, ?, ?, ?, 'adjust', ?, ?, ?)`,
+      [crypto.randomUUID(), a.storeId, customerId, a.orderId, -toReverse, tag, now]
+    );
+    db.run(
+      `UPDATE loyalty_points SET points = points - ?1, total_earned = ?2, tier = ?3, updated_at = ?6
+       WHERE store_id = ?4 AND customer_id = ?5`,
+      [toReverse, newTotalEarned, newTier, a.storeId, customerId, now]
+    );
+    if (newTier !== (lp.tier as string))
+      db.run(
+        `INSERT INTO loyalty_transactions (id, store_id, customer_id, order_id, type, points, description, created_at)
+         VALUES (?, ?, ?, ?, 'tier_changed', 0, ?, ?)`,
+        [
+          crypto.randomUUID(),
+          a.storeId,
+          customerId,
+          a.orderId,
+          `Tier ${lp.tier} → ${newTier} (from partial refund)`,
           now,
         ]
       );
@@ -1194,6 +1291,64 @@ const EARN_TYPES = [
   'earn_manual',
 ];
 
+const REVOKE_PREFIX = 'refund-revoke:';
+
+/**
+ * #631: what is LEFT of each earned lot for one customer, replayed from the ledger in time order (no extra column, so every
+ * existing row is classified the same way). Every positive row is a lot (earns, positive adjusts such as a redeem
+ * re-credit); every negative row consumes: a refund reversal (`refund-revoke:<earnTxId>`) its OWN lot first, everything
+ * else (redeems, expiries, negative adjusts) the oldest lots first (FIFO). What cannot be taken from a lot is DEBT, and a
+ * later lot pays the debt before anything else, so points earned while in debt are not expired a second time.
+ */
+// pq-allow(unused-export): test seam, imported by packages/repo/test/do-loyalty-lots.test.ts
+export function lotRemaining(
+  db: SyncSql,
+  storeId: string,
+  customerId: string
+): Map<string, number> {
+  const rows = db.all(
+    `SELECT id, type, points, description FROM loyalty_transactions
+      WHERE store_id = ?1 AND customer_id = ?2 AND points <> 0 ORDER BY created_at, rowid`,
+    [storeId, customerId]
+  );
+  const lots: Array<{ id: string; left: number }> = [];
+  const byId = new Map<string, { id: string; left: number }>();
+  let debt = 0;
+  const takeFifo = (n: number): number => {
+    for (const l of lots) {
+      if (n <= 0) break;
+      const t = Math.min(l.left, n);
+      l.left -= t;
+      n -= t;
+    }
+    return n;
+  };
+  for (const r of rows) {
+    const pts = Number(r.points);
+    if (pts > 0) {
+      const lot = { id: r.id as string, left: pts };
+      const pay = Math.min(debt, lot.left);
+      lot.left -= pay;
+      debt -= pay;
+      lots.push(lot);
+      byId.set(lot.id, lot);
+      continue;
+    }
+    let need = -pts;
+    const desc = typeof r.description === 'string' ? r.description : '';
+    if (r.type === 'adjust' && desc.startsWith(REVOKE_PREFIX)) {
+      const own = byId.get(desc.slice(REVOKE_PREFIX.length).split(':')[0]);
+      if (own) {
+        const t = Math.min(own.left, need);
+        own.left -= t;
+        need -= t;
+      }
+    }
+    debt += takeFifo(need);
+  }
+  return new Map(lots.map(l => [l.id, l.left]));
+}
+
 /**
  * One page (<= `limit` earn rows, id order, after the `after` cursor) of expired earn transactions. Per member: the expired
  * points are deducted from the balance (never below 0), ONE `expire` row is written, and the earn rows lose their `expires_at`
@@ -1228,7 +1383,11 @@ export function expirePoints(
         [a.storeId, customerId]
       )[0];
       if (!lp) continue;
-      const deduction = Math.min(g.total, Number(lp.points));
+      // #631: only what is LEFT of the expiring lots expires (points already redeemed, reversed or expired, or that paid a
+      // debt, never expire a second time against unrelated points); never more than a positive balance
+      const left = lotRemaining(db, a.storeId, customerId);
+      const remaining = g.ids.reduce((n, id) => n + Math.max(0, left.get(id) ?? 0), 0);
+      const deduction = Math.max(0, Math.min(remaining, Number(lp.points)));
       const marks = g.ids.map(() => '?').join(',');
       if (deduction > 0) {
         db.run(
