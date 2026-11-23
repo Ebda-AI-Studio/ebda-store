@@ -1,5 +1,9 @@
 /**
- * SP5 task 3 — EGP subscription billing against a real Postgres.
+ * SP5 task 3 — EGP subscription billing on the PLATFORM D1 (ported from tests/integration/subscription-billing.test.ts, which ran
+ * it against a live relational database). The real cf-schema platform migrations run on node:sqlite wrapped as an async D1, the
+ * cutover markers are set, so plan / subscription / ledger / webhook inbox take the production D1 branch (settle lease, batch
+ * writes, billing_events triggers). Only the store's contact row is stubbed; the per-test fixtures set a period that began BEFORE
+ * it ends (a start at/after the charged end reads as 'already applied' on D1).
  *
  * Covers: null-price refusal, checkout -> webhook activation, idempotent
  * renewal (cron twice = one charge), the dunning schedule to downgrade,
@@ -18,14 +22,69 @@
  *      `status: { in: ['pending','succeeded'] }` -> "a late failed webhook
  *      after succeeded" fails (store downgraded / row flipped).
  */
+import fs from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { describe, it, expect, afterAll, beforeAll, beforeEach, vi } from 'vitest';
 import crypto from 'crypto';
 import http from 'http';
 import type { AddressInfo } from 'net';
 import express from 'express';
-import { prisma, withRlsBypass } from '@ebda/database';
-import { exhaustFoundingSlots } from '../helpers/exhaust-founding-slots';
-import { planLimitsSchema } from '@ebda/shared';
+
+// The store's contact row (name, settings, owner e-mail) is not billing data: it is read from the directory row of the D1 `stores`
+// table plus a fixed owner, so the billing models under test (plan, subscription, ledger, webhook inbox) all run on the D1.
+const dir = vi.hoisted(() => ({
+  row: (_id: string): Record<string, unknown> | undefined => undefined,
+}));
+const scope = (db: object) =>
+  new Proxy(db, {
+    get(t, p) {
+      if (p !== 'store') return (t as Record<string | symbol, unknown>)[p];
+      const one = async (a: { where: { id: string } }) => {
+        const r = dir.row(a.where.id);
+        return r
+          ? {
+              id: r.id,
+              name: r.name,
+              status: r.status,
+              settings: {},
+              billingSuspendedReason: null,
+              billingSuspendedAt: null,
+              owner: { email: `owner-${String(r.id)}@test.local`, firstName: 'Bill' },
+            }
+          : null;
+      };
+      return { findUnique: one, findUniqueOrThrow: one };
+    },
+  });
+vi.mock('@ebda/database', async importOriginal => {
+  const real = await importOriginal<typeof import('@ebda/database')>();
+  // No tenant transaction exists on the platform D1: a scope is just the routed client, as in production after the cutover.
+  return {
+    ...real,
+    withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(scope(real.prisma)),
+    withUser: (_id: string, fn: (tx: unknown) => unknown) => fn(scope(real.prisma)),
+    runInTenantContext: (_id: unknown, fn: () => unknown) => fn(),
+    currentStoreId: () => undefined,
+  };
+});
+const storeWrites = vi.hoisted(() => ({
+  apply: (_id: string, _d: Record<string, unknown>): void => undefined,
+}));
+vi.mock('../../apps/api/src/lib/repo-factory', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  storeUpdate: async (
+    _db: unknown,
+    a: { where: { id: string }; data: Record<string, unknown> }
+  ) => {
+    storeWrites.apply(a.where.id, a.data);
+    return {};
+  },
+}));
+import { prisma } from '@ebda/database';
+import { clearCfBindings, setCfBindings } from '../../apps/api/src/cf/bindings';
+import { cutoverKey, resetCutoverCache } from '../../apps/api/src/services/platform/cutover';
+import { registerPlatformRouter } from '../../apps/api/src/services/platform/router';
+import { DEFAULT_PLAN_SEEDS, planLimitsSchema } from '@ebda/shared';
 import {
   StubBillingProvider,
   setBillingProviderForTests,
@@ -57,15 +116,14 @@ import billingWebhookRoutes from '../../apps/api/src/routes/billing-webhook.rout
 
 // Card paths are exercised explicitly; the product default is InstaPay-only.
 process.env.BILLING_TRIAL_CARD_MODE = 'card_on_file';
-const hasDb =
-  !!process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost:5432/test_db');
+const withRlsBypass = <T>(fn: (tx: typeof prisma) => Promise<T>): Promise<T> => fn(prisma);
 
 const uniq = crypto.randomUUID().slice(0, 8);
 const PRO = `bpro-${uniq}`; // 49900 / 499000
 const LITE = `blite-${uniq}`; // 19999
 const NOPRICE = `bnone-${uniq}`;
 const stub = new StubBillingProvider();
-const created = { stores: [] as string[], users: [] as string[], plans: [PRO, LITE, NOPRICE] };
+const created = { stores: [] as string[], plans: [PRO, LITE, NOPRICE] };
 
 const limits = planLimitsSchema.parse({
   maxProducts: 100,
@@ -85,23 +143,99 @@ const limits = planLimitsSchema.parse({
 
 const T0 = new Date('2026-11-03T04:00:00.000Z');
 
+const MIG = fs
+  .readdirSync(new URL('../../packages/cf-schema/migrations/platform/', import.meta.url))
+  .filter(f => f.endsWith('.sql'))
+  .sort()
+  .map(f =>
+    fs.readFileSync(
+      new URL(`../../packages/cf-schema/migrations/platform/${f}`, import.meta.url),
+      'utf8'
+    )
+  )
+  .join('\n');
+let raw: DatabaseSync;
+function installD1() {
+  raw = new DatabaseSync(':memory:');
+  raw.exec('PRAGMA foreign_keys = ON');
+  raw.exec(MIG);
+  const stmt = (sql: string, v: unknown[]) => {
+    if (/^\s*(select|with)/i.test(sql) || /returning/i.test(sql))
+      return { results: raw.prepare(sql).all(...(v as never[])) as never[], meta: { changes: 0 } };
+    return {
+      results: [],
+      meta: { changes: Number(raw.prepare(sql).run(...(v as never[])).changes) },
+    };
+  };
+  const prep = (sql: string) => ({
+    bind: (...v: unknown[]) => ({
+      all: async () => (await Promise.resolve(), stmt(sql, v)),
+      run: async () => (await Promise.resolve(), stmt(sql, v)),
+      first: async () => (await Promise.resolve(), (stmt(sql, v).results[0] ?? null) as never),
+      __run: () => stmt(sql, v),
+    }),
+  });
+  const d1 = {
+    prepare: prep,
+    // atomic: roll everything back if a statement throws (D1 batch semantics)
+    batch: async (list: Array<{ __run: () => { meta: { changes: number } } }>) => {
+      raw.exec('BEGIN');
+      try {
+        const out = list.map(x => x.__run());
+        raw.exec('COMMIT');
+        return out;
+      } catch (e) {
+        raw.exec('ROLLBACK');
+        throw e;
+      }
+    },
+  };
+  for (const family of ['billing', 'access', 'platform'])
+    raw
+      .prepare(`INSERT INTO system_settings (id, key, value) VALUES (?, ?, '{}')`)
+      .run(`m-${family}`, cutoverKey(family as never));
+  // plans are platform data (imported in production): the locked catalog, with its real prices
+  for (const [i, p] of DEFAULT_PLAN_SEEDS.entries())
+    raw
+      .prepare(
+        `INSERT INTO plans (id, code, name_en, name_ar, sort, is_public, price_monthly_minor, price_yearly_minor, feature_tier, limits) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        `plan-${p.code}`,
+        p.code,
+        p.nameEn,
+        p.nameAr,
+        i,
+        p.isPublic ? 1 : 0,
+        p.priceMonthlyMinor,
+        p.priceYearlyMinor,
+        p.featureTier,
+        JSON.stringify(p.limits)
+      );
+  // FOUNDING-1: the first 20 paying stores get a free month, which moves a period end; fill the 20 slots with inert rows so the
+  // exact period ends below do not depend on that global counter (the same filler the relational suite used).
+  for (let g = 1; g <= 20; g++)
+    raw
+      .prepare(
+        `INSERT INTO billing_grants (id, kind, beneficiary_id, months, status, idempotency_key) VALUES (?, 'founding', ?, 1, 'applied', ?)`
+      )
+      .run(`filler-${g}`, `test-filler-${g}`, `founding:test-filler-${g}`);
+  dir.row = id => raw.prepare('SELECT * FROM stores WHERE id = ?').get(id) as never;
+  storeWrites.apply = (id, data) => {
+    if (typeof data.plan === 'string')
+      raw.prepare('UPDATE stores SET plan = ? WHERE id = ?').run(data.plan, id);
+  };
+  setCfBindings({ PLATFORM_DB: d1 } as never);
+}
+
 async function makeStore() {
   const id = crypto.randomUUID().slice(0, 10);
-  const user = await prisma.user.create({
-    data: {
-      email: `bill-${id}@test.local`,
-      passwordHash: 'x',
-      firstName: 'Bill',
-      lastName: 'Ing',
-      role: 'store_admin',
-    },
-  });
-  const store = await prisma.store.create({
-    data: { name: `bill-${id}`, slug: `bill-${id}`, ownerId: user.id, status: 'active' },
-  });
-  created.users.push(user.id);
-  created.stores.push(store.id);
-  return store.id;
+  const storeId = crypto.randomUUID();
+  raw
+    .prepare(`INSERT INTO stores (id, name, slug, owner_id, status) VALUES (?, ?, ?, ?, 'active')`)
+    .run(storeId, `bill-${id}`, `bill-${id}`, crypto.randomUUID());
+  created.stores.push(storeId);
+  return storeId;
 }
 
 /** A store already subscribed (as if checkout had completed) with a saved card. */
@@ -123,7 +257,8 @@ async function subscribedStore(opts: {
         planCode: opts.planCode ?? PRO,
         status: opts.status ?? 'active',
         billingInterval: opts.interval ?? 'monthly',
-        currentPeriodStart: addInterval(opts.periodEnd ?? T0, 'monthly'),
+        // the period began BEFORE it ends (the settle on D1 reads a start at/after the charged period end as already applied)
+        currentPeriodStart: new Date((opts.periodEnd ?? T0).getTime() - 30 * 86_400_000),
         currentPeriodEnd: opts.periodEnd ?? T0,
         trialEndsAt: opts.trialEndsAt ?? null,
         provider: opts.provider === undefined ? 'stub' : opts.provider,
@@ -144,11 +279,8 @@ const ledger = (storeId: string) =>
   withRlsBypass(tx =>
     tx.billingEvent.findMany({ where: { storeId }, orderBy: { createdAt: 'asc' } })
   );
-const storeTier = (storeId: string) =>
-  withRlsBypass(tx =>
-    tx.store.findUniqueOrThrow({ where: { id: storeId }, select: { plan: true } })
-  );
-
+const storeTier = async (storeId: string) =>
+  raw.prepare('SELECT plan FROM stores WHERE id = ?').get(storeId) as { plan: string };
 /** One billing pass scoped to this store's subscription (the DB is shared across tests). */
 async function cycleFor(now: Date, storeId: string) {
   const sub = await getSubOrNull(storeId);
@@ -159,9 +291,10 @@ let emailSpy: ReturnType<typeof vi.spyOn>;
 let bellSpy: ReturnType<typeof vi.spyOn>;
 
 beforeAll(async () => {
-  if (!hasDb) return;
+  installD1();
+  resetCutoverCache();
+  registerPlatformRouter();
   setBillingProviderForTests(stub);
-  await exhaustFoundingSlots(sql => prisma.$executeRawUnsafe(sql));
   await prisma.plan.createMany({
     data: [
       {
@@ -206,16 +339,8 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
-  if (!hasDb) return;
   setBillingProviderForTests(null);
-  await withRlsBypass(async tx => {
-    // billing_events rows go with their store (FK cascade); a direct delete is refused by design.
-    await tx.storeSubscription.deleteMany({ where: { storeId: { in: created.stores } } });
-    await tx.store.deleteMany({ where: { id: { in: created.stores } } });
-    await tx.user.deleteMany({ where: { id: { in: created.users } } });
-    await tx.billingWebhookEvent.deleteMany({ where: { provider: 'stub' } });
-    await tx.plan.deleteMany({ where: { code: { in: created.plans } } });
-  });
+  clearCfBindings();
 });
 
 function stubEvent(
@@ -246,7 +371,7 @@ async function deliver(
   return applyWebhookEvent('stub', ev, now);
 }
 
-describe.skipIf(!hasDb)('plan prices', () => {
+describe('plan prices', () => {
   it('refuses to check out a plan whose price is null (clear error, no ledger row)', async () => {
     const storeId = await makeStore();
     const err = await startCheckout({ storeId, planCode: NOPRICE, provider: stub }).catch(e => e);
@@ -296,7 +421,7 @@ describe.skipIf(!hasDb)('plan prices', () => {
   });
 });
 
-describe.skipIf(!hasDb)('checkout -> webhook activates the plan', () => {
+describe('checkout -> webhook activates the plan', () => {
   it('creates a pending ledger row, redirects, and the signed webhook makes it active', async () => {
     const storeId = await makeStore();
     const out = await startCheckout({ storeId, planCode: PRO, provider: stub });
@@ -347,7 +472,7 @@ describe.skipIf(!hasDb)('checkout -> webhook activates the plan', () => {
   });
 });
 
-describe.skipIf(!hasDb)('webhooks: replay and out-of-order', () => {
+describe('webhooks: replay and out-of-order', () => {
   it('a replayed delivery leaves exactly one ledger row, one inbox row and one effect', async () => {
     const storeId = await makeStore();
     const { billingEventId } = await startCheckout({ storeId, planCode: PRO, provider: stub });
@@ -423,7 +548,7 @@ describe.skipIf(!hasDb)('webhooks: replay and out-of-order', () => {
   });
 });
 
-describe.skipIf(!hasDb)('renewal is idempotent', () => {
+describe('renewal is idempotent', () => {
   it('running the cycle twice charges once and renews the period once', async () => {
     const { storeId, subId } = await subscribedStore({});
     const a = await cycleFor(T0, storeId);
@@ -610,14 +735,12 @@ describe.skipIf(!hasDb)('renewal is idempotent', () => {
   });
 });
 
-describe.skipIf(!hasDb)('dunning: day 0, day 3, day 7, then downgrade', () => {
+describe('dunning: day 0, day 3, day 7, then downgrade', () => {
   it('follows the schedule and downgrades to free + canceled, keeping the data', async () => {
     const { storeId, subId } = await subscribedStore({});
     const only = { subscriptionIds: [subId] };
-    // a product proves data is kept
-    await prisma.product.create({
-      data: { storeId, name: 'keep me', slug: `keep-${uniq}`, price: 1000 },
-    });
+    // (products live in the store's own Durable Object, which a downgrade never touches: only the subscription row and the ledger are
+    // the platform's to keep, asserted below)
     stub.declineAll = true;
 
     // day 0: fails -> past_due, retry in 3 days
@@ -665,7 +788,7 @@ describe.skipIf(!hasDb)('dunning: day 0, day 3, day 7, then downgrade', () => {
     expect(bellSpy).toHaveBeenCalledTimes(3);
 
     // data kept, three distinct ledger rows with the retry key shape
-    expect(await prisma.product.count({ where: { storeId } })).toBe(1);
+    expect((await ledger(storeId)).length).toBeGreaterThan(0); // the billing history is kept
     const rows = await ledger(storeId);
     expect(rows.map(r => r.idempotencyKey)).toEqual([
       `sub:${subId}:${T0.toISOString()}`,
@@ -699,7 +822,7 @@ describe.skipIf(!hasDb)('dunning: day 0, day 3, day 7, then downgrade', () => {
   });
 });
 
-describe.skipIf(!hasDb)('comped is never charged', () => {
+describe('comped is never charged', () => {
   it('skips a comped subscription even with a card on file and an expired period', async () => {
     const { storeId, subId } = await subscribedStore({
       planCode: 'comped',
@@ -733,7 +856,7 @@ describe.skipIf(!hasDb)('comped is never charged', () => {
   });
 });
 
-describe.skipIf(!hasDb)('trial end', () => {
+describe('trial end', () => {
   const FAR = addDays(T0, 100);
 
   it('trial not ended: untouched, no charge', async () => {
@@ -808,7 +931,7 @@ describe.skipIf(!hasDb)('trial end', () => {
   });
 });
 
-describe.skipIf(!hasDb)('cancel, upgrade, downgrade', () => {
+describe('cancel, upgrade, downgrade', () => {
   it('cancel at period end keeps the plan until then, never charges, then moves to free', async () => {
     const { storeId, subId } = await subscribedStore({ periodEnd: addDays(T0, 10) });
     const out = await cancelSubscription({ storeId });
@@ -886,7 +1009,7 @@ describe.skipIf(!hasDb)('cancel, upgrade, downgrade', () => {
   });
 });
 
-describe.skipIf(!hasDb)('refunds and the append-only ledger', () => {
+describe('refunds and the append-only ledger', () => {
   it('refunds part then the rest of a succeeded charge; over-refund is refused', async () => {
     const { storeId } = await subscribedStore({});
     await cycleFor(T0, storeId);
@@ -969,7 +1092,7 @@ describe.skipIf(!hasDb)('refunds and the append-only ledger', () => {
       withRlsBypass(tx =>
         tx.billingEvent.update({ where: { id: row.id }, data: { status: 'failed' } })
       )
-    ).rejects.toThrow(/succeeded charge cannot become/);
+    ).rejects.toThrow(/a succeeded charge can only become refunded/);
   });
 
   it('exposes the ledger to super-admin and the charges list to the merchant', async () => {
@@ -985,7 +1108,7 @@ describe.skipIf(!hasDb)('refunds and the append-only ledger', () => {
   });
 });
 
-describe.skipIf(!hasDb)('POST /api/v1/webhooks/billing/:provider', () => {
+describe('POST /api/v1/webhooks/billing/:provider', () => {
   let server: http.Server;
   let base = '';
   beforeAll(async () => {
@@ -1040,7 +1163,7 @@ describe.skipIf(!hasDb)('POST /api/v1/webhooks/billing/:provider', () => {
 // ── PROVIDERS-17: a Kashier billing delivery is applied only as Kashier's own record says.
 // `event` (refund vs payment) is outside Kashier's signature: a relabelled genuine charge must
 // still activate the plan, and nothing is applied (nor marked seen) while Kashier cannot answer.
-describe.skipIf(!hasDb)('Kashier billing webhook: confirm before apply', () => {
+describe('Kashier billing webhook: confirm before apply', () => {
   const KEY = 'billing-kashier-api-key';
   let detailsDown = false;
   const txnRecords = new Map<string, { order: string; operation: string; status: string }>();
