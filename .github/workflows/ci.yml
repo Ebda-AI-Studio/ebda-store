@@ -371,10 +371,10 @@ jobs:
         # PR-CI-CHEAP-1: ONE job when the affected set is narrow (setup paid once, not 3x); the whole suite (root config /
         # packages/shared|database change => `all`) keeps 3 shards so wall time stays bounded.
         shard: ${{ fromJSON(needs.changes.outputs.all == 'true' && '[1,2,3]' || '[1]') }}
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # 35, not 20: on a congested Umbra runner the SETUP (npm ci, builds, chromium) took 16.5 of the 20 minutes and
     # the job was CANCELLED while its 3.7 minutes of tests were still running (#253, #256: cancelled, not failed).
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 45 || 95 }} # 35 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    timeout-minutes: ${{ contains(vars.EBDA_RUNS_ON, 'ubuntu') && 45 || 95 }} # 35 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -468,10 +468,10 @@ jobs:
   builder-e2e:
     name: Builder E2E (ar/en x 390/820/1280)
     needs: [build]
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # 35, not 25: the green run 42827770627 took 20m03s for 192 tests on one worker (hosted 2 vCPU), 80% of the old
     # cap; a slow runner would cancel a passing suite.
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 45 || 95 }} # 35 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    timeout-minutes: ${{ contains(vars.EBDA_RUNS_ON, 'ubuntu') && 45 || 95 }} # 35 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -522,7 +522,7 @@ jobs:
     # always()): marketing, so its page-weight budget is proven on main too. It broke unseen on main on 2026-11-10
     # because no main run measured it (Ruling MKT-LEGAL-HTML-BUDGET-2); the other Workers build in their deploy workflows.
     if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true') && needs.tested-tree.outputs.skip != 'true'
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # Exempt from the hosted run+10 rule: cf-cache-bindings-assert guards a roomy budget (>=25) per leg (issue 2155).
     timeout-minutes: 90 # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     strategy:
@@ -686,7 +686,7 @@ jobs:
     name: App build (${{ matrix.app }})
     needs: [changes]
     if: needs.changes.outputs.has_build_apps == 'true'
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -759,8 +759,8 @@ jobs:
     # No job-level `if`: a required PR check (scripts/ci/merge-gate-required.mjs; a skipped required job would read as a PASS) AND part of the full
     # lane, where it runs the WHOLE workers-test suite (route-sweep included) instead of the PR slice below. The MERGE-QUEUE-1 tested-tree skip is
     # therefore decided at STEP level (the `scope` step below): the job always runs and reports.
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 35 || 85 }} # 25 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    timeout-minutes: ${{ contains(vars.EBDA_RUNS_ON, 'ubuntu') && 35 || 85 }} # 25 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -861,9 +861,9 @@ jobs:
     needs: [changes, tested-tree]
     # PR: only when a Worker changed. Full lane: always (`changes` is skipped there, hence always()).
     if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true') && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.heavy != 'false'
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # 30, not 15: the job timeout also covers the Umbra throttle-slot wait (775s on #322, tests then took 6s).
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 40 || 90 }} # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    timeout-minutes: ${{ contains(vars.EBDA_RUNS_ON, 'ubuntu') && 40 || 90 }} # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -903,7 +903,7 @@ jobs:
     # scheduled no-op: schedules run on hosted runners when EBDA_RUNS_ON is unset).
     needs: [tested-tree]
     if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.heavy != 'false'
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: 25
     env:
       # 4 GB, not the 2 GB default: the all-workspace `npm run typecheck` died of heap exhaustion (exit 134,
@@ -964,11 +964,11 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3]
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # 50, not 20: on hosted ubuntu-24.04 (2 vCPU) the coverage step alone took 16m47s in run 42820243819 and the
     # job was cancelled at 20:00 inside the accounts worker tests, with every assertion so far green; green runs then
     # took 20m05s (42827770627) and 28m39s (42829048643) for the same suite, so the cap keeps ~20 min of headroom.
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 40 || 90 }} # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    timeout-minutes: ${{ contains(vars.EBDA_RUNS_ON, 'ubuntu') && 40 || 90 }} # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -1070,7 +1070,7 @@ jobs:
     name: Unit Tests
     needs: [test-unit-shard, tested-tree]
     if: always() && github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true'
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1136,7 +1136,7 @@ jobs:
     # any file present in the first set but not the second. A gate that cannot
     # fail must not report success — this one can, and does today if a colocated
     # test lands outside every job's glob again.
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: 15
     needs: [build]
     steps:
@@ -1254,10 +1254,10 @@ jobs:
       always() && !cancelled() && (
         (github.event_name != 'pull_request' && needs.build.result == 'success') ||
         (github.event_name == 'pull_request' && needs.changes.outputs.integration == 'true'))
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # 40, not 25: the full suite (305 files + serial lane) reached its last lane and was cancelled at 25:01 on a
     # hosted runner (run 42046806700, PR 437); a wide PR runs every integration file.
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 50 || 100 }} # 40 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    timeout-minutes: ${{ contains(vars.EBDA_RUNS_ON, 'ubuntu') && 50 || 100 }} # 40 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     needs: [build, changes]
     services:
       postgres:
@@ -1494,8 +1494,8 @@ jobs:
 
   test-e2e:
     name: E2E Tests
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 35 || 85 }} # 25 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    timeout-minutes: ${{ contains(vars.EBDA_RUNS_ON, 'ubuntu') && 35 || 85 }} # 25 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     needs: [build]
     services:
       postgres:
@@ -1600,7 +1600,7 @@ jobs:
     # scheduled no-op: schedules run on hosted runners when EBDA_RUNS_ON is unset).
     needs: [tested-tree]
     if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true'
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # 20: the budget is the SUM of the worst cases, not the audit alone — TWO
     # audit runs of 3 bounded attempts (~5.8 min each, #1520; the blocking production gate and the
     # non-blocking all-dependencies report, Ruling AUDIT-SPLIT-1) + a COLD `npm ci` + checkout and
@@ -1709,8 +1709,8 @@ jobs:
     name: Mutation tests
     # Sunday cron or a manual dispatch with `mutation` ticked; never on a push (Ruling CI-FULL-MAIN-1).
     if: (github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0') || (github.event_name == 'workflow_dispatch' && inputs.mutation)
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 55 || 105 }} # 45 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    timeout-minutes: ${{ contains(vars.EBDA_RUNS_ON, 'ubuntu') && 55 || 105 }} # 45 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner

@@ -26,7 +26,7 @@ concurrency:
 jobs:
   current:
     name: CF schema is current
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
