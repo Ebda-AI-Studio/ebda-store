@@ -76,6 +76,14 @@
       "types": "./src/qr/links.ts",
       "require": "./dist/qr/links.js",
       "default": "./src/qr/links.ts"
+    },
+    "./observe": {
+      "types": "./src/observe-kit.ts",
+      "default": "./src/observe-kit.ts"
+    },
+    "./web-search": {
+      "types": "./src/web-search-kit.ts",
+      "default": "./src/web-search-kit.ts"
     }
   },
   "files": [
