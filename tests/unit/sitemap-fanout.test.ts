@@ -54,7 +54,7 @@ function installFetchMock(world: MockWorld) {
 
     if (url.pathname.endsWith('/public/store/resolve')) {
       if (!world.tenant) return json({}, false);
-      return json({ data: { store: world.tenant } });
+      return json({ success: true, data: { store: world.tenant } });
     }
 
     if (url.pathname.endsWith('/public/stores')) {
@@ -144,8 +144,27 @@ describe('sitemap — could-not-ask vs genuinely empty', () => {
     );
   }
 
+  it('R1: a custom domain whose host resolve fails on a COLD hit once is served from the last-known-good copy, not a 500', async () => {
+    hostRef.host = 'warm-merchant.example';
+    const ok = (u: URL) =>
+      u.pathname.endsWith('/public/store/resolve')
+        ? {
+            ok: true,
+            status: 200,
+            body: { success: true, data: { store: { id: 'w1', slug: 'warm' } } },
+          }
+        : { ok: true, status: 200, body: { data: [], pagination: { totalPages: 1 } } };
+    stubWith(ok);
+    await sitemap(); // the host resolves and its copy is kept
+    // the API is now cold / limited: 429 on the resolve
+    stubWith(u =>
+      u.pathname.endsWith('/public/store/resolve') ? { ok: false, status: 429 } : ok(u)
+    );
+    await expect(sitemap()).resolves.toBeDefined();
+  });
+
   it('host resolve failing (not 404) does not fall through to the platform sitemap', async () => {
-    hostRef.host = 'merchant.example';
+    hostRef.host = 'merchant-down.example';
     stubWith(u =>
       u.pathname.endsWith('/public/store/resolve')
         ? { ok: false, status: 429 }
@@ -158,7 +177,11 @@ describe('sitemap — could-not-ask vs genuinely empty', () => {
     hostRef.host = 'merchant.example';
     stubWith(u => {
       if (u.pathname.endsWith('/public/store/resolve')) {
-        return { ok: true, status: 200, body: { data: { store: { id: 's1', slug: 'm' } } } };
+        return {
+          ok: true,
+          status: 200,
+          body: { success: true, data: { store: { id: 's1', slug: 'm' } } },
+        };
       }
       if (u.pathname.endsWith('/public/products')) return { ok: false, status: 503 };
       return { ok: false, status: 404 };
