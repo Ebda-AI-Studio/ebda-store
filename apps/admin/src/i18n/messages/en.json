@@ -9373,7 +9373,7 @@
     "usageTitle": "Usage",
     "ordersThisMonth": "Orders this month",
     "usedOf": "{used} of {limit}",
-    "storageNotTracked": "Up to {limit} MB (usage is not tracked yet)",
+    "storageUnknown": "Not known right now",
     "includedTitle": "Included in your plan",
     "included": "Included",
     "notIncluded": "Not included",
@@ -9388,7 +9388,8 @@
       "active": "Active",
       "past_due": "Payment overdue",
       "canceled": "Canceled",
-      "comped": "Complimentary"
+      "comped": "Complimentary",
+      "awaiting_payment": "Awaiting payment"
     },
     "overLimit": {
       "title": "You passed this month's order limit",
@@ -9573,7 +9574,18 @@
     "receiptProcessing": "Your payment went through. Your receipt will print here in a moment.",
     "cancelObject": "Cancelling your plan subscription",
     "cancelAction": "Cancel subscription",
-    "adminPlanHidden": "hidden"
+    "adminPlanHidden": "hidden",
+    "stateLine": {
+      "none": "Your free plan is running.",
+      "trialing": "You are on a trial and have not paid yet.",
+      "active": "Your plan is paid and running.",
+      "awaiting_payment": "Your plan is running now, but you have not paid yet. Pay before the date below so you do not drop back to the free plan.",
+      "past_due": "Your payment is late. Pay to keep your plan running.",
+      "canceled": "Your plan was canceled.",
+      "comped": "Your plan is free as a grant from the Ebda AI Studio team."
+    },
+    "trialDaysLeft": "{count, plural, one {{count} day left} other {{count} days left}}",
+    "trialDaysLeftLabel": "Trial days left"
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
@@ -11505,7 +11517,7 @@
       "editTitle": "Edit endpoint",
       "urlLabel": "Address (HTTPS)",
       "urlPlaceholder": "https://example.com/ebda-webhook",
-      "urlHelp": "It must be a public HTTPS address. Local and private addresses are not accepted.",
+      "urlHelp": "It must be a public HTTPS address on your own server. Local and private addresses and Ebda AI Studio domains (ebda.app) are not accepted.",
       "descriptionLabel": "Note (optional)",
       "eventsLabel": "Events to send",
       "customerLabel": "Include customer name, email and phone in order events",
@@ -11575,6 +11587,16 @@
     "error": {
       "WEBHOOK_URL_REJECTED": "This address cannot be used. Use a public HTTPS address.",
       "WEBHOOK_LIMIT": "You reached the maximum number of endpoints."
+    },
+    "urlError": {
+      "not_a_url": "That is not a valid link. Write the full address, like https://example.com/ebda-webhook.",
+      "https_required": "The address must start with https://. http addresses are not accepted.",
+      "credentials_not_allowed": "The address cannot contain a username or password.",
+      "port_not_allowed": "The address must use the standard HTTPS port (443), with no port number.",
+      "ip_literal_not_allowed": "Use a domain name, not an IP number.",
+      "public_hostname_required": "Use a public address with a full domain name, like example.com.",
+      "internal_hostname_not_allowed": "Local and internal addresses are not accepted. Use a public address on the internet.",
+      "platform_host_not_allowed": "The address cannot be on an Ebda AI Studio domain (ebda.app or any store of ours). Use your own server."
     }
   },
   "receiptBarcode": {
@@ -11918,7 +11940,7 @@
       "variant": "Variant",
       "price": "Price",
       "digits": "Digits under the bars",
-      "qr": "Store QR",
+      "qr": "Product page QR",
       "lang": "Label language",
       "langAr": "Arabic",
       "langEn": "English"
@@ -11946,6 +11968,7 @@
       "checking": "Checking that the barcode scans…",
       "ok": "Barcode scans correctly",
       "notPrintable": "The bars are too thin to print at this size. Choose a bigger label, plain bars, or a roll.",
+      "qrRefused": "Barcode and QR cannot both scan at this size. Choose a bigger label, or untick the QR to print the barcode only.",
       "unreadable": "The barcode could not be read back. Change the style or the size.",
       "dropped": "Left out because the label is small: {parts}.",
       "copies": "{labels} labels on {pages} pages"
