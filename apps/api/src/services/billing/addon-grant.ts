@@ -296,6 +296,49 @@ async function grantTerm(
   );
 }
 
+/**
+ * A term that was queued behind another term of the same SKU (`start = predecessor.end`) must not keep waiting for a
+ * predecessor that is gone. After a refund, walk the sku's live terms in end order and pull every NOT-YET-STARTED one
+ * forward to start at max(now, the previous live term's end), keeping its full ADDON_TERM_DAYS (F1). A term only ever
+ * moves earlier (the update is guarded by `forPeriodEnd > newEnd`), so a replay or a race is a no-op and a started term
+ * is never touched.
+ */
+export async function replaceQueuedTerms(
+  tx: Tx,
+  storeId: string,
+  sku: string,
+  now: Date
+): Promise<void> {
+  const rows = await tx.billingEvent.findMany({
+    where: {
+      storeId,
+      type: 'upgrade',
+      status: 'succeeded',
+      planCode: `${ADDON_PLAN_PREFIX}${sku}`,
+      forPeriodEnd: { gt: now },
+    },
+    orderBy: { forPeriodEnd: 'asc' },
+    select: { id: true, forPeriodEnd: true },
+  });
+  let prevEnd: Date | null = null;
+  for (const r of [...rows].sort((a, b) => a.forPeriodEnd!.getTime() - b.forPeriodEnd!.getTime())) {
+    const end = r.forPeriodEnd!;
+    if (addDays(end, -ADDON_TERM_DAYS) <= now) {
+      prevEnd = end; // already running: untouched
+      continue;
+    }
+    const start: Date = prevEnd && prevEnd > now ? prevEnd : now;
+    const newEnd = addDays(start, ADDON_TERM_DAYS);
+    if (newEnd < end) {
+      await tx.billingEvent.updateMany({
+        where: { id: r.id, storeId, forPeriodEnd: { gt: newEnd } },
+        data: { forPeriodEnd: newEnd },
+      });
+      prevEnd = newEnd;
+    } else prevEnd = end;
+  }
+}
+
 export async function applyAddonGrant(
   tx: Tx,
   row: { id: string; storeId: string; planCode: string | null },

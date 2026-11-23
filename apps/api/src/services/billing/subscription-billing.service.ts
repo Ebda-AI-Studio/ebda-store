@@ -90,8 +90,8 @@ import {
   sweepFreeMonthGrants,
 } from './grants.service';
 import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
-import { applyAddonGrant } from './addon-grant';
-import { ADDON_MARKER_PREFIX, ADDON_PLAN_PREFIX } from './addon-catalog';
+import { applyAddonGrant, replaceQueuedTerms } from './addon-grant';
+import { ADDON_MARKER_PREFIX, ADDON_PLAN_PREFIX, skuOfPlanCode } from './addon-catalog';
 import { SETTLE_LEASE, SETTLE_LEASE_MS } from './settle-lease';
 import { renewDueAddons } from './addon-renewal';
 import { auditLog } from '../../middleware/security';
@@ -2109,7 +2109,12 @@ async function settleRefundInTx(
     if (flipped.count === 1) {
       await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', new Date(), storeId);
       // A refunded add-on stops being an entitlement AT ONCE: drop the cached feature map (NEVER-stale class).
-      if (isAddonRow(charge)) effects?.push({ kind: 'addon_granted', storeId });
+      if (isAddonRow(charge)) {
+        // A term queued behind the refunded one starts now instead of waiting for its end (F1).
+        const sku = skuOfPlanCode(charge.planCode);
+        if (sku) await replaceQueuedTerms(tx, storeId, sku, new Date());
+        effects?.push({ kind: 'addon_granted', storeId });
+      }
     }
   }
 }

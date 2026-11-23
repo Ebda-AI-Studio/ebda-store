@@ -184,6 +184,31 @@ describe('refund of an add-on payment', () => {
     // an add-on refund never goes near the plan period (R-REFUND-PERIOD-1 must not downgrade the store)
     expect(refundTx.storeSubscription.findUnique).not.toHaveBeenCalled();
   });
+  it('F1: refunding a term re-places the terms queued behind it (wired into the settle)', async () => {
+    const NOWMS = Date.now();
+    const queued = { id: 'B', forPeriodEnd: new Date(NOWMS + 40 * 86_400_000) };
+    const updates: any[] = [];
+    refundTx.billingEvent.findUnique.mockImplementation(async ({ where }: any) =>
+      where.id === 'c1'
+        ? charge('addon:ai:topup_300')
+        : { id: where.id, relatedEventId: 'c1', storeId: 's1' }
+    );
+    const orig = { m: refundTx.billingEvent.findMany, u: refundTx.billingEvent.updateMany };
+    refundTx.billingEvent.findMany = async () => [queued];
+    refundTx.billingEvent.updateMany = async (a: any) => {
+      updates.push(a);
+      return { count: 1 };
+    };
+    try {
+      await refundCharge({ eventId: 'c1', provider });
+    } finally {
+      refundTx.billingEvent.findMany = orig.m;
+      refundTx.billingEvent.updateMany = orig.u;
+    }
+    const moved = updates.find(u => u.where.id === 'B');
+    expect(moved.data.forPeriodEnd.getTime() - NOWMS).toBeGreaterThan(29.99 * 86_400_000);
+    expect(moved.data.forPeriodEnd.getTime() - NOWMS).toBeLessThan(30.01 * 86_400_000);
+  });
   it('a plan refund does not touch the feature cache from this path', async () => {
     refundTx.billingEvent.findUnique.mockImplementation(async ({ where }: any) =>
       where.id === 'c1' ? charge('growth') : { id: where.id, relatedEventId: 'c1', storeId: 's1' }
