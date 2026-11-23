@@ -13,7 +13,6 @@
     "policy-free-writes|account.verify-email",
     "policy-free-writes|chat.ref-help",
     "policy-free-writes|integrations.shopper-mcp",
-    "policy-free-writes|marketing.product-feeds",
     "policy-free-writes|mcp.read-tools",
     "policy-free-writes|onboarding.setup-guide",
     "policy-free-writes|onboarding.signup",
