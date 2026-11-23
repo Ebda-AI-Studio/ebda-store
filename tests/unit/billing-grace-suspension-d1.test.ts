@@ -32,6 +32,12 @@ vi.mock('../../apps/api/src/services/billing/account.service', () => ({
   assertPayableStore: vi.fn(),
   suspendForBilling: (id: string) => h.suspend!(id),
 }));
+// The lapse downgrade (MONEY-LAPSE-1) also mirrors the plan onto the store row through storeUpdate, which needs a tenant
+// context this rig does not open (withStore is replaced by a raw transaction); the row's own write is what is under test.
+vi.mock('../../apps/api/src/lib/repo-factory', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  storeUpdate: vi.fn(async () => undefined),
+}));
 vi.mock('@ebda/database', async importOriginal => {
   const real = await importOriginal<typeof import('@ebda/database')>();
   // a real transaction, as on D1: a failed claim must roll the past_due decision back with it
@@ -78,6 +84,10 @@ function rig(migrated: boolean) {
   );
   db.prepare(
     `INSERT INTO plans (id, code, name_en, name_ar, feature_tier, limits) VALUES ('plan-growth','growth','g','g','professional','{}')`
+  ).run();
+  // the lapse downgrade (MONEY-LAPSE-1) moves the row to the seeded free plan (store_subscriptions.plan_code FK)
+  db.prepare(
+    `INSERT INTO plans (id, code, name_en, name_ar, feature_tier, limits) VALUES ('plan-free','free','f','f','free','{}')`
   ).run();
   db.prepare(
     `INSERT INTO stores (id, name, slug, owner_id, status) VALUES (?, 's', 's', 'o', 'active')`

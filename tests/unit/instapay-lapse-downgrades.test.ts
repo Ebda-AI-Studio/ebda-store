@@ -50,6 +50,8 @@ const h = vi.hoisted(() => {
       },
     },
     plan: { findUnique: async () => ({ code: 'free', featureTier: 'free' }) },
+    // the `suspended` notice stage claim (BILL-NOTICE-1)
+    billingReminder: { createMany: async () => ({ count: 1 }) },
   };
   return Object.assign(st, { tx });
 });
