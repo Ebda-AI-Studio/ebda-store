@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { cfWaitUntil } from '../cf/bindings';
 import { storeDb, storeMoney } from '../lib/repo-factory';
 import { requestHoldsOrderViewToken, requireOrderAccess } from '../lib/order-view-token';
 import { maskReceiptPayerPii } from '../services/payment-providers/instapay-receipt.service';
@@ -1391,13 +1392,16 @@ async function refundOnce(
   } catch (err) {
     // The compensating row: the intent is not left dangling. Best effort; the provider outcome (maybe executed)
     // is the claim-stuck sweep's job, not this write's.
-    void runInStoreCtx(refundStoreId, () =>
-      auditLogStrict({
-        ...auditBase,
-        action: 'payment.refund_failed',
-        details: { error: err instanceof Error ? err.message.slice(0, 200) : 'unknown' },
-      })
-    ).catch(() => undefined);
+    // cfWaitUntil: a bare `void` is cancelled with the response on a Worker, losing the compensating row.
+    cfWaitUntil(
+      runInStoreCtx(refundStoreId, () =>
+        auditLogStrict({
+          ...auditBase,
+          action: 'payment.refund_failed',
+          details: { error: err instanceof Error ? err.message.slice(0, 200) : 'unknown' },
+        })
+      ).catch(() => undefined)
+    );
     throw err;
   }
 

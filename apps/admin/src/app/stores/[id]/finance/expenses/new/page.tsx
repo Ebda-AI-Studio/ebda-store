@@ -6,7 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { FormFooter } from '@/components/FormFooter';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, getApiUrl, localizedApiMessage } from '@/lib/api';
-import { minorToMajor } from '@/lib/format';
+import { formatPrice } from '@/lib/format';
 import { resolveUploadErrorMessage } from '@/lib/expense-upload-error';
 import {
   isCashOrBankAccount,
@@ -554,9 +554,7 @@ export default function NewExpensePage() {
               required
             />
             {isNonBase && rawAmount > 0 && fxRateNum > 0 && (
-              <p className="text-xs text-muted-foreground">
-                = {minorToMajor(baseAmountFils)} {tc('egp')}
-              </p>
+              <p className="text-xs text-muted-foreground">= {formatPrice(baseAmountFils)}</p>
             )}
           </label>
           <label className="block space-y-1">
@@ -572,9 +570,7 @@ export default function NewExpensePage() {
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
             />
             {isNonBase && rawTax > 0 && fxRateNum > 0 && (
-              <p className="text-xs text-muted-foreground">
-                = {minorToMajor(baseTaxFils)} {tc('egp')}
-              </p>
+              <p className="text-xs text-muted-foreground">= {formatPrice(baseTaxFils)}</p>
             )}
           </label>
         </div>

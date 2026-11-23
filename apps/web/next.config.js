@@ -10,6 +10,8 @@ const IMAGE_VARIANTS = process.env.NEXT_PUBLIC_IMAGE_VARIANTS === '1';
 const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAGES;
 
 /** @type {import('next').NextConfig} */
+const { authRedirects } = require('./auth-redirects');
+
 const nextConfig = {
   reactStrictMode: true,
   // Dev only: hosts (comma separated) allowed to load /_next dev assets, e.g. when a demo store host is
@@ -124,17 +126,9 @@ const nextConfig = {
     optimizePackageImports: ['@ebda/shared', '@ebda/ui'],
   },
 
-  // `/account/login` is the natural guess for the sign-in page; the page lives at `/auth/login`. Permanent, keeps the
-  // `/ar|/en` language prefix (LOCALE-PATHS-1) and the query string (next appends it to the destination).
+  // /account/register, /signup, /login ... -> the real /auth/* pages (auth-redirects.js)
   async redirects() {
-    return [
-      { source: '/account/login', destination: '/auth/login', permanent: true },
-      {
-        source: '/:locale(ar|en)/account/login',
-        destination: '/:locale/auth/login',
-        permanent: true,
-      },
-    ];
+    return authRedirects();
   },
 
   // Security headers

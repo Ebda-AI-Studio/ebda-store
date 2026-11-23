@@ -11,6 +11,7 @@ import {
   redeemPoints,
   reverseEarnedPointsFromOrder,
 } from '../src/do/loyalty';
+import { refundOrder } from '../src/do/refund';
 
 const MONTH = 30 * 86_400_000;
 const T0 = Date.UTC(2026, 0, 1);
@@ -136,5 +137,101 @@ describe('loyalty lots (#631)', () => {
     expect(f.expireAll(T0 + 13 * MONTH).expired).toBe(600);
     expect(f.bal()).toBe(0);
     expect(f.expireAll(T0 + 14 * MONTH).expired).toBe(0);
+  });
+});
+
+// Row 22 (T1): a PARTIAL refund claws back the loyalty earned by that order in proportion to the refunded share. Through the
+// real refundOrder (the wiring is part of the behaviour). The whole-order reversal then takes only what is left.
+describe('loyalty partial refund clawback (proportional)', () => {
+  const paid = (f: ReturnType<typeof fixture>, o: string) =>
+    f.x(`UPDATE orders SET status = 'confirmed', payment_status = 'paid' WHERE id = ?`, o);
+  const earned = (f: ReturnType<typeof fixture>) =>
+    f.one(`SELECT total_earned AS t FROM loyalty_points WHERE customer_id = 'c1'`).t as number;
+
+  it('refunding 25% of a 1000 pt order takes back 250 pts, once per refund key', () => {
+    const f = fixture();
+    const a = f.earn(1000, T0);
+    paid(f, a.o);
+    const r = refundOrder(f.db, { storeId: 's1', orderId: a.o, amount: 25_000, refundKey: 'r1' });
+    expect(r.loyalty.earnedReversed).toBe(250);
+    expect(f.bal()).toBe(750);
+    expect(earned(f)).toBe(750);
+    const again = refundOrder(f.db, {
+      storeId: 's1',
+      orderId: a.o,
+      amount: 25_000,
+      refundKey: 'r1',
+    });
+    expect(again.replayed).toBe(true);
+    expect(f.bal()).toBe(750);
+  });
+
+  it('partial then full refund takes back the earn exactly once in total', () => {
+    const f = fixture();
+    const a = f.earn(1000, T0);
+    paid(f, a.o);
+    refundOrder(f.db, { storeId: 's1', orderId: a.o, amount: 25_000, refundKey: 'r1' });
+    reverseEarnedPointsFromOrder(f.db, { storeId: 's1', orderId: a.o, now: T0 + MONTH });
+    expect(f.bal()).toBe(0);
+    expect(earned(f)).toBe(0);
+  });
+
+  it('an external refund larger than the order is recorded and clamped to the remaining earn (never aborts)', () => {
+    const f = fixture();
+    const a = f.earn(1000, T0);
+    paid(f, a.o);
+    refundOrder(f.db, {
+      storeId: 's1',
+      orderId: a.o,
+      amount: 90_000,
+      refundKey: 'r1',
+      external: true,
+    });
+    const r = refundOrder(f.db, {
+      storeId: 's1',
+      orderId: a.o,
+      amount: 90_000,
+      refundKey: 'r2',
+      external: true,
+    });
+    expect(r.loyalty.earnedReversed).toBe(100); // only what is left of the earn, never beyond it
+    expect(f.bal()).toBe(0);
+  });
+
+  it('points already spent become debt on a partial clawback, like the full one', () => {
+    const f = fixture();
+    const a = f.earn(1000, T0);
+    paid(f, a.o);
+    const b = f.order(500);
+    redeemPoints(f.db, {
+      storeId: 's1',
+      customerId: 'c1',
+      orderId: b,
+      points: 1000,
+      featureEnabled: true,
+      now: T0,
+    });
+    refundOrder(f.db, { storeId: 's1', orderId: a.o, amount: 50_000, refundKey: 'r1' });
+    expect(f.bal()).toBe(-500);
+  });
+
+  it('an item-level partial refund claws back by the returned lines share', () => {
+    const f = fixture();
+    const a = f.earn(1000, T0);
+    paid(f, a.o);
+    f.x(
+      `INSERT INTO products (id, store_id, name, slug, price, inventory, status) VALUES ('p1', 's1', 'W', 'w', 50000, 9, 'active')`
+    );
+    f.x(
+      `INSERT INTO order_items (id, order_id, product_id, product_name, quantity, price, total) VALUES ('i1', ?, 'p1', 'W', 2, 50000, 100000)`,
+      a.o
+    );
+    refundOrder(f.db, {
+      storeId: 's1',
+      orderId: a.o,
+      lines: [{ orderItemId: 'i1', quantity: 1 }],
+      refundKey: 'ret1',
+    });
+    expect(f.bal()).toBe(500);
   });
 });

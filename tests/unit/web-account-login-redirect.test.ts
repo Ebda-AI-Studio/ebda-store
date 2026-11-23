@@ -1,4 +1,7 @@
-/** `/account/login` (a natural guess, UI audit P2 #10) 301s to `/auth/login`, keeping the language prefix. */
+/**
+ * `/account/login` (a natural guess, UI audit P2 #10) redirects to `/auth/login`, keeping the language prefix. The rule now
+ * comes from `auth-redirects.js` (main's alias set: /login, /signup, /account/register ...), which redirects temporarily.
+ */
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
@@ -24,13 +27,13 @@ function resolve(rules: Awaited<ReturnType<typeof cfg.redirects>>, path: string)
 }
 
 describe('/account/login redirect', () => {
-  it('all redirects are permanent and point at a page that exists', async () => {
+  it('the redirects point at pages that exist', async () => {
     const rules = await cfg.redirects();
     expect(rules.length).toBeGreaterThan(0);
-    for (const r of rules) expect(r.permanent).toBe(true);
+    for (const r of rules) expect(r.destination).toMatch(/^(\/:locale)?\/auth\/(login|register)$/);
     expect(existsSync(join(__dirname, '../../apps/web/src/app/auth/login/page.tsx'))).toBe(true);
   });
-  it('maps the unprefixed and both language-prefixed paths, and nothing else', async () => {
+  it('maps the unprefixed and both language-prefixed paths, and no unrelated account path', async () => {
     const rules = await cfg.redirects();
     expect(resolve(rules, '/account/login')).toBe('/auth/login');
     expect(resolve(rules, '/ar/account/login')).toBe('/ar/auth/login');
@@ -38,5 +41,6 @@ describe('/account/login redirect', () => {
     expect(resolve(rules, '/account/orders')).toBeNull();
     expect(resolve(rules, '/fr/account/login')).toBeNull();
     expect(resolve(rules, '/account/login/x')).toBeNull();
+    expect(existsSync(join(__dirname, '../../apps/web/src/app/auth/register/page.tsx'))).toBe(true);
   });
 });

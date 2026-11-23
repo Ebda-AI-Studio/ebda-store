@@ -1729,6 +1729,27 @@ export const receiptReadLimiter = withoutLimitPlan(
   'keyed on req.user (set by authenticate, after the request-level prefetch)'
 );
 
+// Owner/admin GETs that read one small record (the CodeQL js/missing-rate-limiting class: GETs skip the global limiter).
+// Per USER (a store's staff share one office IP), generous for normal page loads and polling, a hard stop for a script.
+const ADMIN_READ_LIMIT_PER_MINUTE = 120;
+export const adminReadLimiter = withoutLimitPlan(
+  rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, 'admin-read'),
+    windowMs: 60 * 1000,
+    max: ADMIN_READ_LIMIT_PER_MINUTE,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skip: skipForLoadTest,
+    keyGenerator: req => `admin-read-${req.user?.userId ?? ipKeyGenerator(req.ip ?? '')}`,
+  }),
+  'keyed on req.user (set by authenticate, after the request-level prefetch)'
+);
+
 // Stricter limiter for payment operations
 export const paymentLimiter = plannedRateLimit('payment', {
   windowMs: 60 * 1000, // 1 minute
@@ -2079,6 +2100,24 @@ export const promotionPreviewLimiter = plannedRateLimit('promotion-preview', {
   // over, and the failure surfaces as `Cannot read properties of undefined
   // (reading 'promotion')` rather than as a 429 — the misleading-artefact
   // failure mode the retry-safety rule exists to prevent.
+  skip: skipForLoadTestOrTests,
+  keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
+});
+
+// Browse preview limiter: the SAME targeting preview, asked by the PDP and the cart while a shopper browses
+// (every quantity / cart change). Its own bucket ('promo-preview-browse') so browsing on a carrier-shared
+// Egyptian IP can never spend checkout's 20/min `promotion-preview` budget (checkout's promo line would vanish
+// on a 429). Still bounded per IP, and the per-tenant aggregate still applies on the route.
+export const promotionBrowsePreviewLimiter = plannedRateLimit('promo-preview-browse', {
+  windowMs: 60 * 1000,
+  max: 120,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
   skip: skipForLoadTestOrTests,
   keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
 });
