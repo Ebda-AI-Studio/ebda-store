@@ -12,7 +12,11 @@ const { apiPost, apiGet, replace } = vi.hoisted(() => ({
   apiGet: vi.fn(),
   replace: vi.fn(),
 }));
-vi.mock('../../lib/api', () => ({ apiPost, apiGet }));
+vi.mock('../../lib/api', async importActual => ({
+  ...(await importActual<typeof import('../../lib/api')>()),
+  apiPost,
+  apiGet,
+}));
 vi.mock('../../lib/auth', () => ({
   useAuth: () => ({ isAuthenticated: false, isLoading: false }),
 }));
@@ -195,6 +199,23 @@ describe('signup page', () => {
     });
     submit();
     expect(await screen.findByText('onboarding.signup.errors.emailDisposable')).toBeTruthy();
+  });
+
+  it('maps an API VALIDATION_ERROR field to that field, not the generic line', async () => {
+    apiPost.mockResolvedValue({
+      data: null,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'x',
+        status: 400,
+        details: { phone: ['Invalid phone'] },
+      },
+    });
+    render(<SignupPage />);
+    fill({ name: 'Mona', email: 'mona@x.com', phone: '01012345678', password: 'Str0ng!Passw0rd' });
+    submit();
+    expect(await screen.findByText('onboarding.signup.errors.phoneInvalid')).toBeTruthy();
+    expect(screen.queryByText('onboarding.signup.errors.generic')).toBeNull();
   });
 
   it('refetches the form token after a too-fast / expired refusal', async () => {

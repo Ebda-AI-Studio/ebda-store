@@ -17,7 +17,14 @@ const { apiGet, apiPost, calls, posts } = vi.hoisted(() => ({
   posts: [] as Array<{ url: string; resolve: (v: unknown) => void }>,
 }));
 
-vi.mock('@/lib/api', () => ({ apiGet, apiPost }));
+vi.mock('@/lib/api', () => ({
+  apiGet,
+  apiPost,
+  fieldErrorsFrom: (d?: Record<string, unknown>) =>
+    Object.fromEntries(
+      Object.entries(d ?? {}).flatMap(([k, v]) => (Array.isArray(v) ? [[k, String(v[0])]] : []))
+    ),
+}));
 vi.mock('@/lib/auth', () => ({ useAuth: () => ({ user: null }) }));
 vi.mock('@/hooks/useDebouncedValue', () => ({ useDebouncedValue: (v: string) => v }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
@@ -177,5 +184,30 @@ describe('users list — post-invite refetch reads CURRENT page/role filter (iss
 
     expect(screen.getByText('USR-all-3')).toBeTruthy();
     expect(screen.queryByText('USR-all-2')).toBeNull();
+  });
+});
+
+describe('invite form role', () => {
+  it('no longer offers super_admin and explains where platform admins come from', async () => {
+    const { container } = await loadFirstPage();
+    fireEvent.click(screen.getAllByText('inviteUser')[0]);
+    const options = Array.from(container.querySelectorAll('#invite-role option')).map(
+      o => (o as HTMLOptionElement).value
+    );
+    expect(options).toEqual(['store_admin']);
+    expect(screen.getByText('inviteRoleHelp')).toBeTruthy();
+  });
+
+  it('renders the field-level error from the API under the field', async () => {
+    const { container } = await loadFirstPage();
+    submitInvite(container);
+    await waitFor(() => expect(posts).toHaveLength(1));
+    await act(async () =>
+      posts[0].resolve({
+        data: null,
+        error: { message: 'bad', details: { email: ['Invalid email'] } },
+      })
+    );
+    expect(await screen.findByText('Invalid email')).toBeTruthy();
   });
 });

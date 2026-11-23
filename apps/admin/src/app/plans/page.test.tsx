@@ -8,7 +8,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 const { apiGet, apiPut } = vi.hoisted(() => ({ apiGet: vi.fn(), apiPut: vi.fn() }));
 vi.mock('next-intl', () => ({ useLocale: () => 'en' }));
-vi.mock('../../lib/api', () => ({ apiGet, apiPut }));
+vi.mock('../../lib/api', async importActual => ({
+  ...(await importActual<typeof import('../../lib/api')>()),
+  apiGet,
+  apiPut,
+}));
 vi.mock('../../components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -23,8 +27,15 @@ vi.mock('../../i18n/useT', () => {
 vi.mock('@ebda/ui', () => ({
   Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
   Button: (p: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...p} />,
-  Input: ({ label, ...p }: { label?: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
-    <input aria-label={label} {...p} />
+  Input: ({
+    label,
+    error,
+    ...p
+  }: { label?: string; error?: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
+    <>
+      <input aria-label={label} {...p} />
+      {error ? <span role="alert">{error}</span> : null}
+    </>
   ),
   Modal: ({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) =>
     isOpen ? <div role="dialog">{children}</div> : null,
@@ -180,5 +191,16 @@ describe('super-admin plans page', () => {
     await openFree();
     expect(screen.getByText('form.priceYearlyHelp')).toBeTruthy();
     expect(screen.getAllByText('form.currency').length).toBe(2);
+  });
+
+  it('renders the API field error under the field it names', async () => {
+    apiPut.mockResolvedValue({
+      data: null,
+      error: { message: 'bad', status: 400, details: { nameEn: ['Name is too long'] } },
+    });
+    await openFree();
+    fireEvent.change(screen.getByLabelText('form.nameEn'), { target: { value: 'Freee' } });
+    fireEvent.click(screen.getByRole('button', { name: 'save' }));
+    expect(await screen.findByText('Name is too long')).toBeTruthy();
   });
 });

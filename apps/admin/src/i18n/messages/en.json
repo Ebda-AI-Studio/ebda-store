@@ -6183,6 +6183,7 @@
   "users": {
     "title": "Users",
     "subtitle": "Manage all users on the platform",
+    "inviteRoleHelp": "Platform admins are not added from this form. They are added through the secure admin bootstrap (see the admin bootstrap runbook in docs/ENVIRONMENT.md).",
     "inviteUser": "Invite User",
     "email": "Email",
     "firstName": "First name",

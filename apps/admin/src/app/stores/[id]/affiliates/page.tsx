@@ -6,7 +6,8 @@ import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { SearchInput } from '../../../../components/SearchInput';
-import { apiGet, apiPut, apiPost, apiPatch } from '../../../../lib/api';
+import { apiGet, apiPut, apiPost, apiPatch, fieldErrorsFrom } from '../../../../lib/api';
+import { FieldError } from '../../../../components/FieldError';
 import { AffiliateStatsCards } from './_components/AffiliateStatsCards';
 import { AffiliatesTable } from './_components/AffiliatesTable';
 import { AffiliateCommissionForm } from './_components/AffiliateCommissionForm';
@@ -86,6 +87,7 @@ export default function AffiliatesPage() {
   const [inviteInstagram, setInviteInstagram] = useState('');
   const [inviteTiktok, setInviteTiktok] = useState('');
   const [inviteNotes, setInviteNotes] = useState('');
+  const [inviteFieldErrors, setInviteFieldErrors] = useState<Record<string, string>>({});
   const [inviting, setInviting] = useState(false);
   const inviteNameRef = useRef<HTMLInputElement>(null);
 
@@ -234,6 +236,7 @@ export default function AffiliatesPage() {
     setInviteInstagram('');
     setInviteTiktok('');
     setInviteNotes('');
+    setInviteFieldErrors({});
     setShowInviteModal(true);
     setTimeout(() => inviteNameRef.current?.focus(), 50);
   };
@@ -247,6 +250,7 @@ export default function AffiliatesPage() {
     if (!inviteName.trim() || !inviteEmail.trim()) return;
 
     setInviting(true);
+    setInviteFieldErrors({});
     try {
       const { error } = await apiPost(`/api/v1/stores/${storeId}/affiliates`, {
         name: inviteName.trim(),
@@ -263,6 +267,7 @@ export default function AffiliatesPage() {
         setRefreshKey(k => k + 1);
         fetchStats();
       } else {
+        setInviteFieldErrors(fieldErrorsFrom(error.details));
         showError(tToasts('error.title'), error.message || tToasts('inviteError.message'));
       }
     } catch {
@@ -423,6 +428,7 @@ export default function AffiliatesPage() {
                     placeholder={tPage('inviteNamePlaceholder')}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
+                  <FieldError message={inviteFieldErrors.name} />
                 </div>
 
                 <div className="col-span-2 sm:col-span-1">
@@ -437,6 +443,7 @@ export default function AffiliatesPage() {
                     placeholder={tPage('inviteEmailPlaceholder')}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
+                  <FieldError message={inviteFieldErrors.email} />
                 </div>
 
                 <div className="col-span-2 sm:col-span-1">
@@ -451,6 +458,7 @@ export default function AffiliatesPage() {
                     placeholder={REGION.phone.placeholderIntl}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
+                  <FieldError message={inviteFieldErrors.phone} />
                 </div>
 
                 <div className="col-span-2 sm:col-span-1">
@@ -465,6 +473,7 @@ export default function AffiliatesPage() {
                     placeholder="@username"
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
+                  <FieldError message={inviteFieldErrors.instagram} />
                 </div>
 
                 <div className="col-span-2 sm:col-span-1">
@@ -479,6 +488,7 @@ export default function AffiliatesPage() {
                     placeholder="@username"
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
+                  <FieldError message={inviteFieldErrors.tiktok} />
                 </div>
 
                 <div className="col-span-2">
@@ -493,6 +503,7 @@ export default function AffiliatesPage() {
                     placeholder={tPage('inviteNotesPlaceholder')}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                   />
+                  <FieldError message={inviteFieldErrors.notes} />
                 </div>
               </div>
 

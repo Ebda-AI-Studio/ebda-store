@@ -17,7 +17,11 @@ const { apiGet, apiPost, calls, posts } = vi.hoisted(() => ({
   posts: [] as Array<{ url: string; resolve: (v: unknown) => void }>,
 }));
 
-vi.mock('@/lib/api', () => ({ apiGet, apiPost }));
+vi.mock('@/lib/api', async importActual => ({
+  ...(await importActual<typeof import('@/lib/api')>()),
+  apiGet,
+  apiPost,
+}));
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'store-1' }) }));
 vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));
 vi.mock('@/components/AdminLayout', () => ({
@@ -115,5 +119,24 @@ describe('fx rates — refetch reads the CURRENT filter, latest wins (issue 2443
 
     expect(screen.getByText('CUR-EUR')).toBeTruthy();
     expect(screen.queryByText('CUR-USD')).toBeNull();
+  });
+});
+
+describe('fx rates — API field errors render under the field', () => {
+  it('shows the rate error under the rate input', async () => {
+    await loadAll();
+    fireEvent.change(screen.getByPlaceholderText('rateExample2'), { target: { value: '50' } });
+    fireEvent.click(screen.getByText('saveRate'));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    await act(async () =>
+      posts[0].resolve({
+        error: { message: 'bad', status: 400, details: { rate: ['Rate must be positive'] } },
+      })
+    );
+    const msg = await screen.findAllByText('Rate must be positive');
+    expect(msg.length).toBeGreaterThan(0);
+    expect(screen.getByPlaceholderText('rateExample2').closest('label')?.textContent).toContain(
+      'Rate must be positive'
+    );
   });
 });

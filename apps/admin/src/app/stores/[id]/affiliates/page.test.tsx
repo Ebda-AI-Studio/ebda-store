@@ -10,22 +10,43 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 
 type Pending = { url: string; resolve: (v: unknown) => void };
 
-const { apiGet, apiPatch, calls, patches } = vi.hoisted(() => ({
+const { apiGet, apiPatch, apiPost, calls, patches } = vi.hoisted(() => ({
   apiGet: vi.fn(),
+  apiPost: vi.fn(),
   apiPatch: vi.fn(),
   calls: [] as Array<{ url: string; resolve: (v: unknown) => void }>,
   patches: [] as Array<{ url: string; resolve: (v: unknown) => void }>,
 }));
 
-vi.mock('@/lib/api', () => ({ apiGet, apiPatch, apiPost: vi.fn(), apiPut: vi.fn() }));
+vi.mock('@/lib/api', async importActual => ({
+  ...(await importActual<typeof import('@/lib/api')>()),
+  apiGet,
+  apiPatch,
+  apiPost,
+  apiPut: vi.fn(),
+}));
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'store-1' }) }));
-vi.mock('@ebda/ui', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
+vi.mock('@ebda/ui', () => ({
+  useToast: () => ({ success: vi.fn(), error: vi.fn() }),
+  Button: (p: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...p} />,
+}));
 vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));
 vi.mock('@/hooks/useRequireFeature', () => ({
   useRequireFeature: () => ({ enabled: true, isLoading: false, gate: null }),
 }));
 vi.mock('@/components/AdminLayout', () => ({
-  AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AdminLayout: ({
+    children,
+    actions,
+  }: {
+    children: React.ReactNode;
+    actions?: React.ReactNode;
+  }) => (
+    <div>
+      {actions}
+      {children}
+    </div>
+  ),
 }));
 vi.mock('@/components/SearchInput', () => ({ SearchInput: () => null }));
 vi.mock('./_components/AffiliateStatsCards', () => ({ AffiliateStatsCards: () => null }));
@@ -136,5 +157,21 @@ describe('affiliates list — post-action refetch reads CURRENT page/status (iss
 
     expect(screen.getByText('AFF-all-3')).toBeTruthy();
     expect(screen.queryByText('AFF-all-2')).toBeNull();
+  });
+});
+
+describe('affiliate invite form — API field errors', () => {
+  it('shows the email error under the email field', async () => {
+    apiPost.mockResolvedValue({
+      data: null,
+      error: { message: 'bad', status: 400, details: { email: ['Email already invited'] } },
+    });
+    await loadFirstPage();
+    fireEvent.click(screen.getByText('inviteButton'));
+    const inputs = document.querySelectorAll('form input');
+    fireEvent.change(inputs[0], { target: { value: 'Sara' } });
+    fireEvent.change(inputs[1], { target: { value: 'sara@x.com' } });
+    fireEvent.submit(inputs[0].closest('form')!);
+    expect(await screen.findByText('Email already invited')).toBeTruthy();
   });
 });

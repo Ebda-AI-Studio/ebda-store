@@ -23,7 +23,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { Toggle } from '../../components/Toggle';
 import { DataTable, type DataTableColumn } from '../../components/mobile/DataTable';
-import { apiGet, apiPut } from '../../lib/api';
+import { apiGet, apiPut, fieldErrorsFrom } from '../../lib/api';
 import { useT } from '../../i18n/useT';
 import { bpsToPercentInput, percentInputToBps } from './plan-form';
 
@@ -212,6 +212,7 @@ function PlansInner() {
   const [editing, setEditing] = useState<PlanRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [saveFieldErrors, setSaveFieldErrors] = useState<Record<string, string>>({});
 
   // Edit-form state (strings for inputs; converted on save).
   const [form, setForm] = useState<FormState>({
@@ -288,9 +289,11 @@ function PlansInner() {
     }
     setSaving(true);
     setFormError(null);
+    setSaveFieldErrors({});
     try {
       const { error } = await apiPut(`/api/v1/admin/plans/${editing.code}`, payload);
       if (error) {
+        setSaveFieldErrors(fieldErrorsFrom(error.details));
         setFormError(error.message || t('errors.saveFailed'));
         return;
       }
@@ -428,12 +431,14 @@ function PlansInner() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Input
                     label={t('form.nameEn')}
+                    error={saveFieldErrors.nameEn}
                     value={form.nameEn}
                     onChange={e => setForm(f => ({ ...f, nameEn: e.target.value }))}
                   />
                   <Input
                     label={t('form.nameAr')}
                     dir="rtl"
+                    error={saveFieldErrors.nameAr}
                     value={form.nameAr}
                     onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))}
                   />
@@ -441,6 +446,7 @@ function PlansInner() {
                     label={t('form.sort')}
                     type="number"
                     min={0}
+                    error={saveFieldErrors.sort}
                     value={form.sort}
                     onChange={e => setForm(f => ({ ...f, sort: e.target.value }))}
                   />
@@ -464,7 +470,7 @@ function PlansInner() {
                     error={
                       Number.isNaN(inputToMinor(form.priceMonthly))
                         ? t('errors.invalidNumber')
-                        : undefined
+                        : saveFieldErrors.priceMonthlyMinor
                     }
                     type="number"
                     min={0}
@@ -481,7 +487,7 @@ function PlansInner() {
                     error={
                       Number.isNaN(inputToMinor(form.priceYearly))
                         ? t('errors.invalidNumber')
-                        : undefined
+                        : saveFieldErrors.priceYearlyMinor
                     }
                     type="number"
                     min={0}
@@ -502,6 +508,7 @@ function PlansInner() {
                         label={t(`limits.${k}`)}
                         type="number"
                         min={0}
+                        error={saveFieldErrors[`limits.${k}`]}
                         disabled={limits[k] === null}
                         value={limits[k] === null ? '' : String(limits[k])}
                         placeholder={limits[k] === null ? t('unlimited') : undefined}
@@ -535,7 +542,9 @@ function PlansInner() {
                       label={t(`limits.${k}`)}
                       unit="%"
                       error={
-                        Number.isNaN(percentInputToBps(fees[k])) ? t('form.invalidFee') : undefined
+                        Number.isNaN(percentInputToBps(fees[k]))
+                          ? t('form.invalidFee')
+                          : saveFieldErrors[`limits.${k}`]
                       }
                       type="text"
                       inputMode="decimal"
