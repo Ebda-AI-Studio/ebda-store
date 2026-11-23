@@ -16,7 +16,7 @@
  *       re-opened by a repair), record it as `keptRestrictive` and alert for a human to rule on
  * Every correction and every kept-restrictive case is logged and alerted.
  *
- * NEON-ZERO (Ruling NZ-C-10): with no Postgres (no Hyperdrive binding, or the directory read fails) the Postgres side is SKIPPED, never
+ * NEON-ZERO (Ruling NZ-C-10): with no Postgres (no Postgres binding, or the directory read fails) the Postgres side is SKIPPED, never
  * thrown: the tick reconciles D1 against each `do` store's own StoreDO instead (slug and status of the DO record vs the D1 row). The
  * same restrictive rule applies: a DO that is stricter than D1 closes the D1 row (status only), anything else is alert-only. A DO
  * that cannot be read is alert-only. The report says `postgresSkipped`. Cost if wrong: a Postgres outage silences the Postgres
