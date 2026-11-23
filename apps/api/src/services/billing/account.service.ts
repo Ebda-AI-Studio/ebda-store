@@ -963,16 +963,7 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     throw new AppError(400, 'INVALID_PERIOD', 'The period must end after it starts');
   }
   const { plan, price } = await loadPayablePlan(input.planCode, input.interval);
-  const expectedAmountMinor = (await chargeFor(price)).totalMinor;
   const overrideReason = input.overrideAmountReason?.trim() || null;
-  if (input.amountMinor !== expectedAmountMinor && !overrideReason) {
-    throw new AppError(
-      409,
-      'AMOUNT_MISMATCH',
-      'The amount is not the price of this plan and interval. Check it, or give a reason to record it anyway.',
-      { expectedAmountMinor, amountMinor: input.amountMinor }
-    );
-  }
   if (overrideReason && (overrideReason.length < 3 || overrideReason.length > 300)) {
     throw new AppError(400, 'INVALID_OVERRIDE_REASON', 'Give a short reason (3-300 characters)');
   }
@@ -1071,6 +1062,34 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
           await pgHalf(tx, existing.id);
       }
       return { duplicate: true, billingEventId: existing.id } as ManualPaymentResult;
+    }
+    // Ruling BILLING-AMOUNT-GUARD-1 - AFTER the replay check above, so a retry of an already recorded payment returns
+    // `duplicate` even when the price has moved since. The expected amount is what the merchant was told and the receipt
+    // was checked against: the stored claim's amount (named, or the pending one with this reference); the current list
+    // price only when there is no claim.
+    const claim = await tx.manualPaymentClaim.findFirst({
+      where: {
+        storeId: input.storeId,
+        ...(input.claimId
+          ? { id: input.claimId }
+          : {
+              status: 'pending',
+              method: input.method,
+              payerReference: {
+                in: [reference, normalizeInstapayReference(reference) ?? reference],
+              },
+            }),
+      },
+      select: { amountMinor: true },
+    });
+    const expectedAmountMinor = claim?.amountMinor ?? (await chargeFor(price)).totalMinor;
+    if (input.amountMinor !== expectedAmountMinor && !overrideReason) {
+      throw new AppError(
+        409,
+        'AMOUNT_MISMATCH',
+        'The amount is not what this payment was quoted at. Check it, or give a reason to record it anyway.',
+        { expectedAmountMinor, amountMinor: input.amountMinor }
+      );
     }
     // Row lock first: a free-month grant (grants.service) moves currentPeriodEnd under the same lock, so the
     // period computed below is never from a read a grant is about to change.
