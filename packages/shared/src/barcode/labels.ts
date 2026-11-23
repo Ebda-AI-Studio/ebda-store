@@ -129,6 +129,8 @@ export type LabelItem = {
   /** Piastres. */
   priceMinor: number;
   barcode: string;
+  /** Product page on the store's own domain (custom domain when set, else <slug>.ebda.app). */
+  qrUrl?: string | null;
 };
 
 export type LabelText = {
@@ -163,12 +165,35 @@ export type LabelLayout = {
     /** The drawn art inside the box (a shape keeps its aspect; plain bars fill the box). */
     art: { x: number; y: number; w: number; h: number };
   };
-  qr: { x: number; y: number; size: number } | null;
+  /** `size` = the whole code incl. its quiet zone, mm; `moduleMm` = one QR dot on paper. */
+  qr: { x: number; y: number; size: number; modules: number; moduleMm: number; url: string } | null;
+  /** The QR was asked for but cannot be scanned at this label size: the label is refused (never silently squeezed). */
+  qrRefused: boolean;
   /** Parts left out because they did not fit this label size. */
   dropped: Array<'qr' | 'variant' | 'price' | 'name' | 'digits'>;
   /** False when the narrowest bar would print under MIN_MODULE_MM: pick a bigger label or a plain EAN-13. */
   printable: boolean;
 };
+
+/** Smallest QR dot that scans reliably off a 203 dpi thermal head (2 dots) and a 300 dpi laser. */
+// pq-allow(unused-export): asserted by tests/unit/barcode-labels.test.ts
+export const MIN_QR_MODULE_MM = 0.25;
+/** Quiet zone around the QR, in dots (same as the QR renderer's scene). */
+// pq-allow(unused-export): asserted by tests/unit/barcode-labels.test.ts
+export const QR_QUIET_MODULES = 4;
+/** Byte-mode capacity at error correction M, QR versions 1..20 (ISO 18004 table 7). */
+const QR_BYTES_M = [
+  14, 26, 42, 62, 84, 106, 122, 152, 180, 213, 251, 287, 331, 362, 412, 450, 504, 560, 624, 666,
+];
+
+/** Dots per side (without quiet zone) of the QR that encodes `url` at ECC M. */
+// pq-allow(unused-export): asserted by tests/unit/barcode-labels.test.ts
+export function qrModuleCount(url: string): number {
+  const bytes = new TextEncoder().encode(url).length;
+  const v = QR_BYTES_M.findIndex(c => bytes <= c) + 1;
+  if (v === 0) throw new Error('qr url too long for a label');
+  return 17 + 4 * v;
+}
 
 /**
  * Narrowest bar a thermal head (203 dpi, ~0.125 mm/dot) prints reliably: 1.5 dots = 0.19 mm.
@@ -258,12 +283,31 @@ export function layoutLabel(
     dropped.push('digits');
   }
 
-  // QR: top-right square, only on labels tall enough that text and bars keep their room.
+  // QR (combined barcode + QR label): top-right square at the largest size the label allows. It is
+  // never shrunk below MIN_QR_MODULE_MM per dot: if the code, the text and the bars cannot all keep
+  // their scannable size the label is refused (`qrRefused`) instead of printing a dead QR.
   let qr: LabelLayout['qr'] = null;
-  if (wants.qr) {
+  let qrRefused = false;
+  if (wants.qr && !item.qrUrl) dropped.push('qr');
+  else if (wants.qr && item.qrUrl) {
+    const modules = qrModuleCount(item.qrUrl);
+    const total = modules + 2 * QR_QUIET_MODULES;
     const size = Math.min(H * 0.42, innerW * 0.3);
-    if (H >= 25 && size >= 12) qr = { x: rtl ? x0 : x0 + innerW - size, y: PAD, size };
-    else dropped.push('qr');
+    const textsH = priority.filter(k => lines[k]).length * lineH;
+    const barTop = PAD + Math.max(size + 1, textsH);
+    const fits =
+      size >= total * MIN_QR_MODULE_MM &&
+      barTop + MIN_BAR_H + (digitsOn ? digitsH : 0) + PAD <= H + 1e-6;
+    if (fits)
+      qr = {
+        x: rtl ? x0 : x0 + innerW - size,
+        y: PAD,
+        size,
+        modules,
+        moduleMm: size / total,
+        url: item.qrUrl,
+      };
+    else qrRefused = true;
   }
   const textW = qr ? innerW - qr.size - 1.5 : innerW;
   const textX = qr && rtl ? x0 + qr.size + 1.5 : x0;
@@ -339,8 +383,9 @@ export function layoutLabel(
     texts,
     barcode,
     qr,
+    qrRefused,
     dropped,
-    printable: moduleMm >= MIN_MODULE_MM && barH >= 5,
+    printable: moduleMm >= MIN_MODULE_MM && barH >= 5 && !qrRefused,
   };
 }
 

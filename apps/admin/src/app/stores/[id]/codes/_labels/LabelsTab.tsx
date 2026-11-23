@@ -27,12 +27,12 @@ import {
 import { Segmented } from '../_qr/_components/Segmented';
 import { ShapePicker } from './_components/ShapePicker';
 import { SheetPreview } from './_components/SheetPreview';
-import { toLabelItem, useLabels } from './useLabels';
+import { labelQrScene, toLabelItem, useLabels } from './useLabels';
 import { Button, buttonVariants } from '@/components/ui/Button';
 
 const MAX_TOTAL_COPIES = 2000;
 
-type Status = 'checking' | 'ok' | 'notPrintable' | 'unreadable';
+type Status = 'checking' | 'ok' | 'notPrintable' | 'qrRefused' | 'unreadable';
 
 export function LabelsTab({ storeId }: { storeId: string }) {
   const t = useT('labels');
@@ -60,7 +60,15 @@ export function LabelsTab({ storeId }: { storeId: string }) {
         if (!alive) return;
         setLabelCanvas(c);
         const r: LabelCheck = checkLabelCanvas(c, layout);
-        setStatus(r.ok ? 'ok' : r.reason === 'not-printable' ? 'notPrintable' : 'unreadable');
+        setStatus(
+          r.ok
+            ? 'ok'
+            : r.reason === 'not-printable'
+              ? layout.qrRefused
+                ? 'qrRefused'
+                : 'notPrintable'
+              : 'unreadable'
+        );
       })
       .catch(() => alive && setStatus('unreadable'));
     return () => {
@@ -110,9 +118,12 @@ export function LabelsTab({ storeId }: { storeId: string }) {
       const labels = [];
       const failed: string[] = [];
       for (const c of printable) {
-        const li = toLabelItem(c.item)!;
+        const li = toLabelItem(c.item, L.qrOrigin)!;
         const lay = layoutLabel(preset, li, settings);
-        const canvas = await renderLabelCanvas({ layout: lay, qrScene: L.qrScene });
+        const canvas = await renderLabelCanvas({
+          layout: lay,
+          qrScene: lay.qr ? labelQrScene(lay.qr.url, L.qrDesign) : null,
+        });
         // every label is read back from its own pixels before any file is produced
         if (!checkLabelCanvas(canvas, lay).ok) {
           failed.push(li.nameAr && locale === 'ar' ? li.nameAr : li.name);
