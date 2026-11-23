@@ -86,6 +86,14 @@ export const PER_EMAIL = (name: string, n: number): Budget => ({
   perIp: Number.MAX_SAFE_INTEGER,
 });
 
+/** Ebda Chat invitation mail: 5 per address per hour (the limiter's longest window), whether or not the address is registered. */
+export const CHAT_INVITE_MAIL: Budget = {
+  name: 'chat-invite',
+  perKey: 5,
+  perIp: Number.MAX_SAFE_INTEGER,
+  windowMs: 60 * 60_000,
+};
+
 export interface Attempt {
   ok: boolean;
   /** The guarded work succeeded: clear the subject's counter and give the IP row back. */
