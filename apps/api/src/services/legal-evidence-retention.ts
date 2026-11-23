@@ -29,9 +29,18 @@ export function legalEvidenceRetentionPlan(): Record<string, Retention> {
   return plan;
 }
 
+/**
+ * `months` calendar months before `now`, the day clamped to the LAST day of the target month. `setUTCMonth` alone overflows
+ * (31 Mar - 1 month = "31 Feb" = 3 Mar; 29 Feb - 12 months = "29 Feb" of a common year = 1 Mar), which moves the cutoff LATER and
+ * would delete or NULL rows up to a few days younger than the retention window.
+ */
 export const monthsAgo = (now: number, months: number): number => {
   const d = new Date(now);
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
   d.setUTCMonth(d.getUTCMonth() - months);
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
   return d.getTime();
 };
 export const yearsAgo = (now: number, years: number): number => monthsAgo(now, years * 12);

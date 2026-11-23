@@ -85,6 +85,30 @@ describe('legal evidence retention', () => {
     expect(Object.values(again.deleted)).toEqual([0, 0]);
   });
 
+  it('month arithmetic clamps to the last day of the target month (no overflow past the window)', () => {
+    const at = (y: number, m: number, d: number, h = 9) => Date.UTC(y, m - 1, d, h);
+    expect(monthsAgo(at(2028, 2, 29), 12)).toBe(at(2027, 2, 28)); // 29 Feb - 1 year: 28 Feb, NOT 1 Mar
+    expect(yearsAgo(at(2028, 2, 29), 7)).toBe(at(2021, 2, 28)); // 7 years back from a leap day
+    expect(monthsAgo(at(2026, 3, 31), 1)).toBe(at(2026, 2, 28)); // 31 Mar - 1 month: 28 Feb, NOT 3 Mar
+    expect(monthsAgo(at(2028, 3, 31), 1)).toBe(at(2028, 2, 29)); // leap February
+    expect(monthsAgo(at(2026, 5, 31), 3)).toBe(at(2026, 2, 28));
+    expect(monthsAgo(at(2026, 1, 15), 2)).toBe(at(2025, 11, 15)); // an ordinary day is unchanged, across a year boundary
+    expect(monthsAgo(at(2026, 11, 24, 12), 12)).toBe(at(2025, 11, 24, 12)); // time of day kept
+  });
+
+  it('a row one day younger than the cutoff survives on a month-end run (the overflow would have deleted it)', async () => {
+    const db = platform();
+    const runNow = Date.UTC(2028, 1, 29, 12); // 29 Feb 2028
+    // 12-month cutoff is 28 Feb 2027 12:00; a row accepted on 28 Feb 2027 18:00 is younger than 12 months and keeps its ip
+    db.prepare(
+      'INSERT INTO legal_acceptances (id, user_id, doc_key, version, accepted_at, ip, user_agent, source) VALUES (?,?,?,?,?,?,?,?)'
+    ).run('edge', 'u9', 'terms', 'v1', Date.UTC(2027, 1, 28, 18), '9.9.9.9', 'UA', 'signup');
+    await runLegalEvidenceRetention(runNow, runOn(db));
+    expect(db.prepare('SELECT ip FROM legal_acceptances WHERE id = ?').get('edge')).toEqual({
+      ip: '9.9.9.9',
+    });
+  });
+
   it('the delete window is never shorter than RETENTION_YEARS', () => {
     expect(RETENTION_YEARS).toBeGreaterThanOrEqual(7);
     expect(yearsAgo(now, 7)).toBeLessThan(monthsAgo(now, 83));
