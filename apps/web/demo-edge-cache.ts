@@ -225,7 +225,10 @@ export async function serveDemoEdge(
   cache: Pick<Cache, 'match' | 'put'> = (caches as unknown as { default: Cache }).default
 ): Promise<Response> {
   // Ruling RESOLVE-BULLETPROOF-1: a store-unresolvable render leaves as 503 + Retry-After, never 500 (and never stored).
-  const origin = (r: Request) => render(r).then(retryableUnavailable).then(suspendedStore503);
+  const origin = (r: Request) =>
+    render(r)
+      .then(res => retryableUnavailable(res, new URL(r.url).pathname))
+      .then(suspendedStore503);
   const requestKey = build ? demoEdgeKey(request) : null;
   if (!requestKey || !build) return origin(request);
   const key = buildScopedKey(requestKey, build);
