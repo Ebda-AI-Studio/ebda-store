@@ -1014,12 +1014,20 @@ describe('#627 review: ONE may-settle predicate on every settle path (a held cha
     await expect(go()).rejects.toMatchObject({ statusCode: 409, code: 'HELD_PAYMENT_NOT_OPEN' });
   });
 
-  it('a second mismatching delivery on a held row keeps the FIRST hold reason', async () => {
+  it('a second delivery with a DIFFERENT reason keeps the FIRST hold reason on the row and is recorded in the queue', async () => {
     const db = rig();
     renewal(db);
     await applyWebhookEvent('stub', paid900());
-    await applyWebhookEvent('stub', paid900({ eventId: 'wh-b', amountMinor: 1100 }));
+    const second = await applyWebhookEvent(
+      'stub',
+      paid900({ eventId: 'wh-b', amountMinor: 1000, currency: 'USD' })
+    );
+    expect(second).toMatchObject({ outcome: 'held' });
     expect(status(db)).toEqual({ s: 'pending', f: 'held:amount_mismatch' });
+    const q = await listHeldBillingWebhooks({ status: 'open' });
+    expect(q.map(x => x.eventId).sort()).toEqual(['wh-900', 'wh-b']);
+    expect(q.find(x => x.eventId === 'wh-b')).toMatchObject({ reason: 'currency_mismatch' });
+    expect(q.find(x => x.eventId === 'wh-900')).toMatchObject({ reason: 'amount_mismatch' });
   });
 
   it('a hold on an already SUCCEEDED row queues nothing', async () => {
