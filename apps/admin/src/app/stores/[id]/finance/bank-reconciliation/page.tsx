@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
+import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { apiGetPage, apiDelete, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
@@ -38,12 +39,6 @@ function fmt(iso: string | null): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString(intlLocaleForUi('en-GB'));
 }
-
-const STATUS_CLASS: Record<StatementStatus, string> = {
-  pending: 'bg-warning/10 text-warning-ink',
-  reconciling: 'bg-blue-100 text-blue-700',
-  reconciled: 'bg-green-100 text-green-700',
-};
 
 const PER_PAGE = 50;
 
@@ -161,13 +156,7 @@ export default function BankReconciliationPage() {
     {
       header: t('status'),
       mobileBadge: true,
-      cell: stmt => (
-        <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_CLASS[stmt.status]}`}
-        >
-          {t(`statusLabels.${stmt.status}`)}
-        </span>
-      ),
+      cell: stmt => <OrderStatusBadge family="bankStatement" status={stmt.status} />,
     },
     {
       header: '',

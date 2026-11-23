@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
+import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { ErrorState } from '../../../../components/ErrorState';
 import { apiGet } from '../../../../lib/api';
@@ -19,13 +20,6 @@ interface Log {
   optedOut: boolean;
   entries: Entry[];
 }
-
-const STATUS_CLASS: Record<Status, string> = {
-  sent: 'bg-success/10 text-success-ink',
-  skipped: 'bg-muted text-muted-foreground',
-  failed: 'bg-destructive/10 text-destructive-ink',
-  pending: 'bg-muted text-muted-foreground',
-};
 
 /** The merchant's view of the self-serve lifecycle emails Ebda sent (and why some were not needed). */
 export default function LifecycleEmailsPage() {
@@ -76,11 +70,7 @@ export default function LifecycleEmailsPage() {
                   <tr key={e.kind} className="border-b border-border last:border-0">
                     <td className="p-3">{t(`kind.${e.kind}`)}</td>
                     <td className="p-3">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[e.status]}`}
-                      >
-                        {t(e.status)}
-                      </span>
+                      <OrderStatusBadge family="lifecycleEmail" status={e.status} />
                     </td>
                     <td className="p-3 whitespace-nowrap">{e.at ? formatDateTime(e.at) : '-'}</td>
                     <td className="p-3 text-muted-foreground">

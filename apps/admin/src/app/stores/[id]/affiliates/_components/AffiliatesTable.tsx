@@ -5,13 +5,13 @@ import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import {
   formatFils,
-  STATUS_COLORS,
   STATUS_FILTERS,
   type Affiliate,
   type AffiliateStatusAction,
   type Meta,
 } from './types';
 import { Button } from '@/components/ui/Button';
+import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 
 interface AffiliatesTableProps {
   storeId: string;
@@ -59,15 +59,7 @@ export function AffiliatesTable({
     {
       header: t('columns.status'),
       mobileBadge: true,
-      cell: affiliate => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            STATUS_COLORS[affiliate.status] ?? 'bg-muted text-foreground'
-          }`}
-        >
-          {t(`status.${affiliate.status}`)}
-        </span>
-      ),
+      cell: affiliate => <OrderStatusBadge family="affiliate" status={affiliate.status} />,
     },
     {
       header: t('columns.referralCode'),

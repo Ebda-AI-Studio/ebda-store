@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
-import { NOTIFICATION_COLORS } from './types';
 import type { NotificationLog } from './types';
 import { withNumerals } from '@ebda/shared';
 
@@ -83,11 +82,7 @@ export function NotificationsLog({
       mobileBadge: true,
       cell: log => (
         <>
-          <OrderStatusBadge
-            status={log.status}
-            namespace="notifications.log.status"
-            colorMap={NOTIFICATION_COLORS}
-          />
+          <OrderStatusBadge status={log.status} family="notification" />
           {log.error && (
             <p
               className="text-xs text-destructive-ink mt-1 truncate max-w-[200px]"

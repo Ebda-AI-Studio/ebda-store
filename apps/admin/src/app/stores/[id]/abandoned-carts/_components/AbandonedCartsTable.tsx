@@ -7,7 +7,7 @@ import { CartIcon } from '@ebda/ui';
 import { formatPrice, formatDate } from '@/lib/format';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
-import { ABANDONED_CART_COLORS, CART_STATUS_KEYS } from './types';
+import { CART_STATUS_KEYS } from './types';
 import type { AbandonedCartRecord, ListMeta } from './types';
 import { Button } from '@/components/ui/Button';
 
@@ -68,13 +68,7 @@ export function AbandonedCartsTable({
     {
       header: t('columns.status'),
       mobileBadge: true,
-      cell: record => (
-        <OrderStatusBadge
-          status={record.status}
-          namespace="abandonedCarts.status"
-          colorMap={ABANDONED_CART_COLORS}
-        />
-      ),
+      cell: record => <OrderStatusBadge status={record.status} family="abandonedCart" />,
     },
     {
       header: t('columns.email'),

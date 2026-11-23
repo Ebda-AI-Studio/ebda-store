@@ -22,6 +22,7 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge, Select, useToast } from '@ebda/ui';
+import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { billingDisplayStatus, showPeriodEnd, trialDaysLeft } from '@/lib/billing-state';
 import { Button } from '@/components/ui/Button';
 import { formatMoney, type PlanLimits, withNumerals } from '@ebda/shared';
@@ -724,19 +725,7 @@ export default function StoreBillingPage() {
                 <p className="text-xs text-muted-foreground">{t('currentPlan')}</p>
                 <h2 className="text-xl font-semibold text-foreground">{planName(data.plan)}</h2>
               </div>
-              <Badge
-                variant={
-                  displayStatus === 'past_due'
-                    ? 'destructive'
-                    : displayStatus === 'comped' || displayStatus === 'trialing'
-                      ? 'info'
-                      : displayStatus === 'awaiting_payment'
-                        ? 'warning'
-                        : 'success'
-                }
-              >
-                {t(`status.${displayStatus}`)}
-              </Badge>
+              <OrderStatusBadge family="subscription" status={displayStatus} />
             </div>
             <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
               {data.subscription.trialEndsAt && (
@@ -791,21 +780,7 @@ export default function StoreBillingPage() {
             <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <h2 className="text-base font-semibold">{t('trial.title')}</h2>
-                <Badge
-                  variant={
-                    displayStatus === 'past_due'
-                      ? 'destructive'
-                      : displayStatus === 'trialing' || displayStatus === 'comped'
-                        ? 'info'
-                        : displayStatus === 'awaiting_payment'
-                          ? 'warning'
-                          : displayStatus === 'active'
-                            ? 'success'
-                            : 'secondary'
-                  }
-                >
-                  {t(`status.${displayStatus}`)}
-                </Badge>
+                <OrderStatusBadge family="subscription" status={displayStatus} />
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
                 {t(`stateLine.${displayStatus}`)}

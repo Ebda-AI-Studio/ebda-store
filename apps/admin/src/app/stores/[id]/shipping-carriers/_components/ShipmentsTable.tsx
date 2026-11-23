@@ -4,7 +4,6 @@ import { formatDate } from '@/lib/format';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
-import { SHIPMENT_COLORS } from './types';
 import type { Shipment } from './types';
 
 import { Button } from '@/components/ui/Button';
@@ -77,13 +76,7 @@ export function ShipmentsTable({
     {
       header: t('columns.status'),
       mobileBadge: true,
-      cell: shipment => (
-        <OrderStatusBadge
-          status={shipment.status}
-          namespace="shipping.carriers.shipments.statuses"
-          colorMap={SHIPMENT_COLORS}
-        />
-      ),
+      cell: shipment => <OrderStatusBadge status={shipment.status} family="shipment" />,
     },
     {
       header: t('columns.created'),

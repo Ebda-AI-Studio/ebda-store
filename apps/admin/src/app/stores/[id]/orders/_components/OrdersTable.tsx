@@ -177,7 +177,7 @@ export function OrdersTable({
             // Uses the `orders.list` namespace's own `agentBadge` key
             // (added alongside `orders.detail.agent`) so this list-row
             // badge doesn't depend on the detail page's translations.
-            colorMap={{ agent: { className: 'bg-violet-50 text-violet-700' } }}
+            family="orderSource"
           />
         );
         if (transitions.length === 0) {

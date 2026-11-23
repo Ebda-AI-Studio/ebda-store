@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { apiGet, apiPut, apiDelete } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { LegalAcceptancesPanel } from '../../../components/legal/LegalAcceptancesPanel';
 import { intlLocaleForUi } from '@/lib/format';
 
@@ -23,12 +24,6 @@ interface UserDetail {
   lastLoginAt: string | null;
   stores?: { id: string; name: string; slug: string }[];
 }
-
-const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
-  active: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  inactive: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
-  suspended: { bg: 'bg-destructive/5', text: 'text-destructive-ink', dot: 'bg-destructive' },
-};
 
 export default function UserDetailPage() {
   const t = useT('users.detail');
@@ -194,7 +189,6 @@ export default function UserDetailPage() {
   }
 
   const resolvedStatus = user.status || (user.isActive ? 'active' : 'inactive');
-  const statusStyle = STATUS_STYLES[resolvedStatus] ?? STATUS_STYLES.inactive;
   const hasChanges =
     editRole !== user.role ||
     editStatus !== resolvedStatus ||
@@ -235,12 +229,7 @@ export default function UserDetailPage() {
               <p className="text-sm text-muted-foreground">{user.email}</p>
 
               <div className="mt-4 flex justify-center">
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${statusStyle.bg} ${statusStyle.text}`}
-                >
-                  <span className={`h-1.5 w-1.5 rounded-full ${statusStyle.dot}`} />
-                  {t(`statusLabels.${resolvedStatus}`)}
-                </span>
+                <OrderStatusBadge family="user" status={resolvedStatus} />
               </div>
 
               <div className="mt-6 space-y-3 text-start">

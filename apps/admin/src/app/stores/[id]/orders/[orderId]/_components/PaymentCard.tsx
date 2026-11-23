@@ -118,7 +118,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
               empty section. */}
           {order.status === 'awaiting_payment_confirmation' && (
             <div
-              className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900"
+              className="mt-4 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm text-primary-ink"
               data-testid="instapay-panel"
             >
               <p className="font-semibold">{tInstapay('title')}</p>
@@ -143,20 +143,20 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
               <dl className="mt-3 space-y-1.5">
                 {order.instapay?.handle && (
                   <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                    <dt className="text-violet-700">{tInstapay('payTo')}</dt>
+                    <dt className="text-primary-ink/80">{tInstapay('payTo')}</dt>
                     <dd className="font-medium" dir="ltr">
                       {order.instapay.handle}
                     </dd>
                   </div>
                 )}
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                  <dt className="text-violet-700">{tInstapay('orderRef')}</dt>
+                  <dt className="text-primary-ink/80">{tInstapay('orderRef')}</dt>
                   <dd className="font-mono text-xs" dir="ltr">
                     {order.orderNumber}
                   </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                  <dt className="text-violet-700">{tInstapay('customerReference')}</dt>
+                  <dt className="text-primary-ink/80">{tInstapay('customerReference')}</dt>
                   <dd className="font-medium" dir="ltr">
                     {order.instapay?.customerReference ?? (
                       <span className="text-xs font-normal">{tInstapay('noReference')}</span>
