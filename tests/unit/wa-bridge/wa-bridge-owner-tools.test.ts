@@ -8,6 +8,9 @@ import {
   cairoStartOfDay,
   resetOwnerToolBuckets,
   MAX_FIXED_MINOR,
+  MAX_PERCENT,
+  MAX_WINDOW_DAYS,
+  MAX_USAGE_LIMIT,
   type OwnerToolsPorts,
 } from '../../../apps/api/src/lib/wa/bridge/owner-tools';
 
@@ -216,6 +219,58 @@ describe('createCoupon', () => {
       code: 'DUPLICATE_CODE',
     });
     expect(f.coupons).toHaveLength(1);
+  });
+  it('the same code with a different window is a duplicate, not a replay of the earlier window; an identical explicit window is a replay', async () => {
+    const f = fake();
+    await f.t.createCoupon(S, OWNER, base); // 1 day from NOW
+    expect(await f.t.createCoupon(S, OWNER, { ...base, durationDays: 2 })).toMatchObject({
+      ok: false,
+      code: 'DUPLICATE_CODE',
+    });
+    expect(
+      await f.t.createCoupon(S, OWNER, {
+        ...base,
+        durationDays: undefined,
+        endsAt: '2026-11-25T12:00:00Z',
+      })
+    ).toMatchObject({ ok: false, code: 'DUPLICATE_CODE' });
+    expect(
+      await f.t.createCoupon(S, OWNER, {
+        ...base,
+        durationDays: undefined,
+        startsAt: '2026-11-23T13:00:00Z',
+        endsAt: '2026-11-24T12:00:00Z',
+      })
+    ).toMatchObject({ ok: false, code: 'DUPLICATE_CODE' }); // a start where the first had none
+    const e = {
+      ...base,
+      code: 'EXPL',
+      durationDays: undefined,
+      startsAt: '2026-11-24T00:00:00Z',
+      endsAt: '2026-11-26T00:00:00Z',
+    };
+    const first: any = await f.t.createCoupon(S, OWNER, e);
+    expect(await f.t.createCoupon(S, OWNER, e)).toMatchObject({
+      ok: true,
+      value: { couponId: first.value.couponId, replayed: true },
+    });
+    expect(
+      await f.t.createCoupon(S, OWNER, { ...e, endsAt: '2026-11-26T00:00:01Z' })
+    ).toMatchObject({ ok: false, code: 'DUPLICATE_CODE' });
+    expect(f.coupons).toHaveLength(2);
+  });
+  it('limits pinned to ebda-whatsapp COUPON_LIMITS (src/core/store-bridge.ts); change both together', () => {
+    expect({
+      percentMax: MAX_PERCENT,
+      fixedMaxMinor: MAX_FIXED_MINOR,
+      windowDaysMax: MAX_WINDOW_DAYS,
+      usageLimitMax: MAX_USAGE_LIMIT,
+    }).toEqual({
+      percentMax: 90,
+      fixedMaxMinor: 5_000_000,
+      windowDaysMax: 90,
+      usageLimitMax: 100_000,
+    });
   });
   it('a code race the lookup missed maps to DUPLICATE_CODE', async () => {
     const f = fake({

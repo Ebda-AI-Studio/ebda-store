@@ -13,6 +13,8 @@
 import { z } from 'zod/v3';
 import { args as bridgeArgs } from './schemas';
 
+/** Pinned against ebda-whatsapp's COUPON_LIMITS (src/core/store-bridge.ts) by a test in each repo: change both together. */
+export const MAX_PERCENT = 90;
 export const MAX_FIXED_MINOR = 5_000_000; // 50,000 EGP
 export const MAX_WINDOW_DAYS = 90;
 export const MAX_USAGE_LIMIT = 100_000;
@@ -229,7 +231,7 @@ export function createOwnerTools(ports: OwnerToolsPorts) {
       if (!a.success) return fail('invalid', 'INVALID_ARGS', a.error.issues[0]?.path.join('.'));
       const v = a.data;
       // Guard rails run BEFORE the member read so a bad request never costs a lookup.
-      if (v.type === 'percentage' && v.value > 90) return fail('invalid', 'PERCENT_RANGE');
+      if (v.type === 'percentage' && v.value > MAX_PERCENT) return fail('invalid', 'PERCENT_RANGE');
       if (v.type === 'fixed' && v.value > MAX_FIXED_MINOR)
         return fail('invalid', 'FIXED_TOO_LARGE');
       const g = await gate('createCoupon', storeId, asUserId, ['owner']);
@@ -245,10 +247,22 @@ export function createOwnerTools(ports: OwnerToolsPorts) {
       if (end - begins > MAX_WINDOW_DAYS * 86_400_000) return fail('invalid', 'WINDOW_TOO_LONG');
       if (end <= now) return fail('invalid', 'WINDOW_PAST');
 
+      // Same terms INCLUDING the window: an explicit start / end must match to the millisecond; a duration is judged from the existing coupon's own creation time (a retry computes
+      // its end from a later "now"), within a minute. A different window under the same code is a duplicate, never a replay of the earlier window.
+      const sameWindow = (c: CouponRowLite) => {
+        if ((c.startsAt ? c.startsAt.getTime() : null) !== start) return false;
+        if (!c.expiresAt) return false;
+        return v.endsAt !== undefined
+          ? c.expiresAt.getTime() === end
+          : Math.abs(
+              c.expiresAt.getTime() - (c.createdAt.getTime() + v.durationDays! * 86_400_000)
+            ) <= 60_000;
+      };
       const same = (c: CouponRowLite) =>
         c.type === v.type &&
         c.value === v.value &&
-        (c.usageLimit ?? null) === (v.usageLimit ?? null);
+        (c.usageLimit ?? null) === (v.usageLimit ?? null) &&
+        sameWindow(c);
       const view = (c: CouponRowLite, replayed: boolean): CreatedCoupon => ({
         couponId: c.id,
         code: c.code,
