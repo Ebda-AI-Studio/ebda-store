@@ -3,7 +3,8 @@ import type { Prisma } from '@prisma/client';
 import { getSystemAccountIdByCode } from '../account.service';
 import { postEntry } from '../journal.service';
 import logger from '../../../lib/logger';
-import { storeMoney } from '../../../lib/repo-factory';
+import { storeMoney, storeRepo } from '../../../lib/repo-factory';
+import { replayPreSaleRefunds } from '../../../lib/accounting/refund-replay';
 
 /**
  * Maps a Payment.provider value to the COA system account code that should
@@ -67,6 +68,19 @@ export async function postOrderPaymentJournal(args: {
         { orderId, skipped: r.skipped },
         'postOrderPaymentJournal: not posted (Durable Object)'
       );
+    // A refund booked BEFORE this sale existed (a COD return ahead of delivery settling, a cancelled backorder line) had its journal
+    // skipped (`no-original-entry`) and nothing retried it, so the sale would overstate revenue by that refund. Now the sale exists:
+    // book those refunds. Skipped only when the sale was declined (not paid, accounting off, reversed). Idempotent per refundKey, and
+    // it throws so the job step retries a half-done replay instead of losing it.
+    if (!r.skipped) {
+      const storeId = currentStoreId();
+      const replay = await replayPreSaleRefunds(await storeRepo(storeId), money, storeId, orderId);
+      if (replay.replayed > 0)
+        logger.info(
+          { orderId, ...replay },
+          'postOrderPaymentJournal: replayed pre-sale refund journals'
+        );
+    }
     return;
   }
   const client: Prisma.TransactionClient | typeof prisma = tx ?? prisma;
