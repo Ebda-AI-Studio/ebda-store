@@ -12,7 +12,7 @@ const OP = BRAND.company.shortNameEn;
  * English legal text. Version, publish date and effective date of each document live in
  * LEGAL_POLICIES (packages/shared/src/legal); bump it in the same PR as any text change
  * (docs/runbooks/legal-policy-change.md). Original wording written from the common protective
- * structure of SaaS store-builder terms; not reviewed by counsel.
+ * structure of SaaS store-builder terms; reviewed and approved by counsel (2026-11-19).
  */
 export const LEGAL_EN: LegalPages = {
   updated: { label: 'Last updated', versionLabel: 'Version' },

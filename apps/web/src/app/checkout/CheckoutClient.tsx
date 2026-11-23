@@ -52,6 +52,7 @@ import {
   daysAheadSchema,
   deliveryDateChoices,
   checkDeliveryPick,
+  catalogueItemId,
   fromMinor,
   REGION,
   isValidEgyptianMobile,
@@ -338,7 +339,9 @@ export default function CheckoutClient() {
     pixelFiredRef.current = true;
     trackInitiateCheckout({
       contentIds: [
-        ...cartContextItems.map(item => item.productId),
+        ...cartContextItems.map(item =>
+          catalogueItemId({ productId: item.productId, variantId: item.variantId })
+        ),
         ...cartContextBundles.map(b => b.bundleId),
       ],
       numItems:
@@ -1749,8 +1752,8 @@ export default function CheckoutClient() {
         orderId: order.id,
         provider: selectedProviderId,
         ...(selectedMethod ? { method: selectedMethod } : {}),
-        successUrl: `/checkout/success?orderId=${order.id}`,
-        errorUrl: `/checkout/error?orderId=${order.id}`,
+        successUrl: storeUrl(`/checkout/success?orderId=${order.id}`),
+        errorUrl: storeUrl(`/checkout/error?orderId=${order.id}`),
       });
 
       // Success clears the saved checkout form and promo code before leaving

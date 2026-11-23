@@ -162,7 +162,6 @@ const allInngestFunctions: JobDef[] = [
   analyticsRefundCorrection,
   analyticsFunnelBackfill,
   analyticsRollupOnDemand,
-  // Phase A: product → Meta Catalog sync (native catalog bot)
   // AI-first autofill: fills product fields + kicks recommendations on create
   aiAutofillProduct,
   // AI-first autofill: purges recommendation graph rows on product delete
