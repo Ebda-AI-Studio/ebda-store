@@ -107,7 +107,8 @@ describe('push broadcast to storefront subscribers', () => {
 
   // Merchant broadcasts moved from OneSignal to native Web Push (pushService.broadcastToStore); the gate moved with it.
   it('a suspended store is refused with 423 and no push is sent', async () => {
-    const send = vi.spyOn(pushService, 'sendToStore').mockResolvedValue({} as never);
+    // PUSH-AUDIENCE-1: the broadcast no longer goes through `sendToStore`; it calls the one private delivery path.
+    const send = vi.spyOn(pushService as never, 'deliver').mockResolvedValue({} as never);
     await expect(pushService.broadcastToStore('s1', input)).rejects.toMatchObject({
       statusCode: 423,
       code: 'STORE_NOT_OPERATIONAL',
@@ -117,7 +118,7 @@ describe('push broadcast to storefront subscribers', () => {
 
   it('an active store broadcasts (unchanged)', async () => {
     h.active.value = true;
-    const send = vi.spyOn(pushService, 'sendToStore').mockResolvedValue({} as never);
+    const send = vi.spyOn(pushService as never, 'deliver').mockResolvedValue({} as never);
     await pushService.broadcastToStore('s1', input);
     expect(send).toHaveBeenCalledTimes(1);
   });
