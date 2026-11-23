@@ -617,7 +617,7 @@ export class AuthService {
         {
           email,
           name,
-          token,
+          verificationPath: `/auth/verify-email?token=${token}`,
           expiresInHours: EMAIL_VERIFICATION_EXPIRY_HOURS,
         },
         language
@@ -2064,7 +2064,7 @@ export class AuthService {
           {
             email: user.email,
             name,
-            token: resetToken,
+            resetPath: `/auth/reset-password?token=${resetToken}`,
             expiresInMinutes: RESET_TOKEN_TTL_MINUTES,
           },
           language

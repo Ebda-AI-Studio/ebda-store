@@ -78,7 +78,7 @@ async function sendVerification(
     {
       email: u.email,
       name: `${u.firstName} ${u.lastName}`.trim() || u.email,
-      token,
+      verificationPath: `/auth/verify-email?token=${token}`,
       expiresInHours: EMAIL_VERIFICATION_EXPIRY_HOURS,
     },
     lang(u.language)
@@ -366,7 +366,7 @@ export const CustomerAuthFlows = {
         {
           email: u.email,
           name: `${u.firstName} ${u.lastName}`.trim() || u.email,
-          token: t.token,
+          resetPath: `/auth/reset-password?token=${t.token}`,
           expiresInMinutes: PASSWORD_RESET_TTL_MINUTES,
         },
         lang(u.language)

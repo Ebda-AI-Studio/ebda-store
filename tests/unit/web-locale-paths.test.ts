@@ -86,7 +86,8 @@ describe('locale path rules (pure)', () => {
     // Only the exact path. Anything else under a prefix keeps its old answer.
     expect(decide('/en/manifest.webmanifest/x').kind).toBe('redirect');
     expect(decide('/en//manifest.webmanifest')).toEqual({ kind: 'none' });
-    expect(decide('/en/cart')).toEqual({ kind: 'redirect', location: '/cart' });
+    expect(decide('/en/cart')).toEqual({ kind: 'rewrite', locale: 'en', rest: '/cart' });
+    expect(decide('/en/no-such-route')).toEqual({ kind: 'redirect', location: '/no-such-route' });
   });
 
   it('a page links the manifest of its own URL language', () => {
@@ -157,8 +158,13 @@ describe('locale path rules (pure)', () => {
       rest: '/',
     });
     expect(decideLocalePath({ ...base, pathname: '/ar/cart', search: '?a=1' })).toEqual({
+      kind: 'rewrite',
+      locale: 'ar',
+      rest: '/cart',
+    });
+    expect(decideLocalePath({ ...base, pathname: '/ar/nope', search: '?a=1' })).toEqual({
       kind: 'redirect',
-      location: '/cart?a=1',
+      location: '/nope?a=1',
     });
     expect(decideLocalePath({ ...base, pathname: '/cart' })).toEqual({ kind: 'none' });
     expect(decideLocalePath({ ...base, pathname: '/products', method: 'POST' })).toEqual({
@@ -187,12 +193,11 @@ describe('locale path rules (pure)', () => {
     expect(localizeHref('/products/x?a=1#top', 'en')).toBe('/en/products/x?a=1#top');
     expect(localizeHref('/', 'ar')).toBe('/ar');
     expect(localizeHref('/?x=1', 'ar')).toBe('/ar?x=1');
+    expect(localizeHref('/cart', 'en')).toBe('/en/cart');
+    expect(localizeHref('/search?q=a', 'en')).toBe('/en/search?q=a');
     for (const keep of [
-      '/cart',
-      '/checkout',
-      '/account/orders',
-      '/auth/login',
-      '/search?q=a',
+      '/api/x',
+      '/llms.txt',
       'https://x.com/products',
       '//cdn/x',
       'mailto:a@b.c',
@@ -224,7 +229,7 @@ describe('locale path rules (pure)', () => {
       `${o}/ar/categories`,
     ]);
     expect(out.image).toBe(g.image);
-    expect(out.cart).toBe(`${o}/cart`);
+    expect(out.cart).toBe(`${o}/ar/cart`);
     expect(out.sameAs).toEqual(g.sameAs);
     expect(out.name).toBe('Products');
     expect(localizeJsonLdUrls(g, o, null)).toBe(g);
@@ -351,9 +356,9 @@ describe('middleware: language in the URL', () => {
         expect(loc ?? '', `${l}${tail}`).not.toMatch(/evil\.com/);
       }
     // the legitimate retired-path redirect still works
-    const ok = middleware(sub('/ar/cart'));
+    const ok = middleware(sub('/ar/nope'));
     expect(ok.status).toBe(301);
-    expect(new URL(ok.headers.get('location')!).pathname).toBe('/cart');
+    expect(new URL(ok.headers.get('location')!).pathname).toBe('/nope');
   });
 
   it('marks an old URL pending (the layout redirects it, it has the store) and never caches that response', () => {
@@ -417,11 +422,11 @@ describe('middleware: language in the URL', () => {
     expect(r.cookies.get('force-language')).toBeUndefined();
   });
 
-  it('a prefixed non-route 301s to the plain URL; cart and checkout are never prefixed or marked', () => {
+  it('a prefixed non-route 301s to the plain URL; cart and checkout are served under the prefix and never marked pending', () => {
     on();
-    const r = middleware(sub('/ar/cart'));
+    const r = middleware(sub('/ar/nope'));
     expect(r.status).toBe(301);
-    expect(r.headers.get('location')).toBe('https://demo-boutique.ebda.app/cart');
+    expect(r.headers.get('location')).toBe('https://demo-boutique.ebda.app/nope');
     for (const p of [
       '/cart',
       '/checkout',

@@ -7,6 +7,7 @@ import { withStore } from '@ebda/database';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { isDemoStore } from '../lib/demo-store';
+import { storefrontAuthLink, storefrontBase } from '../lib/storefront-auth-link';
 import { storeBrandTheme } from '../lib/store-brand-theme';
 import { StoreMailer } from './store-mailer.service';
 import { sendMail } from './mail-transport';
@@ -80,7 +81,6 @@ import {
 import { BRAND, BRAND_EMAIL_LOGO_URL, brandFrom, poweredByBrand } from '@ebda/shared';
 
 import { resolveDefaultLanguage } from '@ebda/shared';
-import { storefrontBase, storefrontTokenLink } from '../lib/storefront-link';
 // ==========================================
 // Email Service
 // Transactional email handling
@@ -784,7 +784,7 @@ export class EmailService {
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { name: true, settings: true, slug: true, domain: true },
+        select: { name: true, slug: true, domain: true, settings: true },
       })
     );
     if (!store) throw new Error(`Store ${storeId} not found`);
@@ -842,8 +842,8 @@ export class EmailService {
     data: {
       email: string;
       name: string;
-      /** The raw one-time token; the link is built here on the store's storefront host. */
-      token: string;
+      /** Storefront path + query (`/auth/reset-password?token=...`); the origin and language prefix are added here. */
+      resetPath: string;
       expiresInMinutes: number;
     },
     language?: 'en' | 'ar'
@@ -851,7 +851,7 @@ export class EmailService {
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { name: true, settings: true, slug: true, domain: true },
+        select: { name: true, slug: true, domain: true, settings: true },
       })
     );
     if (!store) throw new Error(`Store ${storeId} not found`);
@@ -860,14 +860,10 @@ export class EmailService {
       resolveDefaultLanguage(
         (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
       );
-    const tpl = {
-      email: data.email,
-      name: data.name,
-      expiresInMinutes: data.expiresInMinutes,
-      resetUrl: storefrontTokenLink(store, lang, 'reset-password', data.token),
-    };
-    const subject = passwordResetTemplate.subject[lang](tpl, store.name);
-    const content = passwordResetTemplate[lang](tpl, store.name);
+    const { resetPath, ...rest } = data;
+    const mail = { ...rest, resetUrl: storefrontAuthLink(store, lang, resetPath) };
+    const subject = passwordResetTemplate.subject[lang](mail, store.name);
+    const content = passwordResetTemplate[lang](mail, store.name);
     await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
   }
 
@@ -899,7 +895,7 @@ export class EmailService {
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { name: true, settings: true, slug: true, domain: true },
+        select: { name: true, slug: true, domain: true, settings: true },
       })
     );
     if (!store) throw new Error(`Store ${storeId} not found`);
@@ -921,8 +917,8 @@ export class EmailService {
     data: {
       email: string;
       name: string;
-      /** The raw one-time token; the link is built here on the store's storefront host, never by the caller. */
-      token: string;
+      /** Storefront path + query (`/auth/verify-email?token=...`); the origin and language prefix are added here. */
+      verificationPath: string;
       expiresInHours: number;
     },
     language?: 'en' | 'ar'
@@ -930,7 +926,7 @@ export class EmailService {
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { name: true, settings: true, slug: true, domain: true },
+        select: { name: true, slug: true, domain: true, settings: true },
       })
     );
     if (!store) throw new Error(`Store ${storeId} not found`);
@@ -939,14 +935,10 @@ export class EmailService {
       resolveDefaultLanguage(
         (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
       );
-    const tpl = {
-      email: data.email,
-      name: data.name,
-      expiresInHours: data.expiresInHours,
-      verificationUrl: storefrontTokenLink(store, lang, 'verify-email', data.token),
-    };
-    const subject = emailVerificationTemplate.subject[lang](tpl, store.name);
-    const content = emailVerificationTemplate[lang](tpl, store.name);
+    const { verificationPath, ...rest } = data;
+    const mail = { ...rest, verificationUrl: storefrontAuthLink(store, lang, verificationPath) };
+    const subject = emailVerificationTemplate.subject[lang](mail, store.name);
+    const content = emailVerificationTemplate[lang](mail, store.name);
     await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
   }
 
@@ -967,7 +959,7 @@ export class EmailService {
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { name: true, settings: true, slug: true, domain: true },
+        select: { name: true, slug: true, domain: true, settings: true },
       })
     );
     if (!store) throw new Error(`Store ${storeId} not found`);
