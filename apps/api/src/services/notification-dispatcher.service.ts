@@ -352,6 +352,13 @@ class NotificationDispatcherService {
 // Helpers
 // ==========================================
 
+/** The DO store repo is not typed as the Prisma client; this is the one typed seam for its `store.findUnique`. */
+function doStoreFindUnique<T>(db: unknown, query: object): Promise<T | null> {
+  return (db as { store: { findUnique: (a: object) => Promise<T | null> } }).store.findUnique(
+    query
+  );
+}
+
 /**
  * The language a shopper's SMS / push is written in: the order's or customer's stored locale
  * (`data.locale`), else the store's `settings.defaultLanguage`, else the region default (`ar`
@@ -366,7 +373,7 @@ export async function resolveShopperLocale(storeId: string, stored: unknown): Pr
     const repo = await storeRepo(storeId);
     const store =
       repo.backend === 'do'
-        ? await (repo.db as any).store.findUnique(query)
+        ? await doStoreFindUnique<{ settings: unknown }>(repo.db, query)
         : await withStore(storeId, tx => tx.store.findUnique(query));
     return resolveDefaultLanguage(
       (store?.settings as { defaultLanguage?: string } | null)?.defaultLanguage
@@ -409,7 +416,7 @@ async function readStorefrontBase(storeId: string): Promise<{ base: string; foun
     const repo = await storeRepo(storeId);
     store =
       repo.backend === 'do'
-        ? await (repo.db as any).store.findUnique(query)
+        ? await doStoreFindUnique<{ domain: string | null; slug: string }>(repo.db, query)
         : await withStore(storeId, tx => tx.store.findUnique(query));
   } catch (err) {
     if (!isStoreGoneError(err)) throw err;
