@@ -556,6 +556,9 @@ export class WhatsAppBridge extends WorkerEntrypoint<CfBindings> {
   getOrderStatus(storeId: string, orderNumber: string, buyerKey: string, phoneE164?: string) {
     return this.bridge(b => b.getOrderStatus(storeId, orderNumber, buyerKey, phoneE164));
   }
+  getRecommendations(storeId: string, req: unknown) {
+    return this.bridge(b => b.getRecommendations(storeId, req));
+  }
   listCustomerOrders(storeId: string, buyerKey: string, limit: number, phoneE164?: string) {
     return this.bridge(b => b.listCustomerOrders(storeId, buyerKey, limit, phoneE164));
   }
