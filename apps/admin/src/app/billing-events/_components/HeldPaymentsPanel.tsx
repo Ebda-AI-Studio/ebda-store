@@ -36,6 +36,7 @@ const REASONS = [
   'amount_missing',
   'currency_missing',
   'kind_mismatch',
+  'row_resolved',
 ] as const;
 
 /**

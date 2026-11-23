@@ -10233,7 +10233,8 @@
         "currency_mismatch": "العملة مختلفة",
         "amount_missing": "مااتبعتش مبلغ",
         "currency_missing": "مااتبعتش عملة",
-        "kind_mismatch": "دفع على عملية حفظ كارت"
+        "kind_mismatch": "دفع على عملية حفظ كارت",
+        "row_resolved": "دفعة جاية متأخرة على صف حد قرر فيه خلاص"
       },
       "resolve": "حلّ",
       "resolveTitle": "حلّ الدفعة المتعلّقة دي",

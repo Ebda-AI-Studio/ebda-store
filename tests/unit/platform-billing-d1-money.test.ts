@@ -925,9 +925,68 @@ describe('#627 review: ONE may-settle predicate on every settle path (a held cha
       ok: false,
       reason: 'held',
     });
+    expect(
+      maySettle({ ...row, failureReason: 'held_resolved:refunded' }, { status: 'succeeded' })
+    ).toEqual({ ok: false, reason: 'resolved' });
     expect(maySettle({ ...row, type: 'card_setup' }, { status: 'succeeded' })).toEqual({
       ok: true,
     });
+  });
+
+  it.each(['refunded', 'credited'] as const)(
+    'held_resolved is FINAL: hold (SUCCESS, no amount) -> resolve %s -> a late signed webhook is recorded + alerted, never settles',
+    async action => {
+      const db = rig();
+      renewal(db);
+      await sweepStuckCharges(NOW, gateway({ status: 'succeeded', chargeId: 'ref-1', raw: {} }));
+      const [h] = await listHeldBillingWebhooks({ status: 'open' });
+      await resolveHeldBillingWebhook({
+        id: h.id,
+        actorId: 'a',
+        action,
+        note: 'decided',
+        audit: async () => undefined,
+      });
+      expect(status(db)).toEqual({ s: 'failed', f: `held_resolved:${action}` });
+      vi.mocked(sendAlert).mockClear();
+      const late = await applyWebhookEvent(
+        'stub',
+        paid900({ eventId: 'wh-late', amountMinor: 1000 })
+      );
+      expect(late).toMatchObject({ outcome: 'held', detail: 'row_resolved' });
+      expect(status(db)).toEqual({ s: 'failed', f: `held_resolved:${action}` });
+      expect(plan(db)).toBe('free');
+      expect(sendAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ level: 'p1', source: 'billing.webhook.held.row_resolved' })
+      );
+      const q = await listHeldBillingWebhooks({ status: 'open' });
+      expect(q).toEqual([expect.objectContaining({ reason: 'row_resolved', eventId: 'wh-late' })]);
+      // a late AMOUNT-MISMATCHED delivery must not re-open the hold either
+      await applyWebhookEvent('stub', paid900({ eventId: 'wh-late2' }));
+      expect(status(db)).toEqual({ s: 'failed', f: `held_resolved:${action}` });
+      // and the shared predicate / a direct settle refuses too
+      const r = await settleInTx(
+        prisma as never,
+        EV,
+        { status: 'succeeded', amountSource: 'charge_request' },
+        NOW,
+        []
+      );
+      expect(r).toMatchObject({ transitioned: false, refused: 'resolved' });
+      expect(plan(db)).toBe('free');
+    }
+  );
+
+  it('the held-at-settle alert names the PROVIDER, not the webhook kind', async () => {
+    const db = rig();
+    renewal(db);
+    vi.mocked(sendAlert).mockClear();
+    await sweepStuckCharges(NOW, gateway({ status: 'succeeded', chargeId: 'ref-1', raw: {} }));
+    expect(sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ provider: 'stub', eventId: `settle:${EV}` }),
+      })
+    );
   });
 
   it('resolve: the audit row is written FIRST (a failing audit changes nothing), then the held row is closed', async () => {
