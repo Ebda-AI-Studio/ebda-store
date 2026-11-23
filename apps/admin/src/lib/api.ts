@@ -1034,6 +1034,27 @@ export function adminUiLocale(): 'ar' | 'en' {
   return typeof document !== 'undefined' && document.documentElement.dir === 'rtl' ? 'ar' : 'en';
 }
 
+/**
+ * Per-field messages from a VALIDATION_ERROR's `details` (`{ field: string[] }`, plus the bilingual sentence keys
+ * which are skipped), so a form can show the error under the field instead of one generic line.
+ */
+export function fieldErrorsFrom(
+  details: Record<string, unknown> | undefined
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!details) return out;
+  const fields = Object.entries(details).filter(
+    ([k, v]) => k !== 'messageAr' && k !== 'messageEn' && Array.isArray(v)
+  );
+  // A single-field refusal that carries its own bilingual sentence (e.g. a wrong role) shows that sentence.
+  const bilingual = bilingualOrRaw('', details);
+  for (const [field, value] of fields) {
+    const first = (value as unknown[]).find((v): v is string => typeof v === 'string');
+    if (first) out[field] = fields.length === 1 && bilingual ? bilingual : first;
+  }
+  return out;
+}
+
 function bilingualOrRaw(message: string, details: Record<string, unknown> | undefined): string {
   // Any code whose details carry both-language text is localized (plan limits,
   // subscription gates, go-live gates, ...). apiRequest applies its own gates + the map after this.

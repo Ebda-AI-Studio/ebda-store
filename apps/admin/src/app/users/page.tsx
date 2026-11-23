@@ -7,7 +7,7 @@ import { Badge, Modal, ModalBody, ModalFooter, Input, Label } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiGet, apiPost, fieldErrorsFrom } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useLatestRequest } from '../../hooks/useLatestRequest';
@@ -79,12 +79,13 @@ export default function UsersPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteFieldErrors, setInviteFieldErrors] = useState<Record<string, string>>({});
   const [inviteForm, setInviteForm] = useState({
     email: '',
     firstName: '',
     lastName: '',
     password: '',
-    role: 'store_admin' as 'super_admin' | 'store_admin',
+    role: 'store_admin' as const,
   });
 
   function resetInviteForm() {
@@ -96,6 +97,7 @@ export default function UsersPage() {
       role: 'store_admin',
     });
     setInviteError(null);
+    setInviteFieldErrors({});
   }
 
   function formatDate(date: string | null) {
@@ -153,10 +155,12 @@ export default function UsersPage() {
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
     setInviteError(null);
+    setInviteFieldErrors({});
     setInviting(true);
     try {
       const { error: apiError } = await apiPost<{ user: User }>('/api/v1/admin/users', inviteForm);
       if (apiError) {
+        setInviteFieldErrors(fieldErrorsFrom(apiError.details));
         setInviteError(apiError.message || t('errorDefault'));
         return;
       }
@@ -426,6 +430,11 @@ export default function UsersPage() {
                 value={inviteForm.email}
                 onChange={e => setInviteForm({ ...inviteForm, email: e.target.value })}
               />
+              {inviteFieldErrors.email && (
+                <p className="text-sm text-destructive-ink" role="alert">
+                  {inviteFieldErrors.email}
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -465,16 +474,19 @@ export default function UsersPage() {
                 id="invite-role"
                 className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={inviteForm.role}
-                onChange={e =>
-                  setInviteForm({
-                    ...inviteForm,
-                    role: e.target.value as 'super_admin' | 'store_admin',
-                  })
-                }
+                aria-describedby="invite-role-help"
+                onChange={() => setInviteForm({ ...inviteForm, role: 'store_admin' })}
               >
                 <option value="store_admin">{t('roleStoreAdmins')}</option>
-                <option value="super_admin">{t('roleSuperAdmins')}</option>
               </select>
+              <p id="invite-role-help" className="mt-1 text-xs text-muted-foreground">
+                {t('inviteRoleHelp')}
+              </p>
+              {inviteFieldErrors.role && (
+                <p className="text-sm text-destructive-ink" role="alert">
+                  {inviteFieldErrors.role}
+                </p>
+              )}
             </div>
             {inviteError && (
               <p className="text-sm text-destructive-ink" role="alert">

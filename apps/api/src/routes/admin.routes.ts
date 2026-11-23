@@ -11,6 +11,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod/v3';
+import { parseAdminInvite } from '../lib/admin-invite-schema';
 import { authenticate } from '../middleware/auth';
 import {
   eraseIdentityUser,
@@ -1203,16 +1204,13 @@ router.post(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const schema = z.object({
-        email: z.string().email().max(255),
-        firstName: z.string().min(1).max(100),
-        lastName: z.string().min(1).max(100),
-        /** Ignored: the invitee sets their own password from the mailed link (kept so older clients still validate). */
-        password: z.string().min(8).max(255).optional(),
-        // Platform administrators are operator-only (Ruling ID-12): this endpoint can only invite merchants.
-        role: z.literal('store_admin'),
-      });
-      const data = schema.parse(req.body);
+      const result = parseAdminInvite(req.body);
+      if (result.ok === 'generic') throw result.error;
+      if (result.ok === false) {
+        res.status(400).json(result.body);
+        return;
+      }
+      const data = result.data;
       const email = data.email.toLowerCase();
 
       // NEON-ZERO (Ruling NZ-C-4): the identity service is the only account store; `inviteIdentity` below answers "already
