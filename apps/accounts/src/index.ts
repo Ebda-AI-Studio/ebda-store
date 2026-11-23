@@ -2,6 +2,7 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import {
   createApp,
   forgotPasswordFor,
+  inviteChatMemberFor,
   inviteFor,
   registerPending,
   resendVerificationFor,
@@ -304,6 +305,29 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
       })
       .parse(input);
     return inviteFor(this.env, v);
+  }
+
+  /**
+   * Invite a person to a standalone Ebda Chat workspace by email (service-to-service: only Workers we deploy hold this
+   * binding, like every method here). Returns `{ userId }` identically whether or not the address had an identity.
+   * Throws `INVITE_REFUSED` for an inactive, suspended or erased identity. See `inviteChatMemberFor`.
+   */
+  async inviteChatMember(input: {
+    email: string;
+    firstName: string;
+    language?: 'en' | 'ar';
+    workspaceName: string;
+  }): Promise<{ userId: string }> {
+    const v = z
+      .object({
+        email: z.string().trim().toLowerCase().email().max(254),
+        firstName: z.string().trim().min(1).max(100),
+        language: z.enum(['en', 'ar']).default('ar'),
+        workspaceName: z.string().trim().min(1).max(200),
+      })
+      .strict()
+      .parse(input);
+    return inviteChatMemberFor(this.env, v);
   }
 
   /** Mail a password-reset code (generic: silent for an unknown or inactive address). */
