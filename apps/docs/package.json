@@ -2,7 +2,7 @@
   "name": "@ebda/docs",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "scripts": {
     "openapi": "tsx scripts/gen-openapi.ts",
