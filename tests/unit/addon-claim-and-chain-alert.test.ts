@@ -121,43 +121,46 @@ describe('the add-on chain giving up is loud', () => {
 });
 
 describe('B4: dead anchors never spend the retry budget', () => {
-  it('a purchase placed after 8 refunded markers under one predecessor still grants', async () => {
-    h.onD1 = false;
-    const DEAD = 8; // more than CHAIN_TRIES (6)
-    const base = 'addon-after:s1:feature:floating_widget:none';
-    const held: Record<string, { relatedEventId: string; forPeriodEnd: Date }> = {};
-    for (let g = 0; g < DEAD; g++)
-      held[g === 0 ? base : `${base}:r${g}`] = {
-        relatedEventId: `dead-${g}`,
-        forPeriodEnd: new Date(Date.now() + 30 * 86_400_000),
-      };
-    const created: string[] = [];
-    const tx: any = {
-      storeFeature: { findFirst: async () => null },
-      billingEvent: {
-        findFirst: vi.fn(async ({ where }: any) => {
-          if (where.idempotencyKey) return held[where.idempotencyKey] ?? null;
-          if (where.id) return { status: 'refunded' }; // every held payment is refunded
-          return null; // no own marker, no latest predecessor
-        }),
-        createMany: async ({ data }: any) => {
-          const k = data[0].idempotencyKey;
-          if (held[k]) return { count: 0 };
-          created.push(k);
-          return { count: 1 };
+  it.each(['refunded', 'failed'])(
+    'a purchase placed after 8 %s markers under one predecessor still grants',
+    async dead => {
+      h.onD1 = false;
+      const DEAD = 8; // more than CHAIN_TRIES (6)
+      const base = 'addon-after:s1:feature:floating_widget:none';
+      const held: Record<string, { relatedEventId: string; forPeriodEnd: Date }> = {};
+      for (let g = 0; g < DEAD; g++)
+        held[g === 0 ? base : `${base}:r${g}`] = {
+          relatedEventId: `dead-${g}`,
+          forPeriodEnd: new Date(Date.now() + 30 * 86_400_000),
+        };
+      const created: string[] = [];
+      const tx: any = {
+        storeFeature: { findFirst: async () => null },
+        billingEvent: {
+          findFirst: vi.fn(async ({ where }: any) => {
+            if (where.idempotencyKey) return held[where.idempotencyKey] ?? null;
+            if (where.id) return { status: dead, failureReason: null, updatedAt: null }; // every held payment is dead
+            return null; // no own marker, no latest predecessor
+          }),
+          createMany: async ({ data }: any) => {
+            const k = data[0].idempotencyKey;
+            if (held[k]) return { count: 0 };
+            created.push(k);
+            return { count: 1 };
+          },
+          updateMany: vi.fn(async () => ({ count: 1 })),
         },
-        updateMany: vi.fn(async () => ({ count: 1 })),
-      },
-    };
-    const effects: any[] = [];
-    await applyAddonGrant(
-      tx,
-      { id: 'pay-9', storeId: 's1', planCode: input.planCode } as any,
-      new Date(),
-      effects
-    );
-    expect(created).toEqual([`${base}:r${DEAD}`]);
-    expect(effects).toEqual([{ kind: 'addon_granted', storeId: 's1' }]);
-    expect(h.alert).not.toHaveBeenCalled();
-  });
+      };
+      const effects: any[] = [];
+      await applyAddonGrant(
+        tx,
+        { id: 'pay-9', storeId: 's1', planCode: input.planCode } as any,
+        new Date(),
+        effects
+      );
+      expect(created).toEqual([`${base}:r${DEAD}`]);
+      expect(effects).toEqual([{ kind: 'addon_granted', storeId: 's1' }]);
+      expect(h.alert).not.toHaveBeenCalled();
+    }
+  );
 });
