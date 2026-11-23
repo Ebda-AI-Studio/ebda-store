@@ -215,6 +215,7 @@ export async function claimEvent(input: ClaimInput): Promise<string | null> {
       relatedEventId: input.relatedEventId ?? null,
       vatMinor,
       vat,
+      raw: input.raw ?? null,
     });
     return won ? id : null;
   }
@@ -306,6 +307,14 @@ async function applyPlan(tx: Tx, storeId: string, planCode: string): Promise<voi
 /** A ledger row that bought an add-on or an AI pack (`upgrade` + `addon:<sku>`), not a plan. */
 function isAddonRow(row: { type: string; planCode: string | null }): boolean {
   return row.type === 'upgrade' && !!row.planCode?.startsWith(ADDON_PLAN_PREFIX);
+}
+
+/**
+ * Zero-amount bookkeeping rows (`addon-cancel:` / `addon-resume:` here; `addon-grant:` / `addon-overlap:` up the stack)
+ * share `type: 'upgrade'` + `status: 'succeeded'` but are NOT payments: they must never read as a newer plan charge (B2).
+ */
+function isAddonMarkerRow(row: { planCode: string | null }): boolean {
+  return !!row.planCode?.startsWith(ADDON_MARKER_PREFIX);
 }
 
 async function applySuccess(
@@ -2029,18 +2038,21 @@ async function confirmAndApplyWebhook(
  */
 async function endAccessForRefund(
   tx: Tx,
-  charge: { id: string; storeId: string; type: string; createdAt: Date },
+  charge: { id: string; storeId: string; type: string; createdAt: Date; planCode?: string | null },
   keepAccess: boolean,
   now: Date,
   effects: BillingEffect[]
 ): Promise<void> {
   if (keepAccess || !['checkout', 'renewal', 'upgrade'].includes(charge.type)) return;
+  // An add-on / AI-pack payment (`upgrade` + `addon:<sku>`) bought no plan period: refunding it never touches the plan
+  // (its entitlement is revoked by settleRefundInTx), and it is never the "newer charge" that owns the period.
+  if (isAddonRow({ type: charge.type, planCode: charge.planCode ?? null })) return;
   const { storeId } = charge;
   const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
   if (!sub || !['active', 'past_due', 'trialing'].includes(sub.status)) return;
   if (sub.planCode === FREE_PLAN_CODE || isGrantedPlan(sub.planCode)) return;
   // only the NEWEST paid charge can own the current period: an older one bought a period already used up
-  const newer = await tx.billingEvent.findFirst({
+  const newerRows = await tx.billingEvent.findMany({
     where: {
       storeId,
       id: { not: charge.id },
@@ -2048,9 +2060,9 @@ async function endAccessForRefund(
       status: { in: ['succeeded', 'refunded'] },
       createdAt: { gt: charge.createdAt },
     },
-    select: { id: true },
+    select: { id: true, type: true, planCode: true },
   });
-  if (newer) return;
+  if (newerRows.some(r => !isAddonRow(r) && !isAddonMarkerRow(r))) return;
   // the free months this payment earned go too (FOUNDING-3)
   await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', now, storeId);
   await downgradeToFree(tx, storeId, 'canceled', effects);
