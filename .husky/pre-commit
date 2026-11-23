@@ -1,1 +1,4 @@
+# Root-checkout guard (2026-11-23): husky sets core.hooksPath, so the global ~/.claude/git-hooks never run here.
+# Vendored from ebda-foundation os/ops/root-checkout-guard.sh; refuses a commit in this repo's main checkout on main.
+bash "$(git rev-parse --show-toplevel)/scripts/ci/root-checkout-guard.sh" pre-commit || exit 1
 npx lint-staged

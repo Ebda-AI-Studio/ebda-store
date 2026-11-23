@@ -17,26 +17,47 @@ import { AppError } from '../middleware/error-handler';
 import { readInStoreContext } from './store-scoped-read';
 
 export const AI_DISABLED_BY_MERCHANT_CODE = 'AI_DISABLED_BY_MERCHANT';
+/** The store is suspended for billing (unpaid / over the store allowance): no AI spend until it is paid for (#836). */
+export const AI_BILLING_SUSPENDED_CODE = 'AI_STORE_BILLING_SUSPENDED';
 
-/** A store that cannot be read is NOT enabled: fail closed. */
-export async function isStoreAiEnabled(storeId: string): Promise<boolean> {
+async function readAiGate(storeId: string) {
   // Through the store's backend (Ruling NZ-INTEG-1, NZ-AN-2): a DO store answers from its profile / D1 directory, never Postgres.
-  const row = await readInStoreContext(storeId, async () =>
+  return readInStoreContext(storeId, async () =>
     (await storeDb(storeId)).store.findUnique({
       where: { id: storeId },
-      select: { aiFeaturesEnabled: true },
+      select: { aiFeaturesEnabled: true, billingSuspendedReason: true },
     })
   );
-  return row?.aiFeaturesEnabled === true;
 }
 
+/** A store that cannot be read is NOT enabled: fail closed. This is the merchant's own switch only. */
+export async function isStoreAiEnabled(storeId: string): Promise<boolean> {
+  return (await readAiGate(storeId))?.aiFeaturesEnabled === true;
+}
+
+/**
+ * The gate every AI spend passes (directly, through `assertAiQuota`, or through `requireAiEnabled`): the merchant's
+ * switch is on AND the store is not suspended for billing. A lapsed InstaPay store is suspended `unpaid` when its grace
+ * ends; before #836 it kept spending Ebda's AI budget because nothing on the AI path read the suspension. Same single
+ * primary-key read as before (NEVER-stale, no cache), so a suspension or a restore is obeyed on the very next call.
+ */
 export async function assertStoreAiEnabled(storeId: string): Promise<void> {
-  if (await isStoreAiEnabled(storeId)) return;
-  throw new AppError(
-    403,
-    AI_DISABLED_BY_MERCHANT_CODE,
-    'AI features are turned off for this store. Turn them on in AI tools.'
-  );
+  const row = await readAiGate(storeId);
+  if (row?.aiFeaturesEnabled !== true) {
+    throw new AppError(
+      403,
+      AI_DISABLED_BY_MERCHANT_CODE,
+      'AI features are turned off for this store. Turn them on in AI tools.'
+    );
+  }
+  if (row.billingSuspendedReason) {
+    const en =
+      'AI tools are paused until the subscription is paid. Pay from the Billing page to turn them back on.';
+    throw new AppError(402, AI_BILLING_SUSPENDED_CODE, en, {
+      messageEn: en,
+      messageAr: 'الأدوات الذكية واقفة لحد ما الاشتراك يتدفع. ادفع من صفحة الفواتير وهترجع تشتغل.',
+    });
+  }
 }
 
 export async function requireAiEnabled(

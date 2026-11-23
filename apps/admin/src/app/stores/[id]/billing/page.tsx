@@ -22,7 +22,7 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge, Select, useToast } from '@ebda/ui';
-import { billingDisplayStatus, trialDaysLeft } from '@/lib/billing-state';
+import { billingDisplayStatus, showPeriodEnd, trialDaysLeft } from '@/lib/billing-state';
 import { Button } from '@/components/ui/Button';
 import { formatMoney, type PlanLimits, withNumerals } from '@ebda/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -737,14 +737,15 @@ export default function StoreBillingPage() {
                   <dd>{fmtDate(data.subscription.trialEndsAt)}</dd>
                 </div>
               )}
-              {data.subscription.currentPeriodEnd && (
-                <div className="flex justify-between gap-2">
-                  <dt className="text-muted-foreground">
-                    {data.subscription.cancelAtPeriodEnd ? t('endsOn') : t('renewsOn')}
-                  </dt>
-                  <dd>{fmtDate(data.subscription.currentPeriodEnd)}</dd>
-                </div>
-              )}
+              {data.subscription.currentPeriodEnd &&
+                showPeriodEnd(displayStatus, data.subscription.cancelAtPeriodEnd) && (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-muted-foreground">
+                      {data.subscription.cancelAtPeriodEnd ? t('endsOn') : t('renewsOn')}
+                    </dt>
+                    <dd>{fmtDate(data.subscription.currentPeriodEnd)}</dd>
+                  </div>
+                )}
               {data.billing?.pendingPlanCode && (
                 <div className="flex justify-between gap-2 sm:col-span-2">
                   <dt className="text-muted-foreground">
