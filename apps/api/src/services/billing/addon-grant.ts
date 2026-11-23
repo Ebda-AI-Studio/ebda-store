@@ -204,7 +204,7 @@ async function grantTerm(
             ],
             skipDuplicates: true,
           })
-        ).count === 1;
+        ).count > 0;
     if (won) return setEnd(end);
     const held = await tx.billingEvent.findFirst({
       where: { storeId: row.storeId, idempotencyKey: key },

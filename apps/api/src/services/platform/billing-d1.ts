@@ -191,7 +191,7 @@ export async function claimAddonMarkerD1(m: {
     m.key,
     m.relatedEventId
   );
-  return changes === 1;
+  return changes > 0;
 }
 
 /** Set a paid add-on row's term end ONCE (`for_period_end IS NULL`). true = THIS caller set it. */
@@ -207,7 +207,7 @@ export async function setTermEndOnceD1(
     storeId,
     endMs
   );
-  return changes === 1;
+  return changes > 0;
 }
 
 /** `UPDATE billing_grants SET status = 'revoked' ... RETURNING id, beneficiary_id` (pending|applied -> revoked, once). */
