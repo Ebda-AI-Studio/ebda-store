@@ -15,7 +15,12 @@ export const HANDLE = 'ebda@instapay';
 export const A = '11111111-1111-4111-8111-111111111111';
 export const B = '22222222-2222-4222-8222-222222222222';
 
-const MIGRATIONS = ['0001_init', '0002_invariants', '0016_instapay_auto_confirm']
+const MIGRATIONS = [
+  '0001_init',
+  '0002_invariants',
+  '0016_instapay_auto_confirm',
+  '0019_pending_billing_interval',
+]
   .map(f =>
     fs.readFileSync(
       new URL(`../../packages/cf-schema/migrations/platform/${f}.sql`, import.meta.url),
@@ -74,6 +79,10 @@ export function buildWorld(opts: { dedupe?: boolean } = {}) {
     );
   db.prepare(
     `INSERT INTO plans (id, code, name_en, name_ar, feature_tier, limits, price_monthly_minor, price_yearly_minor) VALUES ('p', 'growth', 'g', 'g', 'professional', '{}', 5000, 50000)`
+  ).run();
+  // the lapse downgrade (MONEY-LAPSE-1) points a store at the seeded free plan (store_subscriptions.plan_code FK)
+  db.prepare(
+    `INSERT INTO plans (id, code, name_en, name_ar, feature_tier, limits, price_monthly_minor, price_yearly_minor) VALUES ('pf', 'free', 'f', 'f', 'free', '{}', 0, 0)`
   ).run();
   for (const fam of ['billing', 'payments', 'platform'])
     db.prepare(`INSERT INTO system_settings (id, key, value) VALUES (?, ?, '{}')`).run(
