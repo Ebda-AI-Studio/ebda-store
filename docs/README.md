@@ -128,6 +128,10 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [contracts/identity-client-token-v1.3.example.json](contracts/identity-client-token-v1.3.example.json) - identity client token v1.3.example
 - [contracts/identity-token-v1.2.example.json](contracts/identity-token-v1.2.example.json) - identity token v1.2.example
 
+## design - Design and UI work
+
+- [design/DESIGNER-ONBOARDING.md](design/DESIGNER-ONBOARDING.md) - Designer onboarding: redesign branch workflow, running the marketing site, brand rules
+
 ## decisions - Decision logs
 
 - [decisions/2026-10-10-product-company-naming.md](decisions/2026-10-10-product-company-naming.md) - Product and company naming
@@ -218,6 +222,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [merchant/inventory.md](merchant/inventory.md) - Inventory: variant stock, adjustments & scanning — المخزون: مخزون التنويعات والتعديلات والمسح
 - [merchant/loyalty.md](merchant/loyalty.md) - Loyalty points
 - [merchant/orders.md](merchant/orders.md) - Orders (and the Orders app) — الطلبات (وتطبيق الطلبات)
+- [merchant/product-feeds.md](merchant/product-feeds.md) - Product feeds for Google, Meta and TikTok - خلاصات المنتجات للإعلانات
 - [merchant/product-details.md](merchant/product-details.md) - Product details: swatches, facts, personalisation, delivery time and size guides — تفاصيل المنتج
 - [merchant/provider-activation.md](merchant/provider-activation.md) - Connecting a payment or shipping service / ربط خدمة دفع أو شحن
 - [merchant/quickstart.md](merchant/quickstart.md) - Quickstart — البدء السريع
@@ -316,6 +321,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-10-25-templates-match-mockups.md](plans/2026-10-25-templates-match-mockups.md) - Make the real templates look like the Python mock-ups (2026-10-25)
 - [plans/done/2026-10-25-wa-store-contract-store-side.md](plans/done/2026-10-25-wa-store-contract-store-side.md) - Ebda Store side of the WhatsApp contract (producer, consumer, buyer key)
 - [plans/done/2026-10-26-search-as-you-type.md](plans/done/2026-10-26-search-as-you-type.md) - Search as you type, everywhere (2026-10-26)
+- [plans/2026-11-14-catalogue-feeds.md](plans/2026-11-14-catalogue-feeds.md) - Product catalogue feeds: Google, Meta, TikTok (2026-11-14)
 - [plans/2026-11-12-arabic-stemming.md](plans/2026-11-12-arabic-stemming.md) - Arabic light stemming for storefront search (2026-11-12)
 - [plans/2026-10-26-storefront-locale-paths.md](plans/2026-10-26-storefront-locale-paths.md) - Storefront English at its own URL (audit M-168, SEO-9)
 - [plans/done/2026-10-28-customer-intelligence.md](plans/done/2026-10-28-customer-intelligence.md) - Customer Intelligence (CI): capture, internal learning, merchant features

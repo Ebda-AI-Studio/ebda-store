@@ -126,6 +126,7 @@
       "upsell_crosssell",
       "marketing_pixels",
       "agent_feed",
+      "product_feeds",
       "agent_checkout",
       "answer_engine_insights",
       "shipping_carriers",
