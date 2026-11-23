@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const state = vi.hoisted(() => ({
   store: null as null | Record<string, unknown>,
   updates: [] as unknown[],
+  directory: [] as unknown[],
 }));
 vi.mock('@ebda/database', () => ({
   prisma: {},

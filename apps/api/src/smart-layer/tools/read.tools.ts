@@ -259,7 +259,7 @@ export function readTools(d: ToolDeps): ToolSpec[] {
       capabilityId: 'analytics.dashboard',
       resultTrust: 'store-data',
       description:
-        'Dashboard figures: revenue, order count, average order value, top products and low stock, for a date window.',
+        'Dashboard figures: revenue, order count, average order value, top products and low stock, for a date window. Revenue is NET SALES: every order except cancelled, refunded and failed/refunded payments, net of refunds, INCLUDING unpaid cash-on-delivery orders (sales, not cash collected).',
       args: z
         .object({ from: z.string().max(40).optional(), to: z.string().max(40).optional() })
         .strict(),

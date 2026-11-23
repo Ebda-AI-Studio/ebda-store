@@ -32,6 +32,8 @@ export const FEATURE_KEYS_ARRAY = [
   'affiliate',
   'marketing_pixels',
   'agent_feed',
+  // Product feeds for Google Merchant Center, Meta Commerce Manager and TikTok Catalog (2026-11-14, Ruling FEEDS-1).
+  'product_feeds',
   'agent_checkout',
   'answer_engine_insights',
   'shipping_carriers',
@@ -219,6 +221,10 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr: 'تتبع مستويات المخزون وتعيين تنبيهات انخفاض المخزون وإدارة المستودعات.',
     category: 'commerce',
     tier: 'core',
+    // F2 (live QA 2026-11-17): the legacy PARENT flag gates nothing. It is in no plan baseline and no route, page or
+    // nav item reads it (inventory.routes.ts gates each handler on its `inventory.*` sub-key). Shown in the matrix it
+    // said "not included" while every inventory page worked. Hidden; the `inventory.*` sub-features are the gates.
+    hidden: true,
   },
   tax: {
     key: 'tax',
@@ -367,6 +373,17 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'ينشر خلاصة منتجات قابلة للقراءة آليًا على /feeds/products.json حتى تتمكن مساعدات الذكاء الاصطناعي ووكلاء التسوق (ChatGPT وPerplexity وزواحف الوكلاء) من قراءة منتجات المتجر والاستشهاد بها والتوصية بها. تتبع اصطلاحات حقول خلاصة منتجات OpenAI.',
     category: 'marketing',
     tier: 'addon',
+  },
+  product_feeds: {
+    key: 'product_feeds',
+    name: 'Product Feeds (Google, Meta, TikTok)',
+    nameAr: 'خلاصات المنتجات (جوجل وميتا وتيك توك)',
+    description:
+      'Publishes the full product catalogue, variants included, as feeds for Google Merchant Center (Shopping and free listings), Meta Commerce Manager (Facebook and Instagram catalogue ads) and TikTok Catalog Manager, at /feeds/google.xml, /feeds/meta.xml and /feeds/tiktok.csv, with a feed health report in the admin.',
+    descriptionAr:
+      'ينشر كتالوج المنتجات كاملًا بما فيه الأنواع (المقاسات والألوان) كخلاصات لـ Google Merchant Center (إعلانات الشراء والقوائم المجانية) وMeta Commerce Manager (إعلانات الكتالوج على فيسبوك وإنستجرام) وTikTok Catalog Manager، على /feeds/google.xml و/feeds/meta.xml و/feeds/tiktok.csv، مع تقرير صحة الخلاصة في لوحة التحكم.',
+    category: 'marketing',
+    tier: 'core',
   },
   agent_checkout: {
     key: 'agent_checkout',
@@ -592,9 +609,9 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     name: 'Accounting — Profit Anomaly Watch',
     nameAr: 'المحاسبة — مراقبة شذوذ الأرباح',
     description:
-      'Runs a daily AI scan of margins; flags unusual margin drops and cost-volume spikes vs a 28-day rolling baseline.',
+      'Runs a daily AI scan of margins (06:30 Cairo time); flags unusual margin drops and cost-volume spikes vs a 28-day rolling baseline.',
     descriptionAr:
-      'فحص يومي بالذكاء الاصطناعي للهوامش؛ ينبّه عند هبوط الهامش أو ارتفاع حجم التكلفة بشكل غير مألوف مقارنةً بمتوسط 28 يومًا.',
+      'فحص يومي بالذكاء الاصطناعي للهوامش (06:30 بتوقيت القاهرة)؛ ينبّه عند هبوط الهامش أو ارتفاع حجم التكلفة بشكل غير مألوف مقارنةً بمتوسط 28 يومًا.',
     category: 'operations',
     tier: 'addon',
   },

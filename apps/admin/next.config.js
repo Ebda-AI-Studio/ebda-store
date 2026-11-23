@@ -4,6 +4,7 @@ const createNextIntlPlugin = require('next-intl/plugin');
 const { withSentryConfig } = require('@sentry/nextjs/config');
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
+const { trustRedirects } = require('./trust-redirects');
 
 // Cloudflare/OpenNext build target detection (mirrors apps/web). Set
 // OPEN_NEXT_CLOUDFLARE=1 in the Cloudflare build; CF_PAGES is auto-set by CF.
@@ -118,6 +119,8 @@ const nextConfig = {
   // page-builder consolidation (2026-05-19); the visual editor owns them since Ruling VE-6.
   async redirects() {
     return [
+      // QA-TRUST-1: /legal /privacy /terms and /llms.txt are real URLs (one 308 hop to ebda.app)
+      ...trustRedirects(),
       {
         source: '/stores/:id/layout',
         destination: '/stores/:id/builder',

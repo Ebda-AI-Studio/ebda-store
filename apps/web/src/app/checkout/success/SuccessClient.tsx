@@ -17,7 +17,7 @@ import { firePurchasePixelOnce } from '../../../lib/purchase-pixel-guard';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useLastListing } from '../../../hooks/useLastListing';
 import { ReceiptPrinter, type PaymentState } from '../../../components/commerce/ReceiptPrinter';
-import { fromMinor, REGION } from '@ebda/shared';
+import { catalogueItemId, fromMinor, REGION } from '@ebda/shared';
 
 // Payment verification outcome that drives the truthful headline/icon.
 //   verifying → we're asking the API to confirm with the gateway
@@ -131,7 +131,9 @@ function SuccessContent() {
             firePurchasePixelOnce(fetchedOrder.id, () =>
               trackPurchase({
                 orderId: fetchedOrder.id,
-                contentIds: fetchedOrder.items.map(item => item.productId),
+                contentIds: fetchedOrder.items.map(item =>
+                  catalogueItemId({ productId: item.productId, variantId: item.variantId })
+                ),
                 numItems: fetchedOrder.items.reduce((sum, item) => sum + item.quantity, 0),
                 value: fromMinor(fetchedOrder.total),
                 currency: REGION.currency,
