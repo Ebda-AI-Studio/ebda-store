@@ -54,11 +54,7 @@ import { inngest } from '../lib/inngest/client';
 import { invoiceRecipient, queueInvoiceEmail } from '../services/order-invoice-email.service';
 import logger from '../lib/logger';
 import { PaymentService } from '../services/payment-providers/payment.factory';
-import {
-  settleRefundEvent,
-  matchRefundToClaim,
-  inSettlementTx,
-} from '../services/payment-providers/refund-settle';
+import { settleRefundEvent, matchRefundToClaim } from '../services/payment-providers/refund-settle';
 import { recordPaymentEvent, recordPaymentEventForStore } from '../services/payment-event.service';
 import { storeDb, storeMoney } from '../lib/repo-factory';
 import { listAuditWithActors } from '../lib/audit-actors';
@@ -1474,16 +1470,14 @@ router.post(
               orderId,
             })
           ).result
-        : await inSettlementTx(storeId, () =>
-            matchRefundToClaim({
-              paymentId: payment.id,
-              storeId,
-              orderId,
-              providerRefundId: body.providerRefundId,
-              claimId: body.claimId,
-              actorUserId: user.userId,
-            })
-          );
+        : await matchRefundToClaim({
+            paymentId: payment.id,
+            storeId,
+            orderId,
+            providerRefundId: body.providerRefundId,
+            claimId: body.claimId,
+            actorUserId: user.userId,
+          });
       await auditLog({
         action: 'refund.match_claim',
         userId: user.userId,
@@ -1631,13 +1625,13 @@ router.post(
       // Update Payment.metadata with the fresh status. If the provider says the refund completed and our Payment row isn't
       // marked refunded yet (out-of-band path), promote it now.
       //
-      // The whole read-decide-write runs in ONE transaction that holds the payment row lock (`inSettlementTx` joins the
-      // ambient tenant transaction or opens one): every patch below is built from the LOCKED copy, never from the row read
-      // before the lock, so a concurrent webhook cannot interleave and have its metadata overwritten by a stale spread.
+      // Postgres path only (Node: unit tests, local dev). Every patch below is built from the copy `settleRefundEvent` re-read,
+      // never from the row read before it. No row lock (Ruling NZ-REFUND-LOCK-1): on the Worker a store takes the DO branch
+      // above, where the refund-webhook section is one `transactionSync`; a `pg` store answers 410 before reaching here.
       const updateData: Record<string, unknown> = {};
-      // the LOCKED row: everything computed from the payment after the lock (raised amount, status) uses this, never the row read before it
+      // the re-read row: everything computed from the payment (raised amount, status) uses this, never the row read before it
       const lockedHolder: { v: { refundedAmount: number; status: string } | null } = { v: null };
-      await inSettlementTx(storeId, async () => {
+      {
         const settleRes = await settleRefundEvent({
           paymentId: payment.id,
           storeId,
@@ -1705,7 +1699,7 @@ router.post(
         }
         if (!settleRes.seen) await settleRes.commit({ data: updateData });
         else await prisma.payment.update({ where: { id: payment.id }, data: updateData });
-      });
+      }
 
       // Append-only audit row. Records the refund-status refresh — fromStatus
       // is the pre-update payment status; toStatus is what we just wrote (or

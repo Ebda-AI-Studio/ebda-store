@@ -1,9 +1,15 @@
 /**
- * The ONE place a refund is settled against a payment (Postgres path). The webhook, the manual refresh route and the
+ * The ONE place a refund is settled against a payment on the Postgres path. The webhook, the manual refresh route and the
  * in-band claim release used to each do part of this and raced each other; they now all call here.
  *
- * Every entry point takes the payment row lock (`SELECT … FOR UPDATE`), re-reads the payment AND its refund events, decides,
- * and writes the outcome event in the same transaction:
+ * Ruling NZ-REFUND-LOCK-1 (2026-11-23): production has no Postgres. A store is served by its StoreDO, whose refund
+ * sections (packages/repo/src/do/payments.ts: `beginRefund`, `completeRefund`, `releaseRefund`, `matchRefundToClaim`, and
+ * `applyPaymentEventSync` -> `applyRefundWebhook`) each run as ONE `transactionSync` on a single-threaded object, so the
+ * payment row lock and the joined tenant transaction this module used to take are gone. Every caller takes the DO branch first (`storeMoney(storeId)`), a `pg` store answers
+ * 410 on the Worker (lib/store-backend.ts `backendFromRow`), and any Prisma call there throws POSTGRES_REMOVED (worker.ts).
+ * What is left here runs only under Node (unit tests, local dev) and is NOT serialised; it goes with the pg branches (N-16).
+ *
+ * The rules (shared with the DO through `@ebda/shared`):
  *   - a settle event is reconciled with an in-flight claim ONLY when it is a COMPLETED refund (a pending / failed notice
  *     never consumes a claim), and consumes it (REFUND_ABSORBED_EVENT) so one claim settles one notice;
  *   - a claim is released ONLY if no webhook absorbed it (otherwise the money left: it is marked for review, nothing is
@@ -13,13 +19,7 @@
  *   - the unique index `payment_events_claim_single_outcome_key` makes "one claim, one of absorbed/released" a database fact.
  * The callers keep their own effects (order reversal, booking, alerts) and pass their payment-row patch to `commit`.
  */
-import {
-  currentTenantGucs,
-  hasTenantContext,
-  prisma,
-  Prisma,
-  runInTenantContext,
-} from '@ebda/database';
+import { prisma, Prisma } from '@ebda/database';
 import {
   correlateSettleNotice,
   executedClaimForRefundId,
@@ -59,22 +59,6 @@ const FAWRY_CLOSING = [
   REFUND_ABSORBED_EVENT,
 ];
 
-/**
- * Run `fn` inside ONE transaction that the settle functions can lock in: join the ambient tenant transaction (the lock then
- * lives until the caller's transaction ends), else open one. Nested `runInTenantContext` would be a SEPARATE connection
- * (Prisma has no nested interactive transactions) and would wait on locks the outer transaction already holds, so it is
- * never opened when one exists.
- */
-export async function inSettlementTx<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
-  if (!hasTenantContext()) return runInTenantContext(storeId, fn);
-  // an ambient transaction scoped to ANOTHER store (or to none) would read this payment's events as empty under RLS and
-  // make every claim/hold check fail OPEN: refuse instead
-  const scope = currentTenantGucs()?.storeId;
-  if (scope !== undefined && scope !== storeId)
-    throw new Error('settleRefund: ambient transaction is scoped to another store');
-  return fn();
-}
-
 export interface FreshPayment {
   id: string;
   amount: number;
@@ -84,9 +68,8 @@ export interface FreshPayment {
   metadata: Record<string, unknown>;
 }
 
-/** Lock the payment row for the rest of the caller's transaction and read it fresh. Null when it does not exist. */
-export async function lockPayment(paymentId: string): Promise<FreshPayment | null> {
-  await prisma.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId} FOR NO KEY UPDATE`;
+/** Read the payment fresh (no row lock: see the file header). Null when it does not exist. */
+export async function readPayment(paymentId: string): Promise<FreshPayment | null> {
   const row = await prisma.payment.findUnique({
     where: { id: paymentId },
     select: {
@@ -136,10 +119,10 @@ export interface SettleEventResult {
   commit(patch: { data?: Record<string, unknown> }): Promise<void>;
 }
 
-/** Decide (under the payment lock) how a provider refund event settles; the caller applies its effects then `commit`s. */
+/** Decide how a provider refund event settles; the caller applies its effects then `commit`s. */
 export async function settleRefundEvent(input: SettleEventInput): Promise<SettleEventResult> {
   const now = input.now ?? Date.now();
-  const payment = await lockPayment(input.paymentId);
+  const payment = await readPayment(input.paymentId);
   if (!payment) throw new Error(`settleRefund: payment ${input.paymentId} not found`);
   const prevRefundStatus = (payment.metadata.refundStatus as string | undefined) || 'pending';
   const completed = input.refund.status === 'completed';
@@ -307,7 +290,7 @@ export type ReleaseResult = 'released' | 'review' | 'already_released';
  * (the gateway says the money left), in which case nothing is given back and the claim is marked for review.
  */
 export async function settleClaimRelease(input: ReleaseInput): Promise<ReleaseResult> {
-  const payment = await lockPayment(input.paymentId);
+  const payment = await readPayment(input.paymentId);
   if (!payment) throw new Error(`settleRefund: payment ${input.paymentId} not found`);
   const events = await refundEvents(input.paymentId, input.storeId);
   const forClaim = events.filter(
@@ -384,7 +367,7 @@ export type MatchResult = 'matched' | 'already_matched';
  * seen, and writes an audit event naming the operator. Refuses a claim that was not executed or is already closed.
  */
 export async function matchRefundToClaim(input: MatchInput): Promise<MatchResult> {
-  const payment = await lockPayment(input.paymentId);
+  const payment = await readPayment(input.paymentId);
   if (!payment) throw new Error(`settleRefund: payment ${input.paymentId} not found`);
   const events = await refundEvents(input.paymentId, input.storeId);
   const forClaim = events.filter(

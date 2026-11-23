@@ -42,7 +42,6 @@ let paymentFindManyOverride: ((...a: unknown[]) => Promise<unknown[]>) | null = 
 
 vi.mock('@ebda/database', () => ({
   prisma: {
-    $queryRaw: vi.fn().mockResolvedValue([]),
     payment: {
       findFirst: (...a: unknown[]) => paymentFindFirst(...a),
       // refund() resolves by transactionId with findMany({ take: 2 }) and
@@ -54,7 +53,7 @@ vi.mock('@ebda/database', () => ({
       },
       updateMany: (...a: unknown[]) => paymentUpdateMany(...a),
       update: (...a: unknown[]) => paymentUpdate(...a),
-      // the claim just made: 1000 of a 5000 payment (lockPayment in refund-settle re-reads it under the lock)
+      // the claim just made: 1000 of a 5000 payment (readPayment in refund-settle re-reads it)
       findUnique: vi.fn().mockResolvedValue({
         id: 'pay_1',
         amount: 5000,
@@ -83,8 +82,6 @@ vi.mock('@ebda/database', () => ({
   Prisma: {},
   // Each refund record commits on its own transaction; with no database the
   // callback simply runs.
-  hasTenantContext: () => true,
-  currentTenantGucs: () => undefined,
   runInTenantContext: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
   // The factory reads a store's provider configs inside that store's scope.
   withStore: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
