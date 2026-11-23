@@ -10516,7 +10516,8 @@
         "name_unreadable": "The name could not be read from the document",
         "looks_edited": "The document looks edited",
         "low_confidence": "The automatic read was not confident",
-        "not_pre_checked": "Not pre-checked (a PDF, or the automatic read was unavailable): read the document yourself"
+        "not_pre_checked": "Not pre-checked (a PDF, or the automatic read was unavailable): read the document yourself",
+        "trn_in_use_by_other_store": "The number is already held by another store (verified or pending): check before approving"
       },
       "read": "Read from the document: {trn}, {name}",
       "viewDocument": "View the document",

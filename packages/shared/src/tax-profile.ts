@@ -89,9 +89,24 @@ export const taxChangeRequestSchema = z
   })
   .strict();
 
+/**
+ * A decision names the EXACT request the reviewer looked at (the id, the document sha256 and the number the queue showed): a
+ * merchant who replaces the request between the list and the click gets a 409, never an approval of the new, unreviewed one.
+ */
+const taxChangeBinding = {
+  requestId: z.string().uuid(),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  taxRegistrationNumber: z.string().regex(/^\d{9}$/),
+};
 export const taxChangeDecisionSchema = z.discriminatedUnion('decision', [
-  z.object({ decision: z.literal('approve') }).strict(),
-  z.object({ decision: z.literal('reject'), reason: z.string().trim().min(3).max(1000) }).strict(),
+  z.object({ decision: z.literal('approve'), ...taxChangeBinding }).strict(),
+  z
+    .object({
+      decision: z.literal('reject'),
+      reason: z.string().trim().min(3).max(1000),
+      ...taxChangeBinding,
+    })
+    .strict(),
 ]);
 export type TaxChangeDecision = z.infer<typeof taxChangeDecisionSchema>;
 

@@ -9,6 +9,9 @@ import { useT } from '../../../i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
 
 interface ChangeRow {
+  /** The request the reviewer is looking at: the decision names it (id + document sha256 + number) or the server refuses. */
+  id: string;
+  sha256: string;
   storeId: string;
   taxRegistrationNumber: string;
   legalName: string;
@@ -56,11 +59,18 @@ export function ChangeRequestsPanel() {
       });
       if (!ok) return;
     }
-    const { error } = await apiPost(
-      `/api/v1/admin/tax-verification/${r.storeId}/change-decision`,
-      decision === 'approve' ? { decision } : { decision, reason: reason.trim() }
-    );
-    if (error) return toastError(t('actions.failed', { message: error.message }));
+    const { error } = await apiPost(`/api/v1/admin/tax-verification/${r.storeId}/change-decision`, {
+      decision,
+      requestId: r.id,
+      sha256: r.sha256,
+      taxRegistrationNumber: r.taxRegistrationNumber,
+      ...(decision === 'reject' ? { reason: reason.trim() } : {}),
+    });
+    if (error) {
+      toastError(t('actions.failed', { message: error.message }));
+      await load(); // a request replaced since the list loaded: show the current one
+      return;
+    }
     toastSuccess(decision === 'approve' ? t('changes.approved') : t('changes.rejected'));
     setReasonFor(null);
     setReason('');

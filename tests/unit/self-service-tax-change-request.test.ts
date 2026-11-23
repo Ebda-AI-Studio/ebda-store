@@ -26,6 +26,7 @@ const m = vi.hoisted(() => ({
   settingsDown: false,
   beforeClaim: null as null | (() => void),
   upsertFail: false,
+  holders: new Map<string, Array<{ storeId: string; status: string }>>(),
 }));
 
 vi.mock('@api/middleware/auth', async () => {
@@ -75,6 +76,7 @@ vi.mock('@api/lib/ai/tax-document-reader', () => ({ readTaxDocument: m.read }));
 vi.mock('@api/services/tax-profile.service', () => ({
   TaxProfileService: { get: m.getProfile, review: m.review },
   applyApprovedTaxChange: m.apply,
+  storesHoldingTrns: async () => m.holders,
   inReviewScope: (_a: string, _s: string, fn: () => unknown) => fn(),
   listProfilesForReview: async () => [],
   sniffTaxDocumentMime: (b: Buffer) =>
@@ -138,9 +140,13 @@ beforeEach(() => {
   m.createFail = null;
   m.alert.mockReset();
   m.keyN = 0;
+  m.holders.clear();
   for (const f of [m.getProfile, m.apply, m.review, m.read, m.putPrivate, m.deletePrivate, m.audit])
     f.mockReset();
-  m.getProfile.mockResolvedValue({ status: 'verified' });
+  m.getProfile.mockResolvedValue({
+    status: 'verified',
+    reviewedAt: new Date('2026-11-01T00:00:00Z'),
+  });
   m.putPrivate.mockImplementation(async () => ({ key: `stores/s/tax-documents/x${m.keyN++}.pdf` }));
   m.read.mockResolvedValue({
     taxRegistrationNumber: '123-456-789',
@@ -388,6 +394,17 @@ describe('A10 change request on a verified registration', () => {
   });
 });
 
+/** The request the reviewer's queue showed: a decision names its id, document sha256 and number. */
+const bind = (body: Record<string, unknown>) => {
+  const row = m.settings.get(`tax.change.${STORE}`) as any;
+  return {
+    ...body,
+    requestId: row?.id,
+    sha256: row?.sha256,
+    taxRegistrationNumber: row?.taxRegistrationNumber,
+  };
+};
+
 describe('A10 super-admin decision', () => {
   const pending = async () => {
     const token = await preview();
@@ -423,7 +440,7 @@ describe('A10 super-admin decision', () => {
     const res = await request(app)
       .post(`/admin/tax-verification/${STORE}/change-decision`)
       .set('x-role', 'store_admin')
-      .send({ decision: 'approve' });
+      .send(bind({ decision: 'approve' }));
     expect(res.status).toBe(403);
     expect(m.apply).not.toHaveBeenCalled();
   });
@@ -433,7 +450,7 @@ describe('A10 super-admin decision', () => {
     const res = await request(app)
       .post(`/admin/tax-verification/${STORE}/change-decision`)
       .set('x-role', 'super_admin')
-      .send({ decision: 'approve' });
+      .send(bind({ decision: 'approve' }));
     expect(res.status).toBe(200);
     expect(m.apply).toHaveBeenCalledWith(
       STORE,
@@ -450,7 +467,7 @@ describe('A10 super-admin decision', () => {
       request(app)
         .post(`/admin/tax-verification/${STORE}/change-decision`)
         .set('x-role', 'super_admin')
-        .send({ decision: 'approve' });
+        .send(bind({ decision: 'approve' }));
     const [a, b] = await Promise.all([go(), go()]);
     expect([a.status, b.status]).toEqual([200, 200]);
     expect(m.apply).toHaveBeenCalledTimes(1);
@@ -462,7 +479,7 @@ describe('A10 super-admin decision', () => {
     const res = await request(app)
       .post(`/admin/tax-verification/${STORE}/change-decision`)
       .set('x-role', 'super_admin')
-      .send({ decision: 'approve' });
+      .send(bind({ decision: 'approve' }));
     expect(res.status).toBe(200);
     expect(res.body.data.noop).toBe(true);
     expect(m.apply).not.toHaveBeenCalled();
@@ -478,7 +495,7 @@ describe('A10 super-admin decision', () => {
     const res = await request(app)
       .post(`/admin/tax-verification/${STORE}/change-decision`)
       .set('x-role', 'super_admin')
-      .send({ decision: 'approve' });
+      .send(bind({ decision: 'approve' }));
     expect(res.body.data.noop).toBe(true);
     expect(m.apply).not.toHaveBeenCalled();
     expect((m.settings.get(`tax.change.${STORE}`) as { id: string }).id).toBe('new-request-id');
@@ -492,7 +509,7 @@ describe('A10 super-admin decision', () => {
     const res = await request(app)
       .post(`/admin/tax-verification/${STORE}/change-decision`)
       .set('x-role', 'super_admin')
-      .send({ decision: 'approve' });
+      .send(bind({ decision: 'approve' }));
     expect(res.status).toBe(500);
     expect(m.alert.mock.calls.some(c => c[0].level === 'p1' && /restore/i.test(c[0].title))).toBe(
       true
@@ -505,7 +522,7 @@ describe('A10 super-admin decision', () => {
     const res = await request(app)
       .post(`/admin/tax-verification/${STORE}/change-decision`)
       .set('x-role', 'super_admin')
-      .send({ decision: 'reject', reason: 'name differs from the card' });
+      .send(bind({ decision: 'reject', reason: 'name differs from the card' }));
     expect(res.status).toBe(200);
     expect(m.deletePrivate).toHaveBeenCalled();
     expect(m.alert.mock.calls.some(c => c[0].level === 'p1' && /notice/i.test(c[0].title))).toBe(
@@ -519,7 +536,7 @@ describe('A10 super-admin decision', () => {
     const res = await request(app)
       .post(`/admin/tax-verification/${STORE}/change-decision`)
       .set('x-role', 'super_admin')
-      .send({ decision: 'approve' });
+      .send(bind({ decision: 'approve' }));
     expect(res.status).toBe(500);
     expect(m.settings.has(`tax.change.${STORE}`)).toBe(true);
   });
@@ -529,12 +546,12 @@ describe('A10 super-admin decision', () => {
     const bad = await request(app)
       .post(`/admin/tax-verification/${STORE}/change-decision`)
       .set('x-role', 'super_admin')
-      .send({ decision: 'reject' });
+      .send(bind({ decision: 'reject' }));
     expect(bad.status).toBe(400);
     const res = await request(app)
       .post(`/admin/tax-verification/${STORE}/change-decision`)
       .set('x-role', 'super_admin')
-      .send({ decision: 'reject', reason: 'name differs from the card' });
+      .send(bind({ decision: 'reject', reason: 'name differs from the card' }));
     expect(res.status).toBe(200);
     expect(m.apply).not.toHaveBeenCalled();
     expect(m.deletePrivate).toHaveBeenCalled();
@@ -543,16 +560,107 @@ describe('A10 super-admin decision', () => {
     expect(mine.body.data.lastRejection.reason).toBe('name differs from the card');
   });
 
-  it('a failing discard does not turn a committed revoke into a 500', async () => {
+  it('a failing discard FAILS the review decision (no swallow)', async () => {
     await pending();
     m.review.mockResolvedValue({ status: 'revoked' });
     m.settingsDown = true; // the discard cannot reach system_settings
-    m.deletePrivate.mockRejectedValue(new Error('r2 down'));
     const res = await request(app)
       .post(`/admin/tax-verification/${STORE}/decision`)
       .set('x-role', 'super_admin')
       .send({ decision: 'revoke', reason: 'no longer registered' });
+    expect(res.status).toBe(500);
+  });
+
+  it.each([
+    ['approve', { decision: 'approve' }],
+    ['reject', { decision: 'reject', reason: 'documents unreadable' }],
+  ])('a profile %s decision also drops a stale pending change request', async (_n, body) => {
+    await pending();
+    m.review.mockResolvedValue({ status: 'x' });
+    const res = await request(app)
+      .post(`/admin/tax-verification/${STORE}/decision`)
+      .set('x-role', 'super_admin')
+      .send(body);
     expect(res.status).toBe(200);
+    expect(m.settings.has(`tax.change.${STORE}`)).toBe(false);
+    expect(m.deletePrivate).toHaveBeenCalled();
+  });
+
+  it('the request records the profile reviewedAt it was made against', async () => {
+    await pending();
+    expect((m.settings.get(`tax.change.${STORE}`) as any).profileReviewedAt).toBe(
+      '2026-11-01T00:00:00.000Z'
+    );
+    expect(m.apply).not.toHaveBeenCalled();
+  });
+
+  it('TOCTOU: a request replaced between the list and the approve is a 409 and nothing is applied', async () => {
+    await pending();
+    const list = await request(app)
+      .get('/admin/tax-verification/change-requests')
+      .set('x-role', 'super_admin');
+    const seen = list.body.data.requests[0];
+    // the merchant withdraws and sends a different request (other number, other document) before the click
+    m.settings.set(`tax.change.${STORE}`, {
+      ...(m.settings.get(`tax.change.${STORE}`) as object),
+      id: '99999999-9999-4999-8999-999999999999',
+      sha256: 'b'.repeat(64),
+      taxRegistrationNumber: '555555555',
+    });
+    const res = await request(app)
+      .post(`/admin/tax-verification/${STORE}/change-decision`)
+      .set('x-role', 'super_admin')
+      .send({
+        decision: 'approve',
+        requestId: seen.id,
+        sha256: seen.sha256,
+        taxRegistrationNumber: seen.taxRegistrationNumber,
+      });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('TAX_CHANGE_STALE');
+    expect(m.apply).not.toHaveBeenCalled();
+    expect(m.settings.has(`tax.change.${STORE}`)).toBe(true); // not claimed either
+  });
+
+  it('same request id but another document or number is also stale', async () => {
+    await pending();
+    const row = bind({}) as any;
+    for (const over of [{ sha256: 'c'.repeat(64) }, { taxRegistrationNumber: '555555555' }]) {
+      const res = await request(app)
+        .post(`/admin/tax-verification/${STORE}/change-decision`)
+        .set('x-role', 'super_admin')
+        .send({ decision: 'approve', ...row, ...over });
+      expect(res.status).toBe(409);
+    }
+    expect(m.apply).not.toHaveBeenCalled();
+  });
+
+  it('a decision without the request binding is refused (400)', async () => {
+    await pending();
+    const res = await request(app)
+      .post(`/admin/tax-verification/${STORE}/change-decision`)
+      .set('x-role', 'super_admin')
+      .send({ decision: 'approve' });
+    expect(res.status).toBe(400);
+    expect(m.apply).not.toHaveBeenCalled();
+  });
+
+  it('the queue flags a number another store holds (verified or pending), not the store itself', async () => {
+    await pending();
+    m.holders.set('123456789', [{ storeId: STORE, status: 'verified' }]);
+    let list = await request(app)
+      .get('/admin/tax-verification/change-requests')
+      .set('x-role', 'super_admin');
+    expect(list.body.data.requests[0].precheck.flags).not.toContain('trn_in_use_by_other_store');
+    m.holders.set('123456789', [
+      { storeId: STORE, status: 'verified' },
+      { storeId: '33333333-3333-4333-8333-333333333333', status: 'pending' },
+    ]);
+    list = await request(app)
+      .get('/admin/tax-verification/change-requests')
+      .set('x-role', 'super_admin');
+    expect(list.body.data.requests[0].precheck.status).toBe('flagged');
+    expect(list.body.data.requests[0].precheck.flags).toContain('trn_in_use_by_other_store');
   });
 
   it('revoking the verified registration drops a pending request', async () => {

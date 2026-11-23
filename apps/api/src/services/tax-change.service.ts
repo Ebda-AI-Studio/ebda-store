@@ -15,6 +15,7 @@ import {
   TaxProfileService,
   sniffTaxDocumentMime,
   applyApprovedTaxChange,
+  storesHoldingTrns,
 } from './tax-profile.service';
 import { readTaxDocument, type TaxDocumentExtraction } from '../lib/ai/tax-document-reader';
 import {
@@ -65,7 +66,8 @@ type TaxChangeFlag =
   | 'name_unreadable'
   | 'looks_edited'
   | 'low_confidence'
-  | 'not_pre_checked';
+  | 'not_pre_checked'
+  | 'trn_in_use_by_other_store';
 
 interface StoredChange {
   id: string;
@@ -79,6 +81,8 @@ interface StoredChange {
   sha256: string;
   requestedBy: string;
   requestedAt: string;
+  /** The profile's reviewedAt when requested; apply refuses when the profile was re-reviewed since (revoke / re-verify). */
+  profileReviewedAt: string | null;
   precheck: {
     status: 'clean' | 'flagged';
     flags: TaxChangeFlag[];
@@ -204,7 +208,7 @@ function validate(file: TaxChangeFile): 'application/pdf' | 'image/jpeg' | 'imag
   return mime;
 }
 
-async function assertChangeable(storeId: string): Promise<void> {
+async function assertChangeable(storeId: string) {
   const profile = await TaxProfileService.get(storeId);
   if (profile.status !== 'verified')
     throw new AppError(
@@ -218,6 +222,7 @@ async function assertChangeable(storeId: string): Promise<void> {
       'TAX_CHANGE_PENDING',
       'A change request is already waiting for review. Withdraw it to send a new one. / عندك طلب تغيير في انتظار المراجعة. اسحبه لو عايز تبعت طلب جديد.'
     );
+  return profile;
 }
 
 function subjectFor(storeId: string, actor: Actor, input: TaxChangeInput, sha256: string) {
@@ -251,7 +256,7 @@ export async function requestTaxChange(
   confirmToken: string | undefined
 ): Promise<SubmitResult> {
   const mime = validate(file);
-  await assertChangeable(storeId);
+  const profile = await assertChangeable(storeId);
   const sha256 = createHash('sha256').update(file.buffer).digest('hex');
   const subject = subjectFor(storeId, actor, input, sha256);
   if (!confirmToken) {
@@ -287,6 +292,7 @@ export async function requestTaxChange(
     sha256,
     requestedBy: actor.userId,
     requestedAt: new Date().toISOString(),
+    profileReviewedAt: profile.reviewedAt ? new Date(profile.reviewedAt).toISOString() : null,
     precheck: precheck(input, extracted),
   };
   try {
@@ -394,6 +400,10 @@ export async function listTaxChangesForReview(adminId: string) {
       take: 500,
     })
   );
+  // The same cross-store duplicate signal as the main VAT review: another store holding the requested number is a flag.
+  const holders = await withPlatformUser(adminId, () =>
+    storesHoldingTrns(rows.map(r => (r.value as unknown as StoredChange).taxRegistrationNumber))
+  );
   return (
     rows
       .map(r => {
@@ -401,7 +411,18 @@ export async function listTaxChangesForReview(adminId: string) {
           ...(r.value as unknown as StoredChange),
         };
         delete rest.storageKey; // the private object key never leaves the server
-        return { storeId: r.key.slice(TAX_CHANGE_SETTING_PREFIX.length), ...rest };
+        const storeId = r.key.slice(TAX_CHANGE_SETTING_PREFIX.length);
+        const taken = (holders.get(rest.taxRegistrationNumber) ?? []).some(
+          h => h.storeId !== storeId
+        );
+        if (taken && rest.precheck) {
+          rest.precheck = {
+            ...rest.precheck,
+            status: 'flagged',
+            flags: [...(rest.precheck.flags ?? []), 'trn_in_use_by_other_store'],
+          };
+        }
+        return { storeId, ...rest };
       })
       // Oldest first. A malformed row without `requestedAt` (never written by requestTaxChange) sorts FIRST so a reviewer sees it
       // instead of it throwing the whole queue.
@@ -431,6 +452,18 @@ export async function decideTaxChange(
   const c = await readStored(storeId);
   // Idempotent: a request already decided (or never made) is a no-op, never a second apply.
   if (!c) return { decision: decision.decision, noop: true };
+  // The decision is bound to the request the reviewer SAW (id + document sha256 + number): a request replaced since the list was
+  // loaded is a different request and is never approved or rejected by this click. Nothing is claimed or applied.
+  if (
+    c.id !== decision.requestId ||
+    c.sha256 !== decision.sha256 ||
+    c.taxRegistrationNumber !== decision.taxRegistrationNumber
+  )
+    throw new AppError(
+      409,
+      'TAX_CHANGE_STALE',
+      'This request changed after you opened it. Reload the queue and review it again. / الطلب اتغيّر بعد ما فتحته. حدّث القائمة وراجعه تاني.'
+    );
   // Claim first: of two concurrent decisions only the one that removes the row proceeds; the other is a no-op (no double apply).
   if (!(await deleteStored(storeId, c.id))) return { decision: decision.decision, noop: true };
   if (decision.decision === 'approve') {

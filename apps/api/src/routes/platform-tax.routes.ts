@@ -17,7 +17,6 @@ import { withPlatformUser } from '../lib/platform-scope';
 import { getPlatformVat, updatePlatformVat } from '../services/platform-vat.service';
 import { sendTaxDocument } from './tax.routes';
 import { parseInput } from '../lib/parse-input';
-import logger from '../lib/logger';
 import {
   decideTaxChange,
   discardTaxChange,
@@ -154,14 +153,10 @@ router.post(
       const storeId = parseInput(UUID, req.params.storeId);
       const decision = parseInput(taxReviewDecisionSchema, req.body);
       const profile = await TaxProfileService.review(storeId, decision, actorOf(req));
-      // a revoked profile can no longer be "changed": drop a pending request and its evidence
-      if (decision.decision === 'revoke')
-        await discardTaxChange(storeId, actorOf(req)).catch(err =>
-          logger.error(
-            { err, storeId },
-            '[tax-change] could not discard a pending request after revoke'
-          )
-        );
+      // Every review decision (approve / reject / revoke) drops a pending change request: it describes the registration as it was
+      // before this decision. A discard that fails FAILS the decision (no swallow); the request is also bound to the profile's
+      // reviewedAt, so a leftover could never be applied (applyApprovedTaxChange refuses with 409).
+      await discardTaxChange(storeId, actorOf(req));
       res.json({ success: true, data: { profile } });
     } catch (error) {
       next(error);

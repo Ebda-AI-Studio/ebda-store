@@ -16,7 +16,7 @@ import { bustStoreCachesById } from './store.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
 import { listDirectoryStores } from './platform/directory-d1';
-import { platformHubOnD1 } from '../lib/platform-scope';
+import { platformHubOnD1, withPlatformUser } from '../lib/platform-scope';
 import { taxProfilesForReview, type TaxReviewRow } from '../lib/definer';
 import { storeDb, storeRepo, storeUpdate, storeWriter } from '../lib/repo-factory';
 
@@ -303,6 +303,45 @@ export async function listProfilesForReview(status: string | null): Promise<TaxR
  * The status stays `verified`, so VAT never stops charging; the seller identity on later invoices is the new one, so the public caches
  * are busted like every other write that changes what VAT is collected under.
  */
+/**
+ * Which OTHER stores hold each of these numbers as pending / verified, across every store's own backend (the same scan the
+ * review queue's duplicate signal uses). Read it inside a platform scope: it reads every store's profile.
+ */
+export async function storesHoldingTrns(
+  trns: string[]
+): Promise<Map<string, Array<{ storeId: string; status: 'pending' | 'verified' }>>> {
+  const wanted = new Set(trns.filter(Boolean));
+  const out = new Map<string, Array<{ storeId: string; status: 'pending' | 'verified' }>>();
+  if (wanted.size === 0) return out;
+  const add = (trn: string | null, status: string, storeId: string) => {
+    if (!trn || !wanted.has(trn) || (status !== 'pending' && status !== 'verified')) return;
+    const list = out.get(trn) ?? [];
+    list.push({ storeId, status });
+    out.set(trn, list);
+  };
+  if (!(await platformHubOnD1())) {
+    // Pre-cutover Postgres: the review definer (capped like the queue itself).
+    for (const r of await taxProfilesForReview(null))
+      add(r.taxRegistrationNumber, r.status, r.storeId);
+    return out;
+  }
+  const stores = await listDirectoryStores();
+  for (let i = 0; i < stores.length; i += QUEUE_CONCURRENCY) {
+    await Promise.all(
+      stores.slice(i, i + QUEUE_CONCURRENCY).map(async s => {
+        const p = await (
+          await storeDb(s.id)
+        ).storeTaxProfile.findUnique({
+          where: { storeId: s.id },
+          select: { status: true, taxRegistrationNumber: true },
+        });
+        if (p) add(p.taxRegistrationNumber, p.status as string, s.id);
+      })
+    );
+  }
+  return out;
+}
+
 export async function applyApprovedTaxChange(
   storeId: string,
   change: {
@@ -315,17 +354,52 @@ export async function applyApprovedTaxChange(
     sizeBytes: number;
     sha256: string;
     requestedBy: string;
+    /** The profile's reviewedAt when the request was made (null = never reviewed); absent = a row from before this guard. */
+    profileReviewedAt?: string | null;
   },
   actor: Actor
 ): Promise<void> {
+  // Another store already verified under this number: the same registration cannot be verified twice (a pending holder is only
+  // a flag in the queue). Read in a platform scope BEFORE the store-scoped write.
+  const holders = await withPlatformUser(actor.userId, () =>
+    storesHoldingTrns([change.taxRegistrationNumber])
+  );
+  if (
+    (holders.get(change.taxRegistrationNumber) ?? []).some(
+      h => h.storeId !== storeId && h.status === 'verified'
+    )
+  )
+    throw new AppError(
+      409,
+      'TRN_IN_USE_BY_OTHER_STORE',
+      'Another store is already verified under this registration number'
+    );
   await withUser(
     actor.userId,
     async () => {
       const current = await (
         await storeDb(storeId)
-      ).storeTaxProfile.findUnique({ where: { storeId }, select: { id: true, status: true } });
+      ).storeTaxProfile.findUnique({
+        where: { storeId },
+        select: { id: true, status: true, reviewedAt: true },
+      });
       if (!current || current.status !== 'verified')
         throw new AppError(409, 'INVALID_TRANSITION', 'The profile is no longer verified');
+      // The profile was revoked / re-verified / re-reviewed since the request was made: that request describes a registration
+      // that no longer exists. Fail closed for a row that does not record the moment.
+      const reviewedAt = current.reviewedAt ? current.reviewedAt.getTime() : null;
+      const requestedAgainst =
+        change.profileReviewedAt === undefined
+          ? undefined
+          : change.profileReviewedAt === null
+            ? null
+            : new Date(change.profileReviewedAt).getTime();
+      if (requestedAgainst === undefined || requestedAgainst !== reviewedAt)
+        throw new AppError(
+          409,
+          'TAX_CHANGE_STALE',
+          'The registration was reviewed again after this request was made; ask the merchant to send it again'
+        );
       const now = new Date();
       const moved = await guarded(async () =>
         (await storeWriter(storeId)).storeTaxProfile.updateMany({
