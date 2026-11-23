@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { tenantContext } from '../middleware/tenant-context';
+import { adminReadLimiter } from '../middleware/security';
 import { AttentionService } from '../services/attention.service';
 
 /**
@@ -17,6 +18,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  adminReadLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       res.setHeader('Cache-Control', 'no-store');
