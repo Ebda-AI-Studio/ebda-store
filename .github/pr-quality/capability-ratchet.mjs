@@ -17,7 +17,7 @@ const idsOf = (p) => {
 };
 
 /** `mb` (optional, from mergeBaseRef): an id absent from the base TIP is still allowed when the PR left it unchanged since the merge-base
- *  (it is in the merge-base file and its source file, else the baseline file, is not in `mb.touched`). Everything the PR touches is judged against the tip. */
+ *  (it is in the merge-base file and names a real file of the merge-base tree that is not in `mb.touched`; ids with no real path are judged against the tip). Everything the PR touches is judged against the tip. */
 export function growth(base, pr, mb = null) {
   const out = [];
   const dir = join(pr, DIR);
@@ -29,7 +29,7 @@ export function growth(base, pr, mb = null) {
     const bp = join(baseDir, name);
     const mbp = mb && join(mb.dir, DIR, name);
     const M = new Set(mbp && existsSync(mbp) ? idsOf(mbp) : []);
-    const unchanged = (id) => M.has(id) && !mb.touched.has(sourceOfId(id, `${DIR}/${name}`));
+    const unchanged = (id) => { const src = mb && sourceOfId(id, mb); return M.has(id) && !!src && !mb.touched.has(src); };
     if (!existsSync(bp)) {
       // the first adoption PR may seed any baseline; after that a new baseline file must start empty (it can only shrink from nothing)
       if (adopted) for (const id of prIds) if (!unchanged(id)) out.push(`${name} (new file): ${id}`);

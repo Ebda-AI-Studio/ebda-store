@@ -200,8 +200,16 @@ describe('base-branch enforcement', () => {
   });
   // Per-entry rule: the allowed value is the base TIP's; an entry the PR leaves unchanged since the merge-base (same key, its source file NOT in
   // `.mb-touched`) may keep its merge-base value. Anything the PR touches is judged against the tip.
-  const mbTree = (files: Record<string, string>, touched: string[] = []) =>
-    repo({ ...files, '.mb-touched': touched.join('\n') });
+  const mbTree = (
+    files: Record<string, string>,
+    touched: string[] = [],
+    extraPaths: string[] = ['apps/a/src/a.ts', 'apps/a/src/b.ts']
+  ) =>
+    repo({
+      ...files,
+      '.mb-touched': touched.join('\n'),
+      '.mb-paths': [...Object.keys(files), ...extraPaths].join('\n'),
+    });
   const runMb = (pr: string, base: string, mb: string) =>
     spawnSync('node', [cli, '--root', pr, '--base-root', base, '--merge-base-root', mb], {
       encoding: 'utf8',
@@ -289,19 +297,39 @@ describe('base-branch enforcement', () => {
     const cap = (ids: string[]) => ({
       'capabilities/baselines/help.json': JSON.stringify({ ids }),
     });
-    const ids = ['help-missing|a', 'help-missing|b'];
-    it('main shrinks + untouched id passes with the merge-base; touching the baseline file or an old base beyond the cap judges against the tip', () => {
-      const tip = repo(cap(['help-missing|a']));
-      const pr = repo(cap(ids));
-      const mb = (touched: string[]) => ({
-        dir: repo(cap(ids)),
-        touched: new Set(touched),
-      });
-      expect(growth(tip, pr)).toHaveLength(1); // the tip alone false-fails
-      expect(growth(tip, pr, mb([]))).toEqual([]);
-      expect(growth(tip, pr, mb(['capabilities/baselines/help.json']))).toHaveLength(1); // touched
-      expect(growth(tip, repo(cap([...ids, 'help-missing|c'])), mb([]))).toHaveLength(1); // added
+    const real =
+      'model-call-outside-smart-layer|apps/api/src/lib/ai/gemini-keys.ts|provider-sdk-import|e7b5e6352e|0';
+    const fake = [
+      'page-uncovered|/dashboard',
+      'registry|planned.ai-finance',
+      'help-missing|analytics.dashboard',
+      'policy-free-writes|account.login',
+    ];
+    const mb = (ids: string[], touched: string[] = [], paths: string[] = []) => ({
+      dir: repo(cap(ids)),
+      touched: new Set(touched),
+      paths: new Set(paths),
     });
+    const REAL_PATH = 'apps/api/src/lib/ai/gemini-keys.ts';
+    it('an id naming a real merge-base file may keep its merge-base value while untouched; touching the file or the baseline fails', () => {
+      const tip = repo(cap([]));
+      const pr = repo(cap([real]));
+      expect(growth(tip, pr)).toHaveLength(1); // the tip alone false-fails
+      expect(growth(tip, pr, mb([real], [], [REAL_PATH]))).toEqual([]);
+      expect(growth(tip, pr, mb([real], [REAL_PATH], [REAL_PATH]))).toHaveLength(1);
+      expect(growth(tip, pr, mb([real], [], []))).toHaveLength(1); // the named path is not in the merge-base tree
+      expect(
+        growth(tip, repo(cap([real, 'x|apps/api/new.ts|k|1|0'])), mb([real], [], [REAL_PATH]))
+      ).toHaveLength(1);
+    });
+    it.each(fake)(
+      '%s has no real file: judged against the tip only, even when nothing is touched',
+      id => {
+        const tip = repo(cap([]));
+        expect(growth(tip, repo(cap([id])), mb([id], [], [REAL_PATH]))).toHaveLength(1);
+        expect(growth(repo(cap([id])), repo(cap([id])), mb([id]))).toEqual([]); // in the tip: fine
+      }
+    );
   });
   describe('merge-base-tree.sh staleness cap', () => {
     const script = join(__dirname, '../../.github/pr-quality/merge-base-tree.sh');
@@ -339,6 +367,18 @@ describe('base-branch enforcement', () => {
       const out = build(history(2));
       expect(readFileSync(join(out, '.pr-quality-baseline.json'), 'utf8')).toMatch(/x\|a.ts\|1/);
       expect(readFileSync(join(out, '.mb-touched'), 'utf8').trim()).toBe('a.ts');
+    });
+    it('a leftover OUT tree from an earlier job is wiped, never reused', () => {
+      const d = history(3);
+      const out = mkdtempSync(join(tmpdir(), 'mbo-'));
+      writeFileSync(join(out, '.mb-touched'), 'victim-file.ts\n');
+      writeFileSync(join(out, '.mb-paths'), 'victim-file.ts\n');
+      spawnSync('bash', [script, d, out], {
+        encoding: 'utf8',
+        env: { ...process.env, MB_MAX_COMMITS: '2' }, // capped: nothing is written
+      });
+      expect(existsSync(join(out, '.mb-touched'))).toBe(false);
+      expect(existsSync(join(out, '.mb-paths'))).toBe(false);
     });
     it('a merge-base older than the cap writes nothing, so the guards compare against the tip', () => {
       const out = build(history(3), { MB_MAX_COMMITS: '2' });

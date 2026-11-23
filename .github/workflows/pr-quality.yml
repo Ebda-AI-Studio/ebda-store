@@ -105,10 +105,12 @@ jobs:
       - name: Capability baselines may only shrink (judged against the merge-base, else the base branch tip)
         env:
           PR: ${{ github.event.pull_request.number }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           if [ -f base/.github/pr-quality/capability-ratchet.mjs ]; then
             # a main that shrank a baseline after this PR branched must not fail it: unchanged entries may keep their merge-base value
             git -C base fetch --no-tags origin "+refs/pull/$PR/head:refs/pr/head"
+            [ "$(git -C base rev-parse refs/pr/head)" = "$HEAD" ] || { echo "::error::PR head moved while the job started; re-run"; exit 1; }
             if [ -f base/.github/pr-quality/merge-base-tree.sh ]; then bash base/.github/pr-quality/merge-base-tree.sh base "$GITHUB_WORKSPACE/mb"; fi
             node base/.github/pr-quality/capability-ratchet.mjs --base base --pr pr --merge-base-root "$GITHUB_WORKSPACE/mb"
           else

@@ -182,10 +182,13 @@ export function scan({ root, config = {} }) {
 /** the merge-base reference tree, or null when it is absent (no `.mb-touched` = disabled = tip comparison) */
 export function mergeBaseRef(dir) {
   if (!dir || !existsSync(join(dir, '.mb-touched'))) return null;
-  return { dir, touched: new Set(readFileSync(join(dir, '.mb-touched'), 'utf8').split('\n').filter(Boolean)) };
+  const list = (f) => (existsSync(join(dir, f)) ? new Set(readFileSync(join(dir, f), 'utf8').split('\n').filter(Boolean)) : new Set());
+  // `.mb-paths` = every path in the merge-base tree; a missing list means no id can name a real file (fail closed: tip comparison)
+  return { dir, touched: list('.mb-touched'), paths: list('.mb-paths') };
 }
-/** the source file an id points at (`rule|path|...`), else the ratchet file that holds it */
-export const sourceOfId = (id, fallback) => { const p = id.split('|')[1]; return p && !p.startsWith('/') && /\.[a-z0-9]+$/i.test(p) ? p : fallback; };
+/** the source file an id names (`rule|path|...`) ONLY when that path is a real file in the merge-base tree; otherwise null = no merge-base allowance
+ *  (route ids like `/dashboard`, dotted names like `analytics.dashboard` and ids with no path are judged against the base tip alone) */
+export const sourceOfId = (id, mb) => { const p = id.split('|')[1]; return p && mb.paths.has(p) ? p : null; };
 
 /** per ENTRY (`suppressions-file`, source key, rule) counts over every eslint-suppressions.json under root */
 export function eslintEntries(root, roots = ['apps', 'packages']) {
@@ -224,8 +227,10 @@ export function eslintGrowth(root, baseRoot, roots, mb = null) {
     let allowed = tip;
     if (ref && ref.files > 0) {
       const dir = e.f.includes('/') ? e.f.slice(0, e.f.lastIndexOf('/')) : '.';
-      const touched = mb.touched.has(e.src) || mb.touched.has(dir === '.' ? e.src : `${dir}/${e.src}`);
-      if (!touched) allowed = Math.max(tip, ref.entries.get(k)?.n ?? 0);
+      const paths = [e.src, dir === '.' ? e.src : `${dir}/${e.src}`];
+      const real = paths.some((x) => mb.paths.has(x)); // the source must be a real file at the merge-base
+      const touched = paths.some((x) => mb.touched.has(x));
+      if (real && !touched) allowed = Math.max(tip, ref.entries.get(k)?.n ?? 0);
     }
     if (e.n > allowed) out.push(`${e.f}|${e.src}|${e.rule} ${tip} -> ${e.n}`);
   }
@@ -314,7 +319,7 @@ function main() {
     const mbp = mb && join(mb.dir, bpRel);
     const MB = new Set(mbp && existsSync(mbp) ? (readJsonRegular(mbp).ids ?? []).filter((id) => !waivedId(id)) : []);
     // an id absent from the TIP is allowed only when the PR left it unchanged since the merge-base (in it, source file untouched)
-    const unchanged = (id) => MB.has(id) && !mb.touched.has(sourceOfId(id, bpRel));
+    const unchanged = (id) => { const src = mb && sourceOfId(id, mb); return MB.has(id) && !!src && !mb.touched.has(src); };
     if (existsSync(bp)) {
       const B = new Set((readJsonRegular(bp).ids ?? []).filter((id) => !waivedId(id)));
       for (const id of baseline ?? []) if (!B.has(id) && !unchanged(id)) { console.error(`slop-guard: the PR baseline holds an id the base branch's does not (it can only shrink): ${id}`); bad++; }
