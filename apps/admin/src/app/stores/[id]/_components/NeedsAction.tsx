@@ -100,7 +100,7 @@ export function NeedsAction({ storeId }: { storeId: string }) {
               className="flex min-h-20 flex-col justify-center rounded-xl border border-warning/50 bg-warning/10 p-4 shadow-sm transition hover:border-warning hover:shadow-md"
             >
               {typeof i.count === 'number' && (
-                <span className="text-3xl font-bold tracking-tight text-foreground">{i.count}</span>
+                <span className="text-3xl font-bold text-foreground">{i.count}</span>
               )}
               <span className="mt-1 text-sm font-medium text-foreground">{i.title[lang]}</span>
             </Link>
