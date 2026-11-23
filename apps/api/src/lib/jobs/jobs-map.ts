@@ -132,6 +132,8 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
     trigger: 'cron',
     alarm: true,
   },
+  'analytics-funnel-backfill': { group: '3-books-stock', kind: 'workflow', trigger: 'event' },
+  'analytics-refund-correction': { group: '3-books-stock', kind: 'workflow', trigger: 'event' },
   'analytics-rollup-on-demand': { group: '3-books-stock', kind: 'workflow', trigger: 'event' },
   'gold-rate-feed-fetch': {
     group: '3-books-stock',
