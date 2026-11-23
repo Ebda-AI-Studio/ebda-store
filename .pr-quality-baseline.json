@@ -2670,7 +2670,6 @@
     "unused-export|packages/shared/src/payments.ts|isAwaitingPaymentConfirmation",
     "unused-export|packages/shared/src/payments.ts|paymobSettingsSchema",
     "unused-export|packages/shared/src/plan-baselines.ts|getBaselineFeatures",
-    "unused-export|packages/shared/src/plan-baselines.ts|publicPlanForStorePlan",
     "unused-export|packages/shared/src/pricing/resolve-unit-price.ts|PriceSource",
     "unused-export|packages/shared/src/pricing/tier-validation.ts|MAX_TIERS_PER_SCOPE",
     "unused-export|packages/shared/src/pricing/tier-validation.ts|TierValidation",

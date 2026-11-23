@@ -31,6 +31,7 @@ jobs:
         with:
           node-version: '22'
       - name: Install Playwright only (no workspace install)
+        timeout-minutes: 10
         run: |
           v=$(node -p "require('./package.json').devDependencies['@playwright/test']")
           # RUNNER_TEMP, not /tmp: two runners share the Mac host (Ruling CI-MAC-RUNNER-1).
