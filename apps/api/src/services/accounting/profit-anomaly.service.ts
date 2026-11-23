@@ -335,6 +335,7 @@ Anomaly: ${JSON.stringify({
     })}
 Context: ${JSON.stringify(context)}
 
+Write explanationEn in English only and explanationAr in Arabic only.
 Return STRICT JSON: { "explanationEn": "...", "explanationAr": "...", "likelyCause": "cost|refund|coupon|demand" }`;
 
     let explanation: GeminiExplanation;

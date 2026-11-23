@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
+import { pickAiText } from '@/lib/ai-text';
 import { ArrowStart, ArrowEnd } from '@/components/ArrowStart';
 import { useAuth } from '@/lib/auth';
 import { apiGet, apiPost } from '@/lib/api';
@@ -141,13 +142,19 @@ function SuggestionCard({
         <UrgencyBadge days={item.urgencyDays} t={t} />
       </div>
 
-      {/* Bilingual reasoning */}
-      <p className="text-sm text-muted-foreground leading-relaxed">{item.reasoningEn}</p>
-      {item.reasoningAr && (
-        <p className="text-sm text-muted-foreground leading-relaxed" dir="rtl">
-          {item.reasoningAr}
-        </p>
-      )}
+      {/* AI reasoning: the admin's own language only (pickAiText) */}
+      {(() => {
+        const r = pickAiText(isAr ? 'ar' : 'en', item.reasoningEn, item.reasoningAr);
+        return (
+          <p
+            className="text-sm text-muted-foreground leading-relaxed"
+            lang={r.lang}
+            dir={r.lang === 'ar' ? 'rtl' : 'ltr'}
+          >
+            {r.text}
+          </p>
+        );
+      })()}
 
       {/* Details row */}
       <div className="grid grid-cols-2 gap-2 text-xs">

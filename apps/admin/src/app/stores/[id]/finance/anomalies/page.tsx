@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
+import { pickAiText } from '@/lib/ai-text';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { useRequireFeature } from '@/hooks/useRequireFeature';
@@ -74,6 +76,7 @@ function AnomalyRow({
   t: (k: string) => string;
   tc: (k: string) => string;
 }) {
+  const locale = useLocale();
   const [acking, setAcking] = useState(false);
 
   const deltaSign = item.deltaPercent >= 0 ? '+' : '';
@@ -145,12 +148,18 @@ function AnomalyRow({
       </div>
 
       {/* AI explanation */}
-      <p className="text-sm text-muted-foreground leading-relaxed">{item.explanationEn}</p>
-      {item.explanationAr && (
-        <p className="text-sm text-muted-foreground leading-relaxed" dir="rtl">
-          {item.explanationAr}
-        </p>
-      )}
+      {(() => {
+        const x = pickAiText(locale, item.explanationEn, item.explanationAr);
+        return (
+          <p
+            className="text-sm text-muted-foreground leading-relaxed"
+            lang={x.lang}
+            dir={x.lang === 'ar' ? 'rtl' : 'ltr'}
+          >
+            {x.text}
+          </p>
+        );
+      })()}
 
       {/* Acknowledge button */}
       {!item.acknowledged && (
