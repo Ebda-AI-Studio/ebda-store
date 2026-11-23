@@ -11,7 +11,7 @@
 #   (git-dir == git-common-dir), path in a business-folder slot under $OS_PROJECTS_DIR (default ~/Desktop/projects),
 #   HEAD is main/master. Fast-forward merges run no pre-merge-commit and stay allowed.
 # post-merge: WARNS (exit 0) when root main ended up not contained in origin/<branch>.
-# Escape hatch: FORCEAI_ALLOW_ROOT_COMMIT=1 (each use logged to ~/Library/Logs/root-commit-guard.log).
+# Escape hatch: EBDA_ALLOW_ROOT_COMMIT=1 (each use logged to ~/Library/Logs/root-commit-guard.log).
 # Never blocks on what it cannot see (not a repo, detached HEAD, path outside the slots).
 set -uo pipefail
 name="${1:-pre-commit}"
@@ -32,9 +32,9 @@ case "$br" in main|master) ;; *) exit 0 ;; esac
 
 case "$name" in
   pre-commit|pre-merge-commit)
-    if [ "${FORCEAI_ALLOW_ROOT_COMMIT:-0}" = 1 ]; then
+    if [ "${EBDA_ALLOW_ROOT_COMMIT:-0}" = 1 ]; then
       mkdir -p "$HOME/Library/Logs" 2>/dev/null
-      echo "$(date -u +%FT%TZ) $name ALLOWED via FORCEAI_ALLOW_ROOT_COMMIT=1 in $top ($br)" >> "$HOME/Library/Logs/root-commit-guard.log" 2>/dev/null || true
+      echo "$(date -u +%FT%TZ) $name ALLOWED via EBDA_ALLOW_ROOT_COMMIT=1 in $top ($br)" >> "$HOME/Library/Logs/root-commit-guard.log" 2>/dev/null || true
       exit 0
     fi
     {
@@ -42,11 +42,11 @@ case "$name" in
       echo "  Root checkouts stay on main, read-only. Do the work in a worktree:"
       echo "    ~/.claude/scripts/new-task-worktree.sh <repo> <feat|fix>/<task>"
       echo "  (a failed \`cd <worktree> && git ...\` runs git HERE - check the cd succeeded.)"
-      echo "  Deliberate override: FORCEAI_ALLOW_ROOT_COMMIT=1 git ... (logged)."
+      echo "  Deliberate override: EBDA_ALLOW_ROOT_COMMIT=1 git ... (logged)."
     } >&2
     exit 1 ;;
   post-merge)
-    if [ "${FORCEAI_ALLOW_ROOT_COMMIT:-0}" != 1 ] \
+    if [ "${EBDA_ALLOW_ROOT_COMMIT:-0}" != 1 ] \
        && git rev-parse -q --verify "refs/remotes/origin/$br" >/dev/null 2>&1 \
        && ! git merge-base --is-ancestor HEAD "refs/remotes/origin/$br" 2>/dev/null; then
       echo "root-checkout-guard: WARNING - local $br in $top is now AHEAD of origin/$br. Root must mirror origin: undo with \`git reset --hard origin/$br\` after checking nothing unique is on it, and redo the work in a worktree." >&2

@@ -98,7 +98,7 @@ describe('ROOT-GUARD-HUSKY-1: root checkout refuses commits and merge commits', 
     must(git(repo, ['worktree', 'add', '-q', '-b', 'feat/y', wt2]));
     expect(commitIn(wt2).status).toBe(0);
     // give main its own commit so feat/y cannot fast-forward: that commit goes in through the hatch
-    expect(commitIn(repo, { FORCEAI_ALLOW_ROOT_COMMIT: '1' }, 'main-only.txt').status).toBe(0);
+    expect(commitIn(repo, { EBDA_ALLOW_ROOT_COMMIT: '1' }, 'main-only.txt').status).toBe(0);
     const before = must(git(repo, ['rev-parse', 'main']));
     const m = git(repo, ['merge', '--no-ff', '-q', '-m', 'm', 'feat/y']);
     expect(m.status).not.toBe(0);
@@ -109,8 +109,6 @@ describe('ROOT-GUARD-HUSKY-1: root checkout refuses commits and merge commits', 
 
   it('the escape hatch is logged', () => {
     const log = join(home, 'Library/Logs/root-commit-guard.log');
-    expect(readFileSync(log, 'utf8')).toContain(
-      'pre-commit ALLOWED via FORCEAI_ALLOW_ROOT_COMMIT=1'
-    );
+    expect(readFileSync(log, 'utf8')).toContain('pre-commit ALLOWED via EBDA_ALLOW_ROOT_COMMIT=1');
   });
 });
