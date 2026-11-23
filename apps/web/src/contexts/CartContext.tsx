@@ -149,6 +149,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [bundles, setBundles] = useState<CartBundle[]>([]);
   const [isReady, setIsReady] = useState(false);
   const migratedRef = useRef(false);
+  const itemsRef = useRef<CartItem[]>([]);
+  itemsRef.current = items;
   const toast = useToast();
   const { t, language } = useLanguage();
   // On the platform domain root (ebda.app/) there is no resolved
@@ -410,14 +412,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
       // STORE-QA-45: remember what the server last accepted so a refused (400) or throttled (429) change
       // can NEVER leave the optimistic number on screen, even when the reconciling refetch is throttled too.
-      let before: typeof items | null = null;
-      setItems(prev => {
-        before = prev;
-        return prev.map(i => (i.id === id ? { ...i, quantity } : i));
-      });
+      // Read from a ref, synchronously: capturing it inside the setItems updater ran too late (React runs the updater at
+      // render, after a fast 429 had already come back), so nothing was ever restored.
+      const before = itemsRef.current;
+      setItems(prev => prev.map(i => (i.id === id ? { ...i, quantity } : i)));
       const rollback = async () => {
-        const restored = before;
-        if (restored) setItems(restored);
+        setItems(before);
         await refetchCart().catch(() => {});
       };
       try {
