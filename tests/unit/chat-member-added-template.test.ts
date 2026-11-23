@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { chatMemberAddedTemplate as t } from './chat-member-added';
+import { chatMemberAddedTemplate as t } from '@api/services/email-templates/chat-member-added';
 
 const d = {
   email: 'a@example.com',
