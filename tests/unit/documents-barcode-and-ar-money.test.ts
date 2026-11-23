@@ -38,7 +38,7 @@ const doc = (over: Record<string, unknown> = {}) => ({
 
 describe('fiscal document print view', () => {
   it('prints the order barcode, the big order number and the typeable scan digits', () => {
-    const html = renderFiscalDocumentHtml(doc(), 'ar', 'Africa/Cairo', { barcodeShape: 'plain' });
+    const html = renderFiscalDocumentHtml(doc(), 'ar', 'Africa/Cairo', 'plain');
     expect(html).toContain('class="doc-barcode"');
     expect(html).toContain('<svg');
     expect(html).toContain(`class="doc-barcode-num" dir="ltr">${ORDER}<`);
@@ -46,23 +46,22 @@ describe('fiscal document print view', () => {
     expect(scanCodeFor(ORDER)).toMatch(/^\d{18}$/);
   });
 
-  it('is off for shape off, absent without a store shape (archive view) and without an order number', () => {
+  it('is off for shape off and absent without an order number; an unset shape prints the plain default (QA-69)', () => {
+    expect(renderFiscalDocumentHtml(doc(), 'en', 'Africa/Cairo', 'off')).not.toContain(
+      'doc-barcode"'
+    );
+    expect(renderFiscalDocumentHtml(doc(), 'en')).toContain('class="doc-barcode"');
     expect(
-      renderFiscalDocumentHtml(doc(), 'en', 'Africa/Cairo', { barcodeShape: 'off' })
-    ).not.toContain('doc-barcode"');
-    expect(renderFiscalDocumentHtml(doc(), 'en')).not.toContain('doc-barcode"');
-    expect(
-      renderFiscalDocumentHtml(doc({ payload: { lines: [] } }), 'en', 'Africa/Cairo', {
-        barcodeShape: 'plain',
-      })
+      renderFiscalDocumentHtml(doc({ payload: { lines: [] } }), 'en', 'Africa/Cairo', 'plain')
     ).not.toContain('doc-barcode"');
   });
 
   it('an Arabic document shows money in Arabic (ج.م) and an English one in English (EGP)', () => {
     const ar = renderFiscalDocumentHtml(doc(), 'ar');
     expect(ar).toContain('ج.م');
-    expect(ar).not.toMatch(/4,850(\.00)? EGP/);
-    expect(renderFiscalDocumentHtml(doc(), 'en')).toMatch(/4,850(\.00)? EGP/);
+    expect(ar).not.toMatch(/EGP/);
+    // main's moneyHtml isolates the number: `<bdi dir="ltr">4,850</bdi> EGP`
+    expect(renderFiscalDocumentHtml(doc(), 'en')).toMatch(/<bdi dir="ltr">4,850(\.00)?<\/bdi> EGP/);
   });
 
   it('the Arabic line shows the Arabic variant', () => {
