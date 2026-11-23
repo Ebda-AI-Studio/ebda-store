@@ -35,6 +35,7 @@ vi.mock('@api/middleware/feature-gate', () => ({
 vi.mock('@api/middleware/security', () => ({
   uploadLimiter: (_req: any, _res: any, next: any) => next(),
   dailyUploadLimiter: (_req: any, _res: any, next: any) => next(),
+  receiptReadLimiter: (_req: any, _res: any, next: any) => next(),
 }));
 vi.mock('@api/services/storage.service', () => ({
   StorageService: { putPrivate: uploadMock, isAvailable: vi.fn(() => true) },

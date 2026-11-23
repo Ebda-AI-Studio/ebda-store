@@ -376,9 +376,10 @@ router.post(
 router.get(
   '/:storeId/expenses/:expenseId/receipt',
   authenticate,
+  // Before every authorization-performing handler (CodeQL js/missing-rate-limiting reads the order): keyed on req.user.
+  receiptReadLimiter,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
-  receiptReadLimiter,
   requireFeature('accounting.expenses'),
   async (req, res, next) => {
     try {

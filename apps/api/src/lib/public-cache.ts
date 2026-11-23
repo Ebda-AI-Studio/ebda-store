@@ -523,9 +523,9 @@ function openOrderPurgeWindow(storeId: string): void {
  * this one.
  */
 export async function invalidateStoreProductCachesAfterOrder(storeId: string): Promise<void> {
-  await clearProductsRedis(storeId);
-  // Durable guarantee for the last order of a burst (#663); the window below only coalesces mid-burst purges.
-  await requestTrailingOrderPurge(storeId);
+  // Durable guarantee for the last order of a burst (#663); the window below only coalesces mid-burst purges. In parallel with
+  // the Redis clear (never serial: Ruling PERF-ORDER-PURGE-1 keeps order create's waves unchanged; the enqueue never throws).
+  await Promise.all([clearProductsRedis(storeId), requestTrailingOrderPurge(storeId)]);
   const open = orderPurgeWindows.get(storeId);
   if (open && Date.now() - open.openedAt < ORDER_PURGE_COALESCE_MS * 2) {
     open.pending = true;
