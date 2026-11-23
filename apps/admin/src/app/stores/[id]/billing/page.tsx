@@ -512,7 +512,7 @@ export default function StoreBillingPage() {
   const dueNow = instapayDue && info?.inRenewalWindow !== false;
   // QA-88: a payment is due and nothing is paid yet -> say so instead of "active".
   const displayStatus = data
-    ? billingDisplayStatus(data.subscription.status, !!info?.nextCharge && instapayDue)
+    ? billingDisplayStatus(data.subscription.status, !!info?.nextCharge && dueNow)
     : 'none';
   // What the merchant is shown to transfer: the plan just picked, else the stored quote.
   const payDetails = instapay && quote ? { ...instapay, ...quote } : instapay;

@@ -422,6 +422,9 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     expect(screen.queryByText('trial.instapayDue')).toBeNull();
     expect(screen.queryByText('trial.returnsToFree')).toBeNull();
     expect(screen.getByTestId('term-basis').textContent).toContain('trial.basis.assigned');
+    // The badge agrees with the banner: outside the window nothing is due, so it is not 'payment due'.
+    expect(screen.queryByText('status.awaiting_payment')).toBeNull();
+    expect(screen.getAllByText('status.active').length).toBeGreaterThan(0);
   });
 
   it('B2: inside the 7-day window the same store says payment due and warns about free', async () => {
@@ -442,6 +445,7 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     expect(await screen.findByText('trial.instapayDue')).toBeTruthy();
     expect(screen.getByText('trial.returnsToFree')).toBeTruthy();
     expect(screen.getByTestId('term-basis').textContent).toContain('trial.basis.paid');
+    expect(screen.getAllByText('status.awaiting_payment').length).toBeGreaterThan(0);
   });
 
   it('a card store still says next charge, now with the interval beside the amount', async () => {
