@@ -5276,6 +5276,9 @@ model StoreSubscription {
   // (0 = none); `nextRetryAt` is when the cron retries (day 3, then day 7).
   billingInterval String    @default("monthly") @map("billing_interval")
   pendingPlanCode String?   @map("pending_plan_code")
+  // BILLING-INTERVAL-PENDING-1: the interval an ACTIVE store picked at InstaPay checkout, priced into the claim; it replaces
+  // `billingInterval` only when that payment is recorded. NULL = no switch pending.
+  pendingBillingInterval String? @map("pending_billing_interval")
   /// Day of month (UTC, 1-31) the paid cycle started on; every renewal clamps from it (M-125). Null = derived from the period end.
   billingAnchorDay Int?     @map("billing_anchor_day")
   dunningAttempts Int       @default(0) @map("dunning_attempts")

@@ -33,6 +33,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install gitleaks
+        timeout-minutes: 5
         run: |
           set -eu
           GITLEAKS_VERSION=8.21.2
@@ -46,7 +47,7 @@ jobs:
             *) echo "::error::no gitleaks build for $(uname -s)-$(uname -m)"; exit 1 ;;
           esac
           TARBALL="gitleaks_${GITLEAKS_VERSION}_${P}.tar.gz"
-          curl -fsSL -o "$RUNNER_TEMP/$TARBALL" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${TARBALL}"
+          curl -fsSL --max-time 120 --retry 3 -o "$RUNNER_TEMP/$TARBALL" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${TARBALL}"
           echo "${SHA}  $RUNNER_TEMP/$TARBALL" | shasum -a 256 -c -
           mkdir -p "$RUNNER_TEMP/bin"
           tar -xz -C "$RUNNER_TEMP/bin" -f "$RUNNER_TEMP/$TARBALL" gitleaks

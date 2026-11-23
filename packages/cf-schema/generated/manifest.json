@@ -158,7 +158,7 @@
         "answer_engine_provider_configs": 5,
         "merchant_api_keys": 12,
         "plans": 12,
-        "store_subscriptions": 27,
+        "store_subscriptions": 28,
         "billing_events": 33,
         "instapay_receipts": 38,
         "manual_payment_claims": 17,
@@ -1735,6 +1735,18 @@
       "name": "trust_requests_support_cap_slot",
       "table": "trust_requests",
       "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "index",
+      "name": "products_search_doc_h_trgm_idx",
+      "table": "products",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "products_name_doc_h_trgm_idx",
+      "table": "products",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
     }
   ],
   "decimals": [

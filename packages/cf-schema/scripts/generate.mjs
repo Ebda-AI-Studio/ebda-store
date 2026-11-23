@@ -21,6 +21,7 @@ import {
   extraColumns,
   extraIndexes,
   extraModels,
+  latePrismaColumns,
 } from './cf-additions.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -51,6 +52,12 @@ export function build() {
   const addCols = m => {
     const c = clone(m);
     for (const col of extraColumns[m.name] ?? []) c.fields.push(clone(col));
+    for (const [fieldName, since] of Object.entries(latePrismaColumns[m.name] ?? {})) {
+      const field = c.fields.find(x => x.name === fieldName);
+      if (!field)
+        throw new Error(`latePrismaColumns: ${m.name}.${fieldName} is not in schema.prisma`);
+      field.cfSince = since;
+    }
     for (const [mn, cols] of extraIndexes)
       if (mn === m.name) c.indexes.push({ fields: cols.map(field => ({ field })), map: null });
     return c;

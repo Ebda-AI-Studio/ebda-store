@@ -300,6 +300,10 @@
     // Workspace packages bundle from SOURCE (ESM), not their CommonJS dist: from dist, esbuild emits one
     // `__toESM(require_dist())` per import site (451 in this Worker), each copying every export of the
     // package, and nothing tree-shakes. Measured 2026-10-22: startup CPU 164 -> 90 ms (scripts/ci/worker-startup-budget.mjs).
+    // subpaths first: an alias key also prefix-matches `@ebda/shared/<sub>` and would resolve into the index FILE (ENOTDIR)
+    "@ebda/shared/observe": "../../packages/shared/src/observe-kit.ts",
+    "@ebda/shared/wa-v1": "../../packages/shared/src/foundation/contracts/wa-v1.ts",
+    "@ebda/shared/request-guard": "../../packages/shared/src/foundation/request-guard.ts",
     "@ebda/shared": "../../packages/shared/src/index.ts",
     "@ebda/database": "../../packages/database/src/index.ts",
     // StoreDO sources (apps/api/src/cf/repo-modules.d.ts explains why these names are not the package names).
@@ -344,5 +348,9 @@
     // Billing is InstaPay-only until Kashier is approved (Rulings EBDA-FUNNEL-17, BILLING-NONE-1): "none" acknowledges it, so
     // an unset provider no longer pages a P1 at every boot (M-032). Card billing refuses cleanly; set "kashier" to turn cards on.
     "BILLING_PROVIDER": "none",
+    // PDPL erasure job (cf/erasure/job.ts): "true" since Ahmad's approval of 2026-11-20 (register row 33, M-024). Closure of a merchant /
+    // staff account (POST /auth/me/close-account) then erases instead of recording + answering 503 ERASURE_NOT_ENABLED. A wrangler var on
+    // purpose: a dashboard var is wiped by the next deploy. Verify after deploy: super-admin /health checks.pdplErasure=true.
+    "PDPL_CF_ERASURE_ENABLED": "true",
   },
 }
