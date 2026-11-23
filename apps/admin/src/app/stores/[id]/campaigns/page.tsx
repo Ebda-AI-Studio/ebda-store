@@ -55,9 +55,9 @@ interface AudienceInfo {
 // RETURN_COLORS — passed straight into `colorMap`'s `Record<string, ...>`.
 const CAMPAIGN_STATUS_COLORS = {
   draft: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
-  scheduled: { bg: 'bg-cyan-50', text: 'text-cyan-700', dot: 'bg-cyan-500' },
+  scheduled: { bg: 'bg-info/10', text: 'text-info-ink', dot: 'bg-info' },
   sending: { bg: 'bg-warning/10', text: 'text-warning-ink', dot: 'bg-warning' },
-  sent: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  sent: { bg: 'bg-success/10', text: 'text-success-ink', dot: 'bg-success' },
   cancelled: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
   failed: { bg: 'bg-destructive/5', text: 'text-destructive-ink', dot: 'bg-destructive' },
 } as const;

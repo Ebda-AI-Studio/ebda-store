@@ -89,7 +89,7 @@ export function CouponsTable({
       header: tTable('code'),
       primaryOnMobile: true,
       cell: coupon => (
-        <span className="font-mono text-sm bg-muted px-2 py-1 rounded">{coupon.code}</span>
+        <span className="font-mono text-sm bg-muted px-2 py-1 rounded-md">{coupon.code}</span>
       ),
     },
     {
@@ -174,9 +174,9 @@ export function CouponsTable({
   ];
 
   const emptyState = (
-    <div className="bg-card rounded-xl border overflow-hidden">
+    <div className="bg-card rounded-md border overflow-hidden">
       <div className="force-empty-state px-6">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
           <svg
             className="h-8 w-8 text-muted-foreground"
             fill="none"

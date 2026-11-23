@@ -239,7 +239,7 @@ export default function SecurityPage() {
           !status.mfaEnabled &&
           passkeyCount === 0 &&
           step === 'idle' && (
-            <div className="flex items-start gap-4 rounded-2xl border border-warning/30 bg-warning/10 p-4">
+            <div className="flex items-start gap-4 rounded-lg border border-warning/30 bg-warning/10 p-4">
               <svg
                 className="mt-0.5 h-5 w-5 shrink-0 text-warning-ink"
                 fill="none"
@@ -271,14 +271,14 @@ export default function SecurityPage() {
 
         {/* Status card */}
         {isLoadingStatus ? (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
             {t('loading')}
           </div>
         ) : (
           <>
             {/* ── Backup codes display (after successful enroll) ──────────────── */}
             {step === 'backup' && (
-              <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+              <div className="rounded-lg border border-border bg-card p-6 space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success/10 text-success-ink dark:bg-success/15">
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -296,7 +296,7 @@ export default function SecurityPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted/50 p-4 font-mono text-sm">
+                <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/50 p-4 font-mono text-sm">
                   {backupCodes.map((code, i) => (
                     <span key={i} className="text-foreground">
                       {code}
@@ -333,7 +333,7 @@ export default function SecurityPage() {
 
             {/* ── Enrollment flow ─────────────────────────────────────────────── */}
             {step === 'enrolling' && enrollData && (
-              <div className="rounded-2xl border border-border bg-card p-6 space-y-6">
+              <div className="rounded-lg border border-border bg-card p-6 space-y-6">
                 <div>
                   <h3 className="font-semibold text-foreground">{t('scanTitle')}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{t('scanDescription')}</p>
@@ -344,7 +344,7 @@ export default function SecurityPage() {
                   <img
                     src={enrollData.qr}
                     alt={t('qrCodeAlt')}
-                    className="h-48 w-48 rounded-xl border border-border"
+                    className="h-48 w-48 rounded-md border border-border"
                   />
                 </div>
 
@@ -358,7 +358,7 @@ export default function SecurityPage() {
 
                 {/* First factor: a code e-mailed to the account (a platform admin also needs the operator's token) */}
                 {isFirstFactor && (
-                  <div className="space-y-3 rounded-xl border border-border p-4">
+                  <div className="space-y-3 rounded-md border border-border p-4">
                     <p className="text-sm text-muted-foreground">{t('bootstrapIntro')}</p>
                     {isFirstAdminFactor && (
                       <div>
@@ -487,7 +487,7 @@ export default function SecurityPage() {
 
             {/* ── Disable flow ─────────────────────────────────────────────────── */}
             {step === 'disabling' && (
-              <div className="rounded-2xl border border-destructive/30 bg-card p-6 space-y-4">
+              <div className="rounded-lg border border-destructive/30 bg-card p-6 space-y-4">
                 <div>
                   <h3 className="font-semibold text-foreground">{t('disableConfirmTitle')}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -566,7 +566,7 @@ export default function SecurityPage() {
 
             {/* ── Idle: show status + actions ──────────────────────────────────── */}
             {step === 'idle' && (
-              <div className="rounded-2xl border border-border bg-card divide-y divide-border">
+              <div className="rounded-lg border border-border bg-card divide-y divide-border">
                 {/* Status row */}
                 <div className="flex items-center gap-4 p-5">
                   <div
