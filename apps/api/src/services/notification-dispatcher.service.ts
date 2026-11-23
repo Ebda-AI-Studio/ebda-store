@@ -18,6 +18,7 @@ import { redis } from './redis.service';
 import { prisma, withStore } from '@ebda/database';
 import { storeRepo } from '../lib/repo-factory';
 import logger from '../lib/logger';
+import { isStoreGoneError } from '../lib/jobs/store-gone';
 import { config } from '../config';
 import { SmsConsentService } from './sms-consent.service';
 import { signSmsOptOutToken } from '../lib/sms-consent';
@@ -359,9 +360,14 @@ class NotificationDispatcherService {
 export async function resolveShopperLocale(storeId: string, stored: unknown): Promise<'en' | 'ar'> {
   if (stored === 'en' || stored === 'ar') return stored;
   try {
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { settings: true } })
-    );
+    // NZ-SMS-READS-1: a store on its Durable Object keeps `settings` there (the Worker has no Postgres): read it through the
+    // same repo the storefront uses, else the shopper's SMS/push silently fell back to the region default.
+    const query = { where: { id: storeId }, select: { settings: true } } as const;
+    const repo = await storeRepo(storeId);
+    const store =
+      repo.backend === 'do'
+        ? await (repo.db as any).store.findUnique(query)
+        : await withStore(storeId, tx => tx.store.findUnique(query));
     return resolveDefaultLanguage(
       (store?.settings as { defaultLanguage?: string } | null)?.defaultLanguage
     );
@@ -395,12 +401,20 @@ const optOutBaseCache = new BoundedMap<string, { base: Promise<string>; expiresA
 
 async function readStorefrontBase(storeId: string): Promise<{ base: string; found: boolean }> {
   // `stores` is under RLS (R-EBDA-005): read in the store's own scope.
-  const store = await withStore(storeId, tx =>
-    tx.store.findUnique({
-      where: { id: storeId },
-      select: { domain: true, slug: true },
-    })
-  );
+  // NZ-SMS-READS-1: the DO store row on the Worker (no Postgres there). A store that is gone (404 / 410) is "not found":
+  // the platform URL, never cached; any other failure still throws so the dispatch fails loudly and is retried.
+  const query = { where: { id: storeId }, select: { domain: true, slug: true } } as const;
+  let store: { domain: string | null; slug: string } | null;
+  try {
+    const repo = await storeRepo(storeId);
+    store =
+      repo.backend === 'do'
+        ? await (repo.db as any).store.findUnique(query)
+        : await withStore(storeId, tx => tx.store.findUnique(query));
+  } catch (err) {
+    if (!isStoreGoneError(err)) throw err;
+    store = null;
+  }
   const base = store ? storefrontOrigin(store) : config.webUrl;
   return { base, found: !!store };
 }
