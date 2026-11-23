@@ -18,49 +18,57 @@ import { readInStoreContext } from './store-scoped-read';
 import { isStoreOperational } from './store-operational';
 
 export const AI_DISABLED_BY_MERCHANT_CODE = 'AI_DISABLED_BY_MERCHANT';
+/** The store is suspended for billing (unpaid / over the store allowance): no AI spend until it is paid for (#836). */
+export const AI_BILLING_SUSPENDED_CODE = 'AI_STORE_BILLING_SUSPENDED';
 /** An admin-suspended store (or any non-active one) is refused AI spend. */
 // pq-allow(unused-export): test seam, imported by tests/unit/ai-store-switch.test.ts
 export const STORE_AI_SUSPENDED_CODE = 'STORE_AI_SUSPENDED';
 
-/** The merchant switch and the store's status in ONE uncached read (the never-stale gate); no row = both fail closed. */
-async function readAiGate(
-  storeId: string
-): Promise<{ aiFeaturesEnabled: boolean; status: string | null }> {
+/** The merchant switch, the billing suspension and the store's status in ONE uncached read (the never-stale gate); no row = fail closed. */
+async function readAiGate(storeId: string) {
   // Through the store's backend (Ruling NZ-INTEG-1, NZ-AN-2): a DO store answers from its profile / D1 directory, never Postgres.
-  const row = await readInStoreContext(storeId, async () =>
+  return readInStoreContext(storeId, async () =>
     (await storeDb(storeId)).store.findUnique({
       where: { id: storeId },
-      select: { aiFeaturesEnabled: true, status: true },
+      select: { aiFeaturesEnabled: true, status: true, billingSuspendedReason: true },
     })
   );
-  return { aiFeaturesEnabled: row?.aiFeaturesEnabled === true, status: row?.status ?? null };
 }
 
 /** A store that cannot be read is NOT enabled: fail closed. This is the MERCHANT's switch only (what the AI settings page shows). */
 export async function isStoreAiEnabled(storeId: string): Promise<boolean> {
-  return (await readAiGate(storeId)).aiFeaturesEnabled;
+  return (await readAiGate(storeId))?.aiFeaturesEnabled === true;
 }
 
 /**
- * The AI SPEND gate: the merchant's switch AND the store being operational. A store an admin suspended must not keep spending the
- * platform's AI budget (Ruling SUSPEND-AI-1): interactive routes, bulk sweeps and the autopilot all pass here through `assertAiQuota` /
- * `requireAiEnabled`. Status is read uncached with the switch (NEVER-stale: a suspension is obeyed on the very next call); an
- * unknown status is not operational (fail closed).
+ * The AI SPEND gate every AI spend passes (directly, through `assertAiQuota`, or through `requireAiEnabled`): the merchant's
+ * switch is on, the store is not suspended for billing (#836: 402, pay from Billing), and the store is operational (Ruling
+ * SUSPEND-AI-1: an admin-suspended store must not keep spending the platform's AI budget; unknown status = not operational,
+ * fail closed). One primary-key read, uncached (NEVER-stale: a suspension or a restore is obeyed on the very next call).
  */
 export async function assertStoreAiEnabled(storeId: string): Promise<void> {
-  const gate = await readAiGate(storeId);
-  if (!isStoreOperational(gate.status))
+  const row = await readAiGate(storeId);
+  if (row?.aiFeaturesEnabled !== true) {
+    throw new AppError(
+      403,
+      AI_DISABLED_BY_MERCHANT_CODE,
+      'AI features are turned off for this store. Turn them on in AI tools.'
+    );
+  }
+  if (row.billingSuspendedReason) {
+    const en =
+      'AI tools are paused until the subscription is paid. Pay from the Billing page to turn them back on.';
+    throw new AppError(402, AI_BILLING_SUSPENDED_CODE, en, {
+      messageEn: en,
+      messageAr: 'الأدوات الذكية واقفة لحد ما الاشتراك يتدفع. ادفع من صفحة الفواتير وهترجع تشتغل.',
+    });
+  }
+  if (!isStoreOperational(row.status))
     throw new AppError(
       403,
       STORE_AI_SUSPENDED_CODE,
       'This store is suspended, so AI features are paused. Contact support to get it reactivated.'
     );
-  if (gate.aiFeaturesEnabled) return;
-  throw new AppError(
-    403,
-    AI_DISABLED_BY_MERCHANT_CODE,
-    'AI features are turned off for this store. Turn them on in AI tools.'
-  );
 }
 
 export async function requireAiEnabled(
