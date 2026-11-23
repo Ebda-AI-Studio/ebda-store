@@ -19,7 +19,7 @@ import { AdminLayout } from '../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../components/ImageUpload';
 import { useAuth } from '../../../../../lib/auth';
 import { apiGet, apiPost } from '../../../../../lib/api';
-import { productTextFields } from '../../../../../lib/product-payload';
+import { barcodeField, productTextFields } from '../../../../../lib/product-payload';
 import { sanitizeReturnTo } from '../../../../../lib/return-to';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
@@ -81,6 +81,7 @@ export default function NewProductPage() {
     price: '',
     costPrice: '',
     sku: '',
+    barcode: '',
     inventory: '',
     /** Low-stock threshold — mirrors the edit form field. Absent here meant
      *  new products always fell back to the DB default (5) with no way to
@@ -193,6 +194,7 @@ export default function NewProductPage() {
         // entirely (`undefined`). The EDIT form sends `null` instead; see
         // lib/product-payload.ts.
         ...productTextFields(formData, 'create'),
+        ...barcodeField(formData.barcode, undefined, 'create'),
         price: finalPrice,
         compareAtPrice: finalCompareAtPrice,
         costPrice: costPriceInFils,
@@ -537,6 +539,18 @@ export default function NewProductPage() {
                       onChange={e => updateField('sku', e.target.value)}
                       placeholder={t('fields.skuPlaceholder')}
                     />
+                    <div>
+                      <Input
+                        label={t('fields.barcode')}
+                        value={formData.barcode}
+                        onChange={e => updateField('barcode', e.target.value)}
+                        placeholder={t('fields.barcodePlaceholder')}
+                        dir="ltr"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {t('fields.barcodeHint')}
+                      </p>
+                    </div>
                     <Input
                       label={t('fields.lowStockThreshold')}
                       type="number"

@@ -33,7 +33,7 @@ import { MultiImageUpload } from '../../../../../../components/ImageUpload';
 import { AITranslateMissingButton } from '../../../../../../components/AITranslateMissingButton';
 import { useAuth } from '../../../../../../lib/auth';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../../lib/api';
-import { productTextFields } from '../../../../../../lib/product-payload';
+import { barcodeField, productTextFields } from '../../../../../../lib/product-payload';
 import { sanitizeReturnTo } from '../../../../../../lib/return-to';
 import { EditSidebar } from './_components/EditSidebar';
 import { ProductFaqSection, type ProductFaqSectionHandle } from './_components/ProductFaqSection';
@@ -82,6 +82,8 @@ interface Product {
   discountType?: 'percentage' | 'fixed' | null;
   discountValue?: number | null;
   sku?: string;
+  /** BARCODE-1: what the scan page looks up. */
+  barcode?: string | null;
   inventory: number;
   lowStockThreshold?: number;
   /** Made-to-order business days; null = ready to ship. */
@@ -220,6 +222,7 @@ export default function EditProductPage() {
     // server, displayed/edited as EGP in the form.
     costPrice: '',
     sku: '',
+    barcode: '',
     inventory: '',
     // Per-product low-stock threshold — drives the LOW STOCK badge + alerts.
     lowStockThreshold: '',
@@ -347,6 +350,7 @@ export default function EditProductPage() {
           price: derived.regularPrice ? minorToDecimalString(derived.regularPrice) : '',
           costPrice: p.costPrice ? minorToDecimalString(p.costPrice) : '',
           sku: p.sku || '',
+          barcode: p.barcode || '',
           inventory: String(p.inventory ?? 0),
           lowStockThreshold:
             p.lowStockThreshold === undefined || p.lowStockThreshold === null
@@ -637,6 +641,7 @@ export default function EditProductPage() {
         // below. These MUST send null: `undefined` omits the key, so an
         // emptied field saved with no effect and could never be cleared.
         ...productTextFields(formData, 'update'),
+        ...barcodeField(formData.barcode, product.barcode, 'update'),
         excerpt: formData.excerpt || null,
         excerptAr: formData.excerptAr || null,
         // A gold-priced product's price, compare-at and discount belong to the repricer (Ruling B5-13).
@@ -1196,6 +1201,16 @@ export default function EditProductPage() {
                   onChange={e => updateField('sku', e.target.value)}
                   placeholder={tFields('skuPlaceholder')}
                 />
+                <div>
+                  <Input
+                    label={tFields('barcode')}
+                    value={formData.barcode}
+                    onChange={e => updateField('barcode', e.target.value)}
+                    placeholder={tFields('barcodePlaceholder')}
+                    dir="ltr"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">{tFields('barcodeHint')}</p>
+                </div>
                 <Input
                   label={tFields('quantity')}
                   type="number"

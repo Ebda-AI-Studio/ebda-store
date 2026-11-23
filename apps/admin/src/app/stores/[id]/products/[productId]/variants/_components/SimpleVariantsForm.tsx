@@ -15,6 +15,7 @@ import {
 import { useT } from '@/i18n/useT';
 import { ImageUpload } from '@/components/ImageUpload';
 import { ColorField } from '@/components/ColorField';
+import { barcodeField } from '../../../../../../../lib/product-payload';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../../../lib/api';
 import type { Option, Variant, ProductInfo } from './types';
 
@@ -58,6 +59,9 @@ interface Row {
   costMajor: string;
   inventory: string;
   imageUrl: string;
+  /** BARCODE-1: typed code, and what was loaded (so an unchanged value is never re-sent). */
+  barcode: string;
+  barcodeLoaded: string;
 }
 
 function newRowId(): string {
@@ -92,6 +96,8 @@ function rowFromVariant(variant: Variant, primaryOption: Option | null, multiAxi
     costMajor: minorToMajor(variant.costPrice),
     inventory: String(Math.max(0, variant.inventory ?? 0)),
     imageUrl: variant.imageUrl ?? '',
+    barcode: variant.barcode ?? '',
+    barcodeLoaded: variant.barcode ?? '',
   };
 }
 
@@ -107,6 +113,8 @@ function emptyRow(): Row {
     costMajor: '',
     inventory: '0',
     imageUrl: '',
+    barcode: '',
+    barcodeLoaded: '',
   };
 }
 
@@ -262,8 +270,11 @@ export function SimpleVariantsForm({
         costPrice: majorInputToMinor(row.costMajor),
         inventory: parseInt(row.inventory) || 0,
         imageUrl: row.imageUrl || null,
+        ...barcodeField(row.barcode, row.barcodeLoaded, 'update'),
       }
     );
+    // A refused barcode (in use / invalid) is the merchant's to fix: say why instead of a bare "partial failure".
+    if (error?.code.startsWith('BARCODE_')) toastError(t('saveFailedTitle'), error.message);
     return !error;
   }
 
@@ -544,6 +555,17 @@ export function SimpleVariantsForm({
                     type="number"
                     value={row.inventory}
                     onChange={e => updateRow(row.rowId, { inventory: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`variant-barcode-${row.rowId}`} className={labelClass}>
+                    {t('colBarcode')}
+                  </label>
+                  <Input
+                    id={`variant-barcode-${row.rowId}`}
+                    dir="ltr"
+                    value={row.barcode}
+                    onChange={e => updateRow(row.rowId, { barcode: e.target.value })}
                   />
                 </div>
                 <div>
