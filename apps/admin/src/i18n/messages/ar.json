@@ -5522,7 +5522,7 @@
       "backToSettings": "العودة إلى الإعدادات",
       "manageRedirects": "افتح التحويلات",
       "redirectsTitle": "إعادة توجيه الروابط",
-      "redirectsSubtitle": "روابط قديمة تُحوَّل تلقائيًا (301) إلى منتج أو تصنيف أو مقالة تم تغيير رابطها.",
+      "redirectsSubtitle": "روابط قديمة تُحوَّل تلقائيًا بشكل دائم (308) إلى منتج أو تصنيف أو مقالة تم تغيير رابطها.",
       "redirectsFromSlug": "من",
       "redirectsToSlug": "إلى",
       "redirectsEntityType": "النوع",
