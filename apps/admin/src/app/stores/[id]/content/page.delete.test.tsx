@@ -29,6 +29,12 @@ const { apiGet, apiDelete, confirm } = vi.hoisted(() => ({
 }));
 vi.mock('@/hooks/useConfirm', () => ({ useConfirm: () => confirm }));
 vi.mock('../../../../lib/api', () => ({ apiGet, apiDelete }));
+const pagesResponse = (pages: unknown[]) => (url: string) =>
+  Promise.resolve(
+    url.endsWith('/pages')
+      ? { data: { pages }, error: null }
+      : { data: { store: { slug: 'amelia', domain: 'ameliaaurum.com' } }, error: null }
+  );
 
 import ContentListPage from './page';
 
@@ -46,9 +52,21 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+describe('content list: view page', () => {
+  it('a published custom page links to its public URL on the store domain; a draft does not', async () => {
+    apiGet.mockImplementation(
+      pagesResponse([row('qa-test-page'), { ...row('صفحة-اختبار'), isPublished: false }])
+    );
+    render(<ContentListPage />);
+    const link = (await screen.findByText('viewPage')).closest('a')!;
+    expect(link.getAttribute('href')).toBe('https://ameliaaurum.com/pages/qa-test-page');
+    expect(screen.getAllByText('viewPage')).toHaveLength(1);
+  });
+});
+
 describe('content list: delete', () => {
   it('only custom pages show Delete; it confirms in-app, then calls the tenant-scoped DELETE', async () => {
-    apiGet.mockResolvedValue({ data: { pages: [row('about'), row('qa-test-page')] }, error: null });
+    apiGet.mockImplementation(pagesResponse([row('about'), row('qa-test-page')]));
     apiDelete.mockResolvedValue({ error: null });
     confirm.mockResolvedValue(true);
     const nativeConfirm = vi.spyOn(window, 'confirm').mockImplementation(() => {
@@ -66,7 +84,7 @@ describe('content list: delete', () => {
   });
 
   it('cancelling the confirm deletes nothing', async () => {
-    apiGet.mockResolvedValue({ data: { pages: [row('qa-test-page')] }, error: null });
+    apiGet.mockImplementation(pagesResponse([row('qa-test-page')]));
     confirm.mockResolvedValue(false);
     render(<ContentListPage />);
     fireEvent.click(await screen.findByText('deletePage'));

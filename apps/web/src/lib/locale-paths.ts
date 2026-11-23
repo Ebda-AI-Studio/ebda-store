@@ -59,6 +59,7 @@ const LOCALE_SERVED_ROOTS: readonly string[] = [
   'size-guide',
   'affiliate',
   'q',
+  'pages', // /pages/<slug>: a merchant's custom page (served under both prefixes, not redirected)
   'o', // /o/<token>: the WhatsApp cash-on-delivery confirmation page (#811)
 ];
 const SERVED_ROOTS = new Set(LOCALE_SERVED_ROOTS);

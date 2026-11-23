@@ -188,6 +188,16 @@ router.delete(
 // Public Routes
 // ==========================================
 
+// GET /public/:storeId/pages - the store's published custom pages (slug + titles + updatedAt), for the sitemap.
+router.get('/public/:storeId/pages', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const pages = await PagesService.listPublicCustom(req.params.storeId);
+    res.json({ success: true, data: { pages } });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /public/:storeId/pages/:slug - storefront public read.
 //
 // Three-state response so the storefront can distinguish "no row, fall

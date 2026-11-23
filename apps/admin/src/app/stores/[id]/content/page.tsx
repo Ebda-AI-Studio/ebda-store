@@ -10,6 +10,7 @@ import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiDelete, apiGet } from '../../../../lib/api';
 import { useConfirm } from '@/hooks/useConfirm';
+import { getStoreHref } from '@/lib/store-url';
 import { PAGE_SLUG_REGEX, isProtectedPageSlug, slugFromTitle } from './page-slug';
 
 interface StorePageRow {
@@ -55,6 +56,8 @@ export default function ContentListPage() {
   const [newSlugInvalid, setNewSlugInvalid] = useState(false);
 
   const [pages, setPages] = useState<StorePageRow[]>([]);
+  // Where the store is served (custom domain, else <slug>.ebda.app): custom pages live at <origin>/pages/<slug>.
+  const [origin, setOrigin] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchPages = useCallback(async () => {
@@ -74,6 +77,16 @@ export default function ContentListPage() {
   useEffect(() => {
     fetchPages();
   }, [fetchPages]);
+
+  useEffect(() => {
+    if (!storeId) return;
+    void apiGet<{ store?: { slug?: string; domain?: string | null } }>(
+      `/api/v1/stores/${storeId}`
+    ).then(({ data }) => {
+      const st = data?.store;
+      if (st?.slug) setOrigin(getStoreHref({ slug: st.slug, domain: st.domain }));
+    });
+  }, [storeId]);
 
   // In-app dialog, never window.prompt: a native prompt blocks the whole tab
   // (and every automation driver) until answered, which read as a freeze.
@@ -247,6 +260,12 @@ export default function ContentListPage() {
                       publishedLabel={t('publishedBadge')}
                       draftLabel={t('draftBadge')}
                       editLabel={t('openEditor')}
+                      viewHref={
+                        origin && p.isPublished
+                          ? `${origin}/pages/${encodeURIComponent(p.slug)}`
+                          : undefined
+                      }
+                      viewLabel={t('viewPage')}
                       deleteLabel={isProtectedPageSlug(p.slug) ? undefined : t('deletePage')}
                       onDelete={() => void handleDelete(p)}
                     />
@@ -272,6 +291,8 @@ function PageRowCard({
   publishedLabel,
   draftLabel,
   editLabel,
+  viewHref,
+  viewLabel,
   deleteLabel,
   onDelete,
 }: {
@@ -285,6 +306,8 @@ function PageRowCard({
   publishedLabel: string;
   draftLabel: string;
   editLabel: string;
+  viewHref?: string;
+  viewLabel?: string;
   deleteLabel?: string;
   onDelete?: () => void;
 }) {
@@ -336,6 +359,16 @@ function PageRowCard({
         </div>
         <span className="shrink-0 text-sm font-medium text-primary">{editLabel} →</span>
       </Link>
+      {viewHref && viewLabel && (
+        <a
+          href={viewHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 self-center text-sm font-medium text-primary-ink underline underline-offset-2"
+        >
+          {viewLabel}
+        </a>
+      )}
       {deleteLabel && onDelete && (
         <Button type="button" variant="outline" onClick={onDelete} className="shrink-0 self-center">
           {deleteLabel}

@@ -4700,7 +4700,8 @@
       "newPageNameLabel": "عنوان الصفحة (عربي أو إنجليزي)",
       "newPageNamePlaceholder": "مثلًا: حكايتنا",
       "newPageAdvanced": "متقدم: رابط الصفحة",
-      "newPageSlugLabel": "رابط الصفحة (اختياري، بيتعمل من العنوان)"
+      "newPageSlugLabel": "رابط الصفحة (اختياري، بيتعمل من العنوان)",
+      "viewPage": "افتح الصفحة"
     },
     "editor": {
       "title": "تحرير الصفحة",

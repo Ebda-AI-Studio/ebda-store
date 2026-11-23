@@ -4700,7 +4700,8 @@
       "newPageNameLabel": "Page title (Arabic or English)",
       "newPageNamePlaceholder": "e.g. Our story",
       "newPageAdvanced": "Advanced: page address",
-      "newPageSlugLabel": "Page address (optional, made from the title)"
+      "newPageSlugLabel": "Page address (optional, made from the title)",
+      "viewPage": "View page"
     },
     "editor": {
       "title": "Edit page",

@@ -227,6 +227,22 @@ export class PagesService {
     });
   }
 
+  /**
+   * Published CUSTOM pages (the standard slugs have their own storefront routes), for the sitemap. Slug + titles +
+   * updatedAt only: the public list never carries page content.
+   */
+  static async listPublicCustom(storeId: string) {
+    const rows = await PagesService.list(storeId);
+    return rows
+      .filter(p => p.isPublished && !PROTECTED_PAGE_SLUGS.includes(p.slug))
+      .map(p => ({
+        slug: p.slug,
+        title: p.title,
+        titleAr: p.titleAr,
+        updatedAt: p.updatedAt.toISOString(),
+      }));
+  }
+
   /** Fetch a single page by slug. Returns null when not found. */
   static async get(storeId: string, slugRaw: string) {
     const slug = normalizeSlug(slugRaw);
