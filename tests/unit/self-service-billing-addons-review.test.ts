@@ -76,7 +76,11 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('@api/lib/definer', () => ({ countAiUsage: vi.fn() }));
-vi.mock('@api/lib/ai-quota', () => ({ storeAiAllowance: async () => ({}) }));
+vi.mock('@api/lib/ai-quota', () => ({
+  storeAiAllowance: async () => ({}),
+  storeAiExtraRequests: async () => 0,
+  maxStoreDailyRequests: () => Number.MAX_SAFE_INTEGER,
+}));
 vi.mock('@api/lib/money-idempotency', () => ({
   idempotencyKeyOf: (v?: string) => v,
   withIdempotencyKey: async (_s: string, _k: string, fn: () => Promise<unknown>) => ({

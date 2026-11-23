@@ -94,6 +94,9 @@ export const TENANT_CHILD_MODELS: readonly string[] = [
 export const IDENTITY_MODELS: Readonly<Record<string, string>> = {
   User: 'id',
   StoreStaff: 'userId',
+  // slug claims + store-cap requests are filed BEFORE a store exists (storeId null, keyed on the requester); the
+  // table's RLS already admits `user_id = app.current_user_id`, so the guard must too (withUser, no ambient store).
+  TrustRequest: 'userId',
 };
 
 export const STORE_MODEL = 'Store';

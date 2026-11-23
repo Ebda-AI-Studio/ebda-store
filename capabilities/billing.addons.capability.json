@@ -16,7 +16,7 @@
   ],
   "mcpTool": null,
   "planGate": null,
-  "roles": ["store_admin", "super_admin"],
+  "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
     "class": "irreversible",

@@ -10,6 +10,7 @@ import { NotificationProvider } from '../contexts/NotificationContext';
 import { FocusModeProvider } from '../contexts/FocusModeContext';
 import { PwaInstallHint } from '../components/PwaInstallHint';
 import { PostHogProvider } from '../components/PostHogProvider';
+import { StoreNotOperationalNotice } from '@/components/StoreNotOperationalNotice';
 import { UpsellDialog } from '../components/billing/UpsellDialog';
 import { PushClickListener } from '../components/PushClickListener';
 import { EbdaFunnelTracking } from '../components/EbdaFunnelTracking';
@@ -32,6 +33,7 @@ function AuthenticatedProviders({ children }: { children: ReactNode }) {
             <ToastProvider>
               <PwaInstallHint />
               <UpsellDialog />
+              <StoreNotOperationalNotice />
               <PushClickListener />
               <FlashToast />
               {children}
