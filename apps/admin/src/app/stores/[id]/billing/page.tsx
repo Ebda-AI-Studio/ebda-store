@@ -507,7 +507,12 @@ export default function StoreBillingPage() {
   const instapayChosen = info?.billingMethod === 'instapay';
   // InstaPay-only deployment (BILLING_PROVIDER=none) or a store that pays by transfer: a payment is DUE, nothing is
   // charged automatically (Ruling BILLING-NONE-COPY-1).
-  const renewalOnly = isRenewalOnly(data?.subscription.status, info, !!quote);
+  // Renewal wording only while the next charge is still ahead: a charge already at/behind today with nothing paid is a
+  // payment awaited (#1042/#896: awaiting badge, no "renews on" date), whatever the 7-day notice window says.
+  const nextChargeAhead = !!info?.nextCharge && Date.parse(info.nextCharge.at) > Date.now();
+  const renewalOnly =
+    isRenewalOnly(data?.subscription.status, info, !!quote) &&
+    (nextChargeAhead || !info?.nextCharge);
   const instapayDue = !renewalOnly && (info?.cardBilling === false || instapayChosen);
   // QA-88: a payment is due and nothing is paid yet -> say so instead of "active".
   const displayStatus = data
