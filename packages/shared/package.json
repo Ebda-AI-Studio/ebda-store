@@ -79,14 +79,20 @@
     },
     "./request-guard": {
       "types": "./src/foundation/request-guard.ts",
+      "import": "./dist/foundation/request-guard.js",
+      "require": "./dist/foundation/request-guard.js",
       "default": "./src/foundation/request-guard.ts"
     },
     "./wa-v1": {
       "types": "./src/foundation/contracts/wa-v1.ts",
+      "import": "./dist/foundation/contracts/wa-v1.js",
+      "require": "./dist/foundation/contracts/wa-v1.js",
       "default": "./src/foundation/contracts/wa-v1.ts"
     },
     "./observe": {
       "types": "./src/observe-kit.ts",
+      "import": "./dist/observe-kit.js",
+      "require": "./dist/observe-kit.js",
       "default": "./src/observe-kit.ts"
     },
     "./web-search": {
