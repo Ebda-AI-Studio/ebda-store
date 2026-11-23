@@ -230,7 +230,7 @@ describe('BILLING-INTERVAL-PENDING-1: a settled card payment drops the InstaPay 
     await settleInTx(
       prisma as never,
       EV,
-      { status: 'succeeded', providerRef: 'r' } as never,
+      { status: 'succeeded', providerRef: 'r', amountSource: 'charge_request' } as never,
       new Date(),
       []
     );

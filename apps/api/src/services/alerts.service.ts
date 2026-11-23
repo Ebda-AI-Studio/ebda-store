@@ -167,7 +167,7 @@ function buildMessage(opts: AlertOptions): string {
  */
 function throttleKey(level: AlertLevel, title: string, storeId?: string): string {
   const seed = storeId ? `${level}:${title}:${storeId}` : `${level}:${title}`;
-  const hash = crypto.createHash('sha1').update(seed).digest('hex').slice(0, 16);
+  const hash = crypto.createHash('sha256').update(seed).digest('hex').slice(0, 16);
   return `alert-throttle:${hash}`;
 }
 
