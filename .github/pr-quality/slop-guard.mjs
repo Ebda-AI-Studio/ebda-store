@@ -13,6 +13,8 @@
 //   --merge-base-baseline FILE  (CI) the baseline as it was at merge-base(base, PR head). The "PR may not ADD an id" test then compares against
 //     THIS, not the base tip: an id main removed after the PR branched is not the PR's doing, so a shrinking main never fails open PRs.
 //     Without it (or a merge-base with no baseline) the base tip's baseline is used, as before.
+//   --merge-base-root DIR  (CI) a data tree holding the eslint-suppressions.json files as of that merge-base; the suppression-growth ratchet compares
+//     against it instead of the base tip (same reason). Used only when it holds at least one suppression file; otherwise the base tip.
 // Config (.pr-quality.json): { "roots": ["apps","packages"], "locales": ["apps/web/messages"], "baseline": ".pr-quality-baseline.json",
 //   "skip": ["generated"], "frameworkExports": ["extra names"], "ruleExemptions": [{ "rule": "unused-export", "path": "<foundation.lock.json dir>",
 //   "reason": "...", "requires": "<foundation.lock.json parity test>" }] }.  Ruling SLOP-VENDORED-1: the ONLY exemption that exists. It waives the
@@ -281,7 +283,9 @@ function main() {
       for (const id of baseline ?? []) if (!B.has(id)) { console.error(`slop-guard: the PR baseline holds an id the ${label} does not (it can only shrink): ${id}`); bad++; }
       for (const id of current.keys()) if (!B.has(id)) { console.error(`slop-guard: NEW vs the ${label} baseline: ${current.get(id)}`); bad++; }
     }
-    for (const g of eslintGrowth(root, baseRoot, config.roots)) { console.error(`slop-guard: eslint suppressions grew vs the base branch (they can only shrink): ${g}`); bad++; }
+    const mbRoot = arg('--merge-base-root', null);
+    const eslintRef = mbRoot && existsSync(mbRoot) && eslintTotals(mbRoot, config.roots).files > 0 ? mbRoot : baseRoot;
+    for (const g of eslintGrowth(root, eslintRef, config.roots)) { console.error(`slop-guard: eslint suppressions grew vs the base branch (they can only shrink): ${g}`); bad++; }
   }
   if (bad) {
     if (added.length) console.error('Fix the new violation, or justify it inline with  pq-allow(<rule>): <reason>');

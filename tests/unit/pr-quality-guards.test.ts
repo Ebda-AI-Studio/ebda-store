@@ -226,6 +226,36 @@ describe('base-branch enforcement', () => {
       expect(r.stderr).toMatch(/holds an id the merge-base's does not/);
     });
   });
+  describe('eslint suppressions vs the merge-base', () => {
+    const sup = (n: number) => JSON.stringify({ 'src/a.ts': { 'no-console': { count: n } } });
+    const withSup = (files: Record<string, string>, n: number) =>
+      repo({ ...files, 'apps/a/eslint-suppressions.json': sup(n) });
+    const run = (pr: string, base: string, mb: string) =>
+      spawnSync('node', [cli, '--root', pr, '--base-root', base, '--merge-base-root', mb], {
+        encoding: 'utf8',
+      });
+    it('main shrinks suppressions after branching: an untouched PR passes against the merge-base only', () => {
+      const b = seed(1);
+      const mb = withSup(b.files, 3);
+      const tip = withSup(b.files, 1); // main fixed two
+      const pr = withSup(b.files, 3); // the PR changed nothing
+      expect(guard(pr, tip).stderr).toMatch(/eslint suppressions grew/); // the false failure against the tip
+      expect(run(pr, tip, mb).status).toBe(0);
+    });
+    it('a PR that ADDS suppressions still fails against the merge-base', () => {
+      const b = seed(1);
+      const mb = withSup(b.files, 3);
+      const tip = withSup(b.files, 1);
+      const r = run(withSup(b.files, 4), tip, mb);
+      expect(r.status).toBe(1);
+      expect(r.stderr).toMatch(/eslint suppressions grew/);
+    });
+    it('a merge-base with no suppression files falls back to the tip', () => {
+      const b = seed(1);
+      const r = run(withSup(b.files, 4), withSup(b.files, 1), repo({}));
+      expect(r.status).toBe(1);
+    });
+  });
   it('base config wins: a PR cannot narrow roots to skip files', () => {
     const b = seed(1);
     const pr = repo({ ...b.files, '.pr-quality.json': '{"roots":["nowhere"]}' });

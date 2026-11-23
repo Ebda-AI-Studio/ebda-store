@@ -72,7 +72,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - name: Baseline at the merge-base (a PR is judged by what IT added, not by what main removed after it branched)
+      - name: Baselines at the merge-base (a PR is judged by what IT added, not by what main removed after it branched)
         run: |
           set -euo pipefail
           git -C base fetch --no-tags --unshallow origin 2>/dev/null || git -C base fetch --no-tags origin
@@ -84,12 +84,20 @@ jobs:
           else
             echo "::notice::no baseline at the merge-base; comparing against the base tip"
           fi
+          # eslint suppression files at the merge-base, as plain data (git archive of the trusted base history)
+          mkdir -p "$GITHUB_WORKSPACE/mb"
+          if [ -n "$MB" ]; then
+            git -C base ls-tree -r --name-only "$MB" | grep -E '(^|/)eslint-suppressions\.json$' > "$RUNNER_TEMP/mb-files.txt" || true
+            if [ -s "$RUNNER_TEMP/mb-files.txt" ]; then
+              xargs git -C base archive "$MB" -- < "$RUNNER_TEMP/mb-files.txt" | tar -x -C "$GITHUB_WORKSPACE/mb"
+            fi
+          fi
       - name: no-any, no-console, todo-no-issue, emoji-copy, duplicate-helper, unused-export (baseline may only shrink, judged against the base)
-        run: node base/.github/pr-quality/slop-guard.mjs --root pr --base-root base ${MB_BASELINE:+--merge-base-baseline "$MB_BASELINE"}
+        run: node base/.github/pr-quality/slop-guard.mjs --root pr --base-root base --merge-base-root "$GITHUB_WORKSPACE/mb" ${MB_BASELINE:+--merge-base-baseline "$MB_BASELINE"}
 
       - name: Remove the checkouts (a shared runner keeps its workspace between jobs; never leave a fork's files on it)
         if: always()
-        run: rm -rf "$GITHUB_WORKSPACE/pr" "$GITHUB_WORKSPACE/base"
+        run: rm -rf "$GITHUB_WORKSPACE/pr" "$GITHUB_WORKSPACE/base" "$GITHUB_WORKSPACE/mb"
 
   capability-ratchet:
     name: Capability baselines
@@ -110,10 +118,22 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - name: Capability baselines may only shrink (judged against the base branch)
+      - name: Capability baselines may only shrink (judged against the merge-base, else the base branch tip)
+        env:
+          PR: ${{ github.event.pull_request.number }}
         run: |
           if [ -f base/.github/pr-quality/capability-ratchet.mjs ]; then
-            node base/.github/pr-quality/capability-ratchet.mjs --base base --pr pr
+            # a main that shrank a baseline after this PR branched must not fail it: judge by what the PR added since the merge-base
+            REF=base
+            git -C base fetch --no-tags --unshallow origin 2>/dev/null || git -C base fetch --no-tags origin
+            git -C base fetch --no-tags origin "+refs/pull/$PR/head:refs/pr/head"
+            MB="$(git -C base merge-base HEAD refs/pr/head || true)"
+            if [ -n "$MB" ] && git -C base ls-tree -r --name-only "$MB" | grep -q '^capabilities/baselines/.*\.json$'; then
+              mkdir -p mb
+              git -C base archive "$MB" -- capabilities/baselines | tar -x -C mb
+              REF=mb
+            fi
+            node base/.github/pr-quality/capability-ratchet.mjs --base "$REF" --pr pr
           else
             # the adoption PR: the script reaches the base branch only when this PR merges; every later PR is judged by it
             echo "::notice::capability-ratchet.mjs is not on the base branch yet (adoption PR): nothing to compare"
@@ -121,4 +141,4 @@ jobs:
 
       - name: Remove the checkouts (a shared runner keeps its workspace between jobs; never leave a fork's files on it)
         if: always()
-        run: rm -rf "$GITHUB_WORKSPACE/pr" "$GITHUB_WORKSPACE/base"
+        run: rm -rf "$GITHUB_WORKSPACE/pr" "$GITHUB_WORKSPACE/base" "$GITHUB_WORKSPACE/mb"
