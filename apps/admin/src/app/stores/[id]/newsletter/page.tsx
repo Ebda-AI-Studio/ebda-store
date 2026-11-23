@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDate } from '@/lib/format';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -7,7 +8,6 @@ import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, getApiUrl, apiFetch, apiPost } from '../../../../lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
-import { withNumerals } from '@ebda/shared';
 import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 /**
@@ -193,11 +193,7 @@ export default function NewsletterPage() {
     },
     {
       header: tTable('subscribedAt'),
-      cell: s => (
-        <span className="text-muted-foreground">
-          {new Date(s.subscribedAt).toLocaleDateString(undefined, withNumerals())}
-        </span>
-      ),
+      cell: s => <span className="text-muted-foreground">{formatDate(s.subscribedAt)}</span>,
     },
   ];
 

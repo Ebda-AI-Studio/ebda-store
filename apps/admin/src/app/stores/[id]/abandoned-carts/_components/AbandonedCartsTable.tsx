@@ -4,16 +4,13 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { CartIcon } from '@ebda/ui';
-import { minorToMajor } from '@/lib/format';
+import { formatPrice, formatDate } from '@/lib/format';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { ABANDONED_CART_COLORS, CART_STATUS_KEYS } from './types';
 import type { AbandonedCartRecord, ListMeta } from './types';
-import { withNumerals } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
 import { FIELD_CLASSES } from '@/components/ui/tokens';
-
-const formatMajor = minorToMajor;
 
 /** Best-effort display string for the customer column. */
 function customerDisplay(record: AbandonedCartRecord): string {
@@ -49,7 +46,6 @@ export function AbandonedCartsTable({
   const storeId = useParams().id as string;
   const t = useT('abandonedCarts.list');
   const tStatus = useT('abandonedCarts.status');
-  const tMajor = useT('abandonedCarts.stats');
   const tEmail = useT('abandonedCarts.emailStatus');
 
   const columns: DataTableColumn<AbandonedCartRecord>[] = [
@@ -62,7 +58,7 @@ export function AbandonedCartsTable({
       header: t('columns.total'),
       cell: record => (
         <span className="text-sm text-foreground whitespace-nowrap">
-          {tMajor('baseValue', { amount: formatMajor(record.cartTotal) })}
+          {formatPrice(record.cartTotal)}
         </span>
       ),
     },
@@ -96,7 +92,7 @@ export function AbandonedCartsTable({
       header: t('columns.date'),
       cell: record => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {new Date(record.createdAt).toLocaleDateString(undefined, withNumerals())}
+          {formatDate(record.createdAt)}
         </span>
       ),
     },
