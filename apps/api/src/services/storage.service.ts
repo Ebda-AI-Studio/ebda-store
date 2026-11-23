@@ -442,6 +442,33 @@ export class StorageService {
     return { key };
   }
 
+  /**
+   * Store bytes in the private bucket under an EXPLICIT key (write-once archives and ledgers whose key must be derivable, Ruling
+   * NZ-D15B). Only the `closed-store-purge/` and `closed-store-archive/` prefixes: a caller can never overwrite a tenant object.
+   * `ifAbsent` refuses to replace an existing object (a verified archive is never overwritten).
+   */
+  static async putPrivateAt(
+    key: string,
+    buffer: Buffer,
+    contentType: string,
+    opts: { ifAbsent?: boolean } = {}
+  ): Promise<void> {
+    if (!/^closed-store-(purge|archive)\/[0-9a-fA-F-]{8,64}\/[A-Za-z0-9._-]+$/.test(key))
+      throw new AppError(400, 'BAD_PRIVATE_KEY', 'This private key prefix is not allowed');
+    const bucket = this.privateBucket();
+    const client = await this.getClient();
+    await client.send(
+      new (await loadS3()).PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+        CacheControl: 'private, no-store',
+        ...(opts.ifAbsent ? { IfNoneMatch: '*' } : {}),
+      })
+    );
+  }
+
   /** Read a private object's bytes. The caller authorises the request first. */
   static async getPrivate(key: string): Promise<{ body: Buffer; contentType: string | null }> {
     const bucket = this.privateBucket();

@@ -1114,6 +1114,68 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     );
   }
 
+  /**
+   * NZ-D15B (read only): the fiscal records of a CLOSED store, paged by serial, for the verified archive export of the closed-store
+   * purge. Refuses a store that is not closed (an open store is never exported or wiped through here).
+   */
+  closedFiscalPage(
+    storeId: string,
+    afterSerial: number,
+    limit: number
+  ): Result<{ rows: Array<Record<string, unknown>>; count: number; lastIssuedAt: number | null }> {
+    return run(() => {
+      this.bind(storeId);
+      if (!isStoreClosed(this.sync)) throw new StoreError('STORE_NOT_CLOSED' as never, 409);
+      const sqlx = this.ctx.storage.sql;
+      const rows = sqlx
+        .exec(
+          'SELECT * FROM fiscal_documents WHERE store_id = ? AND serial > ? ORDER BY serial LIMIT ?',
+          storeId,
+          Number(afterSerial) || 0,
+          Math.min(Math.max(Number(limit) || 1, 1), 500)
+        )
+        .toArray();
+      const agg = sqlx
+        .exec(
+          'SELECT count(*) AS n, max(issued_at) AS last FROM fiscal_documents WHERE store_id = ?',
+          storeId
+        )
+        .toArray()[0];
+      return {
+        rows,
+        count: Number(agg?.n ?? 0),
+        lastIssuedAt: agg?.last == null ? null : Number(agg.last),
+      };
+    });
+  }
+
+  /**
+   * NZ-D15B: PHYSICAL wipe of a closed store, the only one in the code base (Ruling NZ-D15B, plan N-24). Refuses unless the store is
+   * closed AND its fiscal row count still equals the count of the export the caller verified (a store that changed since is stale:
+   * refuse, the next run exports again). IRREVERSIBLE: callers gate it behind the dry-run period and the live flag.
+   */
+  async purgeClosedStore(
+    storeId: string,
+    expect: { fiscalDocuments: number }
+  ): Promise<Result<{ wiped: true }>> {
+    const checked = run(() => {
+      this.bind(storeId);
+      if (!isStoreClosed(this.sync)) throw new StoreError('STORE_NOT_CLOSED' as never, 409);
+      const n = Number(
+        this.ctx.storage.sql
+          .exec('SELECT count(*) AS n FROM fiscal_documents WHERE store_id = ?', storeId)
+          .toArray()[0]?.n ?? 0
+      );
+      if (n !== Number(expect.fiscalDocuments))
+        throw new StoreError('PURGE_EXPORT_STALE' as never, 409);
+      return true;
+    });
+    if (!checked.ok) return checked;
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+    return { ok: true, data: { wiped: true } };
+  }
+
   /** PITR bookmark for "now" (SQLite-backed DOs, 30 days). Returned so the drill can record availability. */
   async pitrBookmark(): Promise<string> {
     const s = this.ctx.storage as unknown as { getCurrentBookmark(): Promise<string> };
