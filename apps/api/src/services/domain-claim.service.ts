@@ -23,6 +23,7 @@
  * context and stay in the existing plain-prisma style.
  */
 import { prisma, Prisma, storeDirectory, withStore } from '@ebda/database';
+import { cfWaitUntil } from '../cf/bindings';
 import { storeIdByDomain, storeIdsClaimingDomain } from '../lib/definer';
 import { abuseConfig } from '../lib/abuse-config';
 import { bustCorsCache } from '../lib/cors-cache';
@@ -361,14 +362,14 @@ export class DomainClaimService {
 
     // Old hostname leaves the provider only AFTER the DB points at the new one.
     if (oldDomain) {
-      void removeFromProvider(provider, oldDomain);
+      cfWaitUntil(removeFromProvider(provider, oldDomain));
       bustCorsCache(oldDomain);
-      void invalidateCached(`public:store:resolve:${oldDomain}`);
-      void redis.delete(`store:domain:${oldDomain}`).catch(() => undefined);
+      cfWaitUntil(invalidateCached(`public:store:resolve:${oldDomain}`));
+      cfWaitUntil(redis.delete(`store:domain:${oldDomain}`));
     }
     if (newDomain) {
       bustCorsCache(newDomain);
-      void invalidateCached(`public:store:resolve:${newDomain}`);
+      cfWaitUntil(invalidateCached(`public:store:resolve:${newDomain}`));
     }
     await bustStoreCaches(storeId, slug, newDomain, { domain: oldDomain });
   }

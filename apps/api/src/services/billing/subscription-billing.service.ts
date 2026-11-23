@@ -49,7 +49,7 @@ import {
   ledgerTaxFieldsD1,
 } from '../platform/billing-d1';
 import { isFamilyFrozen } from '../platform/cutover';
-import { cfBindings } from '../../cf/bindings';
+import { cfBindings, cfWaitUntil } from '../../cf/bindings';
 import { encryption } from '../encryption.service';
 import {
   BillingProviderError,
@@ -1877,7 +1877,7 @@ export async function handleBillingWebhook(
     });
     return { duplicate: false, outcome: 'deferred', detail: 'family_frozen' };
   }
-  void drainDeferredSoon();
+  cfWaitUntil(drainDeferredSoon()); // a bare `void` dies with the response on a Worker
   return confirmAndApplyWebhook(provider, event);
 }
 
