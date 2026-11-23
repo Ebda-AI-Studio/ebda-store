@@ -68,7 +68,7 @@ This is the path the migration comments in `20260808120000_fk_only_indexes`,
 `20260902120000_products_search_trgm_gin` and `20261002090000_order_search_trgm_and_fk_indexes`
 refer to.
 
-### Hamza fold indexes (`20261123000100_search_fold_hamza`, Ruling F7-HAMZA-2)
+### Hamza fold indexes (`20261123200000_search_fold_hamza`, Ruling F7-HAMZA-2)
 
 The migration is ADDITIVE: the original fold B (`public.ebda_ar_norm` and every index on it) is untouched, so there is no reindex and no lock on existing
 objects. It adds `public.ebda_ar_norm_h`, the two `_h` doc functions, `public.ebda_product_search_ids_h` and two trigram GIN expression indexes

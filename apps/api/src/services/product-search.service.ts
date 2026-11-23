@@ -104,7 +104,7 @@ export function productSearchSql(
         ${storeId}, ${field}, ${withSku}, ${storefront},
         ${opts.includeDeleted === true}, ${wordStart}, ${patterns}::text[]))`;
   // Ruling F7-HAMZA-2: a word also matches under the hamza fold A (مسئول = مسؤول = سئوال's seat variants), against the A docs and their own
-  // trigram indexes (migration 20261123000100). Fold B above is untouched, so every old match still holds. Skipped for a query with no Arabic letter
+  // trigram indexes (migration 20261123200000). Fold B above is untouched, so every old match still holds. Skipped for a query with no Arabic letter
   // (A and B agree on Latin text), which keeps English searches at one lookup.
   const hamzaTokens = /[\u0600-\u06FF]/.test(raw) ? searchTokensHamza(raw) : [];
   let match: Prisma.Sql = matchB;

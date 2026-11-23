@@ -22,7 +22,7 @@ import { productSearchSql } from '../../apps/api/src/services/product-search.ser
 
 const MIGRATION_H = path.resolve(
   __dirname,
-  '../../packages/database/prisma/migrations/20261123000100_search_fold_hamza/migration.sql'
+  '../../packages/database/prisma/migrations/20261123200000_search_fold_hamza/migration.sql'
 );
 const MIGRATION = path.resolve(
   __dirname,
@@ -215,7 +215,7 @@ describe.skipIf(!hasDb)('ebda_ar_norm parity with normalizeArabicSearch', () => 
   }, 90_000);
 });
 
-// ---- fold A (hamza fold, Ruling F7-HAMZA-2): ebda_ar_norm_h, migration 20261123000100_search_fold_hamza ----
+// ---- fold A (hamza fold, Ruling F7-HAMZA-2): ebda_ar_norm_h, migration 20261123200000_search_fold_hamza ----
 // ebda_ar_norm (fold B) above is untouched; these cases pin the second fold and its two indexes.
 const ALPHABET_H: string[] = [
   ...AR_FOLD_H_FROM,
