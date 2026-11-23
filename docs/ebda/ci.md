@@ -290,3 +290,12 @@ workflows' triggers, paths and concurrency are fine; every missing run is a `pul
 so GitHub dropped the `pull_request` event for that push. Closing and reopening always emits a fresh one.
 Self-heal: `node scripts/ci/reopen-ciless-prs.mjs [--dry-run] [--minutes 10]` closes + reopens every open non-draft PR into main
 whose head is older than N minutes and has zero `CI` runs. Run it from the drain loop before the gate gives up.
+
+## Merge-group scope (MQ-SCOPE-1)
+
+A merge group runs the heavy-only jobs (Build, Orphan test coverage, Integration, E2E, Builder E2E, workerd integration) only when
+`scripts/ci/mq-scope.mjs` says `heavy=true`. It diffs `merge_group.base_sha..head_sha` with `scripts/ci-affected.mjs` and answers
+`heavy=false` only when every changed file is docs or inside `apps/marketing|docs|help|status`. Rails (package.json, lockfile,
+`packages/shared|repo|database`, migrations, `.github/`, `scripts/`, `tests/`) and the `ci:full` PR label force the full tier; any error fails
+closed to full. Unit shards, Security Audit, the marketing dry-run, `Repo guards` and `API Worker boots on workerd` always run. The
+`Merge queue gate` accepts `skipped` for exactly the heavy-only jobs and only when heavy=false. The nightly and main-push full lanes are unchanged.

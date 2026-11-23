@@ -21,8 +21,9 @@ name: CI
 #     updates ONE GitHub issue labelled `ci-main-red`; the next green full run closes it.
 #
 # Every `runs-on` reads a repo variable (EBDA_RUNS_ON for the heavy Mac pool, EBDA_LIGHT_RUNS_ON then EBDA_RUNS_ON for light jobs) and falls back
-# to a Mac label (`["self-hosted","ebda-mac"]` heavy, `["ebda-mac-light"]` light), NEVER a GitHub-hosted runner (Ahmad 2026-11-16: no hosted minutes).
-# tests/unit/workflow-hosted-runners-only.test.ts pins that.
+# to a Mac label (`["self-hosted","ebda-mac"]` heavy, `["ebda-mac-light"]` light), never a hard-coded hosted label (Ahmad 2026-11-16: no PAID hosted minutes).
+# tests/unit/workflow-hosted-runners-only.test.ts pins that. Once the repo is PUBLIC (Ahmad 2026-11-23) hosted minutes are free: the repo
+# variables are set to ["ubuntu-latest"] and the Mac runner groups refuse public repos, so the Mac fallback only applies while private.
 #
 # No setup-node here has a `cache:` input: it restores/saves the GitHub Actions cache over the network (1.5-2.5 min per restore, a 10 min hanging
 # post-step save, 14 GB pulled once), while ~/.npm already persists locally on the Mac runners.
@@ -151,8 +152,10 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read # MQ-SCOPE-1: read the queued PR's labels (ci:full)
     outputs:
       skip: ${{ steps.decide.outputs.skip }}
+      heavy: ${{ steps.scope.outputs.heavy }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -169,6 +172,18 @@ jobs:
           EVENT: ${{ github.event_name }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/ci/tested-tree.mjs
+      - id: scope
+        # MQ-SCOPE-1: a merge group whose diff (base_sha..head_sha, via scripts/ci-affected.mjs) touches only light workspaces / docs and no rail
+        # (lockfile, packages/shared|repo|database, migrations, .github, scripts, tests) skips the heavy-only jobs; the `Merge queue gate` then accepts
+        # `skipped` for exactly those. Fails closed to heavy=true. Label `ci:full` on the PR forces the full tier. Other events: heavy=true.
+        name: Merge group scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          HEAD_REF: ${{ github.event.merge_group.head_ref }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ci/mq-scope.mjs
 
   guards:
     name: Repo guards
@@ -847,7 +862,7 @@ jobs:
     name: Integration on local workerd (DO + D1 + R2)
     needs: [changes, tested-tree]
     # PR: only when a Worker changed. Full lane: always (`changes` is skipped there, hence always()).
-    if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true') && needs.tested-tree.outputs.skip != 'true'
+    if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true') && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.heavy != 'false'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # 30, not 15: the job timeout also covers the Umbra throttle-slot wait (775s on #322, tests then took 6s).
     timeout-minutes: 90 # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
@@ -889,7 +904,7 @@ jobs:
     # FULL lane: every push to main, every cron, manual dispatch (Ruling CI-FULL-MAIN-1; supersedes CI-HOSTED-1's
     # scheduled no-op: schedules run on hosted runners when EBDA_RUNS_ON is unset).
     needs: [tested-tree]
-    if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true'
+    if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.heavy != 'false'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: 25
     env:
@@ -1765,6 +1780,7 @@ jobs:
         test-e2e,
         builder-e2e,
         security,
+        tested-tree,
       ]
     runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '["ebda-mac-light"]') }}
     timeout-minutes: 5
