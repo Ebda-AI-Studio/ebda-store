@@ -1563,7 +1563,6 @@
       "unpaid": "Unpaid",
       "remain": "Remain {amount}",
       "refunded": "Refunded",
-      "partiallyRefunded": "Partially refunded",
       "refundedAmount": "Refunded {amount}",
       "disputed": "Disputed",
       "paymentMethod": "Payment method",

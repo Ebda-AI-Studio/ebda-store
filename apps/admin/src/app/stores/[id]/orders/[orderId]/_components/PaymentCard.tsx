@@ -1,10 +1,10 @@
 'use client';
 
 import { useLocale } from 'next-intl';
+import { orderPaymentSummary } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { PaymentEventsTimeline } from '../../../../../../components/payment-events/PaymentEventsTimeline';
 import { formatMoney } from './format';
-import { paymentDisplay } from './payment-display';
 import type { OrderDetail } from './types';
 
 import { Button } from '@/components/ui/Button';
@@ -19,18 +19,10 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
   const t = useT('orders.detail');
   const tInstapay = useT('orders.detail.instapay');
   const locale = useLocale();
-  const { state, remain, refunded } = paymentDisplay(order);
+  // paid / refunded / disputed / unpaid. A refunded order is NOT unpaid: nothing is owed on it.
+  const { state, remain, refunded } = orderPaymentSummary(order);
   const isUnpaid = state === 'unpaid';
-  const stateLabel =
-    state === 'refunded'
-      ? t('refunded')
-      : state === 'partially_refunded'
-        ? t('partiallyRefunded')
-        : state === 'paid'
-          ? t('paid')
-          : state === 'disputed'
-            ? t('disputed')
-            : t('unpaid');
+  const stateLabel = t(state);
   const link = order.payments?.find(p => p.paymentLink)?.paymentLink ?? null;
   const expiresAt = order.paymentConfirmationExpiresAt
     ? new Date(order.paymentConfirmationExpiresAt)

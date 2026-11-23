@@ -1562,7 +1562,6 @@
       "paid": "مدفوع",
       "unpaid": "غير مدفوع",
       "remain": "المتبقي {amount}",
-      "partiallyRefunded": "مُسترد جزئيًا",
       "refunded": "مسترد",
       "refundedAmount": "المسترد {amount}",
       "disputed": "متنازع عليه",
