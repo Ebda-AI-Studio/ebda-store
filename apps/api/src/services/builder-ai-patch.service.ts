@@ -16,6 +16,7 @@ import {
 } from '@ebda/shared';
 import { AIService } from './ai.service';
 import { getPageState, type ServiceResult } from './page-builder.service';
+import { describeCatalogueForPrompt, loadBuilderAiCatalogue } from './builder-ai-context.service';
 
 export interface BuilderPatchProposal {
   baseRev: number;
@@ -40,15 +41,27 @@ export async function proposeBuilderPatch(args: {
   storeId: string;
   pageKey: string;
   instruction: string;
+  /** The editor's current canvas width, so "fix the mobile view" means the phone. */
+  viewport?: 'desktop' | 'tablet' | 'mobile';
+  /** The admin language the merchant is writing in; new copy the model fills in follows it. */
+  locale?: 'ar' | 'en';
 }): Promise<ServiceResult<BuilderPatchProposal>> {
   const state = await getPageState(args.storeId, args.pageKey);
   if (!state) return notFound;
+  const catalogue = await loadBuilderAiCatalogue(args.storeId);
+  if (!catalogue) return notFound;
   const { patch } = await AIService.proposeBuilderPatch({
     storeId: args.storeId,
     instruction: args.instruction,
-    page: describeAiPatchContext(state.definition),
+    page: {
+      ...describeAiPatchContext(state.definition),
+      viewport: args.viewport ?? 'desktop',
+      locale: args.locale ?? 'ar',
+      ...describeCatalogueForPrompt(catalogue),
+    },
   });
-  const applied = applyAiPatch(state.definition, patch.ops);
+  // References are checked against THIS store's own catalogue, never against what the model says exists.
+  const applied = applyAiPatch(state.definition, patch.ops, catalogue.allow);
   const dropped = new Set(applied.rejected.map(r => r.index));
   const ok = validateDefinitionSync(applied.doc);
   if (!ok.ok)

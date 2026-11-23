@@ -7,9 +7,10 @@
  * Apply only writes the DRAFT (Undo works, nothing goes live before Publish).
  */
 import { Button } from '@/components/ui/Button';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
+import { AiChangeValue } from './AiChangeValue';
 
 export interface AiPatchChangeRow {
   op: string;
@@ -30,18 +31,6 @@ export interface AiPatchProposal {
   rejected: Array<{ index: number; reason: string }>;
 }
 
-/** A boolean means "hidden" for a hide/show change and "on" for a switch setting. */
-function show(
-  v: unknown,
-  op: string,
-  t: (k: string, p?: Record<string, string | number>) => string
-): string {
-  if (v === undefined || v === null || v === '') return '-';
-  if (typeof v === 'boolean')
-    return op === 'setSectionHidden' ? t(v ? 'hidden' : 'shown') : t(v ? 'on' : 'off');
-  return String(v);
-}
-
 export function AiPatchPane({
   busy,
   proposal,
@@ -60,6 +49,8 @@ export function AiPatchPane({
   const t = useT('builder.aiPatch');
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const [text, setText] = useState('');
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const kept = proposal?.rejected.filter(r => r.reason === 'OVERWRITE_PROTECTED').length ?? 0;
 
   return (
     <div
@@ -95,16 +86,19 @@ export function AiPatchPane({
                       {c.op === 'setSectionSetting' ||
                       c.op === 'setBlockSetting' ||
                       c.op === 'setTheme' ||
-                      c.op === 'setSectionHidden' ? (
+                      c.op === 'setSectionHidden' ||
+                      c.op === 'setRef' ||
+                      c.op === 'setViewportSetting' ||
+                      c.op === 'setViewportHidden' ? (
                         <span className="mt-1 flex flex-wrap items-center gap-1 text-muted-foreground">
                           <span>{t('from')}</span>
-                          <bdi className="rounded bg-muted px-1 line-through decoration-muted-foreground/60">
-                            {show(c.before, c.op, t)}
-                          </bdi>
+                          <span className="rounded bg-muted px-1 line-through decoration-muted-foreground/60">
+                            <AiChangeValue value={c.before} op={c.op} field={c.key} t={t} />
+                          </span>
                           <span>{t('to')}</span>
-                          <bdi className="rounded bg-primary/15 px-1 text-foreground">
-                            {show(c.after, c.op, t)}
-                          </bdi>
+                          <span className="rounded bg-primary/15 px-1 text-foreground">
+                            <AiChangeValue value={c.after} op={c.op} field={c.key} t={t} />
+                          </span>
                         </span>
                       ) : (
                         <span className="mt-1 block text-muted-foreground">
@@ -112,7 +106,13 @@ export function AiPatchPane({
                             ? t('added')
                             : c.op === 'removeSection'
                               ? t('removed')
-                              : t('moved_to', { pos: Number(c.after ?? 0) + 1 })}
+                              : c.op === 'addBlock'
+                                ? t('added_block')
+                                : c.op === 'removeBlock'
+                                  ? t('removed_block')
+                                  : c.op === 'moveBlock'
+                                    ? t('moved_block', { pos: Number(c.after ?? 0) + 1 })
+                                    : t('moved_to', { pos: Number(c.after ?? 0) + 1 })}
                         </span>
                       )}
                     </li>
@@ -120,9 +120,12 @@ export function AiPatchPane({
                 </ul>
               </>
             )}
-            {proposal.rejected.length > 0 && (
+            {kept > 0 && (
+              <p className="text-xs text-muted-foreground">{t('kept', { count: kept })}</p>
+            )}
+            {proposal.rejected.length - kept > 0 && (
               <p className="text-xs text-muted-foreground">
-                {t('skipped', { count: proposal.rejected.length })}
+                {t('skipped', { count: proposal.rejected.length - kept })}
               </p>
             )}
             {proposal.changes.length > 0 && (
@@ -157,6 +160,7 @@ export function AiPatchPane({
           <>
             <textarea
               id="ai-patch-input"
+              ref={inputRef}
               aria-labelledby="ai-patch-title"
               dir="auto"
               rows={4}
@@ -168,13 +172,22 @@ export function AiPatchPane({
               className="w-full rounded-lg border border-border bg-background p-2 text-sm"
             />
             <div className="flex flex-wrap gap-2">
-              {(['example1', 'example2'] as const).map(k => (
+              {(['example1', 'example2', 'example3', 'example4'] as const).map(k => (
                 <Button
                   variant="outline"
                   size="sm"
                   key={k}
                   type="button"
-                  onClick={() => setText(t(k))}
+                  onClick={() => {
+                    const v = t(k);
+                    setText(v);
+                    const el = inputRef.current;
+                    if (el) {
+                      el.value = v;
+                      el.focus();
+                      el.setSelectionRange(v.length, v.length);
+                    }
+                  }}
                 >
                   {t(k)}
                 </Button>
