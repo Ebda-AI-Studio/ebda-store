@@ -162,6 +162,18 @@ export function closedStorePurgePorts(): PurgePorts {
         deletePublic: key => StorageService.delete(key),
         urlToKey: urlToR2Key,
         belongsToStore: r2KeyBelongsToStore,
+        onForeignKey: async info => {
+          logger.error(
+            info,
+            '[closed-store-purge] a proof key outside the store prefix was NOT deleted'
+          );
+          await sendAlert({
+            level: 'p1',
+            source: 'closed-store-purge',
+            title: 'Closed-store purge skipped a proof file outside the store prefix',
+            body: `store ${info.storeId}: ${info.table} ${info.id} points at ${info.key}; nothing was deleted for it, check by hand.`,
+          });
+        },
       });
     },
     async deleteDirectory(storeId) {

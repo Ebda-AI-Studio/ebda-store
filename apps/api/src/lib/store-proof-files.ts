@@ -6,7 +6,8 @@
  *   - `manual_payment_claims.proof_url` legacy public-bucket URL of an uploaded screenshot (no code writes it any more; read-only
  *     production check 2026-11-24: 0 of 1 claims has one), deleted when it maps to a key of THIS store, then cleared
  * Idempotent and resumable: an object that is already gone is a no-op; a row is marked only AFTER its object delete returned, so a
- * failure leaves the row pointing at the object and the next run retries it. A failure throws (the purge aborts with a P1, and the
+ * failure leaves the row pointing at the object and the next run retries it. A key outside the store's own prefix is skipped (not
+ * deleted, not marked), logged and raised as a P1 by the caller. A failure throws (the purge aborts with a P1, and the
  * tombstone, which nulls proof_url, has NOT run yet).
  */
 export interface ProofFileDeps {
@@ -16,6 +17,13 @@ export interface ProofFileDeps {
   deletePublic(key: string): Promise<void>;
   urlToKey(url: string): string | null;
   belongsToStore(key: string, storeId: string): boolean;
+  /** A stored key outside the store's own prefix was found: it is NEVER deleted; the caller logs it and raises a P1. */
+  onForeignKey(info: {
+    storeId: string;
+    table: string;
+    id: string;
+    key: string;
+  }): Promise<void> | void;
 }
 
 export async function deleteStoreProofFiles(
@@ -30,6 +38,16 @@ export async function deleteStoreProofFiles(
     storeId
   );
   for (const r of rs) {
+    // an object that is not under THIS store's prefix is never deleted (a corrupt or hostile key must not reach another store's file)
+    if (!deps.belongsToStore(r.storage_key, storeId)) {
+      await deps.onForeignKey({
+        storeId,
+        table: 'instapay_receipts',
+        id: r.id,
+        key: r.storage_key,
+      });
+      continue;
+    }
     await deps.deletePrivate(r.storage_key);
     await deps.d1Run(
       `UPDATE "instapay_receipts" SET "image_deleted_at" = ?2 WHERE "id" = ?1 AND "store_id" = ?3 AND "image_deleted_at" IS NULL`,
@@ -47,6 +65,8 @@ export async function deleteStoreProofFiles(
     const key = deps.urlToKey(c.proof_url);
     // only an object of THIS store is ever deleted; an external or foreign URL is simply unlinked
     if (key && deps.belongsToStore(key, storeId)) await deps.deletePublic(key);
+    else if (key)
+      await deps.onForeignKey({ storeId, table: 'manual_payment_claims', id: c.id, key });
     await deps.d1Run(
       `UPDATE "manual_payment_claims" SET "proof_url" = NULL WHERE "id" = ?1 AND "store_id" = ?2`,
       c.id,

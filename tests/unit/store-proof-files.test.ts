@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
+import { r2KeyBelongsToStore } from '../../apps/api/src/services/r2-cleanup.service';
 import {
   deleteStoreProofFiles,
   type ProofFileDeps,
@@ -53,6 +54,7 @@ function harness(failOn?: string) {
   const db = platform();
   const priv: string[] = [];
   const pub: string[] = [];
+  const foreign: Array<{ table: string; id: string; key: string }> = [];
   const deps: ProofFileDeps = {
     d1All: async (sql, ...p) => db.prepare(sql).all(...(p as never[])) as never[],
     d1Run: async (sql, ...p) => Number(db.prepare(sql).run(...(p as never[])).changes),
@@ -63,9 +65,10 @@ function harness(failOn?: string) {
     deletePublic: async key => void pub.push(key),
     urlToKey: url =>
       url.startsWith('https://media.test/') ? url.slice('https://media.test/'.length) : null,
-    belongsToStore: (key, id) => key.startsWith(`stores/${id}/`),
+    belongsToStore: r2KeyBelongsToStore, // the REAL prefix rule (also refuses `..` segments)
+    onForeignKey: info => void foreign.push({ table: info.table, id: info.id, key: info.key }),
   };
-  return { db, deps, priv, pub };
+  return { db, deps, priv, pub, foreign };
 }
 const S = 's1';
 
@@ -156,5 +159,46 @@ describe('payment-proof files of a purged store', () => {
         .get()
     ).toEqual({ n: 0 });
     expect((await deleteStoreProofFiles(S, h2.deps)).receipts).toBe(0); // idempotent
+  });
+
+  it('a receipt key outside the store prefix is NEVER deleted: skipped, reported, left unmarked, and the others still go', async () => {
+    const h = harness();
+    insert(h.db, 'instapay_receipts', {
+      id: 'a-mine',
+      store_id: S,
+      storage_key: 'stores/s1/instapay/mine.jpg',
+    });
+    insert(h.db, 'instapay_receipts', {
+      id: 'b-foreign',
+      store_id: S,
+      storage_key: 'stores/OTHER/instapay/theirs.jpg',
+    });
+    insert(h.db, 'instapay_receipts', {
+      id: 'c-traversal',
+      store_id: S,
+      storage_key: 'stores/s1/../OTHER/x.jpg',
+    });
+    const r = await deleteStoreProofFiles(S, h.deps, 9_000);
+    expect(r.receipts).toBe(1);
+    expect(h.priv).toEqual(['stores/s1/instapay/mine.jpg']);
+    expect(h.foreign.map(f => f.id).sort()).toEqual(['b-foreign', 'c-traversal']);
+    expect(
+      h.db
+        .prepare('SELECT id FROM instapay_receipts WHERE image_deleted_at IS NULL ORDER BY id')
+        .all()
+    ).toEqual([{ id: 'b-foreign' }, { id: 'c-traversal' }]);
+  });
+  it('a claim proof URL that maps to another store key is reported too, and unlinked without deleting', async () => {
+    const h = harness();
+    insert(h.db, 'manual_payment_claims', {
+      id: 'c3',
+      store_id: S,
+      proof_url: 'https://media.test/stores/OTHER/proofs/y.png',
+    });
+    await deleteStoreProofFiles(S, h.deps);
+    expect(h.pub).toEqual([]);
+    expect(h.foreign).toEqual([
+      { table: 'manual_payment_claims', id: 'c3', key: 'stores/OTHER/proofs/y.png' },
+    ]);
   });
 });
