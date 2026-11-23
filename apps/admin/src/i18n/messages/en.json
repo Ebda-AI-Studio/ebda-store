@@ -833,7 +833,7 @@
         "excerptAr": "Short excerpt (Arabic)",
         "excerptArPlaceholder": "ملخص من جملة أو جملتين لنتائج البحث وبطاقات المشاركة...",
         "mediaHint": "Drag and drop images here, or click to select",
-        "mediaSizeHint": "Recommended 1000×1000 (square). Up to 10MB per file — we auto-compress for the storefront.",
+        "mediaSizeHint": "Portrait 3:4 photos (shown in the storefront without cropping). Up to 10MB per file — we auto-compress for the storefront.",
         "price": "Price (EGP)",
         "costPrice": "Cost (EGP)",
         "profitLabel": "Profit margin per unit:",
@@ -1173,7 +1173,7 @@
         "searchTermsAtLimit": "Limit reached",
         "searchTermsNearLimit": "Almost at the limit",
         "mediaHint": "Drag and drop images here, or click to select",
-        "mediaSizeHint": "Recommended 1000×1000 (square). Up to 10MB per file — we auto-compress for the storefront.",
+        "mediaSizeHint": "Portrait 3:4 photos (shown in the storefront without cropping). Up to 10MB per file — we auto-compress for the storefront.",
         "price": "Price (EGP)",
         "pricePlaceholder": "0.00",
         "costPrice": "Cost (EGP)",
@@ -1263,7 +1263,7 @@
       "failedTitle": "Could not switch to AI — try again",
       "handBackTitle": "Hand this field back to the AI",
       "retryLabel": "Retry",
-      "switchToAiLabel": "Switch to AI"
+      "switchToAiLabel": "Have AI write it"
     },
     "model3d": {
       "title": "3D model",
