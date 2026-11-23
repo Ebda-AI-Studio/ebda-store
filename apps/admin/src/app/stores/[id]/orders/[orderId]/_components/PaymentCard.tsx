@@ -20,7 +20,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
   const tInstapay = useT('orders.detail.instapay');
   const locale = useLocale();
   const { state, remain, refunded } = paymentDisplay(order);
-  const isPaid = state !== 'unpaid';
+  const isUnpaid = state === 'unpaid';
   const stateLabel =
     state === 'refunded'
       ? t('refunded')
@@ -117,12 +117,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
               {formatMoney(order.total, order.currency)}
             </div>
           </div>
-          {refunded > 0 && (
-            <div className="mt-1 text-sm text-muted-foreground text-end">
-              {t('refundedAmount', { amount: formatMoney(refunded, order.currency) })}
-            </div>
-          )}
-          {!isPaid && (
+          {isUnpaid && (
             <div className="mt-1 text-sm text-muted-foreground text-end">
               {t('remain', { amount: formatMoney(remain, order.currency) })}
             </div>
