@@ -99,6 +99,15 @@ describe('PLAN_BASELINE', () => {
     expect(PLAN_BASELINE.free).not.toContain('accounting.profit_anomaly');
   });
 
+  // Product feeds (Ruling FEEDS-1): same gate as agent_feed - every paid plan, off on free.
+  it('product_feeds is registered and default-ON for all paid plans, off on free', () => {
+    expect(FEATURE_KEYS_ARRAY).toContain('product_feeds');
+    for (const plan of ['starter', 'professional', 'enterprise'] as const) {
+      expect(PLAN_BASELINE[plan]).toContain('product_feeds');
+    }
+    expect(PLAN_BASELINE.free).not.toContain('product_feeds');
+  });
+
   // Answer-Engine Insights (Task 1, 2026-07-22): default-ON for all paid
   // plans, off on free — mirrors the agent_feed AI-first baseline above.
   it('answer_engine_insights is registered and default-ON for all paid plans, off on free', () => {
