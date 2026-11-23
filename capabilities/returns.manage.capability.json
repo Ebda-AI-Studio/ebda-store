@@ -9,6 +9,7 @@
   "screens": ["/stores/[id]/returns"],
   "api": [
     "GET /stores/:storeId/returns/admin/list",
+    "POST /stores/:storeId/returns/admin",
     "GET .../admin/stats",
     "POST .../admin/:id/approve|reject|received",
     "PUT .../admin/:id/tracking",

@@ -20,6 +20,7 @@ import customersRoutes from './customers.routes';
 import reviewRoutes from './review.routes';
 import analyticsRoutes from './analytics.routes';
 import answerEngineRoutes from './answer-engine.routes';
+import productFeedsRoutes from './product-feeds.routes';
 import returnRoutes from './return.routes';
 import publicRoutes from './public.routes';
 import paymentRoutes from './payment.routes';
@@ -332,6 +333,7 @@ router.use('/stores/:storeId', tenantContext, customersRoutes);
 router.use('/stores/:storeId/reviews', tenantContext, reviewRoutes);
 router.use('/stores/:storeId/analytics', tenantContext, analyticsRoutes);
 router.use('/stores/:storeId/answer-engine', tenantContext, answerEngineRoutes);
+router.use('/stores/:storeId/product-feeds', tenantContext, productFeedsRoutes);
 router.use('/stores/:storeId/returns', tenantContext, returnRoutes);
 
 // Store-scoped routes mounted under /stores (storeId in sub-route params).

@@ -127,7 +127,7 @@ describe('pre-push slop guard (same check as CI "Slop baselines")', () => {
   });
 
   it('the pre-push gate calls it, before the related-test step', () => {
-    const gate = readFileSync(path.join(REPO, 'scripts/ci/pre-push-gate.sh'), 'utf8');
+    const gate = readFileSync(path.join(REPO, 'scripts/ci/pre-push-extra.sh'), 'utf8');
     expect(gate).toContain('bash scripts/ci/pre-push-slop.sh origin/main HEAD');
     expect(gate.indexOf('pre-push-slop.sh')).toBeLessThan(gate.indexOf('Cheap related tests'));
   });
