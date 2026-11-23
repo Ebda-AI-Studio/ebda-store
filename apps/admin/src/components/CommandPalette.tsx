@@ -5,13 +5,13 @@ import { useParams, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import type { PaletteItem } from './admin-layout/buildPaletteItems';
 import {
-  intlLocale,
   normalizeArabicSearch as normalize,
   searchQueryHeaders,
   type AdminSearchResponse,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../lib/api';
+import { formatPrice } from '../lib/format';
 
 /**
  * Global ⌘K / Ctrl+K command palette for the admin. Searches EVERY admin
@@ -193,7 +193,6 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
       icon: i.icon,
     }));
     if (!records || !storeId) return pages;
-    const money = new Intl.NumberFormat(intlLocale(locale), { style: 'currency', currency: 'EGP' });
     const out: Row[] = [...pages];
     const push = (section: NonNullable<Row['section']>, list: Row[]) =>
       list.forEach((r, i) =>
@@ -214,7 +213,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
         key: `o:${o.id}`,
         href: `/stores/${storeId}/orders/${o.id}`,
         title: `#${o.orderNumber}`,
-        sub: [o.customerName, money.format(o.total / 100)].filter(Boolean).join(' · '),
+        sub: [o.customerName, formatPrice(o.total)].filter(Boolean).join(' · '),
       }))
     );
     push(
