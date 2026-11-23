@@ -222,6 +222,37 @@ export class DomainClaimService {
       tx.store.findUnique({ where: { id: storeId }, select: claimSelect })
     );
     const pending = store?.pendingDomain;
+    if (store && !pending && store.domain && store.domainStatus !== 'active') {
+      // STORE-QA-40: a store that holds a `domain` but whose status never reached 'active' (a claim promoted by hand, a drifted
+      // row) was invisible to this reconcile: the sweep only looked at `pendingDomain`, so the admin said "awaiting verification"
+      // for a hostname that already served the storefront. Probe the provider; a verified hostname becomes 'active'.
+      let status: Awaited<ReturnType<DomainProvider['getDomain']>> = null;
+      try {
+        status = await provider.getDomain(store.domain);
+      } catch (err) {
+        logger.warn(
+          { err, storeId, domain: store.domain },
+          '[DOMAIN CLAIM] provider status failed'
+        );
+      }
+      if (!status?.verified) return { action: 'none' };
+      const domain = store.domain;
+      const res = await withStore(storeId, tx =>
+        storeUpdateMany(tx, {
+          where: { id: storeId, domain },
+          data: { domainStatus: 'active', domainVerifiedAt: now, domainClaimedAt: null },
+        })
+      );
+      if (res.count === 0) return { action: 'none' };
+      await this.afterDomainChanged({
+        storeId,
+        slug: store.slug,
+        oldDomain: domain,
+        newDomain: domain,
+        provider,
+      });
+      return { action: 'activated' };
+    }
     if (!store || !pending) return { action: 'none' };
 
     let verifiedStatus: Awaited<ReturnType<DomainProvider['getDomain']>> = null;
@@ -353,7 +384,17 @@ export class DomainClaimService {
   ): Promise<{ examined: number; activated: number; failed: number; released: number }> {
     // `stores` is under RLS (R-EBDA-005): the cron lists claimants through the store
     // directory (id order; the per-store `sync` reads each claim in its own scope).
-    const rows = (await storeDirectory(s => s.hasPendingDomain)).slice(0, limit);
+    // Pending claims FIRST (they are the work), then stores that merely hold a domain (a stuck-short-of-active one is reconciled;
+    // an active one is a cheap no-op read). The directory summary carries no domain status, so the holders are taken from a
+    // window that ROTATES each run: pending claims can never be starved by active domains, and every holder is reached over time.
+    const all = await storeDirectory(s => s.hasPendingDomain || s.hasDomain);
+    const pendingRows = all.filter(s => s.hasPendingDomain).slice(0, limit);
+    const holders = all.filter(s => !s.hasPendingDomain && s.hasDomain);
+    const room = Math.max(0, limit - pendingRows.length);
+    const start =
+      holders.length > 0 ? (Math.floor(now.getTime() / HOUR_MS) * room) % holders.length : 0;
+    const rotated = [...holders.slice(start), ...holders.slice(0, start)].slice(0, room);
+    const rows = [...pendingRows, ...rotated];
     const out = { examined: rows.length, activated: 0, failed: 0, released: 0 };
     for (const { id } of rows) {
       try {

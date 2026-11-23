@@ -37,3 +37,12 @@ The store-credit credit (and the wallet share of a gateway refund) is written in
 ## Guest returns (Ruling GUEST-RET-1)
 
 `returnCreate` takes `customerId: null` for a guest order (`orders.customer_id` is null) and matches the order with `customer_id IS ?`. `returns.customer_id` is nullable on every StoreDO (`cf-0008_returns_customer_nullable`, which also turns old `''` rows into NULL); a guest return stores NULL. `returnClaim` refuses `store_credit` for such a return (`GUEST_RETURN_NO_WALLET`). The identity check (order number plus phone or email) is Worker-side in `ReturnService.createForGuest`, before the op. See `docs/rulings/GUEST-RET-1.md`.
+
+## Merchant-opened returns and the admin partial refund (STORE-QA-76)
+
+`returnCreate` takes `byMerchant: true` (set only by `POST /returns/admin` and `POST /orders/:id/partial-refund`, never by a shopper route): the order's own customer is used, the return window does not bind the merchant, and an item may carry `restock: false`. A guest order is refused (`GUEST_ORDER_RETURN_UNSUPPORTED`) until GUEST-RET-1 makes `returns.customer_id` nullable.
+
+- Per-line restock rides `return_items.condition = 'no_restock'` (merchant-opened only; a shopper-supplied value is dropped). `finishReturn` passes `skipRestock` to `refundOrder` (no stock move) and `postPartialReturnJournal` leaves those lines' COGS expensed (no inventory reversal). A return covering every line takes the whole-order reversal, which restocks everything, so a mixed choice there is refused at the claim (`FULL_RETURN_RESTOCK_ALL`).
+- `analyticsRefundQuote` (read): paid / refunded / refundable (the ONE balance, #624), per-line remaining quantity, and an estimate for a selection from `allocatePartialReturn`, the allocation the completion pays.
+- `POST /orders/:id/partial-refund` = open (merchant) -> approve -> receive -> complete in one request under an `Idempotency-Key`, `orders:refund`. A failure before money may have moved rejects the opened return so its lines can be retried; an indeterminate provider failure keeps it for reconciliation.
+- Test: `apps/api/workers-do/admin-partial-refund.test.ts` (workerd, `npm run cf:test:do -w apps/api -- admin-partial-refund`).

@@ -32,6 +32,9 @@ const NOT_ON_COMPLETION = new Set([
   'GOLD_EXCHANGE_UNSUPPORTED',
   // Guest return create path (GUEST-RET-1): the one identical identity-miss answer.
   'GUEST_RETURN_NOT_FOUND',
+  // Merchant-opened return / partial refund only (STORE-QA-76): the order's store has no Durable Object, nothing left to refund.
+  'RETURNS_NEED_DO_STORE',
+  'NOTHING_REFUNDABLE',
 ]);
 
 describe('return completion refusals are all translated (issue 2033)', () => {

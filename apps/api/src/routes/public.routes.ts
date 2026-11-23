@@ -1,4 +1,5 @@
 import { redeemWaCheckout } from '../lib/wa/bridge/redeem';
+import { signOrderStatusLinkToken } from '../lib/order-status-link-token';
 import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod/v3';
@@ -1666,10 +1667,25 @@ router.get(
       res.setHeader('Cache-Control', 'private, no-store');
       res.vary('X-Order-View-Token');
 
+      // STORE-QA-41: a GUEST who proved possession of THIS order's view token gets the signed, 14-day, view-only status link
+      // (`/o/<token>`, minimal summary, bound to this store + order) so the success page can offer "view order status" without a login.
+      // Never issued without the view token, never for a customer-owned order.
+      let statusToken: string | undefined;
+      if (order.customerId === null && !isCustomer && requestHoldsOrderViewToken(req, order.id)) {
+        try {
+          statusToken = signOrderStatusLinkToken(storeId, order.id);
+        } catch {
+          statusToken = undefined; // ORDER_STATUS_LINK_SECRET unset: no link, the page falls back
+        }
+      }
+
       res.json({
         success: true,
         // The shopper's own order without the merchant's cost and the gold margin (Ruling B5-23).
-        data: { order: guestMayViewPii ? visible : maskGuestOrderView(visible) },
+        data: {
+          order: guestMayViewPii ? visible : maskGuestOrderView(visible),
+          ...(statusToken ? { statusToken } : {}),
+        },
       });
     } catch (error) {
       next(error);
