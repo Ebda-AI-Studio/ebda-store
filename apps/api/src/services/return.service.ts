@@ -595,6 +595,17 @@ export class ReturnService {
     const money = await storeMoney(storeId);
     if (!money)
       throw new AppError(409, 'RETURNS_NEED_DO_STORE', 'Returns for this store are not available');
+    // Ruling REFUND-GATE-1: refunding MONEY is never plan-gated, the returns WORKFLOW is. Without the `returns` feature the
+    // amount is still refunded, but nothing goes back on the shelf: restock must be explicitly false on every line.
+    if (
+      data.items.some(i => i.restock !== false) &&
+      !(await featureService.isFeatureEnabled(storeId, 'returns'))
+    )
+      throw new AppError(
+        403,
+        'RETURNS_FEATURE_REQUIRED_FOR_RESTOCK',
+        'Putting refunded goods back on the shelf needs the Returns feature on your plan. Refund without restocking, or upgrade.'
+      );
     const quote = await money.analyticsRefundQuote({ orderId: data.orderId, items: data.items });
     if (quote.refundable <= 0)
       throw new AppError(409, 'NOTHING_REFUNDABLE', 'This order has nothing left to refund.');

@@ -79,7 +79,7 @@ export function RefundLinesPicker({ idPrefix, quote, currency, value, onChange, 
                       className="h-11 w-20 rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </label>
-                  {l.trackInventory ? (
+                  {l.trackInventory && quote.returnsEnabled === false ? null : l.trackInventory ? (
                     <label htmlFor={restockId} className="flex min-h-11 items-center gap-2 text-sm">
                       <input
                         id={restockId}
@@ -100,7 +100,7 @@ export function RefundLinesPicker({ idPrefix, quote, currency, value, onChange, 
           );
         })}
       </ul>
-      {quote.coversWholeOrder && (
+      {quote.coversWholeOrder && quote.returnsEnabled !== false && (
         <p role="note" className="mt-2 text-xs text-muted-foreground">
           {t('wholeOrderRestockNote')}
         </p>
