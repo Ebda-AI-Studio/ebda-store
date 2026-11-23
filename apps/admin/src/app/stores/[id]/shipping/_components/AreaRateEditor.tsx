@@ -9,7 +9,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
-import { useToast } from '@ebda/ui';
+import { useToast, SignedNumber } from '@ebda/ui';
 import { EGYPT_GOVERNORATES, minorToDecimalString, REGION } from '@ebda/shared';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
@@ -1042,7 +1042,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   )}
                   {customAreas.length > 0 && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary-ink">
-                      +{customAreas.length}
+                      <SignedNumber value={customAreas.length} plus />
                     </span>
                   )}
                 </div>

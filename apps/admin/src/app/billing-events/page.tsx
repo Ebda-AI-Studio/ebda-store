@@ -20,7 +20,7 @@
 import { formatDate } from '@/lib/format';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge } from '@ebda/ui';
+import { Badge, SignedNumber } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { formatMoney, withNumerals } from '@ebda/shared';
 import { AdminLayout } from '../../components/AdminLayout';
@@ -185,8 +185,10 @@ function LedgerPanel({
       header: t('columns.amount'),
       cell: r => (
         <span className="tabular-nums">
-          {r.type === 'refund' ? '−' : ''}
-          {formatMoney(r.amountMinor, locale, { fixedDecimals: true })}
+          <SignedNumber
+            value={r.type === 'refund' ? -r.amountMinor : r.amountMinor}
+            format={abs => formatMoney(abs, locale, { fixedDecimals: true })}
+          />
           {r.vat && (r.vatMinor ?? 0) > 0 && (
             <span className="block text-xs text-muted-foreground">
               {t('vatLine', {

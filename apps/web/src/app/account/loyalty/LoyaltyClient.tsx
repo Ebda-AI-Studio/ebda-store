@@ -8,7 +8,7 @@ import { useNumerals } from '../../../hooks/useNumerals';
 import { useFeatures } from '../../../contexts/FeatureContext';
 import { api, API_URL } from '../../../lib/api';
 import { formatDate as formatStoreDate } from '../../../lib/format-date';
-import { useToast } from '@ebda/ui';
+import { useToast, SignedNumber } from '@ebda/ui';
 import { PointsBalance } from './PointsBalance';
 
 interface LoyaltyPoints {
@@ -507,8 +507,7 @@ export default function LoyaltyClient() {
                           isPositive ? 'text-success-ink' : 'text-destructive-ink'
                         }`}
                       >
-                        {isPositive ? '+' : ''}
-                        {localize(txn.points.toLocaleString('en-US'))}
+                        <SignedNumber value={txn.points} plus />
                       </td>
                     </tr>
                   );

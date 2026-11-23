@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Modal } from '@ebda/ui';
+import { Modal, SignedNumber } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../lib/api';
@@ -323,8 +323,11 @@ export function RefundMethodModal({
                             {t('tierAdjustment.adjustment')}
                           </dt>
                           <dd className="tabular-nums">
-                            {l.adjustment > 0 ? '-' : l.adjustment < 0 ? '+' : ''}
-                            {formatCurrency(Math.abs(l.adjustment))}
+                            <SignedNumber
+                              value={-l.adjustment}
+                              plus
+                              format={abs => formatCurrency(abs)}
+                            />
                           </dd>
                           <dt className="font-semibold text-foreground">
                             {t('tierAdjustment.adjusted')}

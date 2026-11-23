@@ -12,6 +12,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { apiGet, apiPost } from '@/lib/api';
 import { parseStockAdjustCsv, generateStockAdjustCsvTemplate } from '@ebda/shared';
 import type { StockAdjustParseResult, StockAdjustParsedRow } from '@ebda/shared';
+import { SignedNumber } from '@ebda/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -210,7 +211,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
           alignEnd: true,
           cell: row => (
             <span className="font-mono">
-              {row.delta !== null ? (row.delta >= 0 ? `+${row.delta}` : row.delta) : '—'}
+              {row.delta !== null ? <SignedNumber value={row.delta} plus /> : '—'}
             </span>
           ),
         },

@@ -31,6 +31,9 @@ vi.mock('../../../../i18n/useT', () => {
 });
 vi.mock('@ebda/ui', () => ({
   Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+  SignedNumber: ({ value, format }: { value: number; format?: (abs: number) => string }) => (
+    <span>{`${value < 0 ? '-' : ''}${format ? format(Math.abs(value)) : Math.abs(value)}`}</span>
+  ),
   Button: (p: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...p} />,
   Select: ({ label }: { label: string }) => <select aria-label={label} />,
   Input: ({

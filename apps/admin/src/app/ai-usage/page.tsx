@@ -26,6 +26,7 @@ import { PageState } from '@/components/PageState';
 import { formatSpend } from '@/lib/ai-spend';
 import { withNumerals } from '@ebda/shared';
 import { intlLocaleForUi } from '@/lib/format';
+import { SignedNumber } from '@ebda/ui';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -265,8 +266,7 @@ function PlatformAiUsagePageInner() {
           <div className="font-medium text-foreground">{formatSpend(store.monthCostMicros)}</div>
           {store.monthUnpricedCalls > 0 && (
             <div className="text-xs text-warning-ink" title={t('unpricedTooltip')}>
-              +{store.monthUnpricedCalls.toLocaleString(undefined, withNumerals())}{' '}
-              {t('unpricedRowSuffix')}
+              <SignedNumber value={store.monthUnpricedCalls} plus /> {t('unpricedRowSuffix')}
             </div>
           )}
         </div>

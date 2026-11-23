@@ -14,6 +14,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { isUntrackedForGuests } from '@/lib/guest-checkout';
 import { withNumerals } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { SignedNumber } from '@ebda/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,10 +40,13 @@ interface FunnelData {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function dropoff(from: number, to: number): string {
-  if (from === 0) return '—';
-  const pct = ((from - to) / from) * 100;
-  return `-${pct.toFixed(1)}%`;
+/** Step-to-step change: a drop is negative, a gain is positive (`plus`), zero is plain. */
+function Dropoff({ from, to }: { from: number; to: number }) {
+  if (from === 0) return <>—</>;
+  const change = ((to - from) / from) * 100;
+  return (
+    <SignedNumber value={change} plus fractionDigits={1} format={abs => `${abs.toFixed(1)}%`} />
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -225,7 +229,7 @@ export default function InsightsFunnelPage() {
                         <div className="flex items-center gap-3">
                           {prevValue !== null && step.value !== null && (
                             <span className="text-xs text-red-500">
-                              {dropoff(prevValue, step.value)}
+                              <Dropoff from={prevValue} to={step.value} />
                             </span>
                           )}
                           {step.value === null ? (

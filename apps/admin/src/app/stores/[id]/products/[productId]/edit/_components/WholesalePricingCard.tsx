@@ -21,6 +21,7 @@ import { useFeatures } from '../../../../../../../hooks/useFeatures';
 import { checkTierDraft, type DraftProblem } from './tier-draft';
 
 import { Button } from '@/components/ui/Button';
+import { PlusGlyph } from '@ebda/ui';
 interface TierRow extends TierInput {
   id: string;
   stale: boolean;
@@ -230,7 +231,10 @@ export function WholesalePricingCard(props: Props) {
                     </span>
                   ) : null}
                 </td>
-                <td className="py-2 tabular-nums">{r.minQty}+</td>
+                <td className="py-2 tabular-nums">
+                  {r.minQty}
+                  <PlusGlyph decorative={false} />
+                </td>
                 <td className="py-2 tabular-nums">{minorToDecimalString(r.priceMinor)}</td>
                 <td className="py-2 text-end">
                   <Button

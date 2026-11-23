@@ -13,6 +13,7 @@ import { useCurrentStore } from '@/hooks/useCurrentStore';
 import { resolveStoreTimeZone, zonedIsoDay, zonedMonthStartDay } from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
+import { SignedNumber } from '@ebda/ui';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 import {
@@ -476,8 +477,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                 data.netIncome >= 0 ? 'text-green-700' : 'text-red-600'
               }`}
             >
-              {data.netIncome < 0 ? '−' : ''}
-              {formatPrice(Math.abs(data.netIncome))}
+              <SignedNumber value={data.netIncome} format={abs => formatPrice(abs)} />
             </span>
           </div>
         </div>

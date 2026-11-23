@@ -8,6 +8,8 @@ import { apiGet } from '../../../../../../lib/api';
 import { formatPrice, intlLocaleForUi } from '@/lib/format';
 import { useT } from '@/i18n/useT';
 import { Button } from '@/components/ui/Button';
+import {} from '@ebda/shared';
+import { SignedNumber } from '@ebda/ui';
 
 interface AffiliateEvent {
   id: string;
@@ -305,7 +307,11 @@ export default function AffiliateEventsPage() {
                         <p>
                           {t('commissionLabel')}{' '}
                           <span className="font-medium text-success-ink">
-                            +{formatPrice(event.details.commissionAmount)}
+                            <SignedNumber
+                              value={event.details.commissionAmount}
+                              plus
+                              format={abs => formatPrice(abs)}
+                            />
                           </span>
                         </p>
                       )}

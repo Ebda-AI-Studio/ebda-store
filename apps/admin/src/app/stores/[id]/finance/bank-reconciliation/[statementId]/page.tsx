@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
-import { useToast } from '@ebda/ui';
+import { useToast, SignedNumber } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { apiGet, apiGetPage, apiPost, apiPatch, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
@@ -375,8 +375,10 @@ export default function StatementDetailPage() {
                   {t('difference.bankBalance')}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
-                  {difference.bankBalanceFils < 0 ? '−' : ''}
-                  {formatPrice(Math.abs(difference.bankBalanceFils))}
+                  <SignedNumber
+                    value={difference.bankBalanceFils}
+                    format={abs => formatPrice(abs)}
+                  />
                 </p>
               </div>
               <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
@@ -384,8 +386,10 @@ export default function StatementDetailPage() {
                   {t('difference.ledgerBalance')}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
-                  {difference.ledgerBalanceFils < 0 ? '−' : ''}
-                  {formatPrice(Math.abs(difference.ledgerBalanceFils))}
+                  <SignedNumber
+                    value={difference.ledgerBalanceFils}
+                    format={abs => formatPrice(abs)}
+                  />
                 </p>
               </div>
               <div
@@ -409,8 +413,11 @@ export default function StatementDetailPage() {
                     difference.isReconciled ? 'text-success-ink' : 'text-destructive-ink'
                   }`}
                 >
-                  {difference.differenceFils < 0 ? '−' : difference.differenceFils > 0 ? '+' : ''}
-                  {formatPrice(Math.abs(difference.differenceFils))}
+                  <SignedNumber
+                    value={difference.differenceFils}
+                    plus
+                    format={abs => formatPrice(abs)}
+                  />
                 </p>
               </div>
             </div>
@@ -434,8 +441,10 @@ export default function StatementDetailPage() {
                     {t('difference.unmatchedLedgerSide')}
                   </p>
                   <p className="mt-0.5 text-sm font-semibold text-info-ink font-mono">
-                    {difference.unmatchedLedgerFils < 0 ? '−' : ''}
-                    {formatPrice(Math.abs(difference.unmatchedLedgerFils))}
+                    <SignedNumber
+                      value={difference.unmatchedLedgerFils}
+                      format={abs => formatPrice(abs)}
+                    />
                   </p>
                   <p className="mt-0.5 text-xs text-info-ink">
                     {difference.unmatchedLedgerCount} {t('difference.ledgerEntries')}

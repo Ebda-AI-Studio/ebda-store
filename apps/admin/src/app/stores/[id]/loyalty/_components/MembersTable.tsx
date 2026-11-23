@@ -5,6 +5,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { TIER_COLORS, TIER_KEYS, type LoyaltyMember, type TierKey } from './types';
 import { withNumerals } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { SignedNumber } from '@ebda/ui';
 
 interface MembersTableProps {
   members: LoyaltyMember[];
@@ -81,7 +82,7 @@ export function MembersTable({
       header: t('columns.totalEarned'),
       cell: member => (
         <span className="text-success-ink">
-          +{member.totalEarned.toLocaleString(undefined, withNumerals())}
+          <SignedNumber value={member.totalEarned} plus />
         </span>
       ),
     },
@@ -89,7 +90,7 @@ export function MembersTable({
       header: t('columns.totalRedeemed'),
       cell: member => (
         <span className="text-primary">
-          -{member.totalRedeemed.toLocaleString(undefined, withNumerals())}
+          <SignedNumber value={-member.totalRedeemed} />
         </span>
       ),
     },

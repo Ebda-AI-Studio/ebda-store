@@ -52,8 +52,11 @@ interface StatItem {
   labelAr: string;
 }
 
+/** The "200+" marketing suffix (not a signed value). */
+const PLUS_SUFFIX = '+';
+
 const STATS: StatItem[] = [
-  { value: 200, suffix: '+', labelEn: 'products imported', labelAr: 'منتج مستورد' },
+  { value: 200, suffix: PLUS_SUFFIX, labelEn: 'products imported', labelAr: 'منتج مستورد' },
   { value: 2, suffix: '', labelEn: 'languages, AR + EN', labelAr: 'لغتان، عربي + إنجليزي' },
   { value: 7, suffix: '', labelEn: 'days to launch', labelAr: 'أيام للإطلاق' },
 ];

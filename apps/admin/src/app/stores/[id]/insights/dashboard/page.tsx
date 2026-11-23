@@ -13,6 +13,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { isUntrackedForGuests } from '@/lib/guest-checkout';
 
 import { minorToDecimalString, withNumerals } from '@ebda/shared';
+import { SignedNumber } from '@ebda/ui';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TopSku {
@@ -191,8 +192,12 @@ export default function InsightsDashboardPage() {
                     aovChange >= 0 ? 'text-green-700' : 'text-red-600'
                   }`}
                 >
-                  {aovChange >= 0 ? '+' : ''}
-                  {num(aovChange, 1)}%
+                  <SignedNumber
+                    value={aovChange}
+                    plus
+                    fractionDigits={1}
+                    format={abs => `${num(abs, 1)}%`}
+                  />
                 </span>
               )}
             </p>

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useToast } from '@ebda/ui';
+import { useToast, SignedNumber } from '@ebda/ui';
 import { Button, buttonVariants } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPut, apiPost, apiFetch } from '../../../../../lib/api';
@@ -103,6 +103,7 @@ interface OrderRow {
 import { formatDate, formatPrice } from '../../../../../lib/format';
 import { ERASURE_REVIEW_PARAM } from '../_components/customerSegments';
 import { useT } from '../../../../../i18n/useT';
+import {} from '@ebda/shared';
 
 function formatMajor(piastres: number): string {
   return formatPrice(piastres);
@@ -396,8 +397,12 @@ export default function CustomerDetailPage() {
             {refundedPayment && (
               <p className="mt-1 text-xs text-destructive-ink">
                 <span className="font-semibold">{t('refunded')}</span>
-                {' · '}-{formatMajor(refundedPayment.refundedAmount ?? order.total)} {t('via')}{' '}
-                {refundedPayment.provider}
+                {' · '}
+                <SignedNumber
+                  value={-(refundedPayment.refundedAmount ?? order.total)}
+                  format={abs => formatMajor(abs)}
+                />{' '}
+                {t('via')} {refundedPayment.provider}
                 {refundedPayment.metadata?.refundedAt && (
                   <>
                     {' '}

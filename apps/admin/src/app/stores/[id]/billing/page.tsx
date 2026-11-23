@@ -21,7 +21,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Select, useToast } from '@ebda/ui';
+import { Badge, Select, useToast, SignedNumber } from '@ebda/ui';
 import { billingDisplayStatus, showPeriodEnd, trialDaysLeft } from '@/lib/billing-state';
 import { Button } from '@/components/ui/Button';
 import { formatMoney, type PlanLimits, withNumerals } from '@ebda/shared';
@@ -1301,8 +1301,10 @@ export default function StoreBillingPage() {
                     header: t('invoiceCols.amount'),
                     cell: c => (
                       <span className="tabular-nums">
-                        {c.type === 'refund' ? '−' : ''}
-                        {formatMoney(c.amountMinor, locale, { fixedDecimals: true })}
+                        <SignedNumber
+                          value={c.type === 'refund' ? -c.amountMinor : c.amountMinor}
+                          format={abs => formatMoney(abs, locale, { fixedDecimals: true })}
+                        />
                         {c.vat && (c.vatMinor ?? 0) > 0 && (
                           <span className="block text-xs text-muted-foreground">
                             {t('invoiceVat', {

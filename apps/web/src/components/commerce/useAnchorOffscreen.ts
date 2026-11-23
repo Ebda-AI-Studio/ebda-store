@@ -38,7 +38,7 @@ export function useAnchorOffscreen(ref: RefObject<Element | null>): boolean {
         // 1 = the whole row must be inside the reachable area: a button half-covered by the
         // tab bar (or clipped at the top) is not reachable, so the bar stays up for it.
         threshold: 1,
-        rootMargin: `0px 0px -${measureBottomObstruction()}px 0px`,
+        rootMargin: `0px 0px ${-measureBottomObstruction()}px 0px`,
       });
       io.observe(el);
     };

@@ -14,6 +14,7 @@ import { reportRangeQueryString, withNumerals } from '@ebda/shared';
 import { formatPrice } from '@/lib/format';
 
 import { Button } from '@/components/ui/Button';
+import { SignedNumber } from '@ebda/ui';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface CashAccountRow {
@@ -310,8 +311,7 @@ export default function FinanceDashboardPage() {
                     '—'
                   ) : (
                     <>
-                      {netPositive ? '' : '−'}
-                      {major(Math.abs(thisMonth.net))}
+                      <SignedNumber value={thisMonth.net} format={major} />
                     </>
                   )}
                 </p>
@@ -475,7 +475,6 @@ export default function FinanceDashboardPage() {
                 ) : (
                   <div className="divide-y divide-border/40">
                     {recentAnomalies.map(a => {
-                      const sign = a.deltaPercent >= 0 ? '+' : '';
                       // `deltaPercent` is stored as a ratio (e.g. -0.35); ×100
                       // to show a real percentage, matching the anomalies page.
                       const deltaPercentDisplay = a.deltaPercent * 100;
@@ -499,8 +498,12 @@ export default function FinanceDashboardPage() {
                                 a.deltaPercent < 0 ? 'text-red-600' : 'text-green-700'
                               }`}
                             >
-                              {sign}
-                              {deltaPercentDisplay.toFixed(1)}%
+                              <SignedNumber
+                                value={deltaPercentDisplay}
+                                plus
+                                fractionDigits={1}
+                                format={abs => `${abs.toFixed(1)}%`}
+                              />
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground line-clamp-1">

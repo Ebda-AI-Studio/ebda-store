@@ -8,6 +8,7 @@ import { useLocalePrice } from '../../../hooks/useLocalePrice';
 import { useWallet } from '../../../hooks/useWallet';
 import { api } from '../../../lib/api';
 import { formatDate as formatStoreDate } from '../../../lib/format-date';
+import { SignedNumber } from '@ebda/ui';
 
 interface WalletEntry {
   id: string;
@@ -211,8 +212,7 @@ export default function WalletClient() {
                     }`}
                   >
                     <span dir="ltr">
-                      {entry.amount > 0 ? '+' : '−'}
-                      {money(Math.abs(entry.amount))}
+                      <SignedNumber value={entry.amount} plus format={abs => money(abs)} />
                     </span>
                   </p>
                   <p className="text-xs text-muted-foreground">

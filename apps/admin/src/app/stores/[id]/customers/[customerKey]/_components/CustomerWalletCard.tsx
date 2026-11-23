@@ -8,6 +8,8 @@ import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 import { formatDateTime, formatPrice } from '@/lib/format';
 import { WalletAdjustModal } from './WalletAdjustModal';
+import {} from '@ebda/shared';
+import { SignedNumber } from '@ebda/ui';
 
 export interface WalletEntryRow {
   id: string;
@@ -198,8 +200,7 @@ export function CustomerWalletCard({
                     }`}
                     dir="ltr"
                   >
-                    {row.amount > 0 ? '+' : '−'}
-                    {money(Math.abs(row.amount))}
+                    <SignedNumber value={row.amount} plus format={abs => money(abs)} />
                   </td>
                   <td
                     className="px-4 py-2 text-end text-muted-foreground whitespace-nowrap hidden sm:table-cell"

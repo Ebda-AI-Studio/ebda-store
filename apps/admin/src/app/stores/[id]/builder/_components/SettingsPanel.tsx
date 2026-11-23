@@ -51,6 +51,7 @@ import { MediaPicker } from './MediaPicker';
 import { VideoField } from './VideoField';
 import type { Selection } from './SectionTree';
 import { fieldDefId } from '../_lib/deeplink';
+import { PlusGlyph } from '@ebda/ui';
 
 type Mode = 'content' | 'design';
 
@@ -855,7 +856,7 @@ function ProductListPicker({
                 onClick={() => onChange([...value, p.id])}
                 className="w-full truncate justify-start"
               >
-                + {locale === 'ar' && p.nameAr ? p.nameAr : p.name}
+                <PlusGlyph /> {locale === 'ar' && p.nameAr ? p.nameAr : p.name}
               </Button>
             </li>
           ))}

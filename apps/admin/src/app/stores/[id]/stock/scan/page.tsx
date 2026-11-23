@@ -22,9 +22,14 @@ import { useT } from '@/i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useFeatures } from '@/hooks/useFeatures';
 import { useLocale } from 'next-intl';
-import { VariantText } from '@ebda/ui';
+import { VariantText, SignedNumber } from '@ebda/ui';
 import { apiGet, apiPost } from '@/lib/api';
-import { orderLineVariantTitle, searchQueryHeaders, withNumerals } from '@ebda/shared';
+import {
+  orderLineVariantTitle,
+  searchQueryHeaders,
+  withNumerals,
+  formatSigned,
+} from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
 import { cameraScanAvailable, createScanDetector, type ScanDetector } from '@/lib/barcode-scanner';
@@ -864,7 +869,7 @@ function CountMode({ storeId }: { storeId: string }) {
     const ok = await askConfirm({
       object: t('counting.reconcileObject', {
         count: changed.length,
-        units: `${netUnits > 0 ? '+' : ''}${netUnits}`,
+        units: formatSigned(netUnits, { plus: true }),
       }),
       consequence: t('counting.reconcileConsequence'),
       confirmLabel: t('counting.reconcileAction'),
@@ -1081,7 +1086,7 @@ function CountMode({ storeId }: { storeId: string }) {
                         : 'text-muted-foreground'
                   }`}
                 >
-                  {line.variance > 0 ? `+${line.variance}` : line.variance}
+                  <SignedNumber value={line.variance} plus />
                 </span>
               ),
             },

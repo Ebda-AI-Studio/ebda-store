@@ -118,6 +118,9 @@ const chip = (on: boolean) => `${CHIP_BASE} ${on ? CHIP_ON : CHIP_OFF}`;
  * `surface` distinguishes the desktop sidebar from the mobile bottom-sheet so the
  * two copies of the panel never collide on checkbox ids / htmlFor pairs.
  */
+/** DOM id prefix of the price slider (an id, not a signed number). */
+const PRICE_ID_PREFIX = 'price';
+
 function FacetGroup({
   facet,
   selectedValues,
@@ -343,7 +346,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
               {t('Price range', 'مجال السعر')}
             </h3>
             <PriceRangeSlider
-              idPrefix={`price-${mobile ? 'm' : 'd'}`}
+              idPrefix={`${PRICE_ID_PREFIX}-${mobile ? 'm' : 'd'}`}
               floor={priceFloor}
               ceil={priceCeil}
               min={priceMin}
