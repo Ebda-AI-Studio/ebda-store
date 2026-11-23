@@ -85,7 +85,7 @@ describe("a store removed from the directory keeps Ebda's billing records", () =
       expect(n(db, `SELECT count(*) n FROM "${t}" WHERE store_id = 'sx'`), t).toBe(1);
     expect(
       db.prepare("SELECT slug, status, deleted_at AS d FROM stores WHERE id = 'sx'").get()
-    ).toEqual({ slug: 'purged-sx', status: 'inactive', d: 7_000 });
+    ).toEqual({ slug: '~purged~sx', status: 'inactive', d: 7_000 });
   });
 });
 
