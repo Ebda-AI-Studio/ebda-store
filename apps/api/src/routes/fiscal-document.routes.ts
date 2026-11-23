@@ -52,6 +52,7 @@ const UUID = z.string().uuid();
  * A printable document is inert HTML: every dynamic value is escaped in the renderer, and the response
  * also forbids script (CSP), sniffing and caching, so stored data can never execute in the viewer's origin.
  */
+// pq-allow(unused-export): test seam, imported by tests/unit/fiscal-document-html-xss.test.ts
 export function sendFiscalHtml(res: Response, html: string): void {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('X-Content-Type-Options', 'nosniff');
