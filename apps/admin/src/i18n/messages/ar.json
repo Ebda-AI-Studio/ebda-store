@@ -1609,7 +1609,8 @@
         "addNote": "إضافة ملاحظة",
         "refund": "استرداد",
         "toolbarLabel": "إجراءات الطلب",
-        "confirmInstapay": "الفلوس وصلت"
+        "confirmInstapay": "الفلوس وصلت",
+        "refundOrder": "استرداد الطلب"
       },
       "loading": "جاري تحميل الطلب…",
       "errors": {

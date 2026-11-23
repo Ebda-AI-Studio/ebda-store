@@ -1609,7 +1609,8 @@
         "addNote": "Add Note",
         "refund": "Refund",
         "toolbarLabel": "Order actions",
-        "confirmInstapay": "Payment received"
+        "confirmInstapay": "Payment received",
+        "refundOrder": "Refund order"
       },
       "loading": "Loading order…",
       "errors": {

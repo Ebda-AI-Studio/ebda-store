@@ -67,11 +67,20 @@ export default function AnswerEnginePage() {
             </p>
           )}
 
-          <EngineSummaryCards engines={summary.engines} />
+          {/* STORE-QA-34: nothing to show in any of the three = ONE empty state, not three copies of it. */}
+          {summary.engines.length === 0 &&
+          summary.trend.length === 0 &&
+          summary.prompts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('noData')}</p>
+          ) : (
+            <>
+              <EngineSummaryCards engines={summary.engines} />
 
-          <TrendChart trend={summary.trend} />
+              <TrendChart trend={summary.trend} />
 
-          <PromptResultsList storeId={storeId} prompts={summary.prompts} />
+              <PromptResultsList storeId={storeId} prompts={summary.prompts} />
+            </>
+          )}
 
           <div className="pt-2">
             <h2 className="text-base font-semibold text-foreground mb-4" dir="auto">

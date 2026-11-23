@@ -31,11 +31,14 @@ function AboutFallback() {
       <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl sm:text-4xl font-bold mb-6 text-foreground">{brandName}</h1>
 
-        {description && (
-          <p className="text-base sm:text-lg text-muted-foreground leading-relaxed mb-12">
-            {description}
-          </p>
-        )}
+        {/* STORE-QA-47: a store with no description still gets a real sentence, never a bare heading. */}
+        <p className="text-base sm:text-lg text-muted-foreground leading-relaxed mb-12">
+          {description ||
+            t(
+              `Welcome to ${brandName}. Browse our collection and message us any time if you need help choosing.`,
+              `أهلاً بيك في ${brandName}. اتفرج على مجموعتنا وكلّمنا في أي وقت لو محتاج مساعدة في الاختيار.`
+            )}
+        </p>
 
         {hasContactDetails && (
           <section className="mb-12">

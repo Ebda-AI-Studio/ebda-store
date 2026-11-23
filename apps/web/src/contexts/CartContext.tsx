@@ -149,6 +149,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [bundles, setBundles] = useState<CartBundle[]>([]);
   const [isReady, setIsReady] = useState(false);
   const migratedRef = useRef(false);
+  const itemsRef = useRef<CartItem[]>([]);
+  itemsRef.current = items;
   const toast = useToast();
   const { t, language } = useLanguage();
   // On the platform domain root (ebda.app/) there is no resolved
@@ -408,7 +410,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         await removeItem(id);
         return;
       }
+      // STORE-QA-45: remember what the server last accepted so a refused (400) or throttled (429) change
+      // can NEVER leave the optimistic number on screen, even when the reconciling refetch is throttled too.
+      // Read from a ref, synchronously: capturing it inside the setItems updater ran too late (React runs the updater at
+      // render, after a fast 429 had already come back), so nothing was ever restored.
+      const before = itemsRef.current;
       setItems(prev => prev.map(i => (i.id === id ? { ...i, quantity } : i)));
+      const rollback = async () => {
+        setItems(before);
+        await refetchCart().catch(() => {});
+      };
       try {
         const res = await api.updateCartItem(id, quantity);
         if (res.success && res.data?.cart) {
@@ -417,11 +428,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             ((res.data.cart.bundles as ServerCartBundle[] | undefined) ?? []).map(mapServerBundle)
           );
         } else {
-          await refetchCart();
-          throw new Error(res.error?.message || 'Failed to update item');
+          await rollback();
+          const e = new Error(res.error?.message || 'Failed to update item') as Error & {
+            code?: string;
+          };
+          e.code = res.error?.code;
+          throw e;
         }
       } catch (err) {
-        await refetchCart().catch(() => {});
+        await rollback();
         throw err;
       }
     },
