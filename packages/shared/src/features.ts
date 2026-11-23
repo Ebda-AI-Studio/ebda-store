@@ -123,10 +123,11 @@ export type FeatureCategory = 'commerce' | 'marketing' | 'operations' | 'storefr
  *   per-tenant config beyond on/off. Super-admin still gates per-store
  *   for billing-plan reasons but most stores get it.
  * - 'extra' — extra polish or specialized capability, INCLUDED in the
- *   Business plan (Ruling BIZ-ALL-1, Ahmad 2026-11-15: nothing is sold
- *   separately any more; it was called 'addon' before). Often needs
- *   per-tenant config (floating widget button list, etc.). Lower plans
- *   reach it by upgrading, never by buying the feature alone here.
+ *   Business plan (Ruling BIZ-ALL-1, Ahmad 2026-11-15; it was called
+ *   'addon' before). Often needs per-tenant config (floating widget
+ *   button list, etc.). A lower plan reaches it by upgrading, or by buying
+ *   that one feature as a paid monthly add-on (Ruling AI-ADDON-1, Ahmad
+ *   2026-11-23: add-ons and AI request packs ARE sold by card).
  * - 'experimental' — scaffold only / not customer-visible yet. Most
  *   `hidden: true` features fall here.
  */

@@ -1,8 +1,9 @@
 /**
- * Where "add just this feature" goes on a lower-plan upgrade screen (Ahmad 2026-11-15: Basic/Growth can buy ONE Business
- * feature monthly instead of upgrading). The purchase flow itself is built in the self-service add-ons stack (#775 / #827,
- * route `/stores/:id/billing/addons?sku=...`), not here. Until that route is on main this points at the Billing plans
- * section; the add-ons builder swaps the body of this ONE function and no caller changes.
+ * Where "add just this feature" goes on a lower-plan upgrade screen. Add-ons ARE sold (Ruling AI-ADDON-1, Ahmad
+ * 2026-11-23): the purchase flow is the self-service add-ons page `/stores/:id/billing/addons?sku=...` of PR #775 / #827,
+ * which is not on main yet, so until it lands this points at the Billing plans section (a lower plan can still upgrade
+ * there; nothing is lost). When #775 merges, its owner swaps the body of this ONE function (and hides the CTA for a
+ * feature that has no add-on SKU); no caller changes. Recorded in docs/rulings/BIZ-ALL-1.md (BIZ-ALL-6).
  */
 export function featureAddHref(storeId: string, featureKey: string): string {
   return `/stores/${encodeURIComponent(storeId)}/billing?feature=${encodeURIComponent(featureKey)}#plans`;
