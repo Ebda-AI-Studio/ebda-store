@@ -23,6 +23,7 @@ import { getEntitlements } from '../plan-entitlements';
 import { bustStoreCaches } from '../store.service';
 import { featureService } from '../feature.service';
 import {
+  FREE_PLAN_CODE,
   INSTAPAY_GRACE_DAYS,
   addDays,
   addInterval,
@@ -275,6 +276,34 @@ export async function syncChildSubscriptions(ownerId: string, now: Date = new Da
     tx.storeSubscription.findUnique({ where: { storeId: parentId } })
   );
   if (!parent) return;
+  // The parent lapsed (dunning / InstaPay grace over / cancel): its children were INCLUDED in the plan it no longer
+  // pays for, so their mirrored rows drop to free too. Without this a child kept the parent's Business row (and its
+  // features + AI) forever, because only COVERED children are synced below (#836). Only a mirror is touched: no
+  // provider, no method, no period. A later payment by the parent re-covers the children and the loop below copies the
+  // plan back.
+  if (parent.status === 'canceled') {
+    for (const child of stores.slice(1)) {
+      const { count } = await withStore(child.id, async tx => {
+        const r = await tx.storeSubscription.updateMany({
+          where: {
+            storeId: child.id,
+            provider: null,
+            billingMethod: null,
+            currentPeriodEnd: null,
+            NOT: { planCode: FREE_PLAN_CODE, status: 'canceled' },
+          },
+          data: { planCode: FREE_PLAN_CODE, status: 'canceled', pendingPlanCode: null },
+        });
+        if (r.count > 0) await storeUpdate(tx, { where: { id: child.id }, data: { plan: 'free' } });
+        return r;
+      });
+      if (count > 0) {
+        await featureService.invalidateCache(child.id).catch(() => undefined);
+        logger.info({ childId: child.id }, '[billing] child plan lapsed with its parent');
+      }
+    }
+    return;
+  }
   const featureTier = (await prisma.plan.findUnique({ where: { code: parent.planCode } }))
     ?.featureTier;
   for (const child of stores.slice(1)) {

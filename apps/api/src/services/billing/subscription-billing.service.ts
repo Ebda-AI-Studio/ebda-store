@@ -1147,6 +1147,11 @@ async function renewSubscriptionInner(
     return { action: 'canceled' };
   }
 
+  // An InstaPay row whose grace already ended (`nextRetryAt` cleared) but that an earlier build never downgraded (#836).
+  if (sub.billingMethod === 'instapay' && sub.status === 'past_due' && !sub.nextRetryAt) {
+    return lapseManualSubscription(sub, now);
+  }
+
   const attempt = sub.status === 'past_due' ? sub.dunningAttempts : 0;
   const due =
     sub.status === 'past_due'
@@ -1236,10 +1241,15 @@ type SubRow = NonNullable<Awaited<ReturnType<typeof loadSub>>>;
 /**
  * One step of the manual-payment policy (no money moves, so no ledger row):
  *  - due day, not yet past_due  -> past_due, retry (= suspension) at due + grace;
- *  - grace over, still unpaid   -> store suspended (`unpaid`), retry cleared.
+ *  - grace over, still unpaid   -> store suspended (`unpaid`) AND downgraded to free / `canceled`
+ *    (`downgradeToFree(..., 'dunning')`, same end state as a card's third failed retry).
  * Both are compare-and-set on the row's state, so a second run the same day is
  * a no-op. A recorded payment (manual or card) makes the row active again and
- * lifts the suspension (reconcileStoreAccess).
+ * lifts the suspension (reconcileStoreAccess; `recordManualPayment` accepts a canceled row).
+ *
+ * Before #836 the grace step only cleared `nextRetryAt` and suspended: the row stayed `past_due` on its paid plan
+ * forever (the due scan never selected it again), so the merchant kept the paid plan's admin features and AI after
+ * the storefront went down.
  */
 async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<RenewalResult> {
   if (sub.status !== 'past_due') {
@@ -1277,8 +1287,39 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
     })
   );
   if (count === 0) return { action: 'skipped', reason: 'already_advanced' };
+  return lapseManualSubscription(sub, now);
+}
+
+/**
+ * The grace is over on an InstaPay subscription: suspend the store (`unpaid`) and downgrade the row to free /
+ * `canceled`. Also the self-heal for rows an earlier build left `past_due` with `nextRetryAt = null` (the due scan
+ * selects them; see findDueSubscriptionIds). Idempotent: the downgrade only applies to a row that is still the same
+ * InstaPay `past_due` subscription, and suspendForBilling is compare-and-set.
+ */
+async function lapseManualSubscription(sub: SubRow, now: Date): Promise<RenewalResult> {
+  const effects: BillingEffect[] = [];
+  const downgraded = await withStore(sub.storeId, async tx => {
+    const cur = await tx.storeSubscription.findUnique({ where: { storeId: sub.storeId } });
+    if (!cur || cur.id !== sub.id || cur.status !== 'past_due' || cur.billingMethod !== 'instapay')
+      return false;
+    await downgradeToFree(tx, sub.storeId, 'dunning', effects);
+    return true;
+  });
+  if (!downgraded) return { action: 'skipped', reason: 'already_advanced' };
+  // Suspend BEFORE the downgrade effects run: the `downgraded` effect calls reconcileStoreAccess, which must find the
+  // store already suspended (a canceled row never lifts an `unpaid` suspension) and drops every feature cache layer.
   const suspended = await suspendForBilling(sub.storeId, 'unpaid', now);
-  await runBillingEffects([{ kind: 'store_suspended', storeId: sub.storeId, applied: suspended }]);
+  await auditLog({
+    action: 'billing.manual_payment_lapsed',
+    resourceType: 'store_subscription',
+    resourceId: sub.id,
+    storeId: sub.storeId,
+    details: { planCode: sub.planCode, graceDays: INSTAPAY_GRACE_DAYS },
+  });
+  await runBillingEffects([
+    { kind: 'store_suspended', storeId: sub.storeId, applied: suspended },
+    ...effects,
+  ]);
   return { action: 'suspended' };
 }
 
@@ -1319,6 +1360,8 @@ export async function findDueSubscriptionIds(
             },
             { status: 'trialing', trialEndsAt: { lte: now } },
             { status: 'past_due', nextRetryAt: { lte: now } },
+            // a lapsed InstaPay row left past_due with no retry by an earlier build (#836 self-heal)
+            { status: 'past_due', billingMethod: 'instapay', nextRetryAt: null },
           ],
         },
         select: { id: true, currentPeriodEnd: true },
