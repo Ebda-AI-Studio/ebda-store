@@ -214,6 +214,7 @@ export async function claimEvent(input: ClaimInput): Promise<string | null> {
       relatedEventId: input.relatedEventId ?? null,
       vatMinor,
       vat,
+      raw: input.raw ?? null,
     });
     return won ? id : null;
   }

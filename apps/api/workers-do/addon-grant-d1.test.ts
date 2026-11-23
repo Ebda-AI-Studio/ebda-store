@@ -227,6 +227,43 @@ describe('the ledger claim on the platform D1 (claimBillingEventD1): exactly one
   });
 });
 
+describe('B3: the D1 claim keeps `raw` (a refund keepAccess) for the webhook settle', () => {
+  it('raw is stored as JSON, and absent raw stays NULL', async () => {
+    const s = await store();
+    const mk = (raw?: unknown) => ({
+      id: crypto.randomUUID(),
+      storeId: s,
+      subscriptionId: null,
+      type: 'upgrade',
+      planCode: PLAN,
+      billingInterval: null,
+      forPeriodEnd: null,
+      attempt: 0,
+      amountMinor: 9900,
+      provider: 'kashier',
+      idempotencyKey: uid('raw'),
+      relatedEventId: null,
+      vatMinor: 0,
+      vat: null,
+      raw,
+    });
+    const a = mk({ keepAccess: true });
+    const b = mk();
+    expect(await claimBillingEventD1(a)).toBe(true);
+    expect(await claimBillingEventD1(b)).toBe(true);
+    const rawOf = async (id: string) =>
+      (
+        (await e.PLATFORM_DB.prepare('SELECT raw FROM billing_events WHERE id = ?1')
+          .bind(id)
+          .first()) as {
+          raw: string | null;
+        }
+      ).raw;
+    expect(JSON.parse((await rawOf(a.id))!)).toEqual({ keepAccess: true });
+    expect(await rawOf(b.id)).toBeNull();
+  });
+});
+
 describe('D1 `meta.changes` counts the AFTER INSERT tax triggers: a claim wins on changes > 0, not === 1', () => {
   it('the marker claim: the first caller wins, the second is refused (no race needed)', async () => {
     const s = await store();
