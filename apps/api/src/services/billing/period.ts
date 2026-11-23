@@ -40,7 +40,11 @@ export function addIntervalAnchored(
   interval: BillingInterval,
   anchorDay?: number | null
 ): Date {
-  const months = interval === 'yearly' ? 12 : 1;
+  return addMonthsAnchored(from, interval === 'yearly' ? 12 : 1, anchorDay);
+}
+
+/** `addIntervalAnchored` for any whole number of months (same UTC day clamp). */
+function addMonthsAnchored(from: Date, months: number, anchorDay?: number | null): Date {
   const y = from.getUTCFullYear();
   const m = from.getUTCMonth() + months;
   const lastDay = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
@@ -55,6 +59,28 @@ export function addIntervalAnchored(
   d.setUTCDate(1);
   d.setUTCFullYear(y, m, Math.min(wanted, lastDay));
   return d;
+}
+
+/**
+ * How many billing intervals the span [start, end) covers, rounded UP (min 1): the smallest k with
+ * start + k intervals >= end, counted in calendar months from `start`'s own day (Jan 31 + 1 month = Feb 28/29,
+ * +2 = Mar 31). A span of one month and one second is 2 intervals. Returns `max + 1` when the span is longer than
+ * `max` intervals, so the caller can refuse it without looping unbounded.
+ */
+export function intervalsCovered(
+  start: Date,
+  end: Date,
+  interval: BillingInterval,
+  max = 120
+): number {
+  const step = interval === 'yearly' ? 12 : 1;
+  const anchor = start.getUTCDate();
+  let k = 1;
+  while (addMonthsAnchored(start, k * step, anchor).getTime() < end.getTime()) {
+    k += 1;
+    if (k > max) return max + 1;
+  }
+  return k;
 }
 
 export function addInterval(from: Date, interval: BillingInterval): Date {

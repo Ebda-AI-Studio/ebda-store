@@ -284,6 +284,45 @@ describe('billing ledger: signup-funnel additions', () => {
     });
   });
 
+  it('manual payment: correcting the amount after AMOUNT_BELOW_PRICE drops the override and never sends allowUnderpay', async () => {
+    mockTabs();
+    apiPost.mockResolvedValueOnce({
+      data: null,
+      error: { code: 'AMOUNT_BELOW_PRICE', message: 'x', status: 409 },
+    });
+    apiPost.mockResolvedValue({ data: { duplicate: false }, error: null });
+    render(<BillingEventsPage />);
+    openTab('tabs.subscriptions');
+    fireEvent.click((await screen.findAllByRole('button', { name: 'record' }))[0]);
+    fireEvent.change(screen.getByLabelText('reference'), { target: { value: 'IPN-1' } });
+    fireEvent.change(screen.getByLabelText('amount'), { target: { value: '1.00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }));
+    fireEvent.click(await screen.findByLabelText('allowUnderpay'));
+    expect(screen.getByLabelText('underpayReason')).toBeTruthy();
+    // the operator fixes the amount: the override box and the reason requirement go away
+    fireEvent.change(screen.getByLabelText('amount'), { target: { value: '89910.00' } });
+    expect(screen.queryByLabelText('allowUnderpay')).toBeNull();
+    expect(screen.queryByLabelText('underpayReason')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }));
+    await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2));
+    expect(apiPost.mock.calls[1][1]).not.toHaveProperty('allowUnderpay');
+    expect(apiPost.mock.calls[1][1]).not.toHaveProperty('underpayReason');
+  });
+
+  it('manual payment: a server REASON_REQUIRED shows its own message, not the generic failure', async () => {
+    mockTabs();
+    apiPost.mockResolvedValue({
+      data: null,
+      error: { code: 'REASON_REQUIRED', message: 'x', status: 400 },
+    });
+    render(<BillingEventsPage />);
+    openTab('tabs.subscriptions');
+    fireEvent.click((await screen.findAllByRole('button', { name: 'record' }))[0]);
+    fireEvent.change(screen.getByLabelText('reference'), { target: { value: 'IPN-1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('underpayReasonRequired');
+  });
+
   it('manual payment: a 409 REFERENCE_USED_ELSEWHERE explains the voided-payment path', async () => {
     mockTabs();
     apiPost.mockResolvedValue({

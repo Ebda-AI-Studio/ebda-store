@@ -418,6 +418,11 @@ const ALLOW: Record<string, AllowEntry> = {
     reason: 'retailUnitPrice: the labelled retail helper',
     reads: { retailUnitPrice: 2 },
   },
+  'services/billing/account.service.ts': {
+    category: 'unrelated',
+    reason: 'subscription plan price: recordManualPayment compares the recorded amount with it',
+    reads: { recordManualPayment: 1 },
+  },
   'services/billing/subscription-billing.service.ts': {
     category: 'unrelated',
     reason: 'subscription plan price',

@@ -13,10 +13,18 @@ vi.mock('../../apps/api/src/services/alerts.service', () => ({
 vi.mock('../../apps/api/src/services/billing/billing-notify', () => ({
   runBillingEffects: vi.fn(async () => undefined),
 }));
-vi.mock('../../apps/api/src/services/billing/charge-amount', async importOriginal => ({
-  ...(await importOriginal<object>()),
-  resolvePlatformVat: async () => ({ enabled: false, rateBps: 0, mode: 'inclusive' }),
+const vatBox = vi.hoisted(() => ({
+  vat: { enabled: false, rateBps: 0, mode: 'inclusive' } as Record<string, unknown>,
 }));
+vi.mock('../../apps/api/src/services/billing/charge-amount', async importOriginal => {
+  const real =
+    await importOriginal<typeof import('../../apps/api/src/services/billing/charge-amount')>();
+  return {
+    ...real,
+    resolvePlatformVat: async () => vatBox.vat as never,
+    chargeFor: async (price: number) => real.subscriptionChargeAmount(price, vatBox.vat as never),
+  };
+});
 const h = vi.hoisted(() => ({
   storeUpdate: vi.fn(async () => ({})),
   claimUpdateMany: vi.fn(async () => ({ count: 1 })),
@@ -137,6 +145,7 @@ beforeEach(() => {
   registerPlatformRouter();
   Object.values(h).forEach(f => f.mockClear());
   h.storeUpdate.mockResolvedValue({});
+  vatBox.vat = { enabled: false, rateBps: 0, mode: 'inclusive' };
 });
 
 describe('manual payment on D1 fails closed', () => {
@@ -235,5 +244,211 @@ describe('manual payment on D1 fails closed', () => {
     h.storeUpdate.mockClear();
     expect(await recordManualPayment(input(A))).toMatchObject({ duplicate: true });
     expect(h.storeUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('R-MANUAL-UNDERPAY-1: the recorded amount must cover the plan price (VAT included)', () => {
+  const ledgerRows = (db: DatabaseSync) =>
+    db.prepare('SELECT COUNT(*) n FROM billing_events WHERE store_id = ?').get(A);
+
+  it('an amount below the plan price is refused: 409 AMOUNT_BELOW_PRICE, nothing written', async () => {
+    const db = world();
+    await expect(recordManualPayment(input(A, { amountMinor: 100 }))).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'AMOUNT_BELOW_PRICE',
+    });
+    expect(h.storeUpdate).not.toHaveBeenCalled();
+    expect(ledgerRows(db)).toEqual({ n: 0 });
+    expect(db.prepare('SELECT COUNT(*) n FROM store_subscriptions').get()).toEqual({ n: 0 });
+  });
+
+  it('allowUnderpay needs a written reason, then records it on the ledger row', async () => {
+    const db = world();
+    await expect(
+      recordManualPayment(input(A, { amountMinor: 100, allowUnderpay: true }))
+    ).rejects.toMatchObject({ statusCode: 400, code: 'REASON_REQUIRED' });
+    expect(ledgerRows(db)).toEqual({ n: 0 });
+    const out = await recordManualPayment(
+      input(A, { amountMinor: 100, allowUnderpay: true, underpayReason: 'agreed discount' })
+    );
+    expect(out.duplicate).toBe(false);
+    const row = db.prepare('SELECT amount_minor a, raw FROM billing_events').get() as {
+      a: number;
+      raw: string;
+    };
+    expect(row.a).toBe(100);
+    expect(JSON.parse(row.raw).underpay).toEqual({
+      expectedMinor: 5000,
+      periodIntervals: 1,
+      reason: 'agreed discount',
+    });
+  });
+
+  it('the exact price and an overpayment are accepted without the flag', async () => {
+    const db = world();
+    await recordManualPayment(input(A));
+    await recordManualPayment(input(B, { amountMinor: 9000, reference: '99999999999' }));
+    expect(db.prepare('SELECT COUNT(*) n FROM billing_events').get()).toEqual({ n: 2 });
+  });
+
+  it('with Ebda VAT exclusive the price to cover is price + VAT', async () => {
+    const db = world();
+    vatBox.vat = {
+      enabled: true,
+      rateBps: 1400,
+      mode: 'exclusive',
+      trn: '100200300',
+      legalName: 'Ebda Studio',
+    };
+    await expect(recordManualPayment(input(A, { amountMinor: 5000 }))).rejects.toMatchObject({
+      code: 'AMOUNT_BELOW_PRICE',
+    });
+    await recordManualPayment(input(A, { amountMinor: 5700 }));
+    expect(ledgerRows(db)).toEqual({ n: 1 });
+  });
+
+  describe('an explicit period is priced by the intervals it covers (audit CRITICAL, PR #860)', () => {
+    const start = new Date('2026-01-15T00:00:00.000Z');
+    const span = (months: number) => ({
+      periodStart: start,
+      periodEnd: new Date(Date.UTC(2026, 0 + months, 15)),
+    });
+
+    const at = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+
+    it('one month price + a 12-month explicit period is refused, nothing written', async () => {
+      const db = world();
+      await expect(
+        recordManualPayment(input(A, { amountMinor: 5000, now: start, ...span(12) }))
+      ).rejects.toMatchObject({ statusCode: 409, code: 'AMOUNT_BELOW_PRICE' });
+      expect(ledgerRows(db)).toEqual({ n: 0 });
+      expect(h.storeUpdate).not.toHaveBeenCalled();
+    });
+
+    it('the same with the override + reason is accepted and recorded as an underpay (12 intervals expected)', async () => {
+      const db = world();
+      const out = await recordManualPayment(
+        input(A, {
+          amountMinor: 5000,
+          now: start,
+          ...span(12),
+          allowUnderpay: true,
+          underpayReason: 'annual deal agreed by phone',
+        })
+      );
+      expect(out.underpay).toEqual({ expectedMinor: 60000, periodIntervals: 12 });
+      const row = db.prepare('SELECT raw FROM billing_events').get() as { raw: string };
+      expect(JSON.parse(row.raw).underpay).toEqual({
+        expectedMinor: 60000,
+        periodIntervals: 12,
+        reason: 'annual deal agreed by phone',
+      });
+    });
+
+    it('12 intervals paid in full needs no flag and reports no underpay (service outcome)', async () => {
+      const db = world();
+      const out = await recordManualPayment(
+        input(A, { amountMinor: 60000, now: start, ...span(12) })
+      );
+      expect(out.underpay).toBeUndefined();
+      const row = db.prepare('SELECT raw FROM billing_events').get() as { raw: string };
+      expect(JSON.parse(row.raw).underpay).toBeUndefined();
+    });
+
+    it('allowUnderpay sent but the amount already covers the price: no underpay is recorded', async () => {
+      const db = world();
+      const out = await recordManualPayment(
+        input(A, { amountMinor: 5000, allowUnderpay: true, underpayReason: 'stale form flag' })
+      );
+      expect(out.underpay).toBeUndefined();
+      const row = db.prepare('SELECT raw FROM billing_events').get() as { raw: string };
+      expect(JSON.parse(row.raw).underpay).toBeUndefined();
+    });
+
+    it('an explicit period of exactly one interval at the plain price still works', async () => {
+      world();
+      expect(
+        await recordManualPayment(input(A, { amountMinor: 5000, now: start, ...span(1) }))
+      ).toMatchObject({
+        duplicate: false,
+      });
+    });
+
+    it('a period a second past one interval is 2 intervals (rounded up)', async () => {
+      world();
+      await expect(
+        recordManualPayment(
+          input(A, {
+            amountMinor: 5000,
+            now: start,
+            periodStart: start,
+            periodEnd: new Date(Date.UTC(2026, 1, 15, 0, 0, 1)),
+          })
+        )
+      ).rejects.toMatchObject({ code: 'AMOUNT_BELOW_PRICE' });
+    });
+
+    it('a period longer than 120 intervals is refused outright, override or not', async () => {
+      world();
+      await expect(
+        recordManualPayment(
+          input(A, {
+            amountMinor: 100_000_000,
+            now: start,
+            ...span(121),
+            allowUnderpay: true,
+            underpayReason: 'whatever',
+          })
+        )
+      ).rejects.toMatchObject({ statusCode: 400, code: 'INVALID_PERIOD' });
+    });
+
+    it('a future-start one-month period is charged for the whole span until paid time resumes', async () => {
+      const db = world();
+      const far = { periodStart: at('2026-07-15'), periodEnd: at('2026-08-15') };
+      await expect(
+        recordManualPayment(input(A, { amountMinor: 5000, now: start, ...far }))
+      ).rejects.toMatchObject({ statusCode: 409, code: 'AMOUNT_BELOW_PRICE' });
+      expect(ledgerRows(db)).toEqual({ n: 0 });
+      // 15 Jan -> 15 Aug = 7 months
+      await recordManualPayment(input(A, { amountMinor: 35000, now: start, ...far }));
+      expect(ledgerRows(db)).toEqual({ n: 1 });
+    });
+
+    it('a gap after the paid-through date is charged; renewal from the paid end is one month', async () => {
+      world();
+      await recordManualPayment(input(A, { now: start })); // paid through 15 Feb
+      const gap = { periodStart: at('2026-03-15'), periodEnd: at('2026-04-15') };
+      await expect(
+        recordManualPayment(
+          input(A, { reference: 'REF-GAP-1', amountMinor: 5000, now: start, ...gap })
+        )
+      ).rejects.toMatchObject({ code: 'AMOUNT_BELOW_PRICE' }); // 15 Feb -> 15 Apr = 2 months
+      await expect(
+        recordManualPayment(
+          input(A, { reference: 'REF-GAP-1', amountMinor: 10000, now: start, ...gap })
+        )
+      ).resolves.toMatchObject({ duplicate: false });
+      await expect(
+        recordManualPayment(
+          input(A, {
+            reference: 'REF-RENEW-1',
+            amountMinor: 5000,
+            now: start,
+            periodStart: at('2026-04-15'),
+            periodEnd: at('2026-05-15'),
+          })
+        )
+      ).resolves.toMatchObject({ duplicate: false });
+    });
+
+    it('a replay of a recorded payment returns it even after the plan price went up', async () => {
+      const db = world();
+      const first = await recordManualPayment(input(A));
+      db.prepare(`UPDATE plans SET price_monthly_minor = 9000`).run();
+      const again = await recordManualPayment(input(A));
+      expect(again).toMatchObject({ duplicate: true, billingEventId: first.billingEventId });
+      expect(ledgerRows(db)).toEqual({ n: 1 });
+    });
   });
 });

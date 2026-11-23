@@ -60,7 +60,7 @@ import {
 } from '@api/services/billing/account.service';
 import { sendDueReminder } from '@api/services/billing/reminders.service';
 import { assertStoreMayGoLive } from '@api/services/billing/go-live-gate';
-import { addDays } from '@api/services/billing/period';
+import { addDays, addInterval } from '@api/services/billing/period';
 import { ProvisioningService } from '@api/services/provisioning.service';
 import { OnboardingService } from '@api/services/onboarding.service';
 import { StoreService } from '@api/services/store.service';
@@ -77,6 +77,12 @@ import {
   resetModel,
   submitTestSubscriptionReceipt,
 } from '../helpers/instapay-receipt-fixtures';
+
+/** An explicit period of exactly one monthly interval (30 days is 2 intervals on some dates: R-MANUAL-UNDERPAY-1). */
+const monthPeriod = () => {
+  const periodStart = new Date();
+  return { periodStart, periodEnd: addInterval(periodStart, 'monthly') };
+};
 
 // Card paths are exercised explicitly; the product default is InstaPay-only.
 process.env.BILLING_TRIAL_CARD_MODE = 'card_on_file';
@@ -610,8 +616,7 @@ describe.skipIf(!hasDb)('signup funnel', () => {
         method: 'instapay',
         reference: `BIZ-${run}`,
         paidAt: new Date(),
-        periodStart: new Date(),
-        periodEnd: addDays(new Date(), 30),
+        ...monthPeriod(),
         actorId: first.ownerId,
       });
       await OnboardingService.goLive(first.storeId);
@@ -690,8 +695,7 @@ describe.skipIf(!hasDb)('signup funnel', () => {
         method: 'instapay',
         reference: `PC-${tag}-${run}`,
         paidAt: new Date(),
-        periodStart: new Date(),
-        periodEnd: addDays(new Date(), 30),
+        ...monthPeriod(),
         actorId: first.ownerId,
       });
       await OnboardingService.goLive(first.storeId);
@@ -816,8 +820,7 @@ describe.skipIf(!hasDb)('signup funnel', () => {
         method: 'instapay',
         reference: `PC-unpaid2-${run}`,
         paidAt: new Date(),
-        periodStart: new Date(),
-        periodEnd: addDays(new Date(), 30),
+        ...monthPeriod(),
         actorId: parent.ownerId,
       });
       expect(await storeRow(parent.storeId)).toMatchObject({ status: 'active' });
