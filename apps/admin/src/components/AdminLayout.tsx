@@ -449,7 +449,11 @@ export function AdminLayout({
         pathname={pathname}
         onNavigate={() => setIsSidebarOpen(false)}
         activeHubKey={activeHubKey}
-        badges={mode === 'store_admin' ? { settings: attention.actionCount } : undefined}
+        badges={
+          mode === 'store_admin'
+            ? { settings: attention.nav.settings, sales: attention.nav.orders }
+            : undefined
+        }
       />
       <SidebarFooter
         isDark={isDark}
@@ -604,7 +608,11 @@ export function AdminLayout({
       {/* The Ebda assistant: renders nothing until the server says it is on for this store (rollout switch, default off). */}
       {navStoreId && mode === 'store_admin' && <AssistantDock storeId={navStoreId} />}
       {navStoreId && (
-        <MobileBottomNav storeId={navStoreId} onOpenMore={() => setIsSidebarOpen(true)} />
+        <MobileBottomNav
+          storeId={navStoreId}
+          onOpenMore={() => setIsSidebarOpen(true)}
+          badges={{ orders: attention.nav.orders, more: attention.nav.settings }}
+        />
       )}
     </div>
   );

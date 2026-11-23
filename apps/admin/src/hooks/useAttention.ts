@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { actionCountsBySection, type AttentionItem, type AttentionResponse } from '@ebda/shared';
+import {
+  actionCountsBySection,
+  attentionNavBadges,
+  type AttentionItem,
+  type AttentionResponse,
+} from '@ebda/shared';
 import { ATTENTION_REFRESH_EVENT, apiGetQuiet } from '../lib/api';
 
 /**
@@ -87,6 +92,8 @@ export function useAttention(storeId: string | null | undefined) {
     loaded: feed.loaded,
     actionCount: actionItems.length,
     bySection: actionCountsBySection(feed.items),
+    /** Navigation badges: Orders / Sales from order-money items, Settings from the rest. */
+    nav: attentionNavBadges(feed.items),
     /** Any item (action or info) per section, for a quiet marker. */
     hasInfoBySection: feed.items.reduce<Record<string, boolean>>((m, i) => {
       m[i.section] = true;

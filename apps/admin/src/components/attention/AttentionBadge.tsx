@@ -25,7 +25,7 @@ export function AttentionBadge({
         data-testid="attention-badge"
         className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-warning px-1.5 text-xs font-semibold leading-none text-warning-foreground ${className}`}
       >
-        <span aria-hidden="true">{count}</span>
+        <span aria-hidden="true">{count > 99 ? '99+' : count}</span>
       </span>
     );
   }

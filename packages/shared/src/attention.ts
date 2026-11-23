@@ -56,3 +56,25 @@ export function actionCountsBySection(items: readonly AttentionItem[]): Record<s
   for (const i of items) if (i.severity === 'action') out[i.section] = (out[i.section] ?? 0) + 1;
   return out;
 }
+
+/** Sections that belong to the Sales hub / Orders tab rather than Settings. */
+const ORDER_SECTIONS = new Set(['orders']);
+
+/**
+ * Badge numbers for the navigation, from the same feed: `orders` = how many orders need the merchant
+ * (summed counts of order-money items), `settings` = how many settings issues need action. Info items
+ * never badge. Used by the desktop sidebar (Sales / Settings) and the phone bottom bar (Orders / More).
+ */
+export function attentionNavBadges(items: readonly AttentionItem[]): {
+  orders: number;
+  settings: number;
+} {
+  let orders = 0;
+  let settings = 0;
+  for (const i of items) {
+    if (i.severity !== 'action') continue;
+    if (ORDER_SECTIONS.has(i.section)) orders += i.count ?? 1;
+    else settings += 1;
+  }
+  return { orders, settings };
+}
