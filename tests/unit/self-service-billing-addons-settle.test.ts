@@ -146,7 +146,8 @@ const refundTx: any = {
   },
   billingGrant: { findMany: async () => [], updateMany: async () => ({ count: 0 }) },
   // R-REFUND-PERIOD-1 (main): a full plan refund reads the subscription to decide whether access ends.
-  storeSubscription: { findUnique: vi.fn(async () => null) },
+  storeSubscription: { findUnique: vi.fn(async () => null), update: vi.fn(async () => ({})) },
+  plan: { findUnique: vi.fn(async () => null) },
 };
 
 describe('refund of an add-on payment', () => {
@@ -187,5 +188,30 @@ describe('refund of an add-on payment', () => {
     );
     await refundCharge({ eventId: 'c1', provider });
     expect(inv.invalidate).not.toHaveBeenCalled();
+  });
+  // B2: a zero-amount marker (addon-cancel / addon-grant / addon-overlap) is not a newer plan payment
+  it.each([
+    'addon-cancel:feature:floating_widget',
+    'addon-grant:feature:floating_widget',
+    'addon-overlap:ai:topup_300',
+  ])('a full plan refund still ends plan access after an add-on marker row (%s)', async marker => {
+    refundTx.billingEvent.findUnique.mockImplementation(async ({ where }: any) =>
+      where.id === 'c1'
+        ? { ...charge('growth'), type: 'renewal', createdAt: new Date('2026-11-01') }
+        : { id: where.id, relatedEventId: 'c1', storeId: 's1' }
+    );
+    refundTx.storeSubscription.findUnique.mockResolvedValue({
+      planCode: 'growth',
+      status: 'active',
+    });
+    const orig = refundTx.billingEvent.findMany;
+    refundTx.billingEvent.findMany = async () => [{ id: 'm1', type: 'upgrade', planCode: marker }];
+    try {
+      await refundCharge({ eventId: 'c1', provider });
+    } finally {
+      refundTx.billingEvent.findMany = orig;
+      refundTx.storeSubscription.findUnique.mockResolvedValue(null);
+    }
+    expect(refundTx.storeSubscription.update).toHaveBeenCalled();
   });
 });

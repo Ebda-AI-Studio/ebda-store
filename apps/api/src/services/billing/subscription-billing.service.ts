@@ -285,6 +285,14 @@ function isAddonRow(row: { type: string; planCode: string | null }): boolean {
   return row.type === 'upgrade' && !!row.planCode?.startsWith(ADDON_PLAN_PREFIX);
 }
 
+/**
+ * Zero-amount bookkeeping rows (`addon-cancel:` / `addon-resume:` here; `addon-grant:` / `addon-overlap:` up the stack)
+ * share `type: 'upgrade'` + `status: 'succeeded'` but are NOT payments: they must never read as a newer plan charge (B2).
+ */
+function isAddonMarkerRow(row: { planCode: string | null }): boolean {
+  return !!row.planCode?.startsWith(ADDON_MARKER_PREFIX);
+}
+
 async function applySuccess(
   tx: Tx,
   row: LedgerRow,
@@ -2032,7 +2040,7 @@ async function endAccessForRefund(
     },
     select: { id: true, type: true, planCode: true },
   });
-  if (newerRows.some(r => !isAddonRow(r))) return;
+  if (newerRows.some(r => !isAddonRow(r) && !isAddonMarkerRow(r))) return;
   // the free months this payment earned go too (FOUNDING-3)
   await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', now, storeId);
   await downgradeToFree(tx, storeId, 'canceled', effects);

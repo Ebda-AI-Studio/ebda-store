@@ -230,6 +230,44 @@ describe('entitlement read: only a succeeded, unexpired, unrefunded payment coun
   });
 });
 
+describe('B5: a chained term counts only once it has started', () => {
+  it('a second AI pack bought while one runs adds nothing until the first ends', async () => {
+    const { activeAddons } = await import('@api/services/billing/addon-grant');
+    h.events = [
+      ev({
+        id: 'p1',
+        planCode: 'addon:ai:topup_300',
+        forPeriodEnd: new Date(NOW.getTime() + 10 * DAY),
+      }),
+      // chained: starts at p1's end (+10d), ends +40d
+      ev({
+        id: 'p2',
+        planCode: 'addon:ai:topup_300',
+        forPeriodEnd: new Date(NOW.getTime() + 40 * DAY),
+      }),
+    ];
+    expect((await activeAddons(tx as any, 's1', NOW)).map(a => a.eventId)).toEqual(['p1']);
+    const later = new Date(NOW.getTime() + 11 * DAY);
+    expect((await activeAddons(tx as any, 's1', later)).map(a => a.eventId)).toEqual(['p2']);
+  });
+  it('storeAiExtraRequests sums one pack, not two, while the second is queued', async () => {
+    const { storeAiExtraRequests } = await import('@api/lib/ai-quota');
+    h.events = [
+      ev({
+        id: 'p1',
+        planCode: 'addon:ai:topup_300',
+        forPeriodEnd: new Date(Date.now() + 10 * DAY),
+      }),
+      ev({
+        id: 'p2',
+        planCode: 'addon:ai:topup_300',
+        forPeriodEnd: new Date(Date.now() + 40 * DAY),
+      }),
+    ];
+    expect(await storeAiExtraRequests('s1')).toBe(300);
+  });
+});
+
 describe('purchase: confirm token, idempotency, ledger row', () => {
   const ctx = { storeId: 's1', userId: 'u1' };
   it('preview quotes the integer total and mints a token; no row, no provider call', async () => {
