@@ -69,6 +69,9 @@ jobs:
           git -C base read-tree refs/pr/head
           git -C base checkout-index --all --prefix="$GITHUB_WORKSPACE/pr/"
           rm -f "$GIT_INDEX_FILE"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
       - name: Baseline at the merge-base (a PR is judged by what IT added, not by what main removed after it branched)
         run: |
           set -euo pipefail
@@ -81,9 +84,6 @@ jobs:
           else
             echo "::notice::no baseline at the merge-base; comparing against the base tip"
           fi
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
       - name: no-any, no-console, todo-no-issue, emoji-copy, duplicate-helper, unused-export (baseline may only shrink, judged against the base)
         run: node base/.github/pr-quality/slop-guard.mjs --root pr --base-root base ${MB_BASELINE:+--merge-base-baseline "$MB_BASELINE"}
 
