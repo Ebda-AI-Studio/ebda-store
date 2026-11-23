@@ -109,7 +109,7 @@ fiscalDocumentRoutes.get(
   ...merchant,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { storeId } = req.params;
+      const storeId = parseInput(UUID, req.params.storeId);
       const docId = parseInput(UUID, req.params.docId);
       const { locale } = parseInput(localeQuery, req.query);
       const doc = await FiscalDocumentService.getById(storeId, docId);
@@ -122,7 +122,15 @@ fiscalDocumentRoutes.get(
         ((store?.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'en'
           ? 'en'
           : 'ar');
-      res.type('html').send(renderFiscalDocumentHtml(doc, lang, store?.timezone || 'Africa/Cairo'));
+      sendFiscalHtml(
+        res,
+        renderFiscalDocumentHtml(
+          doc,
+          lang,
+          store?.timezone || 'Africa/Cairo',
+          (store?.settings as { receiptBarcodeShape?: unknown } | null)?.receiptBarcodeShape
+        )
+      );
     } catch (error) {
       next(error);
     }
