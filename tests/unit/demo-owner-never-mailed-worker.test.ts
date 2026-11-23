@@ -146,9 +146,22 @@ describe('demo owner is never mailed on the Worker', () => {
   it('resend-verification (merchant signup): the demo owner is never handed to identity; a merchant is', async () => {
     const demo = await MerchantSignupService.resendVerification(DEMO);
     const unknown = await MerchantSignupService.resendVerification('nobody@example.com');
+    await settle();
     expect(demo).toEqual(unknown);
     expect(h.resend).not.toHaveBeenCalledWith(DEMO);
+    expect(h.resend).toHaveBeenCalledWith('nobody@example.com');
     await MerchantSignupService.resendVerification(SHOP);
+    await settle();
+    expect(h.resend).toHaveBeenCalledWith(SHOP);
+  });
+
+  it('resend-verification (merchant signup): the answer returns before the guard and hand-over resolve (no timing oracle)', async () => {
+    let release!: () => void;
+    h.idLookup = () => new Promise(r => (release = () => r(null)));
+    await expect(MerchantSignupService.resendVerification(SHOP)).resolves.toBeDefined();
+    expect(h.resend).not.toHaveBeenCalled();
+    release();
+    await settle();
     expect(h.resend).toHaveBeenCalledWith(SHOP);
   });
 

@@ -2147,8 +2147,8 @@
       "tier": "unit",
       "why": "a verification resend for the demo store's seeded owner (storedemo-owner@ebda.app, no mailbox) is handed to the identity service on the merchant-signup resend path, the resend twin of demo-owner-never-mailed (Ruling B1-13, NZ-DEMO-OWNER-1)",
       "source": "apps/api/src/services/merchant-signup.service.ts",
-      "find": "    if (await isDemoOwnerEmail(email)) return GENERIC_SIGNUP_RESULT;\n",
-      "replace": "",
+      "find": "        .then(demoOwner => (demoOwner ? undefined : resendIdentityVerification(email)))",
+      "replace": "        .then(() => resendIdentityVerification(email))",
       "test": "tests/unit/demo-owner-never-mailed-worker.test.ts"
     },
     {
