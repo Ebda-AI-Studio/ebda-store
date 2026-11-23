@@ -5043,7 +5043,7 @@ model Warehouse {
   storeId   String   @map("store_id")
   name      String
   nameAr    String?  @map("name_ar")
-  code      String // Short code e.g. "MAIN", "KWT-2"
+  code      String // Short code e.g. "MAIN", "CAI-2"
   isDefault Boolean  @default(false) @map("is_default")
   priority  Int      @default(0) // Higher = preferred in priority routing
   lat       Float? // Optional: enables proximity routing
