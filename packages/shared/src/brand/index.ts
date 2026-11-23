@@ -486,6 +486,22 @@ export const WHATSAPP_PACKAGES: readonly WhatsAppPackageDef[] = [
     features: WA_BASE[id].features,
   })),
 ];
+/**
+ * A Chat package's display name, BY SIZE (Ahmad 2026-11-19): the size is what the package meters, its monthly AI replies. Starter / Growth / Pro are retired
+ * as Chat package names because they collide with the Store's plan names. Mirrors ebda-whatsapp `src/core/billing/package-names.ts` (same strings, pinned by a
+ * test on each side); ids and prices are unchanged internal codes. Arabic keeps Western digits (DIGITS-1), grouped only from 10,000. `store-included` is not a size.
+ */
+export function whatsappPackageName(
+  id: Exclude<WhatsAppPackageId, 'store-included'>,
+  locale: 'ar' | 'en'
+): string {
+  const p = whatsappPackage(id);
+  const n = p.features.ai_credits;
+  const yearly = p.periodMonths === 12;
+  if (locale === 'en')
+    return `Chat ${n.toLocaleString('en-US')} AI replies${yearly ? ' (yearly)' : ''}`;
+  return `شات ${n >= 10_000 ? n.toLocaleString('en-US') : String(n)} رد ذكي${yearly ? ' سنوي' : ''}`;
+}
 /** The monthly packages, in card order. */
 export const WHATSAPP_MONTHLY_PACKAGES = WHATSAPP_PACKAGES.filter(p => p.periodMonths === 1);
 /** A package by id (throws on an unknown id: ids are a closed set). */
