@@ -31,7 +31,7 @@ function isInteractive(target: EventTarget | null): boolean {
   return !!target.closest('button, a, select, input, [role="button"], [data-row-stop]');
 }
 
-import { formatDate, minorToMajor } from '@/lib/format';
+import { formatDate, formatPrice } from '@/lib/format';
 
 import { Button } from '@/components/ui/Button';
 /**
@@ -159,11 +159,7 @@ export function OrdersTable({
     },
     {
       header: t('table.total'),
-      cell: order => (
-        <span className="font-bold text-foreground">
-          {t('table.totalValue', { amount: minorToMajor(order.total) })}
-        </span>
-      ),
+      cell: order => <span className="font-bold text-foreground">{formatPrice(order.total)}</span>,
     },
     {
       header: t('table.status'),
