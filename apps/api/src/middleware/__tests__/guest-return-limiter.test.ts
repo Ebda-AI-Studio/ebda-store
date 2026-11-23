@@ -1,4 +1,14 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+
+// Only the store resolver may set the verified-store flag (store-miss-catalogue-exempt guard), so this test stands in for
+// publicStoreContext by reading the resolved id from a test header.
+vi.mock('../../utils/resolved-store', () => ({
+  setResolvedStoreId: () => undefined,
+  resolvedStoreId: (req: { headers: Record<string, string | string[] | undefined> }) =>
+    typeof req.headers['x-test-resolved-store'] === 'string'
+      ? (req.headers['x-test-resolved-store'] as string)
+      : undefined,
+}));
 import express from 'express';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -10,7 +20,6 @@ import {
   GUEST_RETURN_IP_MAX,
   GUEST_RETURN_ORDER_MAX,
 } from '../security';
-import { setResolvedStoreId } from '../../utils/resolved-store';
 
 // Foundation criterion 19 / Ruling GUEST-RET-1: the guest return route is bounded per IP and per order.
 // The real limiters + their in-process store; one route stands in for POST /public/returns/guest.
@@ -25,15 +34,7 @@ beforeAll(async () => {
     res.json({ ok: true })
   );
   // the real public route has NO :storeId param: the store is resolved from the host first (publicStoreContext)
-  app.post(
-    '/public-guest',
-    (req, _res, next) => {
-      setResolvedStoreId(req, String(req.headers['x-test-resolved-store']));
-      next();
-    },
-    guestReturnOrderLimiter,
-    (_req, res) => res.json({ ok: true })
-  );
+  app.post('/public-guest', guestReturnOrderLimiter, (_req, res) => res.json({ ok: true }));
   await new Promise<void>(r => {
     server = app.listen(0, r);
   });
