@@ -3,10 +3,12 @@
  * indexable pages at `/ar/...` and `/en/...`; the old unprefixed URLs answer a 301 to them. Pure functions, no
  * `next/*` imports: `middleware.ts` (a relative import), the sitemap and the metadata helpers all use the same rules.
  *
- * Scope: ONLY the anonymous, indexable routes (`LOCALE_PATH_ROOTS` plus the home). Cart, checkout, account, auth,
- * search, compare, wishlist, review, the API and every file route (robots, sitemap, llms.txt, favicon...) keep their
- * URLs; their language stays the `force-language` cookie. The URL wins on a prefixed page, and the middleware writes
- * the cookie to match, so the next unprefixed page (the cart) opens in the same language.
+ * Scope (Ruling LOCALE-PATHS-4): EVERY storefront page is served under both prefixes. The indexable routes
+ * (`LOCALE_PATH_ROOTS` plus the home) are the canonical ones: their unprefixed form is redirected to the prefix. The
+ * transactional routes (`LOCALE_SERVED_ROOTS`: cart, checkout, account, auth, search, wishlist, compare, ...) are
+ * rewritten under the prefix too and their unprefixed form is NOT redirected (noindex, nothing to canonicalise). A prefix is
+ * never stripped by a redirect. Only the API and the file routes (robots, sitemap, llms.txt, favicon...) have no prefix.
+ * The URL wins on a prefixed page, and the middleware writes the `force-language` cookie to match.
  *
  * Gate: `STOREFRONT_LOCALE_PATHS=true` AND the store named in `STOREFRONT_LOCALE_PATHS_STORES` (store keys only:
  * `demo-boutique,shop.example`, or a lone `all` for every store host (LOCALE-PATHS-2); and NO language suffix: the default language is the store's own
@@ -14,7 +16,7 @@
  * Missing, empty or unparseable = no store: it only ever fails closed.
  *
  * The middleware is synchronous and has no store, so it cannot answer "which language is the default". It therefore
- * only (a) rewrites a prefixed URL, (b) 301s `/ar/cart` to `/cart`, and (c) marks an unprefixed indexable URL
+ * only (a) rewrites a prefixed URL, (b) 301s a prefixed non-route (`/ar/nope`) to `/nope`, and (c) marks an unprefixed indexable URL
  * `x-locale-pending`; the root layout, which has the store, turns that into the redirect (`pendingRedirect`).
  */
 
@@ -36,6 +38,30 @@ export const LOCALE_PATH_ROOTS: readonly string[] = [
   'shipping',
 ];
 const ROOTS = new Set(LOCALE_PATH_ROOTS);
+
+/**
+ * Routes that are served UNDER a language prefix but are not indexable (Ruling LOCALE-PATHS-4, QA 2026-11-11: `/en/cart`
+ * 301'd to `/cart` and an English shopper fell into Arabic). `/en/cart` is rewritten to `/cart` with the URL's language
+ * on the request; the unprefixed `/cart` is NOT redirected (no `pending`: it is noindex and has no canonical to protect).
+ * RULE: every storefront route honours the locale prefix and never strips it (ebda-foundation standard/storefront-locale-routes.md).
+ */
+const LOCALE_SERVED_ROOTS: readonly string[] = [
+  'cart',
+  'checkout',
+  'account',
+  'auth',
+  'search',
+  'wishlist',
+  'compare',
+  'review',
+  'bundles',
+  'looks',
+  'size-guide',
+  'affiliate',
+  'q',
+  'o', // /o/<token>: the WhatsApp cash-on-delivery confirmation page (#811)
+];
+const SERVED_ROOTS = new Set(LOCALE_SERVED_ROOTS);
 
 /** Request headers the middleware asserts on a prefixed page, read by the root layout and the metadata helpers. */
 export const LOCALE_PATH_HEADER = 'x-locale-path';
@@ -97,6 +123,12 @@ export function isLocalePathRoute(rest: string): boolean {
   return ROOTS.has(rest.replace(/^\//, '').split('/')[0]);
 }
 
+/** Whether `rest` is a route served under a language prefix, indexable or not. */
+function isLocaleServedRoute(rest: string): boolean {
+  if (isLocalePathRoute(rest)) return true;
+  return SERVED_ROOTS.has(rest.replace(/^\//, '').split('/')[0]);
+}
+
 /** The prefixed path of `rest`: (`ar`, `/`) -> `/ar`, (`ar`, `/products`) -> `/ar/products`. */
 export function prefixedPath(locale: PathLocale, rest: string): string {
   return `/${locale}${rest === '/' || rest === '' ? '' : rest}`;
@@ -104,7 +136,7 @@ export function prefixedPath(locale: PathLocale, rest: string): string {
 
 export type LocalePathDecision =
   | { kind: 'none' }
-  /** `/ar/cart` -> `/cart`: no such prefixed page, never a duplicate URL. */
+  /** `/ar/nonexistent` -> `/nonexistent`: no such prefixed page, never a duplicate URL (a served route never lands here). */
   | { kind: 'redirect'; location: string }
   /** `/ar/products` -> serve `/products` in Arabic. */
   | { kind: 'rewrite'; locale: PathLocale; rest: string }
@@ -143,7 +175,7 @@ export function decideLocalePath(a: {
   if (a.method !== 'GET' && a.method !== 'HEAD') return { kind: 'none' };
   const prefixed = splitLocalePrefix(a.pathname);
   if (prefixed) {
-    if (isLocalePathRoute(prefixed.rest))
+    if (isLocaleServedRoute(prefixed.rest))
       return { kind: 'rewrite', locale: prefixed.locale, rest: prefixed.rest };
     // Exactly this path, before the redirect below: redirected to the shared URL it would answer in the
     // store's default language again, which is the defect (Ruling PWA-MANIFEST-2).
@@ -189,7 +221,7 @@ export function localizeHref(href: string, locale: PathLocale | null): string {
   const path = q === -1 ? href : href.slice(0, q);
   const tail = q === -1 ? '' : href.slice(q);
   if (splitLocalePrefix(path)) return href;
-  if (!isLocalePathRoute(path)) return href;
+  if (!isLocaleServedRoute(path)) return href;
   return prefixedPath(locale, path) + tail;
 }
 
