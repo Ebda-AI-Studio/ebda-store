@@ -2,7 +2,7 @@
  * The `legal-notice-send` Inngest function and its batch step (Ruling LEGAL-4, amendment A4),
  * without a database: the step loop, the step cap (`fail-leftover`), `onFailure`, and the
  * order "wait for a send slot WITH a budget, THEN claim queued -> sending" in sendNextBatch.
- * The real-Postgres twin (RLS, dedupe, retry) is tests/integration/legal-notice-fanout.test.ts.
+ * The platform-D1 twin (dedupe, retry, operator check) is tests/unit/legal-notice-fanout-on-d1.test.ts.
  * Pattern: tests/unit/campaign-send-job.test.ts.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';

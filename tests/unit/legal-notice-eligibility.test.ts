@@ -3,7 +3,7 @@
  * a document's current version is noticeable only when it is MATERIAL and SENT. Imported from
  * `@ebda/shared/legal` (the SOURCE, not the built dist) so `npm run test:defence-mutations`
  * sees a mutation of it (entry consent-legal-ack-material-only). The HTTP twin is the I3 case
- * in tests/integration/legal-notices.test.ts.
+ * in tests/unit/legal-notices-on-d1.test.ts.
  */
 import { describe, it, expect } from 'vitest';
 import {

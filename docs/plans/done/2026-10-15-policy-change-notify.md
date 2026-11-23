@@ -55,12 +55,12 @@
 
 ## Review Focus
 
-1. **A merchant who owns two stores** gets exactly ONE email for a version (recipients are deduped by user, and the delivery row is unique per user+version), and ONE "Got it" removes the banner on both stores, because pending notices are per user and not per store. Pinned by `tests/integration/legal-notice-fanout.test.ts` ("two stores, one email") and `tests/integration/legal-notices.test.ts` ("one ack clears it for every store").
-2. **An Inngest retry after a partial fan-out** (a step re-run, or a whole re-run with a fresh memo) never mails anyone twice: a row leaves `queued` before the send, and a row left in `sending` by a crash is never re-sent. Pinned by the "re-run sends nothing new" and "a row stuck in sending is never re-sent" cases in `legal-notice-fanout.test.ts`.
+1. **A merchant who owns two stores** gets exactly ONE email for a version (recipients are deduped by user, and the delivery row is unique per user+version), and ONE "Got it" removes the banner on both stores, because pending notices are per user and not per store. Pinned by `tests/unit/legal-notice-fanout-on-d1.test.ts` ("two stores, one email") and `tests/unit/legal-notices-on-d1.test.ts` ("one ack clears it for every store").
+2. **An Inngest retry after a partial fan-out** (a step re-run, or a whole re-run with a fresh memo) never mails anyone twice: a row leaves `queued` before the send, and a row left in `sending` by a crash is never re-sent. Pinned by the "re-run sends nothing new" and "a row stuck in sending is never re-sent" cases in `legal-notice-fanout-on-d1.test.ts`.
 3. **Signup without the checkbox** is refused by the API even if the UI is bypassed: missing or `false` `acceptedLegal` gives 400 `VALIDATION_ERROR` and creates no user. Pinned by `tests/integration/legal-signup-acceptance.test.ts`.
-4. **An ack for a version that is not pending** (an old version, a non-material version, a never-sent version, an unknown doc key) is refused with 422 `NOT_PENDING` and writes nothing. A repeated ack of an already-acknowledged item is a harmless 200. Pinned by `legal-notices.test.ts`.
+4. **An ack for a version that is not pending** (an old version, a non-material version, a never-sent version, an unknown doc key) is refused with 422 `NOT_PENDING` and writes nothing. A repeated ack of an already-acknowledged item is a harmless 200. Pinned by `legal-notices-on-d1.test.ts`.
 5. **The marketing "last updated" line** equals the registry's `publishedAt`/`version` for each page in both `ar` and `en`, and the copy files contain no date or version literal any more. Pinned by `tests/unit/marketing-site.test.tsx`.
-6. **A double click on "Send notice"** (or a second operator) gives 409 `ALREADY_SENT` and emits no second event. If the Inngest enqueue fails, the send row is removed and the call answers 502, so nothing is left half-announced. Pinned by `tests/integration/legal-policy-admin.test.ts`.
+6. **A double click on "Send notice"** (or a second operator) gives 409 `ALREADY_SENT` and emits no second event. If the Inngest enqueue fails, the send row is removed and the call answers 502, so nothing is left half-announced. Pinned by `tests/unit/legal-policy-admin-on-d1.test.ts`.
 
 ## Finish line
 
@@ -1742,7 +1742,7 @@ git commit -m "feat(signup): required policy click-wrap recorded per document ve
 - Modify: `apps/api/src/services/legal-notice.service.ts` (append)
 - Create: `apps/api/src/routes/legal-policy.routes.ts`
 - Modify: `apps/api/src/routes/index.ts` (import + mount after `router.use('/auth/mfa', mfaRoutes);`)
-- Test: `tests/integration/legal-notices.test.ts` (new)
+- Test: `tests/unit/legal-notices-on-d1.test.ts` (new)
 
 **Interfaces:**
 
@@ -1755,7 +1755,7 @@ git commit -m "feat(signup): required policy click-wrap recorded per document ve
 
 - [ ] **Step 1: Write the failing test**
 
-`tests/integration/legal-notices.test.ts`:
+`tests/unit/legal-notices-on-d1.test.ts`:
 
 ```ts
 /**
@@ -1960,7 +1960,7 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run (Test environment exported): `npx vitest run tests/integration/legal-notices.test.ts --retry=1`
+Run (Test environment exported): `npx vitest run tests/unit/legal-notices-on-d1.test.ts --retry=1`
 Expected: FAIL, `Failed to resolve import "@api/routes/legal-policy.routes"`.
 
 - [ ] **Step 3: Write the implementation**
@@ -2127,13 +2127,13 @@ router.use('/me/legal-notices', meLegalNoticeRoutes);
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run tests/integration/legal-notices.test.ts --retry=1 && tsc --noEmit -p apps/api/tsconfig.json`
+Run: `npx vitest run tests/unit/legal-notices-on-d1.test.ts --retry=1 && tsc --noEmit -p apps/api/tsconfig.json`
 Expected: PASS; tsc exits 0.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/api/src/services/legal-notice.service.ts apps/api/src/routes/legal-policy.routes.ts apps/api/src/routes/index.ts tests/integration/legal-notices.test.ts
+git add apps/api/src/services/legal-notice.service.ts apps/api/src/routes/legal-policy.routes.ts apps/api/src/routes/index.ts tests/unit/legal-notices-on-d1.test.ts
 git commit -m "feat(api): pending legal notices and got-it acknowledgement"
 ```
 
@@ -2416,7 +2416,7 @@ git commit -m "feat(admin): non-blocking policy-change banner with got-it"
 - Modify: `apps/api/src/lib/inngest/client.ts` (event type + `AppEvent` union)
 - Modify: `apps/api/src/lib/inngest/functions/index.ts` (import + register)
 - Modify: `tests/unit/no-rls-bypass-in-runtime.test.ts` (`ALLOWED_PLATFORM_OPERATOR`)
-- Test: `tests/unit/legal-notice-email.test.ts` (new), `tests/integration/legal-notice-fanout.test.ts` (new)
+- Test: `tests/unit/legal-notice-email.test.ts` (new), `tests/unit/legal-notice-fanout-on-d1.test.ts` (new)
 
 **Interfaces:**
 
@@ -2489,7 +2489,7 @@ describe('sendLegalNoticeEmail', () => {
 });
 ```
 
-`tests/integration/legal-notice-fanout.test.ts`:
+`tests/unit/legal-notice-fanout-on-d1.test.ts`:
 
 ```ts
 /**
@@ -2707,7 +2707,7 @@ describe.skipIf(!hasDb)('legal notice email fan-out', () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `npx vitest run tests/unit/legal-notice-email.test.ts` and (Test environment) `npx vitest run tests/integration/legal-notice-fanout.test.ts --retry=1`
+Run: `npx vitest run tests/unit/legal-notice-email.test.ts` and (Test environment) `npx vitest run tests/unit/legal-notice-fanout-on-d1.test.ts --retry=1`
 Expected: FAIL, `sendLegalNoticeEmail is not a function` / `Failed to resolve import "@api/lib/inngest/functions/legal-notice-send"`.
 
 - [ ] **Step 3: Write the implementation**
@@ -3096,7 +3096,7 @@ Run:
 npx vitest run tests/unit/legal-notice-email.test.ts tests/unit/no-rls-bypass-in-runtime.test.ts tests/unit/inngest-step-serialization.test.ts
 # the service now imports more of @ebda/database: the signup unit tests mock it partially, re-prove them
 npx vitest run tests/unit/merchant-signup-legal.test.ts tests/unit/ebda-ads-signup-persist.test.ts
-npx vitest run tests/integration/legal-notice-fanout.test.ts --retry=1
+npx vitest run tests/unit/legal-notice-fanout-on-d1.test.ts --retry=1
 tsc --noEmit -p apps/api/tsconfig.json
 ```
 
@@ -3105,7 +3105,7 @@ Expected: all PASS; tsc exits 0.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/api/src/services/email-templates/legal-notice.ts apps/api/src/services/platform-mailer.ts apps/api/src/services/legal-notice.service.ts apps/api/src/lib/inngest/functions/legal-notice-send.ts apps/api/src/lib/inngest/client.ts apps/api/src/lib/inngest/functions/index.ts tests/unit/no-rls-bypass-in-runtime.test.ts tests/unit/legal-notice-email.test.ts tests/integration/legal-notice-fanout.test.ts
+git add apps/api/src/services/email-templates/legal-notice.ts apps/api/src/services/platform-mailer.ts apps/api/src/services/legal-notice.service.ts apps/api/src/lib/inngest/functions/legal-notice-send.ts apps/api/src/lib/inngest/client.ts apps/api/src/lib/inngest/functions/index.ts tests/unit/no-rls-bypass-in-runtime.test.ts tests/unit/legal-notice-email.test.ts tests/unit/legal-notice-fanout-on-d1.test.ts
 git commit -m "feat(api): idempotent legal-notice email fan-out to store owners"
 ```
 
@@ -3121,7 +3121,7 @@ git commit -m "feat(api): idempotent legal-notice email fan-out to store owners"
 - Create: `apps/admin/src/app/policy-updates/page.tsx`, `apps/admin/src/app/policy-updates/page.test.tsx`
 - Modify: `apps/admin/src/components/admin-layout/buildStoreAdminNav.ts` (`NavLabels.platformPolicyUpdates` + entry before Platform settings), `apps/admin/src/components/AdminLayout.tsx:120` (label)
 - Modify: `apps/admin/src/i18n/messages/en.json`, `ar.json` (`policyUpdates`, `components.adminLayout.navPlatformPolicyUpdates`)
-- Test: `tests/integration/legal-policy-admin.test.ts` (new)
+- Test: `tests/unit/legal-policy-admin-on-d1.test.ts` (new)
 
 **Interfaces:**
 
@@ -3134,7 +3134,7 @@ git commit -m "feat(api): idempotent legal-notice email fan-out to store owners"
 
 - [ ] **Step 1: Write the failing tests**
 
-`tests/integration/legal-policy-admin.test.ts`:
+`tests/unit/legal-policy-admin-on-d1.test.ts`:
 
 ```ts
 /**
@@ -3428,7 +3428,7 @@ describe('policy updates page', () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `npx vitest run apps/admin/src/app/policy-updates/page.test.tsx` and (Test environment) `npx vitest run tests/integration/legal-policy-admin.test.ts --retry=1`
+Run: `npx vitest run apps/admin/src/app/policy-updates/page.test.tsx` and (Test environment) `npx vitest run tests/unit/legal-policy-admin-on-d1.test.ts --retry=1`
 Expected: FAIL, `Failed to resolve import "./page"` / `adminLegalPolicyRoutes` is undefined.
 
 - [ ] **Step 3: Write the implementation**
@@ -3877,7 +3877,7 @@ Run:
 
 ```bash
 npx vitest run apps/admin/src/app/policy-updates/page.test.tsx tests/unit/admin-i18n-key-parity.test.ts tests/unit/admin-i18n-keys-resolve.test.ts
-npx vitest run tests/integration/legal-policy-admin.test.ts --retry=1
+npx vitest run tests/unit/legal-policy-admin-on-d1.test.ts --retry=1
 tsc --noEmit -p apps/api/tsconfig.json && tsc --noEmit -p apps/admin/tsconfig.json
 ```
 
@@ -3886,7 +3886,7 @@ Expected: all PASS; both tsc runs exit 0.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/api/src/services/legal-notice.service.ts apps/api/src/routes/legal-policy.routes.ts apps/api/src/routes/index.ts apps/admin/src/app/policy-updates/page.tsx apps/admin/src/app/policy-updates/page.test.tsx apps/admin/src/components/admin-layout/buildStoreAdminNav.ts apps/admin/src/components/AdminLayout.tsx apps/admin/src/i18n/messages/en.json apps/admin/src/i18n/messages/ar.json tests/integration/legal-policy-admin.test.ts
+git add apps/api/src/services/legal-notice.service.ts apps/api/src/routes/legal-policy.routes.ts apps/api/src/routes/index.ts apps/admin/src/app/policy-updates/page.tsx apps/admin/src/app/policy-updates/page.test.tsx apps/admin/src/components/admin-layout/buildStoreAdminNav.ts apps/admin/src/components/AdminLayout.tsx apps/admin/src/i18n/messages/en.json apps/admin/src/i18n/messages/ar.json tests/unit/legal-policy-admin-on-d1.test.ts
 git commit -m "feat(admin): super-admin policy updates page with send notice"
 ```
 
@@ -4022,7 +4022,7 @@ npm run typecheck
 npm run lint
 npx vitest run tests/unit packages/shared/src apps/admin/src
 npx vitest run tests/integration/legal-tables-rls.test.ts tests/integration/rls-ebda-app.test.ts --retry=0
-npx vitest run tests/integration/legal-signup-acceptance.test.ts tests/integration/legal-notices.test.ts tests/integration/legal-notice-fanout.test.ts tests/integration/legal-policy-admin.test.ts tests/integration/self-serve-onboarding.test.ts tests/integration/merchant-signup-abuse.test.ts tests/integration/store-creation-tenant-guard.test.ts tests/integration/merchant-password-reset.test.ts --retry=1
+npx vitest run tests/integration/legal-signup-acceptance.test.ts tests/unit/legal-notices-on-d1.test.ts tests/unit/legal-notice-fanout-on-d1.test.ts tests/unit/legal-policy-admin-on-d1.test.ts tests/integration/self-serve-onboarding.test.ts tests/integration/merchant-signup-abuse.test.ts tests/integration/store-creation-tenant-guard.test.ts tests/integration/merchant-password-reset.test.ts --retry=1
 npm run build -w apps/marketing
 graphify update .
 ```
