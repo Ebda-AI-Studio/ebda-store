@@ -90,7 +90,11 @@ export async function appendRenewalMarker(
   });
 }
 
-/** Running terms: succeeded, not refunded, `forPeriodEnd` still ahead. */
+/**
+ * Running terms: succeeded, not refunded, `forPeriodEnd` still ahead AND the term has started. A term bought while
+ * another runs is chained to start at the predecessor's end (`[end - ADDON_TERM_DAYS, end]`); counting it before that
+ * would give an additive AI pack 30 free days (B5).
+ */
 export async function activeAddons(tx: Tx, storeId: string, now: Date): Promise<ActiveAddon[]> {
   const rows = await tx.billingEvent.findMany({
     where: {
@@ -111,6 +115,7 @@ export async function activeAddons(tx: Tx, storeId: string, now: Date): Promise<
   for (const r of rows) {
     const sku = skuOfPlanCode(r.planCode);
     if (!sku || !r.forPeriodEnd) continue;
+    if (addDays(r.forPeriodEnd, -ADDON_TERM_DAYS) > now) continue; // chained term, not started yet
     out.push({ eventId: r.id, sku, endsAt: r.forPeriodEnd, cancelAtPeriodEnd: stopped.has(r.id) });
   }
   return out;
