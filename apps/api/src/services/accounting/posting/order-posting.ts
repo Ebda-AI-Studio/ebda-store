@@ -77,7 +77,7 @@ export async function postOrderPaymentJournal(args: {
       const replay = await replayPreSaleRefunds(await storeRepo(storeId), money, storeId, orderId);
       if (replay.replayed > 0)
         logger.info(
-          { orderId, ...replay },
+          { orderId, replayed: replay.replayed },
           'postOrderPaymentJournal: replayed pre-sale refund journals'
         );
     }
