@@ -350,6 +350,27 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     cancelAtPeriodEnd: false,
   };
 
+  it('awaiting payment: no "renews on" date for a plan nobody has paid for', async () => {
+    mockApi(
+      billing({
+        subscription: {
+          status: 'active',
+          currentPeriodEnd: '2027-11-12T00:00:00.000Z',
+          trialEndsAt: null,
+          cancelAtPeriodEnd: false,
+        },
+        availablePlans: plans,
+        billing: {
+          ...instapayChosen,
+          nextCharge: { at: '2026-11-20T00:00:00.000Z', planCode: 'growth', amountMinor: 3141000 },
+        },
+      })
+    );
+    render(<StoreBillingPage />);
+    expect((await screen.findAllByText('status.awaiting_payment')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('renewsOn')).toBeNull();
+  });
+
   it('Plan & trial: trial end, chosen plan + interval, next charge with amount and plan', async () => {
     mockApi(
       billing({
