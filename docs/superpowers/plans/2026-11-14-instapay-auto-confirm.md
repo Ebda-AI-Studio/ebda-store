@@ -38,7 +38,7 @@ Failure modes the spec implies but no obvious task covers; each has a pinned tes
 
 ## File Structure
 
-**ebda-foundation** (`/Users/ahmadsharaf/Desktop/projects/Ebda-AI-Studio/internal-projects/ebda-foundation`)
+**ebda-foundation** (`~/Desktop/projects/Ebda-AI-Studio/internal-projects/ebda-foundation`)
 
 - Create `packages/foundation/src/instapay-extract.ts` (+ `.test.ts`): `ReceiptExtract`, prompt + JSON schema constants, `parseReceiptExtraction`.
 - Create `packages/foundation/src/instapay-decision.ts` (+ `.test.ts`): `decideInstapay`, reason codes, cap + grace + clean-payment helpers.
