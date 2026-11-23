@@ -77,6 +77,10 @@
       "require": "./dist/qr/links.js",
       "default": "./src/qr/links.ts"
     },
+    "./wa-v1": {
+      "types": "./src/foundation/contracts/wa-v1.ts",
+      "default": "./src/foundation/contracts/wa-v1.ts"
+    },
     "./observe": {
       "types": "./src/observe-kit.ts",
       "default": "./src/observe-kit.ts"
