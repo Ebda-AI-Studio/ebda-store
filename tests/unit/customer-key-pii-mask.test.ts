@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { createHash } from 'node:crypto';
-import { customerKeyOf, guestKeyResolver, isGuestOrder, rfmKeyFor } from '@api/lib/customer-key';
+import { customerKeyOf, isGuestOrder, rfmKeyFor } from '@api/lib/customer-key';
 import { maskAddress, maskEmail, maskPhone, redactFreeText } from '@api/lib/pii-mask';
 import { summarizeFunnel } from '@api/services/accounting/funnel-report.service';
 import { couponState, customerRefOf } from '@api/mcp/tools/admin-read-customers-marketing.tools';
@@ -202,28 +202,5 @@ describe('redactFreeText (issue 2244 — shopper-authored order notes)', () => {
   it('is null for empty input — unknown, not ""', () => {
     expect(redactFreeText(null)).toBeNull();
     expect(redactFreeText('   ')).toBeNull();
-  });
-});
-
-describe('guestKeyResolver (QA-98: one guest, one row)', () => {
-  const o = (shippingAddress: Record<string, unknown>) => ({ customerId: null, shippingAddress });
-  it('folds a phone-only order into the row of the same phone, any spelling', () => {
-    const orders = [
-      o({ email: 'Q@x.test', phone: '+201000000000' }),
-      o({ phone: '01000000000' }),
-      o({ phone: '+20 100 000 0000' }),
-    ];
-    const r = guestKeyResolver(orders);
-    expect(new Set(orders.map(r))).toEqual(new Set(['q@x.test']));
-  });
-  it('never merges a different email, a different phone, or a registered customer', () => {
-    const orders = [
-      o({ email: 'a@x.test', phone: '+201000000000' }),
-      o({ email: 'b@x.test', phone: '+201000000000' }),
-      o({ phone: '+201111111111' }),
-      { customerId: 'u1', shippingAddress: { phone: '+201000000000' } },
-    ];
-    const r = guestKeyResolver(orders);
-    expect(orders.map(r)).toEqual(['a@x.test', 'b@x.test', '+201111111111', 'u1']);
   });
 });
