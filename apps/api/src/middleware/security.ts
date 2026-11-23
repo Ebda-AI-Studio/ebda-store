@@ -2082,6 +2082,24 @@ export const promotionPreviewLimiter = plannedRateLimit('promotion-preview', {
   keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
 });
 
+// Browse preview limiter: the SAME targeting preview, asked by the PDP and the cart while a shopper browses
+// (every quantity / cart change). Its own bucket ('promo-preview-browse') so browsing on a carrier-shared
+// Egyptian IP can never spend checkout's 20/min `promotion-preview` budget (checkout's promo line would vanish
+// on a 429). Still bounded per IP, and the per-tenant aggregate still applies on the route.
+export const promotionBrowsePreviewLimiter = plannedRateLimit('promo-preview-browse', {
+  windowMs: 60 * 1000,
+  max: 120,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
+});
+
 // View ingest limiter — public PDP beacon, high-traffic, unauthenticated.
 // 60 requests per minute per IP. The in-memory session debounce in
 // view-ingest.service.ts provides a second layer: one DB increment per
