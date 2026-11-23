@@ -35,6 +35,7 @@ const h = vi.hoisted(() => ({
   audit: [] as Array<Record<string, unknown>>,
   accounts: new Map<string, { role: string; email: string }>(),
   withStoreRepo: (_id: string, fn: () => unknown): unknown => fn(),
+  currentStoreId: (): string | undefined => undefined,
 }));
 
 vi.mock('@ebda/database', async importOriginal => {
@@ -42,12 +43,13 @@ vi.mock('@ebda/database', async importOriginal => {
   // No tenant transaction on the platform D1 or a DO: a scope is the store's repo scope, as in production after the cutover.
   return {
     ...real,
-    withStore: (id: string, fn: (tx: unknown) => unknown) => h.withStoreRepo(id, () => fn({})),
-    withUser: (_u: string, fn: (tx: unknown) => unknown) => fn({}),
+    withStore: (id: string, fn: (tx: unknown) => unknown) =>
+      h.withStoreRepo(id, () => fn(real.prisma)),
+    withUser: (_u: string, fn: (tx: unknown) => unknown) => fn(real.prisma),
     runInTenantContext: (_i: unknown, fn: () => unknown) => fn(),
     runInStoreScope: (id: string, fn: () => unknown) => h.withStoreRepo(id, fn),
     runInUserScope: (_u: string, fn: () => unknown) => fn(),
-    currentStoreId: () => undefined,
+    currentStoreId: () => h.currentStoreId(),
   };
 });
 vi.mock('@api/lib/identity-client', async importOriginal => ({
@@ -123,6 +125,7 @@ const GOOD = {
 
 const worlds = new DoStores();
 h.withStoreRepo = (id, fn) => worlds.withStoreRepo(id, fn);
+h.currentStoreId = () => worlds.currentStoreId();
 let d1: DatabaseSync;
 let app: Express;
 let kashierServer: ServedStub;

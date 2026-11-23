@@ -147,10 +147,14 @@ describe('integrationPlan', () => {
   });
 
   it('the planner CLI emits the two outputs ci.yml reads', () => {
-    const files = ['tests/integration/shipping-sp7.test.ts'];
-    const lines = classifyOutputs(files);
+    const file = `tests/integration/${
+      readdirSync(join(ROOT, 'tests/integration'))
+        .filter(f => f.endsWith('.test.ts'))
+        .sort()[0]
+    }`;
+    const lines = classifyOutputs([file]);
     expect(lines).toContain('integration=true');
-    expect(lines).toContain('integration_paths=tests/integration/shipping-sp7.test.ts');
+    expect(lines).toContain(`integration_paths=${file}`);
   });
 });
 
