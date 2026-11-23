@@ -16,6 +16,11 @@ vi.mock('@ebda/database', () => ({
   withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
     fn({ store: { findUnique: h.findUnique } }),
 }));
+// the store record comes through the store's own backend (storeDb), not a Prisma tx
+vi.mock('@api/lib/repo-factory', () => ({
+  storeDb: async () => ({ store: { findUnique: h.findUnique } }),
+  storeRepo: async () => ({ backend: 'do' }),
+}));
 vi.mock('@api/services/feature.service', () => ({ featureService: {} }));
 vi.mock('@api/services/notification-config.service', () => ({ notificationConfigService: {} }));
 vi.mock('@api/services/sms-queue.service', () => ({ smsQueue: {} }));
