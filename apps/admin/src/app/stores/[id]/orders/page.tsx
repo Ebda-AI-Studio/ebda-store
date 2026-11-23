@@ -464,7 +464,7 @@ export default function StoreOrdersPage() {
       />
 
       {error && (
-        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
+        <div className="mb-6 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
           {error}
           <button type="button" className="ms-4 font-medium underline" onClick={fetchOrders}>
             {t('errors.retry')}
@@ -481,7 +481,7 @@ export default function StoreOrdersPage() {
         onClearSelection={() => setSelectedOrders(new Set())}
       />
 
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-md border bg-card shadow-sm overflow-hidden">
         <OrdersTable
           orders={filteredOrders}
           isLoading={isLoading}

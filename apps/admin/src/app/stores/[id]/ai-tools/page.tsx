@@ -439,7 +439,7 @@ export default function AiToolsPage() {
                     onChange={e =>
                       setMasterForce(prev => ({ ...prev, [section.id]: e.target.checked }))
                     }
-                    className="h-4 w-4 cursor-pointer accent-primary"
+                    className="h-5 w-5 cursor-pointer accent-primary"
                   />
                   <span>{t('replaceExisting')}</span>
                 </label>

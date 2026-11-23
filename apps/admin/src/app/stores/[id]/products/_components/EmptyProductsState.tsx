@@ -25,7 +25,7 @@ export function EmptyProductsState({
 
   return (
     <div className="force-empty-state py-0">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted mx-auto">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted mx-auto">
         <svg
           className="h-8 w-8 text-muted-foreground"
           fill="none"
