@@ -5145,7 +5145,8 @@
         "totalEarned": "Total Earned",
         "totalRedeemed": "Total Redeemed",
         "actions": "Actions"
-      }
+      },
+      "owed": "Owes {count} points (spent before a refund)"
     },
     "award": {
       "title": "Award Points",
@@ -8538,6 +8539,16 @@
         "errorInvalid": "Enter a valid phone number, with the country code if it is not an Egyptian number.",
         "errorThrottle": "Too many attempts. Wait a few minutes and try again.",
         "errorGeneric": "Could not change the number. Try again."
+      },
+      "closeAccount": {
+        "title": "Close my account",
+        "description": "Permanently erases your personal data and closes your account. Stores you own must be transferred or closed first, and an account with a live paid store cannot be closed. Legally required order and tax records are kept without your identity. This cannot be undone.",
+        "confirmLabel": "Type {word} to confirm",
+        "confirmWord": "CLOSE",
+        "button": "Close my account permanently",
+        "closing": "Closing…",
+        "done": "Your account was closed.",
+        "errorGeneric": "Could not close the account. Try again, or contact support."
       }
     }
   },

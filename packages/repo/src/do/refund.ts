@@ -1,6 +1,10 @@
 import { settleFiscalOnReversal } from './fiscal';
 import { postWalletMovementJournal } from './ledger';
-import { reverseEarnedPointsFromOrder, reverseRedeemedPointsFromOrder } from './loyalty';
+import {
+  reverseEarnedPointsFromOrder,
+  reverseEarnedPointsPartial,
+  reverseRedeemedPointsFromOrder,
+} from './loyalty';
 import { recordTrimmedCredit, refundableBalance } from './refundable';
 import { recordMovement, restock } from './stock';
 import { MoneyError, type SyncSql } from './sync-sql';
@@ -814,6 +818,30 @@ export function refundOrder(
       },
       now
     );
+    // loyalty: the share of the earned points matching what this partial refund gave back (clamped, never aborts)
+    if (o.customer_id) {
+      let value = 0;
+      if (a.lines !== undefined) {
+        const tot = new Map(
+          db
+            .all('SELECT id, quantity, total FROM order_items WHERE order_id = ?', [o.id])
+            .map(r => [r.id as string, r])
+        );
+        for (const l of restored) {
+          const it = tot.get(l.orderItemId);
+          if (it && Number(it.quantity) > 0)
+            value += Math.floor((Number(it.total) * l.quantity) / Number(it.quantity));
+        }
+      } else value = amount ?? walletCredit ?? 0;
+      const e = reverseEarnedPointsPartial(db, {
+        storeId: a.storeId,
+        orderId: o.id,
+        refundKey: key,
+        value,
+        now,
+      });
+      out.loyalty = { ...out.loyalty, earnedReversed: e?.pointsReversed ?? 0 };
+    }
     if (review) out.review = review;
     return out;
   });
