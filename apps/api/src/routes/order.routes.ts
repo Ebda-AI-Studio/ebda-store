@@ -2054,7 +2054,14 @@ router.get(
             // the gateway leg is `orders:refund` only (staff lack it, like the return completion)
             canRefundToOriginal: hasPermission(req.user!.role as Role, 'orders:refund'),
             // REFUND-GATE-1: money refunds are never plan-gated; the restock choice (the returns workflow) is
-            returnsEnabled: await featureService.isFeatureEnabled(storeId, 'returns'),
+            returnsEnabled: await featureService.isFeatureEnabled(storeId, 'returns').catch(err => {
+              // a failed lookup must not 500 the quote: off = no restock choice, the refund itself is unaffected
+              logger.error(
+                { err, storeId },
+                '[order] returns feature lookup failed; quote says off'
+              );
+              return false;
+            }),
           },
         },
       });

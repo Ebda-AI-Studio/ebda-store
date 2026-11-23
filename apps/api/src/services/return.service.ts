@@ -627,21 +627,39 @@ export class ReturnService {
     const money = await storeMoney(storeId);
     if (!money)
       throw new AppError(409, 'RETURNS_NEED_DO_STORE', 'Returns for this store are not available');
-    // Ruling REFUND-GATE-1: refunding MONEY is never plan-gated, the returns WORKFLOW is. Without the `returns` feature the
-    // amount is still refunded, but nothing goes back on the shelf: restock must be explicitly false on every line.
-    if (
-      data.items.some(i => i.restock !== false) &&
-      !(await featureService.isFeatureEnabled(storeId, 'returns'))
-    )
-      throw new AppError(
-        403,
-        'RETURNS_FEATURE_REQUIRED_FOR_RESTOCK',
-        'Putting refunded goods back on the shelf needs the Returns feature on your plan. Refund without restocking, or upgrade.'
-      );
     const quote = await money.analyticsRefundQuote({ orderId: data.orderId, items: data.items });
+    // Ruling REFUND-GATE-1: refunding MONEY is never plan-gated, the returns WORKFLOW (restock) is. Decided on the SERVER from
+    // the order's own lines, never from what the client sent: only a TRACKED-inventory line can restock (an untracked one -
+    // digital / service - never does, whatever its flag says or whether the key is missing). Without the `returns` feature an
+    // explicit restock request on a tracked line is refused; a tracked line with no choice defaults to NO restock (the money
+    // still goes). A lookup failure counts as "no returns": the safe direction is never restocking, never blocking the refund.
+    let returnsOn = false;
+    try {
+      returnsOn = await featureService.isFeatureEnabled(storeId, 'returns');
+    } catch (err) {
+      logger.error(
+        { err, storeId },
+        '[ReturnService] returns feature lookup failed; treating as off'
+      );
+    }
+    const tracked = new Set(quote.lines.filter(l => l.trackInventory).map(l => l.orderItemId));
+    let items = data.items;
+    if (!returnsOn) {
+      if (items.some(i => tracked.has(i.orderItemId) && i.restock === true))
+        throw new AppError(
+          403,
+          'RETURNS_FEATURE_REQUIRED_FOR_RESTOCK',
+          'Putting refunded goods back on the shelf needs the Returns feature on your plan. Refund without restocking, or upgrade.'
+        );
+      items = items.map(i =>
+        tracked.has(i.orderItemId) && i.restock === undefined ? { ...i, restock: false } : i
+      );
+    }
     if (quote.refundable <= 0)
       throw new AppError(409, 'NOTHING_REFUNDABLE', 'This order has nothing left to refund.');
-    if (quote.coversWholeOrder && data.items.some(i => i.restock === false))
+    // A refund of every line takes the whole-order reversal, which restocks everything and cannot skip a line: on a plan without
+    // `returns` that is this existing refusal (use refund-via-provider or the Refunded flow for such a refund).
+    if (quote.coversWholeOrder && items.some(i => i.restock === false))
       throw new AppError(
         409,
         'FULL_RETURN_RESTOCK_ALL',
@@ -653,7 +671,7 @@ export class ReturnService {
         orderId: data.orderId,
         type: 'refund',
         reason: data.reason,
-        items: data.items,
+        items,
       },
       opKey('partial-refund-create', idempotencyKey)
     );
