@@ -8,6 +8,7 @@ import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
+import { aiRunTotal, productScope } from '../../ai-run-estimate';
 import { generateProductExcerpt } from '../../ai/product-excerpt-generator';
 import { AppError } from '../../../middleware/error-handler';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
@@ -120,12 +121,12 @@ const bulkAiExcerptFn = inngest.createFunction(
           select: { name: true },
         });
         const products = await sdb.product.findMany({
-          where: { storeId, status: 'active', deletedAt: null },
+          where: productScope.active(storeId),
           select: { id: true },
         });
         await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
-          data: { total: products.length },
+          data: { total: aiRunTotal('excerpt', { products: products.length, categories: 0 }) },
         });
         return { storeName: store?.name ?? storeId, productIds: products.map(p => p.id) };
       });

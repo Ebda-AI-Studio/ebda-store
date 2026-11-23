@@ -37,6 +37,16 @@ import { markJobFailedOnEnqueueError } from '../lib/jobs/enqueue-fail';
 import { BulkAiEnqueueError, enqueueBulkAiJob } from '../services/bulk-ai-job.service';
 import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
 import { sendOnboardingHelpToCi } from '../lib/ci/emit';
+import {
+  AI_RUN_TOOLS,
+  DEFAULT_FAQ_COUNT,
+  MAX_FAQ_COUNT,
+  TOOL_SCOPES,
+  aiRunCalls,
+  categoryScope,
+  leavesOf,
+  productScope,
+} from '../lib/ai-run-estimate';
 import { resolveAiCaps } from '../lib/usage-caps';
 
 const router = Router({ mergeParams: true });
@@ -399,16 +409,14 @@ router.post('/seo', writeLimiter, async (req: Request, res: Response, next: Next
   }
 });
 
-// =====================================================================
-// Per-product AEO meta description — bilingual conversational
+// ==============================================================// Per-product AEO meta description — bilingual conversational
 // "What is X?" style meta description for a single product, drafted
 // inline (no Inngest job). Twin of the catalogue-wide bulk-ai-meta-aeo
 // sweep (Inngest) — both share `generateProductMetaAeo` (lib/ai/
 // product-meta-aeo-generator.ts) so per-product and bulk output never
 // diverge. Powers the product edit page's "Generate with AI" button
 // alongside /seo and /product-faqs/draft.
-// =====================================================================
-
+// ==============================================================
 const productMetaAeoSchema = z.object({
   productId: z.string().min(1),
 });
@@ -507,11 +515,9 @@ router.post(
   }
 );
 
-// =====================================================================
-// Smart Palette v3 — Layer C: Gemini Vision logo-to-palette extraction.
+// ==============================================================// Smart Palette v3 — Layer C: Gemini Vision logo-to-palette extraction.
 // POST /stores/:storeId/ai/palette-from-logo
-// =====================================================================
-
+// ==============================================================
 router.post(
   '/palette-from-logo',
   writeLimiter,
@@ -542,11 +548,9 @@ router.post(
   }
 );
 
-// =====================================================================
-// Bulk sweeps — translate or SEO across the entire catalogue.
+// ==============================================================// Bulk sweeps — translate or SEO across the entire catalogue.
 // Returns 202 + jobId; admin polls /bulk/:jobId for progress.
-// =====================================================================
-
+// ==============================================================
 const bulkTranslateSchema = z.object({
   direction: z.enum(['to_ar', 'to_en']),
 });
@@ -612,6 +616,61 @@ router.post(
       }
 
       res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /stores/:storeId/ai/bulk-estimate[?tool=<tool>][&faqCount=n]
+ * Read-only: what a run would use, shown next to each Run button. One tool, or every tool when `tool` is omitted
+ * (the page asks once, so a page load is one rate-limited call, not one per card). Counts the SAME rows the sweep walks
+ * (`productScope` / `categoryScope`) and prices them with the SAME function that sets the job total (`aiRunCalls`),
+ * so the number cannot drift from the run. Tenant-scoped: the store comes from the path (requireStoreAccess) and every
+ * count carries `storeId`. A CEILING in AI calls: a smart-skip run fills only what is blank and may use fewer.
+ */
+const bulkEstimateQuery = z.object({
+  tool: z.enum(AI_RUN_TOOLS).optional(),
+  faqCount: z.coerce.number().int().min(1).max(MAX_FAQ_COUNT).optional(),
+});
+
+router.get(
+  '/bulk-estimate',
+  requireFeature('bulk_operations'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { tool, faqCount } = bulkEstimateQuery.parse(req.query);
+      const db = await storeDb(storeId);
+      const productCounts = new Map<string, Promise<number>>();
+      const categoryCounts = new Map<string, Promise<number>>();
+      const countProducts = (k: keyof typeof productScope) => {
+        if (!productCounts.has(k))
+          productCounts.set(k, db.product.count({ where: productScope[k](storeId) }));
+        return productCounts.get(k)!;
+      };
+      const countCategories = (k: keyof typeof categoryScope) => {
+        if (!categoryCounts.has(k))
+          categoryCounts.set(k, db.category.count({ where: categoryScope[k](storeId) }));
+        return categoryCounts.get(k)!;
+      };
+      const opts = { faqCount: faqCount ?? DEFAULT_FAQ_COUNT };
+      const estimates: { tool: string; estimatedCalls: number }[] = [];
+      for (const t of tool ? [tool] : AI_RUN_TOOLS) {
+        let calls = 0;
+        for (const leaf of leavesOf(t)) {
+          const scope = TOOL_SCOPES[leaf];
+          const [products, categories] = await Promise.all([
+            scope.products ? countProducts(scope.products) : 0,
+            scope.categories ? countCategories(scope.categories) : 0,
+          ]);
+          calls += aiRunCalls(leaf, { products, categories }, opts);
+        }
+        estimates.push({ tool: t, estimatedCalls: calls });
+      }
+      res.json({ success: true, data: { estimates, isCeiling: true } });
     } catch (error) {
       next(error);
     }
@@ -686,12 +745,10 @@ router.get('/bulk/:jobId', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
-// =====================================================================
-// Per-product FAQ draft — generates up to 5 FAQ pairs for a single
+// ==============================================================// Per-product FAQ draft — generates up to 5 FAQ pairs for a single
 // product via Gemini, returned inline (no Inngest job). Merchant
 // reviews and accepts before FAQs are persisted.
-// =====================================================================
-
+// ==============================================================
 const draftProductFaqsSchema = z.object({
   productId: z.string().min(1),
   count: z.number().int().min(1).max(10).default(3),
@@ -833,13 +890,11 @@ router.post(
   }
 );
 
-// =====================================================================
-// Catalogue field sweeps (2026-07-03) — category assignment, image
+// ==============================================================// Catalogue field sweeps (2026-07-03) — category assignment, image
 // alt-text, product excerpts, product tags. Each mirrors the bulk-ai
 // pattern above: creates a BulkAiJob + hands off to an Inngest function.
 // See docs/plans/2026-07-03-ai-bulk-sweeps.md.
-// =====================================================================
-
+// ==============================================================
 // Uncategorized-products-only category assignment. `force` is accepted for
 // wiring consistency but is a no-op in the Inngest function (never
 // re-categorizes a product that already has one — see bulk-ai-categorize.ts).
@@ -1020,10 +1075,8 @@ router.post(
   }
 );
 
-// =====================================================================
-// AI Usage — summary + paginated log for merchant quota visibility.
-// =====================================================================
-
+// ==============================================================// AI Usage — summary + paginated log for merchant quota visibility.
+// ==============================================================
 router.get('/usage/summary', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
@@ -1122,11 +1175,9 @@ router.get('/usage/log', async (req: Request, res: Response, next: NextFunction)
   }
 });
 
-// =====================================================================
-// AEO bulk sweeps — FAQ items, HowTo guides, conversational meta.
+// ==============================================================// AEO bulk sweeps — FAQ items, HowTo guides, conversational meta.
 // Each returns 202 + jobId; poll /bulk/:jobId for progress.
-// =====================================================================
-
+// ==============================================================
 router.post(
   '/bulk/faq-aeo',
   requireFeature('bulk_operations'),
@@ -1264,14 +1315,12 @@ router.post(
   }
 );
 
-// =====================================================================
-// Bulk AI recommendations sweep.
+// ==============================================================// Bulk AI recommendations sweep.
 // Generates cross-sell suggestions for every active product using
 // Gemini. Results are stored in ai_recommendation and queried by
 // recommendation.service.ts as the second priority (after manual
 // cross-sells, before FBT).
-// =====================================================================
-
+// ==============================================================
 router.post(
   '/bulk/recommendations',
   requireFeature('bulk_operations'),
@@ -1318,12 +1367,10 @@ router.post(
   }
 );
 
-// =====================================================================
-// AEO master sweep — fires faq_aeo + howto_aeo + meta_aeo in parallel.
+// ==============================================================// AEO master sweep — fires faq_aeo + howto_aeo + meta_aeo in parallel.
 // All three jobs share a master_run_id tag in their summary field so
 // the admin UI can poll + aggregate them as a single combined card.
-// =====================================================================
-
+// ==============================================================
 router.post(
   '/bulk/aeo-sweep-all',
   requireFeature('bulk_operations'),
@@ -1418,11 +1465,9 @@ router.post(
   }
 );
 
-// =====================================================================
-// GEO bulk sweeps — LLMs.txt generation, product citation copy,
+// ==============================================================// GEO bulk sweeps — LLMs.txt generation, product citation copy,
 // and brand facts JSON.  Mirrors the AEO pattern exactly.
-// =====================================================================
-
+// ==============================================================
 router.post(
   '/bulk/llms-txt',
   requireFeature('bulk_operations'),
@@ -1640,13 +1685,11 @@ router.post(
   }
 );
 
-// =====================================================================
-// Cancel a running or queued bulk AI job.
+// ==============================================================// Cancel a running or queued bulk AI job.
 // POST /stores/:storeId/ai/jobs/:jobId/cancel
 // Cooperative cancellation: sets status=cancelled in DB; the Inngest
 // function checks this flag every 5 iterations and breaks out cleanly.
-// =====================================================================
-
+// ==============================================================
 router.post(
   '/jobs/:jobId/cancel',
   requireFeature('bulk_operations'),
@@ -1670,10 +1713,8 @@ router.post(
   }
 );
 
-// ==========================================
-// AI Sweep Result Viewers
-// ==========================================
-// Closes the "every data has a UI" gap for the GEO sweeps. The bulk-ai
+// ===================================// AI Sweep Result Viewers
+// ===================================// Closes the "every data has a UI" gap for the GEO sweeps. The bulk-ai
 // jobs write to `stores.llmsTxt` + `stores.aboutJson` + `ai_recommendation`,
 // then disappear from the admin's view. These endpoints expose the
 // CURRENT VALUES so the merchant can see what the sweep actually filled.
@@ -1826,11 +1867,9 @@ router.get(
   }
 );
 
-// =====================================================================
-// Sweep Result Viewers (read-only) — translate, seo, faqs, howtos,
+// ==============================================================// Sweep Result Viewers (read-only) — translate, seo, faqs, howtos,
 // meta-aeo.  All follow the same auth chain as the rest of the file.
-// =====================================================================
-
+// ==============================================================
 /**
  * GET /stores/:storeId/ai/results/translate
  * AR fill-rate for products and categories + 5 recently-translated
@@ -2164,14 +2203,12 @@ router.get('/results/meta-aeo', async (req: Request, res: Response, next: NextFu
   }
 });
 
-// =====================================================================
-// AI-first autofill — hand a single field BACK to the AI.
+// ==============================================================// AI-first autofill — hand a single field BACK to the AI.
 // POST /stores/:storeId/ai/products/:productId/ai/reset-field
 // Clears the field + its provenance lock, then regenerates ONLY that
 // field via the autofill core. Used by the admin product editor's
 // "✨ Switch to AI" button next to each human-owned AI-writable field.
-// =====================================================================
-
+// ==============================================================
 router.post(
   '/products/:productId/ai/reset-field',
   writeLimiter,
@@ -2224,15 +2261,13 @@ router.post(
   }
 );
 
-// =====================================================================
-// Description-language balancer — bulk + per-product routes.
+// ==============================================================// Description-language balancer — bulk + per-product routes.
 //
 // Bulk: POST /bulk/balance-descriptions  → creates BulkAiJob + enqueues
 // Bulk: POST /bulk/revert-balance        → creates BulkAiJob + enqueues revert
 // Per-product: POST /products/:productId/ai/balance-description
 // Per-product: POST /products/:productId/ai/revert-balance
-// =====================================================================
-
+// ==============================================================
 router.post(
   '/bulk/balance-descriptions',
   requireFeature('bulk_operations'),
@@ -2381,11 +2416,9 @@ router.post(
   }
 );
 
-// =====================================================================
-// Catalogue field sweep results — closes the every-data-has-a-UI gap for
+// ==============================================================// Catalogue field sweep results — closes the every-data-has-a-UI gap for
 // category / image-alt / excerpt / tags, mirroring /results/translate etc.
-// =====================================================================
-
+// ==============================================================
 /**
  * GET /stores/:storeId/ai/results/categorize
  * Category-assignment fill-rate: how many active products have >=1

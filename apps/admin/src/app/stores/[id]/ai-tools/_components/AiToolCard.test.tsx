@@ -33,6 +33,15 @@ describe('AiToolCard states', () => {
     expect(screen.queryByTestId('blocked-reason')).toBeNull();
   });
 
+  it('shows the estimated AI calls next to Run when the server gave one, and nothing when it did not', () => {
+    const { rerender } = render(
+      <AiToolCard {...base} estimateLabel="Up to 12 AI calls for this run" />
+    );
+    expect(screen.getByTestId('tool-estimate').textContent).toBe('Up to 12 AI calls for this run');
+    rerender(<AiToolCard {...base} />);
+    expect(screen.queryByTestId('tool-estimate')).toBeNull();
+  });
+
   it('runs without force by default and with force once replace is ticked', () => {
     const onRun = vi.fn();
     render(<AiToolCard {...base} onRun={onRun} />);

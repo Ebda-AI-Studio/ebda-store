@@ -156,6 +156,10 @@
       "perImage": "Uses 1 AI call per image, up to 4 images per product",
       "none": "Uses no AI calls"
     },
+    "estimate": {
+      "upTo": "{count, plural, one {Up to {count, number, latn} AI call} other {Up to {count, number, latn} AI calls}} for this run",
+      "none": "This run uses no AI calls"
+    },
     "blocked": {
       "running": "Another tool is running. Wait for it to finish, or stop it above.",
       "daily": "Today's AI limit is used up. It renews at midnight UTC.",

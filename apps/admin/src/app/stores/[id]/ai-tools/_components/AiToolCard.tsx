@@ -17,6 +17,8 @@ interface AiToolCardProps {
   outcome: string;
   body: string;
   costLabel: string;
+  /** Server estimate of the AI calls this run will use (a ceiling); absent until it loads. */
+  estimateLabel?: string;
   buttonLabel: string;
   startingLabel: string;
   loading: boolean;
@@ -52,6 +54,7 @@ export function AiToolCard(props: AiToolCardProps) {
     outcome,
     body,
     costLabel,
+    estimateLabel,
     buttonLabel,
     startingLabel,
     loading,
@@ -124,6 +127,15 @@ export function AiToolCard(props: AiToolCardProps) {
       )}
 
       <div className="mt-auto pt-4">
+        {estimateLabel && (
+          <p
+            className="mb-2 text-xs font-medium text-foreground"
+            data-testid="tool-estimate"
+            aria-live="polite"
+          >
+            {estimateLabel}
+          </p>
+        )}
         <Button
           variant={isUndo ? 'outline' : 'default'}
           size="md"
