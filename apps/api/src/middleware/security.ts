@@ -1709,7 +1709,7 @@ export const adminSearchLimiter = withoutLimitPlan(
 
 // Owner/admin GETs that read one small record (the CodeQL js/missing-rate-limiting class: GETs skip the global limiter).
 // Per USER (a store's staff share one office IP), generous for normal page loads and polling, a hard stop for a script.
-export const ADMIN_READ_LIMIT_PER_MINUTE = 120;
+const ADMIN_READ_LIMIT_PER_MINUTE = 120;
 export const adminReadLimiter = withoutLimitPlan(
   rateLimit({
     store: makeRateLimitStore(rateLimitRedisClient, 'admin-read'),
