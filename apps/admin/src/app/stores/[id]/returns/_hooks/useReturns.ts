@@ -66,6 +66,8 @@ export const COMPLETE_ERROR_CODES = new Set([
   'MANUAL_PROVIDER_REFUND',
   // A merchant-opened return that covers every line cannot skip a restock (STORE-QA-76): refused at the claim, before money moves.
   'FULL_RETURN_RESTOCK_ALL',
+  // A guest return has no wallet: store credit is refused (GUEST-RET-1); the dialog also disables the option for it.
+  'GUEST_STORE_CREDIT',
 ]);
 
 /**

@@ -4538,7 +4538,8 @@
         "OVERRIDE_NOT_APPLICABLE": "A refund override only applies to a partial return of a tier-priced item. Complete the return without it.",
         "OVERRIDE_OUT_OF_RANGE": "The override must be between 0 and the standard refund for that item.",
         "OVERRIDE_UNKNOWN_ITEM": "The override names an item that is not on this return. Reopen the dialog and try again.",
-        "FULL_RETURN_RESTOCK_ALL": "Every line of this order is in this return, so every line goes back on the shelf. Open a new return that leaves one unit out if some goods are not coming back to stock."
+        "FULL_RETURN_RESTOCK_ALL": "Every line of this order is in this return, so every line goes back on the shelf. Open a new return that leaves one unit out if some goods are not coming back to stock.",
+        "GUEST_STORE_CREDIT": "Store credit needs a customer account. This order was placed as a guest, so refund it in cash, by bank transfer or manually."
       }
     },
     "modal": {
@@ -4613,7 +4614,8 @@
           "amount": "Enter an amount between 0 and {max}.",
           "reason": "Write a reason (at least 3 characters)."
         }
-      }
+      },
+      "storeCreditNeedsAccount": "Store credit needs a customer account. This order was placed as a guest, so refund it in cash, by bank transfer or manually."
     },
     "newReturn": {
       "title": "New return",
@@ -4644,7 +4646,10 @@
         "bundle_returns_are_atomic": "A bundle can only be returned as a complete box.",
         "FORBIDDEN": "Your role cannot open returns.",
         "UNKNOWN": "The return was not opened. Try again."
-      }
+      },
+      "pickLines": "Tick the lines you are returning.",
+      "estimating": "Working out the amount…",
+      "estimate": "This return refunds about {amount} {currency}, the items' share of any discount and tax."
     }
   },
   "marketingPixels": {

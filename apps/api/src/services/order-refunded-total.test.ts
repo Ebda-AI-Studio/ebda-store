@@ -33,4 +33,30 @@ describe('refundedTotal', () => {
       )
     ).toBe(3000);
   });
+
+  it('counts a completed return paid out by cash (not on the payment row): return 100 + cash 3,260 -> Refunded 3,360', () => {
+    expect(
+      refundedTotal(
+        [{ refundedAmount: 0, metadata: {} }],
+        // both returns flagged `external` on their order events: they were never counted by the event rule
+        [
+          { metadata: { refundKey: 'r1', amount: 100, external: true } },
+          { metadata: { refundKey: 'r2', amount: 3260, external: true } },
+        ],
+        [
+          { refundMethod: 'cash', refundAmount: 100 },
+          { refundMethod: 'cash', refundAmount: 3260 },
+        ]
+      )
+    ).toBe(3360);
+  });
+  it('does not count a gateway return twice (its amount is already on the payment row)', () => {
+    expect(
+      refundedTotal(
+        [{ refundedAmount: 5000, metadata: {} }],
+        [],
+        [{ refundMethod: 'original_payment', refundAmount: 5000 }]
+      )
+    ).toBe(5000);
+  });
 });

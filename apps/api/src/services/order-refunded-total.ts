@@ -6,6 +6,11 @@
  * it is not mirrored on the payment row, so the card showed no refund line for it. The same classification as the DO's
  * one refundable balance (packages/repo/src/do/refundable.ts): an event flagged `external`, or whose refundKey is a
  * provider refund id on a payment's `metadata.refundEventIds`, is already inside `payments.refundedAmount`.
+ *
+ * A refund made through the RETURNS path (a completed return) is a third channel: a gateway return moves
+ * `payments.refundedAmount` (already counted), but a cash / bank / manual payout or store credit does not, and its
+ * `partial_return_restored` event is flagged `external`, so without this the card ignored it. Counted here exactly as the DO's
+ * one refundable balance does (packages/repo/src/do/refundable.ts): completed returns whose method is not a gateway method.
  */
 interface RefundEventLike {
   metadata?: unknown;
@@ -13,9 +18,16 @@ interface RefundEventLike {
 
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
+/** The refund methods that go through the payment provider: those amounts are already in `payments.refundedAmount`. */
+const GATEWAY_RETURN_METHODS = ['original', 'gateway', 'original_payment'];
+
 export function refundedTotal(
   payments: ReadonlyArray<{ refundedAmount?: number | null; metadata?: unknown }>,
-  events: ReadonlyArray<RefundEventLike>
+  events: ReadonlyArray<RefundEventLike>,
+  completedReturns: ReadonlyArray<{
+    refundMethod?: string | null;
+    refundAmount?: number | null;
+  }> = []
 ): number {
   const mirrored = new Set<string>();
   for (const p of payments) {
@@ -33,5 +45,12 @@ export function refundedTotal(
     if (typeof m.refundKey === 'string' && mirrored.has(m.refundKey)) continue;
     booked += Math.max(0, num(m.amount));
   }
-  return payments.reduce((s, p) => s + Math.max(0, num(p.refundedAmount)), 0) + booked;
+  const viaReturns = completedReturns.reduce(
+    (s, r) =>
+      GATEWAY_RETURN_METHODS.includes(r.refundMethod ?? '')
+        ? s
+        : s + Math.max(0, num(r.refundAmount)),
+    0
+  );
+  return payments.reduce((s, p) => s + Math.max(0, num(p.refundedAmount)), 0) + booked + viaReturns;
 }
