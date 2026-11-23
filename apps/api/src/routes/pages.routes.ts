@@ -3,7 +3,8 @@ import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
-import { PagesService } from '../services/pages.service';
+import { PagesService, canDeletePage } from '../services/pages.service';
+import { auditLog } from '../middleware/security';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -148,21 +149,34 @@ router.put(
   }
 );
 
-// DELETE /stores/:storeId/pages/:slug - super_admin only.
-//
-// Keeps the platform from accidentally letting a store_admin nuke a
-// critical legal page (Privacy/Terms). Merchants edit content; only
-// platform staff delete shells.
+// DELETE /stores/:storeId/pages/:slug - a store_admin deletes their own CUSTOM pages; the standard
+// pages (home, legal, about...) stay (PROTECTED_PAGE_SLUGS), only platform staff remove those shells.
 router.delete(
   '/stores/:storeId/pages/:slug',
   authenticate,
   requireMfaEnrolled,
-  authorize('super_admin'),
+  authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, slug } = req.params;
+      if (!canDeletePage(req.user?.role, slug)) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'PAGE_PROTECTED', message: 'Standard pages cannot be deleted' },
+        });
+        return;
+      }
       await PagesService.remove(storeId, slug);
+      await auditLog({
+        action: 'page.deleted',
+        userId: req.user!.userId,
+        resourceType: 'page',
+        resourceId: slug,
+        details: { storeId, slug },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
       res.json({ success: true });
     } catch (error) {
       next(error);

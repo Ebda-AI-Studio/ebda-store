@@ -8,7 +8,9 @@ import { useLocale } from 'next-intl';
 import { Modal, useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet } from '../../../../lib/api';
+import { apiDelete, apiGet } from '../../../../lib/api';
+import { useConfirm } from '@/hooks/useConfirm';
+import { PAGE_SLUG_REGEX, isProtectedPageSlug, slugFromTitle } from './page-slug';
 
 interface StorePageRow {
   id: string;
@@ -31,8 +33,6 @@ const BUILT_IN_SLUGS: Array<{ slug: string; en: string; ar: string }> = [
   { slug: 'faq', en: 'FAQ', ar: 'الأسئلة الشائعة' },
 ];
 
-const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
-
 // A page is considered "authored" when at least one block array has any
 // item. Blocks are arrays of typed objects so the truthiness check is
 // "non-empty array" rather than "non-empty string".
@@ -47,9 +47,11 @@ export default function ContentListPage() {
   const router = useRouter();
   const storeId = params?.id as string;
   const t = useT('content.list');
-  const { error: toastError } = useToast();
+  const { error: toastError, success: toastSuccess } = useToast();
+  const askConfirm = useConfirm();
   const [newPageOpen, setNewPageOpen] = useState(false);
-  const [newSlug, setNewSlug] = useState('');
+  const [newTitle, setNewTitle] = useState('');
+  const [newSlug, setNewSlug] = useState(''); // advanced override; empty = derived from the title
   const [newSlugInvalid, setNewSlugInvalid] = useState(false);
 
   const [pages, setPages] = useState<StorePageRow[]>([]);
@@ -76,19 +78,40 @@ export default function ContentListPage() {
   // In-app dialog, never window.prompt: a native prompt blocks the whole tab
   // (and every automation driver) until answered, which read as a freeze.
   const handleNewPage = () => {
+    setNewTitle('');
     setNewSlug('');
     setNewSlugInvalid(false);
     setNewPageOpen(true);
   };
 
   const submitNewPage = () => {
-    const slug = newSlug.trim().toLowerCase();
-    if (!SLUG_REGEX.test(slug)) {
+    const title = newTitle.trim();
+    const slug = (newSlug.trim() ? newSlug.trim().toLowerCase() : slugFromTitle(title)) || '';
+    if ((!title && !newSlug.trim()) || !PAGE_SLUG_REGEX.test(slug)) {
       setNewSlugInvalid(true);
       return;
     }
     setNewPageOpen(false);
-    router.push(`/stores/${storeId}/content/${encodeURIComponent(slug)}`);
+    const q = title ? `?title=${encodeURIComponent(title)}` : '';
+    router.push(`/stores/${storeId}/content/${encodeURIComponent(slug)}${q}`);
+  };
+
+  const handleDelete = async (p: StorePageRow) => {
+    const ok = await askConfirm({
+      object: t('deleteObject', { name: p.title || p.titleAr || p.slug }),
+      consequence: t('deleteConsequence'),
+      confirmLabel: t('deleteConfirm'),
+    });
+    if (!ok) return;
+    const { error } = await apiDelete(
+      `/api/v1/stores/${storeId}/pages/${encodeURIComponent(p.slug)}`
+    );
+    if (error) {
+      toastError(t('deleteError'));
+      return;
+    }
+    toastSuccess(t('deleted'));
+    await fetchPages();
   };
 
   const pagesBySlug = new Map(pages.map(p => [p.slug, p]));
@@ -119,19 +142,38 @@ export default function ContentListPage() {
           }}
         >
           <label className="block text-sm font-medium text-foreground">
-            {t('newPagePrompt')}
+            {t('newPageNameLabel')}
             <input
-              value={newSlug}
+              value={newTitle}
               onChange={e => {
-                setNewSlug(e.target.value);
+                setNewTitle(e.target.value);
                 setNewSlugInvalid(false);
               }}
-              dir="ltr"
+              dir="auto"
               autoFocus
               aria-invalid={newSlugInvalid}
+              placeholder={t('newPageNamePlaceholder')}
               className="mt-1 w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </label>
+          <details className="mt-3">
+            <summary className="cursor-pointer text-sm text-muted-foreground">
+              {t('newPageAdvanced')}
+            </summary>
+            <label className="mt-2 block text-sm font-medium text-foreground">
+              {t('newPageSlugLabel')}
+              <input
+                value={newSlug}
+                onChange={e => {
+                  setNewSlug(e.target.value);
+                  setNewSlugInvalid(false);
+                }}
+                dir="ltr"
+                placeholder={slugFromTitle(newTitle)}
+                className="mt-1 w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </label>
+          </details>
           {newSlugInvalid && (
             <p role="alert" className="mt-2 text-sm text-destructive-ink">
               {t('newPageInvalid')}
@@ -205,6 +247,8 @@ export default function ContentListPage() {
                       publishedLabel={t('publishedBadge')}
                       draftLabel={t('draftBadge')}
                       editLabel={t('openEditor')}
+                      deleteLabel={isProtectedPageSlug(p.slug) ? undefined : t('deletePage')}
+                      onDelete={() => void handleDelete(p)}
                     />
                   </li>
                 ))}
@@ -228,6 +272,8 @@ function PageRowCard({
   publishedLabel,
   draftLabel,
   editLabel,
+  deleteLabel,
+  onDelete,
 }: {
   slug: string;
   defaultTitleEn: string;
@@ -239,6 +285,8 @@ function PageRowCard({
   publishedLabel: string;
   draftLabel: string;
   editLabel: string;
+  deleteLabel?: string;
+  onDelete?: () => void;
 }) {
   const authored = row ? hasContent(row) : false;
   const titleEn = row?.title?.trim() || defaultTitleEn;
@@ -248,44 +296,51 @@ function PageRowCard({
   const primaryTitle = isAr ? titleAr : titleEn;
   const secondaryTitle = isAr ? titleEn : titleAr;
   return (
-    <Link
-      href={`/stores/${storeId}/content/${encodeURIComponent(slug)}`}
-      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/30"
-    >
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-base font-semibold text-foreground">{primaryTitle}</span>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
-            {slug}
-          </span>
-        </div>
-        <p className="mt-0.5 text-sm text-muted-foreground" dir={isAr ? 'ltr' : 'rtl'}>
-          {secondaryTitle}
-        </p>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-          <span
-            className={`rounded-full px-2 py-0.5 ${
-              authored
-                ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                : 'bg-warning/15 text-warning-ink'
-            }`}
-          >
-            {authored ? authoredLabel : fallbackLabel}
-          </span>
-          {row && (
+    <div className="flex items-stretch gap-2">
+      <Link
+        href={`/stores/${storeId}/content/${encodeURIComponent(slug)}`}
+        className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/30"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-base font-semibold text-foreground">{primaryTitle}</span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
+              {slug}
+            </span>
+          </div>
+          <p className="mt-0.5 text-sm text-muted-foreground" dir={isAr ? 'ltr' : 'rtl'}>
+            {secondaryTitle}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
             <span
               className={`rounded-full px-2 py-0.5 ${
-                row.isPublished
-                  ? 'bg-primary/10 text-primary-ink'
-                  : 'bg-muted text-muted-foreground'
+                authored
+                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-warning/15 text-warning-ink'
               }`}
             >
-              {row.isPublished ? publishedLabel : draftLabel}
+              {authored ? authoredLabel : fallbackLabel}
             </span>
-          )}
+            {row && (
+              <span
+                className={`rounded-full px-2 py-0.5 ${
+                  row.isPublished
+                    ? 'bg-primary/10 text-primary-ink'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {row.isPublished ? publishedLabel : draftLabel}
+              </span>
+            )}
+          </div>
         </div>
-      </div>
-      <span className="shrink-0 text-sm font-medium text-primary">{editLabel} →</span>
-    </Link>
+        <span className="shrink-0 text-sm font-medium text-primary">{editLabel} →</span>
+      </Link>
+      {deleteLabel && onDelete && (
+        <Button type="button" variant="outline" onClick={onDelete} className="shrink-0 self-center">
+          {deleteLabel}
+        </Button>
+      )}
+    </div>
   );
 }

@@ -20,7 +20,7 @@ vi.mock('next/link', () => ({
   default: (p: { children: React.ReactNode }) => <a>{p.children}</a>,
 }));
 vi.mock('@ebda/ui', () => ({
-  useToast: () => ({ error: vi.fn() }),
+  useToast: () => ({ error: vi.fn(), success: vi.fn() }),
   Modal: ({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) =>
     isOpen ? <div role="dialog">{children}</div> : null,
 }));
@@ -32,7 +32,9 @@ vi.mock('../../../../components/AdminLayout', () => ({
     </div>
   ),
 }));
+vi.mock('@/hooks/useConfirm', () => ({ useConfirm: () => async () => true }));
 vi.mock('../../../../lib/api', () => ({
+  apiDelete: vi.fn().mockResolvedValue({ error: null }),
   apiGet: vi.fn().mockResolvedValue({ data: { pages: [] }, error: null }),
 }));
 
@@ -55,16 +57,28 @@ describe('content list: add page', () => {
     expect(await screen.findByRole('dialog')).toBeTruthy();
   });
 
-  it('rejects an invalid slug inline and routes on a valid one', async () => {
+  it('is name-first: an Arabic title makes an Arabic slug and travels to the editor', async () => {
     render(<ContentListPage />);
     fireEvent.click(screen.getByText('newPage'));
     const input = (await screen.findByRole('dialog')).querySelector('input')!;
-    fireEvent.change(input, { target: { value: 'Bad Slug!' } });
+    fireEvent.change(input, { target: { value: 'صفحة اختبار' } });
+    fireEvent.click(screen.getByText('newPageConfirm'));
+    expect(push).toHaveBeenCalledWith(
+      `/stores/s1/content/${encodeURIComponent('صفحة-اختبار')}?title=${encodeURIComponent('صفحة اختبار')}`
+    );
+  });
+
+  it('an English title is slugged and an empty title is refused inline', async () => {
+    render(<ContentListPage />);
+    fireEvent.click(screen.getByText('newPage'));
+    const input = (await screen.findByRole('dialog')).querySelector('input')!;
     fireEvent.click(screen.getByText('newPageConfirm'));
     expect(screen.getByRole('alert')).toBeTruthy();
     expect(push).not.toHaveBeenCalled();
-    fireEvent.change(input, { target: { value: 'Our-Story' } });
+    fireEvent.change(input, { target: { value: 'Our Story' } });
     fireEvent.click(screen.getByText('newPageConfirm'));
-    expect(push).toHaveBeenCalledWith('/stores/s1/content/our-story');
+    expect(push).toHaveBeenCalledWith(
+      `/stores/s1/content/our-story?title=${encodeURIComponent('Our Story')}`
+    );
   });
 });
