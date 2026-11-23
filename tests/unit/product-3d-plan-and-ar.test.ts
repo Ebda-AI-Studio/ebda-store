@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { FEATURE_REGISTRY, PLAN_BASELINE, STORE_PLANS, DEFAULT_PLAN_SEEDS } from '@ebda/shared';
-import { arPlatform, sceneViewerIntent } from '../../packages/ui/src/model3d/ar';
+import { arPlatform, sceneViewerIntent, showDesktopQr } from '../../packages/ui/src/model3d/ar';
 
 describe('product_3d is in every plan', () => {
   it.each(STORE_PLANS)('baseline %s includes product_3d', plan => {
@@ -48,5 +48,24 @@ describe('AR hand-off', () => {
     expect(u).toContain(
       `S.browser_fallback_url=${encodeURIComponent('https://shop.test/p/a')};end;`
     );
+  });
+});
+
+describe('desktop QR for View in your space (A2b)', () => {
+  const base = {
+    platform: 'none' as const,
+    arEnabled: true,
+    src: 'https://cdn.ebda.app/m.glb',
+    pageUrl: 'https://shop.ebda.app/p/ring',
+  };
+  it('shows on a desktop when AR is on and the model is a public https file', () => {
+    expect(showDesktopQr(base)).toBe(true);
+  });
+  it('never shows on a phone (the real AR button is there), with AR off, or for a blob: preview', () => {
+    expect(showDesktopQr({ ...base, platform: 'ios' })).toBe(false);
+    expect(showDesktopQr({ ...base, platform: 'android' })).toBe(false);
+    expect(showDesktopQr({ ...base, arEnabled: false })).toBe(false);
+    expect(showDesktopQr({ ...base, src: 'blob:https://admin/x' })).toBe(false);
+    expect(showDesktopQr({ ...base, pageUrl: '' })).toBe(false);
   });
 });
