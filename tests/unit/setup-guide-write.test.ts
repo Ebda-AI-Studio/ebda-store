@@ -33,7 +33,10 @@ vi.mock('../../apps/api/src/lib/repo-factory', () => ({
   copyStoreSettings: async (_id: string, f: unknown) => void h.copies.push(f),
 }));
 
-import { SetupGuideService } from '../../apps/api/src/services/setup-guide.service';
+import {
+  SetupGuideService,
+  paidOrDeliveredCodWhere,
+} from '../../apps/api/src/services/setup-guide.service';
 
 beforeEach(() => {
   h.onDo = false;
@@ -73,10 +76,46 @@ describe('setup guide writers (N-19)', () => {
 });
 
 describe('SetupGuideService.get paidOrders (launch chip goal)', () => {
-  it('counts only paymentStatus=paid orders, separately from all orders', async () => {
+  type O = {
+    status: string;
+    paymentStatus: string;
+    provider: string;
+  };
+  /** Evaluates the real where-clause against in-memory orders. */
+  function matches(o: O, w: ReturnType<typeof paidOrDeliveredCodWhere>): boolean {
+    if (w.status.notIn.includes(o.status as never)) return false;
+    if (o.paymentStatus === w.paymentStatus.not) return false;
+    return w.OR.some(c => {
+      if ('payments' in c) return o.status === c.status && o.provider === c.payments.some.provider;
+      return o.paymentStatus === c.paymentStatus;
+    });
+  }
+  const orders: Record<string, O> = {
+    paidCard: { status: 'confirmed', paymentStatus: 'paid', provider: 'kashier' },
+    deliveredCodUnpaid: { status: 'delivered', paymentStatus: 'unpaid', provider: 'cod' },
+    undeliveredCod: { status: 'shipped', paymentStatus: 'unpaid', provider: 'cod' },
+    refundedPaid: { status: 'refunded', paymentStatus: 'refunded', provider: 'kashier' },
+    cancelledPaid: { status: 'cancelled', paymentStatus: 'paid', provider: 'kashier' },
+    refundedDeliveredCod: { status: 'delivered', paymentStatus: 'refunded', provider: 'cod' },
+    deliveredCardUnpaid: { status: 'delivered', paymentStatus: 'unpaid', provider: 'kashier' },
+  };
+  const counted = (k: string) => matches(orders[k], paidOrDeliveredCodWhere('s1'));
+  it('a paid card order counts', () => expect(counted('paidCard')).toBe(true));
+  it('a delivered COD order not yet marked paid counts', () =>
+    expect(counted('deliveredCodUnpaid')).toBe(true));
+  it('an undelivered COD order does not', () => expect(counted('undeliveredCod')).toBe(false));
+  it('refunded / cancelled / fully refunded orders do not', () => {
+    expect(counted('refundedPaid')).toBe(false);
+    expect(counted('cancelledPaid')).toBe(false);
+    expect(counted('refundedDeliveredCod')).toBe(false);
+  });
+  it('a delivered but unpaid card order does not (only COD gets the delivered rule)', () =>
+    expect(counted('deliveredCardUnpaid')).toBe(false));
+
+  it('get() uses that clause for paidOrders, separately from all orders', async () => {
     vi.restoreAllMocks();
-    const orderCount = vi.fn(async (a: { where: { paymentStatus?: string } }) =>
-      a.where.paymentStatus === 'paid' ? 3 : 7
+    const orderCount = vi.fn(async (a: { where: Record<string, unknown> }) =>
+      'OR' in a.where ? 3 : 7
     );
     h.getDb = {
       store: {
@@ -97,6 +136,6 @@ describe('SetupGuideService.get paidOrders (launch chip goal)', () => {
     const g = await SetupGuideService.get('s1');
     expect(g.paidOrders).toBe(3);
     expect(g.items.find(i => i.key === 'test_order')?.done).toBe(true);
-    expect(orderCount).toHaveBeenCalledWith({ where: { storeId: 's1', paymentStatus: 'paid' } });
+    expect(orderCount).toHaveBeenCalledWith({ where: paidOrDeliveredCodWhere('s1') });
   });
 });

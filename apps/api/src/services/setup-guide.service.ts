@@ -93,6 +93,23 @@ async function patchGuide(
   });
 }
 
+/**
+ * Launch-chip goal ("first 5 orders paid or delivered", Ahmad 2026-11-23): an order counts when its payment is `paid`, OR it is a
+ * cash-on-delivery order that was delivered (the courier collected the cash even if the merchant has not marked it paid yet).
+ * Cancelled / refunded orders never count, and neither does a fully refunded payment.
+ */
+export function paidOrDeliveredCodWhere(storeId: string) {
+  return {
+    storeId,
+    status: { notIn: ['cancelled', 'refunded'] as ('cancelled' | 'refunded')[] },
+    paymentStatus: { not: 'refunded' as const },
+    OR: [
+      { paymentStatus: 'paid' as const },
+      { status: 'delivered' as const, payments: { some: { provider: 'cod' } } },
+    ],
+  };
+}
+
 export class SetupGuideService {
   static async get(storeId: string): Promise<SetupGuideState> {
     const store = await storeDb(storeId).then(db =>
@@ -110,7 +127,7 @@ export class SetupGuideService {
       db.shippingZone.count({ where: { storeId, isActive: true } }),
       db.shippingAreaRate.count({ where: { storeId, isActive: true } }),
       db.order.count({ where: { storeId } }),
-      db.order.count({ where: { storeId, paymentStatus: 'paid' } }),
+      db.order.count({ where: paidOrDeliveredCodWhere(storeId) }),
       db.paymentConfig.count({ where: { storeId, isEnabled: true, provider: { not: 'cod' } } }),
     ]);
 
