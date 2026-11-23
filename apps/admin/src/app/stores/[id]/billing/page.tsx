@@ -725,7 +725,11 @@ export default function StoreBillingPage() {
                 <p className="text-xs text-muted-foreground">{t('currentPlan')}</p>
                 <h2 className="text-xl font-semibold text-foreground">{planName(data.plan)}</h2>
               </div>
-              <OrderStatusBadge family="subscription" status={displayStatus} />
+              <OrderStatusBadge
+                family="subscription"
+                status={displayStatus}
+                label={t(`status.${displayStatus}`)}
+              />
             </div>
             <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
               {data.subscription.trialEndsAt && (
@@ -780,7 +784,11 @@ export default function StoreBillingPage() {
             <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <h2 className="text-base font-semibold">{t('trial.title')}</h2>
-                <OrderStatusBadge family="subscription" status={displayStatus} />
+                <OrderStatusBadge
+                  family="subscription"
+                  status={displayStatus}
+                  label={t(`status.${displayStatus}`)}
+                />
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
                 {t(`stateLine.${displayStatus}`)}
