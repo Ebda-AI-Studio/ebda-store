@@ -9482,6 +9482,7 @@
       "nextChargeNoAmount": "{plan} on {date}",
       "instapayDue": "Payment due",
       "instapayDueLine": "InstaPay payment due by {date}: {amount} ({interval}) for {plan}",
+      "switchingInterval": "Switching to {interval} billing from {date}, once your payment is confirmed",
       "instapayDueNoAmount": "InstaPay payment due by {date} for {plan}",
       "returnsToFree": "Your plan returns to Free if it is not paid by then."
     },

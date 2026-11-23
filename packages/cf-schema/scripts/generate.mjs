@@ -50,7 +50,13 @@ export function build() {
   const clone = m => JSON.parse(JSON.stringify(m));
   const addCols = m => {
     const c = clone(m);
-    for (const col of extraColumns[m.name] ?? []) c.fields.push(clone(col));
+    for (const col of extraColumns[m.name] ?? []) {
+      // A column that is ALSO a Prisma field (Postgres has it too) only needs `since`: D1 gets it from the numbered
+      // migration instead of 0001, and the field is not emitted twice.
+      const own = c.fields.find(x => x.name === col.name);
+      if (own && col.cfSince) own.cfSince = col.cfSince;
+      else c.fields.push(clone(col));
+    }
     for (const [mn, cols] of extraIndexes)
       if (mn === m.name) c.indexes.push({ fields: cols.map(field => ({ field })), map: null });
     return c;

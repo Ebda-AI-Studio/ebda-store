@@ -376,9 +376,13 @@ export async function instapayDetails(storeId: string) {
   );
   if (!sub) return null;
   const planCode = sub.pendingPlanCode ?? sub.planCode;
-  const interval: BillingInterval = isInterval(sub.billingInterval)
-    ? sub.billingInterval
-    : 'monthly';
+  // BILLING-INTERVAL-PENDING-1: the payment buys the interval the merchant picked at checkout (pending on an active
+  // store), which is what the claim records; the stored `billingInterval` stays the current one until it is paid.
+  const interval: BillingInterval = isInterval(sub.pendingBillingInterval)
+    ? sub.pendingBillingInterval
+    : isInterval(sub.billingInterval)
+      ? sub.billingInterval
+      : 'monthly';
   const plan = await prisma.plan.findUnique({ where: { code: planCode } });
   const listPrice = plan
     ? interval === 'yearly'
@@ -518,11 +522,19 @@ export async function chooseInstapayPlan(args: {
     }
     const samePlan =
       sub.status !== 'canceled' && sub.status !== 'trialing' && plan.code === sub.planCode;
+    // Ruling BILLING-INTERVAL-PENDING-1: on an ACTIVE subscription the interval is a CHOICE until its payment is
+    // recorded. Writing it now would pair the old period end (e.g. a yearly grant) with the new interval's price.
+    // Everything without a live paid period (trialing, past_due, canceled) keeps writing it directly.
+    const deferInterval = sub.status === 'active';
     await tx.storeSubscription.update({
       where: { storeId: args.storeId },
       data: {
         pendingPlanCode: samePlan ? null : plan.code,
-        billingInterval: args.interval,
+        ...(deferInterval
+          ? {
+              pendingBillingInterval: args.interval === sub.billingInterval ? null : args.interval,
+            }
+          : { billingInterval: args.interval, pendingBillingInterval: null }),
         cancelAtPeriodEnd: false,
       },
     });
@@ -1081,6 +1093,7 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
           : periodStart.getUTCDate(),
       trialEndsAt: null,
       pendingPlanCode: null,
+      pendingBillingInterval: null, // the paid interval is now the current one (BILLING-INTERVAL-PENDING-1)
       cancelAtPeriodEnd: false,
       dunningAttempts: 0,
       nextRetryAt: null,

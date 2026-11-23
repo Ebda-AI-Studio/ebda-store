@@ -307,6 +307,7 @@ async function applySuccess(
       billingAnchorDay: now.getUTCDate(), // the cycle restarts today (M-125)
       cancelAtPeriodEnd: false,
       pendingPlanCode: null,
+      pendingBillingInterval: null,
       dunningAttempts: 0,
       nextRetryAt: null,
       provider: row.provider,
@@ -2307,7 +2308,9 @@ type BillingStateSub = {
 export function nextChargeOf(
   sub: BillingStateSub | null,
   plans: Array<{ code: string; priceMonthlyMinor: number | null; priceYearlyMinor: number | null }>,
-  vat: PlatformVat
+  vat: PlatformVat,
+  /** Price at this interval instead of the stored one (the InstaPay payment for a pending switch). */
+  intervalOverride?: BillingInterval
 ): {
   at: Date;
   planCode: string;
@@ -2334,9 +2337,8 @@ export function nextChargeOf(
   if (!at) return null;
   const planCode = sub.pendingPlanCode ?? sub.planCode;
   const plan = plans.find(p => p.code === planCode);
-  const interval: BillingInterval = isInterval(sub.billingInterval)
-    ? sub.billingInterval
-    : 'monthly';
+  const interval: BillingInterval =
+    intervalOverride ?? (isInterval(sub.billingInterval) ? sub.billingInterval : 'monthly');
   const price = plan ? priceFor(plan, interval) : null;
   if (price === null) return { at, planCode, amountMinor: null, vat: null };
   const charge = subscriptionChargeAmount(price, vat);
@@ -2374,12 +2376,19 @@ export async function getSubscriptionBillingState(storeId: string) {
   );
   const vat = await resolvePlatformVat();
   const next = nextChargeOf(sub, plans, vat);
+  // BILLING-INTERVAL-PENDING-1: `next` (the renewal quote) always uses the CURRENT interval; what the merchant must
+  // transfer for a pending switch is priced at the picked interval, the same one instapayDetails puts in the claim.
+  const pendingInterval = isInterval(sub?.pendingBillingInterval)
+    ? sub.pendingBillingInterval
+    : null;
+  const payQuote = pendingInterval ? nextChargeOf(sub, plans, vat, pendingInterval) : next;
   const now = Date.now();
   const daysLeft = next ? Math.ceil((next.at.getTime() - now) / 86_400_000) : null;
   const handle = instapayHandle();
   const support = supportContact();
   return {
     billingInterval: sub?.billingInterval ?? 'monthly',
+    pendingBillingInterval: pendingInterval,
     pendingPlanCode: sub?.pendingPlanCode ?? null,
     nextRetryAt: sub?.nextRetryAt ?? null,
     dunningAttempts: sub?.dunningAttempts ?? 0,
@@ -2392,9 +2401,9 @@ export async function getSubscriptionBillingState(storeId: string) {
       available: !!handle,
       handle,
       reference: sub?.paymentReference ?? null,
-      amountMinor: next?.amountMinor ?? null,
+      amountMinor: payQuote?.amountMinor ?? null,
       /** Ebda VAT inside the amount + Ebda's TRN/legal name; null = no VAT line. */
-      vat: next?.vat ?? null,
+      vat: payQuote?.vat ?? null,
       /** Ebda's InstaPay QR image (EBDA_INSTAPAY_QR_URL); null = no QR shown. */
       qrUrl: handle ? instapayQrUrl() : null,
       pendingClaims,

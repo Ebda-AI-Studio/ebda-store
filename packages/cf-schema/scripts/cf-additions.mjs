@@ -53,6 +53,7 @@ export const LATE_COLUMN_MIGRATIONS = {
   3: 'late_columns',
   7: 'billing_eta_fields',
   10: 'store_template_original',
+  13: 'pending_billing_interval',
 };
 
 export const extraColumns = {
@@ -123,6 +124,14 @@ export const extraColumns = {
       optional: true,
       since: 10,
       note: 'the template before 0009 remapped a retired skin (revert path); NULL = never remapped or not recorded',
+    }),
+  ],
+  StoreSubscription: [
+    // BILLING-INTERVAL-PENDING-1: also a Prisma column (Postgres); D1 gets it from the numbered migration, not 0001.
+    f('pendingBillingInterval', 'String', {
+      optional: true,
+      since: 13,
+      note: 'interval picked at checkout on an active subscription; applied only when its payment is recorded',
     }),
   ],
   Customer: [
