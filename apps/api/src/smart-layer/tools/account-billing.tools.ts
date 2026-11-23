@@ -4,7 +4,7 @@
  * Reads (`free`; owner screens, same role check as `quote_plan`):
  *   - billing_overview (billing.view): GET /stores/:storeId/billing (plan, status, limits, usage, InstaPay state). `getUsageSummary` + `getSubscriptionBillingState`.
  *   - billing_invoices (billing.platform-fee-vat): GET .../billing/invoices (`listStoreCharges`, VAT split included).
- *   - my_features (billing.addons): GET /stores/:storeId/my-features (`authenticate` + store membership only, no role list, so none here either).
+ *   - my_features (billing.my-features): GET /stores/:storeId/my-features (`authenticate` + store membership only, no role list, so none here either).
  *   - list_my_stores (account.multi-store): GET /stores (`StoreService.list` as the owner).
  *   - merchant_mcp_status (mcp.read-tools): GET .../integrations/merchant-keys + write-switch, METADATA ONLY (no key hash, no plaintext: it is never stored).
  * Ruling E1-PLAN-1 - `plan_change` never charges the saved card from chat. A downgrade (or a change that charges nothing) is a confirm card that calls
@@ -128,7 +128,7 @@ const billingInvoices = readTool(
 
 const myFeatures = readTool(
   'my_features',
-  'billing.addons',
+  'billing.my-features',
   'Which features are on or off for my store and why a feature is locked (plan or switched off by Ebda Store). It cannot turn a feature on: that is the Ebda Store team or a plan upgrade. Say: "why is this feature locked", "what features do I have", "الميزة دي مقفولة ليه", "عايز افعل الزر العائم".',
   async ctx => {
     const features = await readInStoreContext(ctx.storeId, () =>

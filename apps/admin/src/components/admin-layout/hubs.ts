@@ -75,6 +75,7 @@ export type HubLabels = {
   aiTools: string;
   aiUsage: string;
   marketingPixels: string;
+  productFeeds: string;
   notifications: string;
   newsletter: string;
   campaigns: string;
@@ -231,6 +232,7 @@ export const HUBS: HubDefinition[] = [
       '/ai-usage',
       '/marketing',
       '/marketing-pixels',
+      '/product-feeds',
       '/newsletter',
       '/notifications',
       '/campaigns',
@@ -262,6 +264,7 @@ export const HUBS: HubDefinition[] = [
       { label: labels.notifications, href: `/stores/${storeId}/notifications` },
       { label: labels.affiliates, href: `/stores/${storeId}/affiliates`, groupStart: true },
       { label: labels.marketingPixels, href: `/stores/${storeId}/marketing-pixels` },
+      { label: labels.productFeeds, href: `/stores/${storeId}/product-feeds` },
       { label: labels.aiTools, href: `/stores/${storeId}/ai-tools`, groupStart: true },
       { label: labels.aiUsage, href: `/stores/${storeId}/ai-usage` },
       { label: labels.answerEngine, href: `/stores/${storeId}/answer-engine` },

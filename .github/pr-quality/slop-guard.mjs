@@ -16,6 +16,8 @@
 //   `unused-export` rule (never another rule) for exactly the vendored foundation folder, and only while the lock proves every vendored file
 //   byte-matches the tagged release and its parity test exists. Any wider path, another rule or a failed proof = the exemption is OFF and the
 //   violations count again.   Inline escape on the same or previous line:  pq-allow(rule): reason
+//   duplicate-helper has its own narrow escape (Ruling SLOP-TWIN-1): `// pq-allow(duplicate-helper): twin of <path>` above BOTH copies, each pointing at the
+//   other; honoured only while the twin file exists, has the same function with an identical body, and points back.
 import { readFileSync, readdirSync, lstatSync, existsSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -80,16 +82,28 @@ function bodyAt(text, from) {
 }
 const normalise = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '').replace(/\s+/g, ' ').trim();
 
-function functions(text) {
+// Ruling SLOP-TWIN-1: `// pq-allow(duplicate-helper): twin of <path>` on the line directly above a function (or on its line).
+const TWIN = /pq-allow\(duplicate-helper\):\s*twin of\s+([^\s;,)]+)/;
+
+/** every function declaration: name, normalised-body hash + length, line count, and its twin annotation (path) when it has one */
+function allFunctions(text) {
   const out = [];
+  const lines = text.split('\n');
   const re = /(?:^|\n)\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*[<(]/g;
   for (let m; (m = re.exec(text)); ) {
     const body = bodyAt(text, m.index + m[0].length);
     if (!body) continue;
     const n = normalise(body);
-    if (n.length >= 160 && body.split('\n').length >= 5 && !FRAMEWORK.has(m[1])) out.push({ name: m[1], hash: h(n) });
+    const kw = m.index + m[0].indexOf('function');
+    const line = text.slice(0, kw).split('\n').length - 1;
+    const twin = TWIN.exec((lines[line - 1] ?? '') + '\n' + (lines[line] ?? ''))?.[1] ?? null;
+    out.push({ name: m[1], hash: h(n), len: n.length, nlines: body.split('\n').length, twin });
   }
   return out;
+}
+
+function functions(text) {
+  return allFunctions(text).filter((f) => f.len >= 160 && f.nlines >= 5 && !FRAMEWORK.has(f.name));
 }
 
 export function scan({ root, config = {} }) {
@@ -102,11 +116,27 @@ export function scan({ root, config = {} }) {
   const src = new Map(app.map((f) => [f, readFileSync(join(root, f), 'utf8')]));
   for (const [f, t] of src) lineRules(f, t, add);
 
+  // SLOP-TWIN-1: a deliberate byte-equal twin is accepted ONLY as a pair: (a) the named twin file exists, (b) it has the same
+  // function with an identical body, (c) it carries the matching annotation pointing back. Anything else still fails.
+  const all = new Map([...src].map(([f, t]) => [f, allFunctions(t)]));
+  const twinOk = (f, fn) => {
+    if (!fn.twin) return false;
+    const other = (all.get(fn.twin) ?? []).find((y) => y.name === fn.name);
+    return !!other && other.hash === fn.hash && other.twin === f;
+  };
+  for (const [f, fns] of all)
+    for (const fn of fns)
+      if (fn.twin && !twinOk(f, fn))
+        viol.set(`duplicate-helper|${f}|${fn.name}|twin-invalid`, `${f} duplicate-helper  ${fn.name} claims "twin of ${fn.twin}" but that file is missing, has no identical ${fn.name}, or does not point back`);
+
   const groups = new Map();
-  for (const [f, t] of src) for (const fn of functions(t)) groups.set(fn.hash, [...(groups.get(fn.hash) ?? []), { f, name: fn.name }]);
+  for (const [f, t] of src) for (const fn of functions(t)) groups.set(fn.hash, [...(groups.get(fn.hash) ?? []), { f, name: fn.name, fn }]);
   for (const [hash, g] of groups) {
     if (new Set(g.map((x) => x.f)).size < 2) continue;
-    for (const x of g) viol.set(`duplicate-helper|${x.f}|${x.name}|${hash}`, `${x.f} duplicate-helper  ${x.name} has the same body in ${g.filter((y) => y.f !== x.f).map((y) => y.f).join(', ')}`);
+    for (const x of g) {
+      if (twinOk(x.f, x.fn)) continue;
+      viol.set(`duplicate-helper|${x.f}|${x.name}|${hash}`, `${x.f} duplicate-helper  ${x.name} has the same body in ${g.filter((y) => y.f !== x.f).map((y) => y.f).join(', ')}`);
+    }
   }
 
   const idents = new Map();

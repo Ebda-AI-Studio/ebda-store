@@ -1,0 +1,31 @@
+{
+  "id": "onboarding.store-cap-request",
+  "status": "live",
+  "area": "trust",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اطلب حد أعلى لعدد المتاجر",
+  "titleEn": "Ask for a higher store limit",
+  "screens": ["/onboarding (store step, after the store limit message)"],
+  "api": ["POST /onboarding/store-cap-requests"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible"
+  },
+  "helpArticle": "protected-address-and-store-limit",
+  "questions": {
+    "ar": ["وصلت لأقصى عدد متاجر", "مش قادر أعمل متجر جديد", "عايز أعمل متاجر أكتر من 3"],
+    "en": ["I hit the store limit"]
+  },
+  "steps": [
+    "When creation says the store limit is reached, fill the request form with the reason and proof, send"
+  ],
+  "edgeCases": [
+    "One open request per account (second is 409)",
+    "Ebda staff decide and set the new limit for the account (above 3, at most 20)"
+  ],
+  "gaps": []
+}

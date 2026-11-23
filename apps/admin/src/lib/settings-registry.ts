@@ -377,6 +377,13 @@ export const PAGES: PageEntry[] = [
       ar: 'فيسبوك تيك توك سناب بكسل تتبع اعلانات',
     },
   }),
+  page('/product-feeds', `${HUB}.productFeeds`, 'staff', {
+    feature: 'product_feeds',
+    syn: {
+      en: 'google merchant center shopping meta commerce manager facebook instagram tiktok catalog catalogue feed xml csv',
+      ar: 'جوجل ميرتشنت شوبينج ميتا فيسبوك انستجرام تيك توك كتالوج خلاصة منتجات',
+    },
+  }),
   page('/affiliates', `${HUB}.affiliates`, 'staff', {
     feature: 'affiliate',
     syn: { en: 'referral partners commission', ar: 'تسويق بالعمولة شركاء احالة' },
@@ -1038,7 +1045,7 @@ export const REGISTRY: RegistryEntry[] = [...PAGES, ...SETTINGS];
 export const SETTINGS_LABEL_BASELINE: Record<string, number> = {
   '/ai-usage': 0, // the switch is a component (components/ai/AiSwitchCard), anchored ai.switch
   '/branding': 43,
-  '/builder': 29, // the visual editor: panels are generated from the registry; the header chrome controls are anchored builder.header-*
+  '/builder': 30, // part C: +1 = look-gallery card label (covered by builder.look-switch); the visual editor: panels are generated from the registry; the header chrome controls are anchored builder.header-*
   '/delivery': 14,
   '/shipping': 22, // T4: first-run card (fee, free-over)
   '/payment-settings': 24, // +6: the instalments card (enable, months, markup, provider ar/en, min price), anchored payment.instalments

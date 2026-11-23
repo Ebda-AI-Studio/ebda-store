@@ -3,6 +3,7 @@
 import { focusFirstError } from '@/lib/focus-first-error';
 import { signedText } from '@/lib/bidi';
 import { randomUuid } from '@/lib/uuid';
+import { checkoutDeliveryEta } from '@/lib/delivery-estimate';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import dynamic from 'next/dynamic';
@@ -51,6 +52,7 @@ import {
   daysAheadSchema,
   deliveryDateChoices,
   checkDeliveryPick,
+  catalogueItemId,
   fromMinor,
   REGION,
   isValidEgyptianMobile,
@@ -337,7 +339,9 @@ export default function CheckoutClient() {
     pixelFiredRef.current = true;
     trackInitiateCheckout({
       contentIds: [
-        ...cartContextItems.map(item => item.productId),
+        ...cartContextItems.map(item =>
+          catalogueItemId({ productId: item.productId, variantId: item.variantId })
+        ),
         ...cartContextBundles.map(b => b.bundleId),
       ],
       numItems:
@@ -431,7 +435,7 @@ export default function CheckoutClient() {
   // apply, and the customer was charged more than this page showed.
   // Identical to `cart.subtotal` for a cart with no bundle.
   const couponBasis = useMemo(() => couponQuoteBasis(cartContextItems), [cartContextItems]);
-  const [, setShippingZones] = useState<ShippingZone[]>([]);
+  const [shippingZones, setShippingZones] = useState<ShippingZone[]>([]);
   const [paymentProviders, setPaymentProviders] = useState<PaymentProvider[]>([]);
   // A FAILED payment-config load must not masquerade as "no payment methods
   // configured" (a transient network error is not a merchant misconfiguration).
@@ -586,6 +590,21 @@ export default function CheckoutClient() {
       : undefined,
     governorate: formData.governorate ? { en: formData.governorate, ar: reviewGov?.ar } : undefined,
   };
+
+  // CK2: the delivery option states its ETA when the store configured one (zone days, else store-wide).
+  const deliveryEta = checkoutDeliveryEta(
+    {
+      zones: shippingZones,
+      address: {
+        area: formData.area,
+        areaAr: reviewPlaceNames.area?.ar,
+        governorate: formData.governorate,
+        governorateAr: reviewPlaceNames.governorate?.ar,
+      },
+      storeDeliveryDays: (store?.settings as Record<string, unknown> | undefined)?.deliveryDays,
+    },
+    language === 'ar' ? 'ar' : 'en'
+  );
 
   const checkoutStorageKey = store?.id ? `force-checkout-form-${store.id}` : null;
   const promoStorageKey = store?.id ? `force-promo-${store.id}` : null;
@@ -1733,8 +1752,8 @@ export default function CheckoutClient() {
         orderId: order.id,
         provider: selectedProviderId,
         ...(selectedMethod ? { method: selectedMethod } : {}),
-        successUrl: `/checkout/success?orderId=${order.id}`,
-        errorUrl: `/checkout/error?orderId=${order.id}`,
+        successUrl: storeUrl(`/checkout/success?orderId=${order.id}`),
+        errorUrl: storeUrl(`/checkout/error?orderId=${order.id}`),
       });
 
       // Success clears the saved checkout form and promo code before leaving
@@ -2623,27 +2642,40 @@ export default function CheckoutClient() {
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-foreground">
-                              {t(
-                                'Standard delivery',
-                                '\u062a\u0648\u0635\u064a\u0644 \u0639\u0627\u062f\u064a'
-                              )}
-                            </span>
-                            <span className="text-sm font-medium text-foreground">
-                              {shippingToConfirm
-                                ? t('Delivery fee is set by the store', 'التوصيل بيتحدد مع المتجر')
-                                : freeShipping
-                                  ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
-                                  : shippingCost > 0
-                                    ? formatPrice(shippingCost)
-                                    : rateByArea.has(formData.area)
-                                      ? formatPrice(rateByArea.get(formData.area)!.deliveryFee)
-                                      : !storeHasAreaRates
-                                        ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
-                                        : t('Calculating...', 'بنحسب...')}
-                            </span>
-                          </div>
+                          <>
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-foreground">
+                                {t(
+                                  'Standard delivery',
+                                  '\u062a\u0648\u0635\u064a\u0644 \u0639\u0627\u062f\u064a'
+                                )}
+                              </span>
+                              <span className="text-sm font-medium text-foreground">
+                                {shippingToConfirm
+                                  ? t(
+                                      'Delivery fee is set by the store',
+                                      'التوصيل بيتحدد مع المتجر'
+                                    )
+                                  : freeShipping
+                                    ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
+                                    : shippingCost > 0
+                                      ? formatPrice(shippingCost)
+                                      : rateByArea.has(formData.area)
+                                        ? formatPrice(rateByArea.get(formData.area)!.deliveryFee)
+                                        : !storeHasAreaRates
+                                          ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
+                                          : t('Calculating...', 'بنحسب...')}
+                              </span>
+                            </div>
+                            {deliveryEta && (
+                              <p
+                                className="text-xs text-muted-foreground"
+                                data-testid="checkout-delivery-eta"
+                              >
+                                {deliveryEta}
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
 

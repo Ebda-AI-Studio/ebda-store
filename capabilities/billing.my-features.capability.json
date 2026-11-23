@@ -1,0 +1,35 @@
+{
+  "id": "billing.my-features",
+  "status": "live",
+  "area": "billing",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اعرف الميزات المفعّلة في متجري",
+  "titleEn": "See which features are on for my store",
+  "screens": ["/stores/[id]/features"],
+  "api": ["GET /stores/:storeId/my-features"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": "my-features-and-add-ons",
+  "questions": {
+    "ar": ["عايز افعل الزر العائم", "ازاي افعل محفظة العميل؟", "الميزة دي مقفولة ليه؟"],
+    "en": [
+      "How do I enable a feature that says super admin must enable?",
+      "Why is a feature locked on my store?"
+    ]
+  },
+  "steps": ["Features page lists what is on; locked items say a super admin must enable."],
+  "edgeCases": [
+    "Feature off by plan vs off by override vs merchant switch: 403 FEATURE_DISABLED with upgrade target only when the plan is the cause",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No add-on purchase flow; super-admin enables only (audit gap 6, High)"],
+  "assistantNote": "assistant says plan/override cause and links billing; cannot enable"
+}
