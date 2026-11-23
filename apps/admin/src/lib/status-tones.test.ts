@@ -6,6 +6,7 @@ import ar from '../i18n/messages/ar.json';
 import {
   STATUS_FAMILIES,
   TONE_CLASSES,
+  UNKNOWN_STATUS,
   getStatusEntry,
   isKnownStatus,
   type StatusFamily,
@@ -67,6 +68,17 @@ describe('status tone registry', () => {
   it('an unknown status degrades to neutral instead of throwing', () => {
     expect(getStatusEntry('order', 'brand_new_state').tone).toBe('neutral');
   });
+
+  it.each(['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf'])(
+    'prototype-member status %s is UNKNOWN, never an Object.prototype member',
+    status => {
+      for (const f of families) {
+        const entry = getStatusEntry(f, status);
+        expect(entry).toBe(UNKNOWN_STATUS);
+        expect(isKnownStatus(f, status)).toBe(false);
+      }
+    }
+  );
 
   it('uses no orange in the tone palette (Ebda palette)', () => {
     expect(Object.values(TONE_CLASSES).join(' ')).not.toMatch(/orange|amber/);

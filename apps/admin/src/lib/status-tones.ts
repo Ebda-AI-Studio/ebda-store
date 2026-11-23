@@ -297,7 +297,8 @@ export const UNKNOWN_STATUS: StatusEntry = { tone: 'neutral', icon: CircleDashed
 
 export function getStatusEntry(family: StatusFamily, status: string): StatusEntry {
   const statuses: Record<string, StatusEntry> = STATUS_FAMILIES[family].statuses;
-  return statuses[status] ?? UNKNOWN_STATUS;
+  // Own-property check: API strings like "constructor" / "__proto__" must not reach Object.prototype members.
+  return Object.prototype.hasOwnProperty.call(statuses, status) ? statuses[status] : UNKNOWN_STATUS;
 }
 
 export function isKnownStatus(family: StatusFamily, status: string): boolean {
