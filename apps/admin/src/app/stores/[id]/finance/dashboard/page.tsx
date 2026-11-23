@@ -338,7 +338,8 @@ export default function FinanceDashboardPage() {
           {/* ── Sales Orders reconciliation ──────────────────────────────
                Canonical order-based revenue from the analytics endpoint.
                This matches the numbers shown in the Analytics hub and is
-               based on PAID orders in the orders table — completely separate
+               the NET SALES population of the orders table (REVENUE-DEF-1: all orders except
+               cancelled, refunded and failed/refunded payments; unpaid COD counts, so it is NOT labelled "paid" - STORE-QA-54) — completely separate
                from the double-entry journal entries above.
                When journal entries haven't been posted yet, this panel is
                the source of truth for actual sales. Both panels are shown
