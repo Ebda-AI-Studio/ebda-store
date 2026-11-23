@@ -19,12 +19,17 @@ describe('alert throttle bucket name', () => {
   it('two different titles never share a key, however crafted (no truncation, no hash)', () => {
     const real = 'Refund needs review';
     expect(throttleKey('p1', `${real} `)).not.toBe(throttleKey('p1', real));
-    expect(throttleKey('p1', 'x'.repeat(500) + 'a')).not.toBe(
-      throttleKey('p1', 'x'.repeat(500) + 'b')
-    );
     // fields cannot spill into each other: store "a" + title "5:abc..." vs store "a:5" + shifted title
     expect(throttleKey('p1', '3:abc', 'a')).not.toBe(throttleKey('p1', 'abc', 'a:3'));
     expect(throttleKey('p1', 'b:1:c', 'a')).not.toBe(throttleKey('p1', 'c', 'a:1:b'));
+  });
+  it('caps the title text at 300 characters but still separates titles that differ inside it or in length', () => {
+    const long = 'x'.repeat(5000);
+    expect(throttleKey('p1', long).length).toBeLessThan(400);
+    expect(throttleKey('p1', 'x'.repeat(299) + 'a')).not.toBe(
+      throttleKey('p1', 'x'.repeat(299) + 'b')
+    );
+    expect(throttleKey('p1', 'x'.repeat(400))).not.toBe(throttleKey('p1', 'x'.repeat(401)));
   });
   it('has no collision across 20000 distinct titles', () => {
     const seen = new Set<string>();
