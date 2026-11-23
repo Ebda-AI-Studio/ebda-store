@@ -134,6 +134,34 @@ beforeEach(() => {
 });
 
 describe('manual payment on D1 fails closed', () => {
+  it('BILLING-AMOUNT-GUARD-1: a typed amount that is not the plan price is refused with the expected amount', async () => {
+    const db = world();
+    await expect(recordManualPayment(input(A, { amountMinor: 4000 }))).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'AMOUNT_MISMATCH',
+      details: { expectedAmountMinor: 5000, amountMinor: 4000 },
+    });
+    expect(db.prepare('SELECT COUNT(*) n FROM billing_events WHERE store_id = ?').get(A)).toEqual({
+      n: 0,
+    });
+    expect(h.storeUpdate).not.toHaveBeenCalled();
+  });
+
+  it('BILLING-AMOUNT-GUARD-1: with an explicit reason the different amount is recorded, reason in the ledger row', async () => {
+    const db = world();
+    await recordManualPayment(
+      input(A, { amountMinor: 4000, overrideAmountReason: 'partner discount agreed on WhatsApp' })
+    );
+    const row = db
+      .prepare('SELECT amount_minor a, raw FROM billing_events WHERE store_id = ?')
+      .get(A) as { a: number; raw: string };
+    expect(row.a).toBe(4000);
+    expect(JSON.parse(row.raw)).toMatchObject({
+      expectedAmountMinor: 5000,
+      amountOverrideReason: 'partner discount agreed on WhatsApp',
+    });
+  });
+
   it('a reference store B already holds is refused for store A: 409, and nothing in Postgres moved', async () => {
     const db = world();
     db.prepare(

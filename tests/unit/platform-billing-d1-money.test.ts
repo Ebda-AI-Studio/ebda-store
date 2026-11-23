@@ -229,6 +229,24 @@ describe('BILLING-INTERVAL-PENDING-1: a settled card payment drops the InstaPay 
     );
     expect(pendingOf(db)).toEqual({ i: 'yearly', p: null });
   });
+  it('a dunning downgrade to free (past_due -> canceled) clears it', async () => {
+    const db = rig();
+    const end = Date.now() - 86_400_000;
+    db.prepare(
+      `INSERT INTO store_subscriptions (id, store_id, plan_code, status, billing_interval, pending_billing_interval, current_period_start, current_period_end) VALUES ('s1', ?, 'basic', 'past_due', 'yearly', 'monthly', ?, ?)`
+    ).run(STORE, end - 364 * 86_400_000, end);
+    ledger(db, { type: 'renewal', billing_interval: 'yearly', for_period_end: end, attempt: 2 });
+    await settleInTx(
+      prisma as never,
+      EV,
+      { status: 'failed', providerRef: 'r', failureReason: 'declined' } as never,
+      new Date(),
+      []
+    );
+    expect(
+      db.prepare('SELECT status s, pending_billing_interval p FROM store_subscriptions').get()
+    ).toEqual({ s: 'canceled', p: null });
+  });
   it('saving a card (card_setup) clears it: a card store renews at its stored interval', async () => {
     const db = rig();
     db.prepare(

@@ -167,6 +167,7 @@ export const planService = {
         update: {
           planCode: plan.code,
           status,
+          pendingBillingInterval: null, // an admin assignment supersedes the merchant's checkout pick
           ordersOverLimitMonth: null,
           ordersOverLimitNotifiedAt: null,
         },

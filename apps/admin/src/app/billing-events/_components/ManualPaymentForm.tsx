@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Input, Modal, Select } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
-import { minorToDecimalString, tryToMinor } from '@ebda/shared';
+import { formatMoney, minorToDecimalString, tryToMinor } from '@ebda/shared';
 import { apiGet, apiPost } from '../../../lib/api';
 import { useLocale } from 'next-intl';
 import { planLabel } from '@/lib/plan-labels';
@@ -91,6 +91,9 @@ export function ManualPaymentForm({
   const [periodEnd, setPeriodEnd] = useState(addPeriod(today, prefill.interval));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState('');
+  // Set by an AMOUNT_MISMATCH refusal: the price the API expects; the operator must then give a reason to go ahead.
+  const [expectedMinor, setExpectedMinor] = useState<number | null>(null);
+  const [overrideReason, setOverrideReason] = useState('');
   const [saving, setSaving] = useState(false);
 
   // The suggestion for the chosen interval (a claim arrives with its own).
@@ -126,6 +129,8 @@ export function ManualPaymentForm({
     if (amountMinor === null || amountMinor <= 0) found.amount = t('amountInvalid');
     if (!reference.trim()) found.reference = t('referenceRequired');
     if (!paidAt) found.paidAt = t('dateRequired');
+    if (expectedMinor !== null && overrideReason.trim().length < 3)
+      found.overrideReason = t('overrideReasonRequired');
     if (editPeriod) {
       if (!periodStart) found.periodStart = t('dateRequired');
       if (!periodEnd) found.periodEnd = t('dateRequired');
@@ -148,10 +153,17 @@ export function ManualPaymentForm({
         // Dates are sent only when the operator edited the period (both, together).
         ...(editPeriod ? { periodStart: toIso(periodStart), periodEnd: toIso(periodEnd) } : {}),
         ...(prefill.claimId ? { claimId: prefill.claimId } : {}),
+        ...(expectedMinor !== null ? { overrideAmountReason: overrideReason.trim() } : {}),
         ...(replacesVoided.trim() ? { replacesVoidedEventId: replacesVoided.trim() } : {}),
       }
     );
     setSaving(false);
+    if (error?.code === 'AMOUNT_MISMATCH') {
+      const exp = Number(error.details?.expectedAmountMinor);
+      setExpectedMinor(Number.isFinite(exp) ? exp : 0);
+      setFormError('');
+      return;
+    }
     if (error || !data) {
       setFormError(
         error?.code === 'REFERENCE_USED_ELSEWHERE'
@@ -208,9 +220,28 @@ export function ManualPaymentForm({
           inputMode="decimal"
           label={t('amount')}
           value={amount}
-          onChange={e => setAmount(e.target.value)}
+          onChange={e => {
+            setAmount(e.target.value);
+            setExpectedMinor(null);
+          }}
           error={errors.amount}
         />
+        {expectedMinor !== null && (
+          <div role="alert" className="space-y-2 rounded-lg bg-warning/10 p-3 text-sm">
+            <p>
+              {t('amountMismatch', {
+                expected: formatMoney(expectedMinor, locale, { fixedDecimals: true }),
+              })}
+            </p>
+            <Input
+              id="mp-override-reason"
+              label={t('overrideReason')}
+              value={overrideReason}
+              onChange={e => setOverrideReason(e.target.value)}
+              error={errors.overrideReason}
+            />
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           <Select
             label={t('method')}

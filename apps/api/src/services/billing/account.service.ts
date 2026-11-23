@@ -911,6 +911,12 @@ export interface ManualPaymentInput {
   actorId: string;
   claimId?: string;
   /**
+   * Ruling BILLING-AMOUNT-GUARD-1: the amount must equal the charge for plan + interval (list price through the VAT
+   * seam). A different amount (partial transfer, discount, typo) is refused unless the operator states why here; the
+   * reason lands in the ledger row and the audit trail.
+   */
+  overrideAmountReason?: string | null;
+  /**
    * The ledger is append-only, so a VOIDED payment keeps its key. To record the same
    * transfer reference for the right store, name the voided payment here: it must be a
    * voided manual payment with exactly this reference; it can be replaced once.
@@ -956,7 +962,20 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
   if (explicit && !(input.periodEnd!.getTime() > input.periodStart!.getTime())) {
     throw new AppError(400, 'INVALID_PERIOD', 'The period must end after it starts');
   }
-  const { plan } = await loadPayablePlan(input.planCode, input.interval);
+  const { plan, price } = await loadPayablePlan(input.planCode, input.interval);
+  const expectedAmountMinor = (await chargeFor(price)).totalMinor;
+  const overrideReason = input.overrideAmountReason?.trim() || null;
+  if (input.amountMinor !== expectedAmountMinor && !overrideReason) {
+    throw new AppError(
+      409,
+      'AMOUNT_MISMATCH',
+      'The amount is not the price of this plan and interval. Check it, or give a reason to record it anyway.',
+      { expectedAmountMinor, amountMinor: input.amountMinor }
+    );
+  }
+  if (overrideReason && (overrideReason.length < 3 || overrideReason.length > 300)) {
+    throw new AppError(400, 'INVALID_OVERRIDE_REASON', 'Give a short reason (3-300 characters)');
+  }
   let key = manualPaymentKey(input.method, reference);
   if (input.replacesVoidedEventId) {
     const vStore = await getEntityStoreId('billing_event', input.replacesVoidedEventId);
@@ -1075,6 +1094,9 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       previousPeriodEnd: sub?.currentPeriodEnd?.toISOString() ?? null,
       previousStatus: sub?.status ?? null,
       recordedBy: input.actorId,
+      ...(input.amountMinor !== expectedAmountMinor
+        ? { expectedAmountMinor, amountOverrideReason: overrideReason }
+        : {}),
     };
     const hasCard = !!sub?.provider && !!sub?.providerPaymentMethodRef;
     const billingMethod = sub?.billingMethod === 'instapay' || !hasCard ? 'instapay' : 'card';
