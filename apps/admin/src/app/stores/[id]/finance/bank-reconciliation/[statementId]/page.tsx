@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { apiGet, apiGetPage, apiPost, apiPatch, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
-import { minorToMajor, intlLocaleForUi } from '@/lib/format';
+import { minorToMajor, intlLocaleForUi, formatPrice } from '@/lib/format';
 import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -142,7 +142,6 @@ function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function StatementDetailPage() {
-  const tc = useT('common');
   const params = useParams();
   const storeId = params?.id as string;
   const statementId = params?.statementId as string;
@@ -329,11 +328,11 @@ export default function StatementDetailPage() {
               { label: t('summary.ignored'), value: summary.ignored },
               {
                 label: t('summary.matchedAmount'),
-                value: `EGP ${major(summary.matchedAmountFils)}`,
+                value: formatPrice(summary.matchedAmountFils),
               },
               {
                 label: t('summary.unmatchedAmount'),
-                value: `EGP ${major(summary.unmatchedAmountFils)}`,
+                value: formatPrice(summary.unmatchedAmountFils),
               },
             ].map(card => (
               <div
@@ -377,7 +376,7 @@ export default function StatementDetailPage() {
                 </p>
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
                   {difference.bankBalanceFils < 0 ? '−' : ''}
-                  {tc('egp')} {major(Math.abs(difference.bankBalanceFils))}
+                  {formatPrice(Math.abs(difference.bankBalanceFils))}
                 </p>
               </div>
               <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
@@ -386,7 +385,7 @@ export default function StatementDetailPage() {
                 </p>
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
                   {difference.ledgerBalanceFils < 0 ? '−' : ''}
-                  {tc('egp')} {major(Math.abs(difference.ledgerBalanceFils))}
+                  {formatPrice(Math.abs(difference.ledgerBalanceFils))}
                 </p>
               </div>
               <div
@@ -411,7 +410,7 @@ export default function StatementDetailPage() {
                   }`}
                 >
                   {difference.differenceFils < 0 ? '−' : difference.differenceFils > 0 ? '+' : ''}
-                  {tc('egp')} {major(Math.abs(difference.differenceFils))}
+                  {formatPrice(Math.abs(difference.differenceFils))}
                 </p>
               </div>
             </div>
@@ -424,7 +423,7 @@ export default function StatementDetailPage() {
                     {t('difference.unmatchedBankSide')}
                   </p>
                   <p className="mt-0.5 text-sm font-semibold text-warning-ink font-mono">
-                    {tc('egp')} {major(difference.unmatchedBankFils)}
+                    {formatPrice(difference.unmatchedBankFils)}
                   </p>
                   <p className="mt-0.5 text-xs text-warning-ink">
                     {summary?.unmatched ?? 0} {t('difference.bankLines')}
@@ -436,7 +435,7 @@ export default function StatementDetailPage() {
                   </p>
                   <p className="mt-0.5 text-sm font-semibold text-info-ink font-mono">
                     {difference.unmatchedLedgerFils < 0 ? '−' : ''}
-                    {tc('egp')} {major(Math.abs(difference.unmatchedLedgerFils))}
+                    {formatPrice(Math.abs(difference.unmatchedLedgerFils))}
                   </p>
                   <p className="mt-0.5 text-xs text-info-ink">
                     {difference.unmatchedLedgerCount} {t('difference.ledgerEntries')}

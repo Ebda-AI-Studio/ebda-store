@@ -33,7 +33,9 @@ vi.mock('@/contexts/NotificationContext', () => ({
 vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));
 vi.mock('@/lib/format', () => ({
   minorToMajor: (n: number) => String(n),
-  intlLocaleForUi: () => 'en-US',
+  formatPrice: (n: number) => String(n),
+  formatDate: (d: string) => String(d),
+  intlLocaleForUi: () => 'en',
 }));
 vi.mock('../../../../../components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

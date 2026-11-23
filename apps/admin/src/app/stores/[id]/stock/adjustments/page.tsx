@@ -1,6 +1,6 @@
 'use client';
 
-import { intlLocaleForUi } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ErrorState';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
-import { reportRangeQueryString, minorToDecimalString, withNumerals } from '@ebda/shared';
+import { reportRangeQueryString, minorToDecimalString } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -109,11 +109,7 @@ export default function StockAdjustmentsPage() {
     {
       header: t('date'),
       className: 'w-32',
-      cell: adj => (
-        <span className="text-muted-foreground">
-          {new Date(adj.createdAt).toLocaleDateString(intlLocaleForUi(), withNumerals())}
-        </span>
-      ),
+      cell: adj => <span className="text-muted-foreground">{formatDate(adj.createdAt)}</span>,
     },
     {
       header: t('impact'),

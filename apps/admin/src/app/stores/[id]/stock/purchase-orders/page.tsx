@@ -11,7 +11,7 @@ import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGetPage, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
-import { minorToMajor } from '@/lib/format';
+import { minorToMajor, formatDate } from '@/lib/format';
 import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -159,12 +159,7 @@ export default function PurchaseOrdersPage() {
                 className: 'w-28',
                 cell: po => (
                   <span className="text-muted-foreground">
-                    {po.expectedDate
-                      ? new Date(po.expectedDate).toLocaleDateString(
-                          intlLocaleForUi(),
-                          withNumerals()
-                        )
-                      : '—'}
+                    {po.expectedDate ? formatDate(po.expectedDate) : '—'}
                   </span>
                 ),
               },
@@ -183,9 +178,7 @@ export default function PurchaseOrdersPage() {
                 hideOnMobile: true,
                 className: 'w-28',
                 cell: po => (
-                  <span className="text-muted-foreground">
-                    {new Date(po.createdAt).toLocaleDateString(intlLocaleForUi(), withNumerals())}
-                  </span>
+                  <span className="text-muted-foreground">{formatDate(po.createdAt)}</span>
                 ),
               },
             ]}

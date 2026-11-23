@@ -20,6 +20,10 @@ export interface SubscriptionRow {
   planCode: string;
   chosenPlanCode: string | null;
   billingInterval: 'monthly' | 'yearly';
+  /** An active store's InstaPay interval pick, applied when its payment is recorded. */
+  pendingBillingInterval?: 'monthly' | 'yearly' | null;
+  /** What that pick costs (the transfer to record); `nextCharge` stays the renewal at the current interval. */
+  pendingNextCharge?: { amountMinor: number | null } | null;
   status: string;
   trialEndsAt: string | null;
   card: { last4: string | null; brand: string | null; savedAt: string | null } | null;
@@ -96,6 +100,9 @@ export function SubscriptionsPanel({
       cell: r => (
         <span className="text-muted-foreground">
           {r.chosenPlanCode ?? '—'} · {t(`interval.${r.billingInterval}`)}
+          {r.pendingBillingInterval
+            ? ` (${t('switchingTo', { interval: t(`interval.${r.pendingBillingInterval}`) })})`
+            : ''}
         </span>
       ),
     },
@@ -167,8 +174,8 @@ export function SubscriptionsPanel({
               storeId: r.storeId,
               storeName: r.storeName,
               planCode: r.chosenPlanCode ?? r.planCode,
-              interval: r.billingInterval,
-              amountMinor: r.nextCharge?.amountMinor ?? null,
+              interval: r.pendingBillingInterval ?? r.billingInterval,
+              amountMinor: (r.pendingNextCharge ?? r.nextCharge)?.amountMinor ?? null,
               method: r.billingMethod === 'instapay' ? 'instapay' : 'bank',
               reference: '',
             })

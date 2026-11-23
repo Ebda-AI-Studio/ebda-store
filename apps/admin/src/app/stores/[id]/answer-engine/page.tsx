@@ -1,6 +1,6 @@
 'use client';
 
-import { intlLocaleForUi } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -17,7 +17,6 @@ import { GscNotConnected } from './_components/GscNotConnected';
 import { GscTotalsCards } from './_components/GscTotalsCards';
 import { GscTrendChart } from './_components/GscTrendChart';
 import { GscTopQueriesList } from './_components/GscTopQueriesList';
-import { withNumerals } from '@ebda/shared';
 
 /**
  * Merchant-facing answer-engine (AEO/GEO citation) dashboard (Task 7).
@@ -63,10 +62,7 @@ export default function AnswerEnginePage() {
           {summary.lastRunAt && (
             <p className="text-xs text-muted-foreground">
               {t('lastRunAt', {
-                date: new Date(summary.lastRunAt).toLocaleDateString(
-                  intlLocaleForUi(),
-                  withNumerals()
-                ),
+                date: formatDate(summary.lastRunAt),
               })}
             </p>
           )}

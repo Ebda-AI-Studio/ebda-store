@@ -1,6 +1,5 @@
-import { intlLocaleForUi } from '@/lib/format';
 import type { AnalyticsPeriod, SalesGranularity } from '@ebda/shared';
-import { formatMoney } from '@ebda/shared';
+import { formatPrice, intlLocaleForUi } from '@/lib/format';
 
 export type { SalesGranularity };
 
@@ -177,7 +176,8 @@ export type ChartType = 'revenue' | 'orders';
  * Amounts are stored as piastres (1 EGP = 100 piastres); `formatMoney` scales.
  */
 export function formatCurrency(amount: number): string {
-  return formatMoney(amount, 'en', { fixedDecimals: true });
+  // STORE-QA-10: follows the UI language ("4,850.00 ج.م" in ar, "EGP 4,850.00" in en), never a hard-coded 'en'.
+  return formatPrice(amount);
 }
 
 /** Shortens large integers with K/M suffixes for compact stat display. */
@@ -198,7 +198,7 @@ export function formatNumber(num: number): string {
  */
 export function formatDate(date: string, granularity: SalesGranularity = 'day'): string {
   return new Date(date).toLocaleDateString(
-    intlLocaleForUi('en-US'),
+    intlLocaleForUi(),
     granularity === 'month'
       ? { month: 'short', year: 'numeric', timeZone: 'UTC' }
       : { month: 'short', day: 'numeric', timeZone: 'UTC' }

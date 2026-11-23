@@ -1,12 +1,11 @@
 'use client';
 
-import { intlLocaleForUi } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { SHIPMENT_COLORS } from './types';
 import type { Shipment } from './types';
-import { withNumerals } from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
 interface ShipmentsTableProps {
@@ -90,7 +89,7 @@ export function ShipmentsTable({
       header: t('columns.created'),
       cell: shipment => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {new Date(shipment.createdAt).toLocaleDateString(intlLocaleForUi(), withNumerals())}
+          {formatDate(shipment.createdAt)}
         </span>
       ),
     },
