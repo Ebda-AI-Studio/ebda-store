@@ -1054,7 +1054,10 @@ describe('refunds and the append-only ledger', () => {
     expect(rejected.status).toBe('failed');
     const retry = await refundCharge({ eventId: charge.id, provider: stub });
     expect(retry.status).toBe('succeeded');
-    const refunds = (await ledger(storeId)).filter(r => r.type === 'refund');
+    // sorted by attempt key: two attempts can share a created_at millisecond, so the ledger order is not the attempt order
+    const refunds = (await ledger(storeId))
+      .filter(r => r.type === 'refund')
+      .sort((a, b) => a.idempotencyKey.localeCompare(b.idempotencyKey));
     expect(refunds.map(r => [r.idempotencyKey, r.status])).toEqual([
       [`refund:${charge.id}:1`, 'failed'],
       [`refund:${charge.id}:2`, 'succeeded'],
