@@ -11,6 +11,7 @@ import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 import { requireFeature } from '../middleware/feature-gate';
 import { listAuditWithActors } from '../lib/audit-actors';
 import { AppError } from '../middleware/error-handler';
+import { idempotencyKeyOf, opKey } from '../lib/money-idempotency';
 
 const router = Router({ mergeParams: true });
 
@@ -270,6 +271,71 @@ router.get(
         success: true,
         data: { stats },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /stores/:storeId/returns/admin - The MERCHANT opens a return for an order (STORE-QA-76).
+// Opens it PENDING: approve / receive / complete (with a refund method) are the existing admin steps.
+const adminCreateReturnSchema = z
+  .object({
+    orderId: z.string().uuid(),
+    type: z.enum(['return', 'refund']).default('return'),
+    reason: z.string().trim().min(1).max(500),
+    reasonDetail: z.string().trim().max(2000).optional(),
+    items: z
+      .array(
+        z
+          .object({
+            orderItemId: z.string().uuid(),
+            quantity: z.number().int().min(1).max(100_000),
+            restock: z.boolean().optional(),
+          })
+          .strict()
+      )
+      .min(1)
+      .max(100),
+  })
+  .strict()
+  .refine(d => new Set(d.items.map(i => i.orderItemId)).size === d.items.length, {
+    message: 'a line is listed twice',
+    path: ['items'],
+  });
+router.post(
+  '/admin',
+  authenticate,
+  rejectImpersonated,
+  requirePermission('returns:write'),
+  requireStoreAccess,
+  writeLimiter,
+  requireFeature('returns'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const data = adminCreateReturnSchema.parse(req.body ?? {});
+      const idem = idempotencyKeyOf(req.header('idempotency-key'));
+      const returnRequest = await ReturnService.adminCreate(
+        storeId,
+        data,
+        idem ? opKey('admin-return-create', idem) : undefined
+      );
+      await auditLog({
+        action: 'return.created_by_merchant',
+        userId: req.user!.userId,
+        resourceType: 'return',
+        resourceId: returnRequest.id,
+        details: {
+          returnNumber: returnRequest.returnNumber,
+          orderId: data.orderId,
+          type: data.type,
+          items: data.items,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.status(201).json({ success: true, data: { return: returnRequest } });
     } catch (error) {
       next(error);
     }

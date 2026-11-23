@@ -929,6 +929,11 @@ export interface MoneyClient {
     missingRevenue: number;
   }>;
   /** The ONE revenue definition's net total + order count (see packages/repo/src/revenue.ts); optional window, optional paid-only. */
+  /** STORE-QA-76: remaining refundable + per-line remaining quantity (+ an estimate for `items`) for the admin dialogs. A read. */
+  analyticsRefundQuote(a: {
+    orderId: string;
+    items?: Array<{ orderItemId: string; quantity: number }>;
+  }): Promise<import('@ebda-src/repo').OrderRefundQuote>;
   analyticsNetRevenue(a: {
     startMs?: number;
     endMs?: number;
@@ -1212,7 +1217,8 @@ export interface MoneyClient {
   returnCreate(
     a: {
       orderId: string;
-      customerId: string;
+      /** required for a shopper-opened return; a merchant-opened one (`byMerchant`) uses the order's own customer */
+      customerId?: string;
       type: string;
       reason: string;
       reasonDetail?: string;
@@ -1224,8 +1230,12 @@ export interface MoneyClient {
         quantity: number;
         reason?: string;
         condition?: string;
+        /** merchant-opened only: false = the goods are not restocked */
+        restock?: boolean;
       }>;
       bundleGroupIds?: string[];
+      /** STORE-QA-76: opened by the merchant from the admin (see `ReturnCreateArgs.byMerchant`) */
+      byMerchant?: boolean;
     },
     key?: string
   ): Promise<{ returnId: string }>;
@@ -1630,6 +1640,7 @@ export function makeMoneyClient(
     analyticsImportFinish: a => call('analyticsImportFinish', a),
     analyticsPeriod: a => call('analyticsPeriod', a),
     analyticsNetRevenue: a => call('analyticsNetRevenue', a),
+    analyticsRefundQuote: a => call('analyticsRefundQuote', a),
     analyticsNetRevenueDays: a => call('analyticsNetRevenueDays', a),
     analyticsSales: a => call('analyticsSales', a),
     analyticsItems: a => call('analyticsItems', a),
