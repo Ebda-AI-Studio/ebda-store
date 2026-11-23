@@ -205,7 +205,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 ## legal - Legal
 
-- [legal/VAT-0-clause.md](legal/VAT-0-clause.md) - VAT-0: the final clause (Ruling VAT-0, Ahmad 2026-10-26)
+- [VAT-0-clause.md](../packages/shared/src/foundation/legal/clauses/VAT-0-clause.md) - VAT-0: the final clause (Ruling VAT-0, Ahmad 2026-10-26); lives in the foundation (`legal/clauses/`, Ruling FDN-LEGAL-1), vendored here byte for byte
 
 ## merchant - Merchant-facing guides
 
