@@ -29,6 +29,19 @@ describe('ReceiptBarcodePicker', () => {
     expect(container.querySelectorAll('bdi[dir="ltr"]').length).toBeGreaterThan(0);
   });
 
+  it('QA-89: every tile clips and shrinks its preview so a wide barcode cannot overlap the next tile', () => {
+    const { container } = render(
+      <ReceiptBarcodePicker storeId="s1" value={undefined} onSaved={() => {}} />
+    );
+    for (const radio of screen.getAllByRole('radio')) {
+      expect(radio.className).toContain('min-w-0');
+      expect(radio.className).toContain('overflow-hidden');
+    }
+    for (const c of container.querySelectorAll('bdi[dir="ltr"] > span')) {
+      expect(c.className).toContain('[&>svg]:max-w-full');
+    }
+  });
+
   it('saves only the one key and reports it to the page', async () => {
     apiPut.mockResolvedValue({ error: null });
     const onSaved = vi.fn();
