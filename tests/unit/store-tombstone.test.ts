@@ -197,6 +197,8 @@ describe('no personal identifier survives on a kept platform table (drift guard 
   const SEED: Record<string, unknown> = {
     'store_subscriptions.payment_method_last4': '4242',
     'instapay_receipts.extracted': '{"payer":"PII-extracted"}',
+    'webhook_events.payload': '{"payer":"PII-payload"}',
+    'billing_events.raw': '{"payer":"PII-raw"}',
   };
   const DELETED_BY_TOMBSTONE = new Set(['store_staff', 'merchant_api_keys', 'staff_invites']);
 

@@ -27,6 +27,12 @@ Counsel has NOT verified 5 vs 7 years or the Egyptian article numbers; the rulin
 - Archive and ledger are per closure (`fiscal-<closedAt>.ndjson`, `ledger-<closedAt>.json`); a ledger of another closure is ignored.
 - Runbook `docs/runbooks/closed-store-purge.md` incl. the R2 retention lock on `closed-store-archive/` (written, NOT applied).
 
+## Follow-up before the first live run
+
+- Payment-proof files (receipt images, legacy claim proofs) are deleted before the tombstone (`lib/store-proof-files.ts`); no existing sweep covered claim proofs and the receipt retention sweep only runs on its own schedule.
+- Classification completeness: every column of every store-keyed kept D1 table is now listed (personal in `piiColumns`, reviewed in `reviewedNotPii`), enforced by a test; the review added personal columns on billing_events (raw, buyer_tax_id), webhook_events (payload, raw_body, last_error), store_subscriptions (provider_payment_method_ref), trust_requests and others, all cleared by the tombstone.
+- Judgment call to confirm: `platform_audit_log.meta` is classified as not personal (structured audit detail kept for compliance).
+
 ## Changes
 
 1. `apps/api/src/lib/closed-store-purge.ts` (rules + ports), `closed-store-purge-adapters.ts` (D1 directory, StoreDO RPC, private bucket, mailer), job `closed-store-purge` (daily 02:17 UTC).

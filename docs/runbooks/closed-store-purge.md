@@ -10,6 +10,11 @@ The wipe is irreversible. This runbook is what to do before the first live run, 
 3. Apply the R2 retention lock below. Confirm with counsel the 5 vs 7 year period and the notice wording.
 4. Only then set `CLOSED_STORE_PURGE_LIVE=true` in `apps/api/wrangler.jsonc` vars (a dashboard var is wiped by the next deploy). It stays a dry run until 2026-12-24 whatever the flag says. To stop: remove the var and deploy.
 
+## What the purge deletes besides the Durable Object (Ruling D15B-LIVE-GATE follow-up)
+
+- The payment-proof FILES: every `instapay_receipts.storage_key` object whose `image_deleted_at` is not set (private bucket) and any legacy `manual_payment_claims.proof_url` object of the store's own prefix, deleted BEFORE the tombstone clears the pointers (`lib/store-proof-files.ts`). A failed delete aborts with a P1 and the tombstone does not run; the next run retries. Production check 2026-11-24 (read-only): 5 InstaPay receipts, all images still stored, so without this step the screenshots (payer name, account, mobile) would have outlived the purge; 1 manual claim, 0 proof URLs.
+- The kept tables lose personal columns in the tombstone; `packages/cf-schema/test/erasure-classification.test.ts` fails CI when any column of a store-keyed kept table is neither classified personal nor reviewed as not personal.
+
 ## What the job keeps for ever (not purged)
 
 - The `stores` row stays as a TOMBSTONE (slug `~purged~<id>`, name `[purged]`, domain / logo / contact columns NULL, soft-deleted). Ebda's own billing_events, instapay_receipts, manual_payment_claims, billing_reminders, store_subscriptions, trust_requests and ai_usage reference `stores(id)` ON DELETE CASCADE, so the row is never deleted (`lib/store-tombstone.ts`).

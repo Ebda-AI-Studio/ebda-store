@@ -9,6 +9,8 @@ import { StorageService } from '../services/storage.service';
 import { sendClosedStorePurgeNoticeEmail } from '../services/platform-mailer';
 import { sendAlert } from '../services/alerts.service';
 import { PLATFORM_RECORDS_LAST_AT_SQL, tombstoneStatements } from './store-tombstone';
+import { deleteStoreProofFiles } from './store-proof-files';
+import { r2KeyBelongsToStore, urlToR2Key } from '../services/r2-cleanup.service';
 import { storeDo } from './store-backend';
 import { getAccountsBrief } from './identity-client';
 import logger from './logger';
@@ -151,6 +153,16 @@ export function closedStorePurgePorts(): PurgePorts {
     },
     async wipe(storeId, expect) {
       must(await stub(storeId).purgeClosedStore(storeId, expect), 'store wipe');
+    },
+    async deleteProofFiles(storeId) {
+      await deleteStoreProofFiles(storeId, {
+        d1All,
+        d1Run,
+        deletePrivate: key => StorageService.deletePrivate(key),
+        deletePublic: key => StorageService.delete(key),
+        urlToKey: urlToR2Key,
+        belongsToStore: r2KeyBelongsToStore,
+      });
     },
     async deleteDirectory(storeId) {
       // TOMBSTONE, never DELETE: billing_events, instapay_receipts, manual_payment_claims ... reference stores(id) ON DELETE CASCADE

@@ -49,7 +49,14 @@ export function tombstoneStatements(storeId: string, now: number = Date.now()): 
     // payments erasure port (services/billing/payments-erasure.ts), re-applied here so a row created or left behind cannot slip through;
     // tests/unit/store-tombstone.test.ts reads the erasure classification and fails when a personal column of a kept table survives.
     set(
-      `UPDATE "store_subscriptions" SET "provider_customer_id" = NULL, "payment_method_last4" = NULL WHERE "store_id" = ?1`
+      `UPDATE "store_subscriptions" SET "provider_customer_id" = NULL, "payment_method_last4" = NULL, "provider_payment_method_ref" = NULL WHERE "store_id" = ?1`
+    ),
+    // Ebda's own invoices keep amounts, dates, numbers, ETA fields and the seller; the gateway's raw payload and the buyer tax id go
+    // (the purge runs after the legal period that the classification of billing_events names for them)
+    set(`UPDATE "billing_events" SET "raw" = NULL, "buyer_tax_id" = NULL WHERE "store_id" = ?1`),
+    // idempotency key, provider, status and result stay (dedupe); the payload, the raw body and the error text (may quote a payer) go
+    set(
+      `UPDATE "webhook_events" SET "payload" = '{}', "raw_body" = '', "last_error" = NULL WHERE "store_id" = ?1`
     ),
     set(
       `UPDATE "instapay_receipts" SET "payer_name" = NULL, "payer_address" = NULL, "payer_mobile" = NULL, "payer_bank" = NULL, "receiver_name" = NULL, "receiver_handle" = NULL, "receiver_mobile" = NULL, "note" = NULL, "extracted" = NULL, "review_note" = NULL, "reviewed_by" = NULL, "personal_scrubbed_at" = COALESCE("personal_scrubbed_at", ?2) WHERE "store_id" = ?1`
@@ -59,13 +66,13 @@ export function tombstoneStatements(storeId: string, now: number = Date.now()): 
     ),
     // the request kind, status and dates stay; the requester and the free text the merchant wrote do not
     set(
-      `UPDATE "trust_requests" SET "user_id" = NULL, "message" = NULL, "evidence_url" = NULL WHERE "store_id" = ?1`
+      `UPDATE "trust_requests" SET "user_id" = NULL, "topic" = NULL, "message" = NULL, "page_url" = NULL, "evidence_url" = NULL WHERE "store_id" = ?1`
     ),
     set(`UPDATE "store_features" SET "enabled_by" = NULL WHERE "store_id" = ?1`),
     // the audit trail keeps what happened and when; who did it is removed (classification: actor id nulled)
     set(`UPDATE "platform_audit_log" SET "actor_id" = NULL WHERE "store_id" = ?1`),
     set(
-      `UPDATE "provider_activation_requests" SET "requested_by_id" = NULL, "decided_by_id" = NULL WHERE "store_id" = ?1`
+      `UPDATE "provider_activation_requests" SET "requested_by_id" = NULL, "decided_by_id" = NULL, "note" = NULL WHERE "store_id" = ?1`
     ),
     {
       sql: `UPDATE "stores" SET "name" = '[purged]', "name_ar" = NULL, "slug" = '${PURGED_SLUG_PREFIX}' || "id", "domain" = NULL, "domain_status" = NULL, "pending_domain" = NULL, "domain_claimed_at" = NULL, "domain_verified_at" = NULL, "domain_provider" = NULL, "email_domain_id" = NULL, "email_domain_status" = NULL, "email_domain_verified_at" = NULL, "logo" = NULL, "logo_ar" = NULL, "favicon" = NULL, "updated_at" = ?2 WHERE "id" = ?1`,

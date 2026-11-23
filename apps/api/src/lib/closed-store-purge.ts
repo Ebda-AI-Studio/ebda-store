@@ -64,6 +64,8 @@ export interface PurgePorts {
   readBack(key: string): Promise<{ rows: number; sha256: string } | null>;
   /** `resume`: a previous run started the wipe; an already-empty Durable Object counts as wiped. */
   wipe(storeId: string, expect: { fiscalDocuments: number; resume?: boolean }): Promise<void>;
+  /** Deletes the payment-proof OBJECTS (receipt images, legacy claim proofs) of the store; runs BEFORE the tombstone, which clears the pointers. */
+  deleteProofFiles(storeId: string): Promise<void>;
   /** Tombstones the directory row (never deletes it: billing records reference it). */
   deleteDirectory(storeId: string): Promise<void>;
   alert(title: string, body: string): Promise<unknown> | unknown;
@@ -130,6 +132,7 @@ export async function purgeOneClosedStore(
     const ledger = await p.ledger.get(s);
     // a wiped store whose directory step failed last time: finish that step only (its DO can no longer be read)
     if (ledger.wipedAt) {
+      await p.deleteProofFiles(s.storeId);
       await p.deleteDirectory(s.storeId);
       return { storeId: s.storeId, outcome: 'purged' };
     }
@@ -137,6 +140,7 @@ export async function purgeOneClosedStore(
     if (ledger.wipeStartedAt !== undefined && ledger.archive) {
       await p.wipe(s.storeId, { fiscalDocuments: ledger.archive.rows, resume: true });
       await p.ledger.put(s, { wipedAt: now });
+      await p.deleteProofFiles(s.storeId);
       await p.deleteDirectory(s.storeId);
       return { storeId: s.storeId, outcome: 'purged' };
     }
@@ -178,6 +182,7 @@ export async function purgeOneClosedStore(
     await p.ledger.put(s, { wipeStartedAt: now });
     await p.wipe(s.storeId, { fiscalDocuments: fiscal.count });
     await p.ledger.put(s, { wipedAt: now });
+    await p.deleteProofFiles(s.storeId);
     await p.deleteDirectory(s.storeId);
     p.log('[closed-store-purge] purged', { storeId: s.storeId, rows: manifest.rows });
     return { storeId: s.storeId, outcome: 'purged' };

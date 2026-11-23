@@ -1154,11 +1154,26 @@
   },
   "d1:webhook_events": {
     "db": "d1",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["payload", "raw_body", "last_error"],
     "subjectKeys": [],
-    "note": ""
+    "note": "",
+    "reviewedNotPii": [
+      "id",
+      "provider",
+      "idempotency_key",
+      "store_id",
+      "signature",
+      "status",
+      "attempts",
+      "result_order_id",
+      "result_status",
+      "received_at",
+      "processed_at",
+      "created_at",
+      "updated_at"
+    ]
   },
   "d1:system_settings": {
     "db": "d1",
@@ -1211,7 +1226,8 @@
     "userIdColumns": ["enabled_by"],
     "actorScrub": {
       "enabled_by": null
-    }
+    },
+    "reviewedNotPii": ["id", "store_id", "feature_key", "enabled", "enabled_at", "updated_at"]
   },
   "d1:store_usage_snapshots": {
     "db": "d1",
@@ -1220,7 +1236,29 @@
     "piiColumns": [],
     "subjectKeys": [],
     "note": "",
-    "reviewedNotPii": ["ai_tokens_in", "ai_tokens_out"]
+    "reviewedNotPii": [
+      "ai_tokens_in",
+      "ai_tokens_out",
+      "id",
+      "store_id",
+      "period_start",
+      "captured_at",
+      "products",
+      "products_active",
+      "variants",
+      "images",
+      "categories",
+      "orders",
+      "revenue_fils",
+      "customers",
+      "sessions_proxy",
+      "carts_with_items",
+      "product_views",
+      "ai_calls",
+      "ai_billable_calls",
+      "ai_cost_micros",
+      "ai_unpriced_calls"
+    ]
   },
   "d1:answer_engine_provider_configs": {
     "db": "d1",
@@ -1252,15 +1290,42 @@
     "db": "d1",
     "class": "merchant-pii",
     "action": "scrub",
-    "piiColumns": ["provider_customer_id", "payment_method_last4"],
+    "piiColumns": ["provider_customer_id", "payment_method_last4", "provider_payment_method_ref"],
     "subjectKeys": [],
-    "note": "billing record kept; card reference removed on close"
+    "note": "billing record kept; card reference removed on close",
+    "reviewedNotPii": [
+      "id",
+      "store_id",
+      "plan_code",
+      "status",
+      "current_period_start",
+      "current_period_end",
+      "trial_ends_at",
+      "cancel_at_period_end",
+      "provider",
+      "provider_subscription_id",
+      "payment_method_brand",
+      "payment_method_saved_at",
+      "billing_method",
+      "payment_reference",
+      "orders_over_limit_month",
+      "orders_over_limit_notified_at",
+      "billing_interval",
+      "pending_plan_code",
+      "billing_anchor_day",
+      "dunning_attempts",
+      "past_due_since",
+      "next_retry_at",
+      "created_at",
+      "updated_at",
+      "pending_billing_interval"
+    ]
   },
   "d1:billing_events": {
     "db": "d1",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["raw", "buyer_tax_id"],
     "subjectKeys": [],
     "note": "Money record, kept (tax law: an invoice and its ETA fields are retained, FOLD-VAT). seller_legal_name / seller_tax_id are the SELLER (the company issuing the invoice), not a person. eta_uuid, eta_long_id, eta_hash and eta_rejection_reason are ETA document identifiers / ETA text, no person. buyer_tax_id (B2B, optional) is the store owner's tax id: nothing writes it yet; when something does, reclassify this table legal-retention with buyer_tax_id as the PII column.",
     "reviewedNotPii": [
@@ -1269,7 +1334,32 @@
       "eta_uuid",
       "eta_long_id",
       "eta_hash",
-      "eta_rejection_reason"
+      "eta_rejection_reason",
+      "id",
+      "store_id",
+      "subscription_id",
+      "type",
+      "plan_code",
+      "billing_interval",
+      "for_period_end",
+      "attempt",
+      "amount_minor",
+      "currency",
+      "provider",
+      "provider_ref",
+      "idempotency_key",
+      "status",
+      "failure_reason",
+      "related_event_id",
+      "vat_minor",
+      "vat",
+      "created_at",
+      "updated_at",
+      "net_minor",
+      "vat_rate_bp",
+      "gross_minor",
+      "eta_status",
+      "eta_submitted_at"
     ]
   },
   "d1:instapay_receipts": {
@@ -1282,26 +1372,75 @@
       "payer_mobile",
       "payer_bank",
       "reviewed_by",
-      "receiver_name"
+      "receiver_name",
+      "receiver_handle",
+      "receiver_mobile",
+      "note",
+      "review_note",
+      "extracted"
     ],
     "subjectKeys": ["userId"],
     "note": "payer details of a merchant subscription payment; kept for accounting without the payer fields after the retention window",
     "userIdColumns": ["reviewed_by"],
     "actorScrub": {
       "reviewed_by": null
-    }
+    },
+    "reviewedNotPii": [
+      "id",
+      "store_id",
+      "kind",
+      "claim_id",
+      "order_id",
+      "payment_id",
+      "storage_key",
+      "mime_type",
+      "size_bytes",
+      "sha256",
+      "extraction_status",
+      "confidence",
+      "extraction_error",
+      "amount_minor",
+      "reference",
+      "reference_key",
+      "transferred_at",
+      "expected_amount_minor",
+      "expected_receiver",
+      "flags",
+      "status",
+      "submitted_at",
+      "reviewed_at",
+      "image_deleted_at",
+      "personal_scrubbed_at",
+      "created_at",
+      "updated_at"
+    ]
   },
   "d1:manual_payment_claims": {
     "db": "d1",
     "class": "merchant-pii",
     "action": "scrub",
-    "piiColumns": ["payer_reference", "reviewed_by"],
+    "piiColumns": ["payer_reference", "reviewed_by", "proof_url", "review_note"],
     "subjectKeys": ["userId"],
     "note": "",
     "userIdColumns": ["reviewed_by"],
     "actorScrub": {
       "reviewed_by": null
-    }
+    },
+    "reviewedNotPii": [
+      "id",
+      "store_id",
+      "subscription_id",
+      "plan_code",
+      "billing_interval",
+      "amount_minor",
+      "method",
+      "payment_reference",
+      "status",
+      "reviewed_at",
+      "billing_event_id",
+      "created_at",
+      "updated_at"
+    ]
   },
   "d1:billing_reminders": {
     "db": "d1",
@@ -1309,7 +1448,8 @@
     "action": "none",
     "piiColumns": [],
     "subjectKeys": [],
-    "note": ""
+    "note": "",
+    "reviewedNotPii": ["id", "store_id", "subscription_id", "due_at", "kind", "created_at"]
   },
   "d1:store_lifecycle_emails": {
     "db": "d1",
@@ -1317,7 +1457,8 @@
     "action": "none",
     "piiColumns": [],
     "subjectKeys": [],
-    "note": ""
+    "note": "",
+    "reviewedNotPii": ["id", "store_id", "kind", "status", "reason", "created_at"]
   },
   "d1:billing_webhook_events": {
     "db": "d1",
@@ -1331,26 +1472,49 @@
     "db": "d1",
     "class": "merchant-pii",
     "action": "scrub",
-    "piiColumns": ["requested_by_id", "decided_by_id"],
+    "piiColumns": ["requested_by_id", "decided_by_id", "note"],
     "subjectKeys": ["userId"],
     "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
     "userIdColumns": ["requested_by_id", "decided_by_id"],
     "actorScrub": {
       "requested_by_id": null,
       "decided_by_id": null
-    }
+    },
+    "reviewedNotPii": [
+      "id",
+      "store_id",
+      "provider",
+      "status",
+      "requested_at",
+      "decided_at",
+      "created_at",
+      "updated_at"
+    ]
   },
   "d1:trust_requests": {
     "db": "d1",
     "class": "merchant-pii",
     "action": "scrub",
-    "piiColumns": ["user_id"],
+    "piiColumns": ["user_id", "topic", "message", "page_url", "evidence_url"],
     "subjectKeys": ["userId"],
     "note": "requester user id nulled on user erasure (OFFBOARD-1); the request text is a business record the merchant wrote to Ebda staff",
     "userIdColumns": ["user_id"],
     "actorScrub": {
       "user_id": null
-    }
+    },
+    "reviewedNotPii": [
+      "id",
+      "kind",
+      "store_id",
+      "slug",
+      "status",
+      "rejected_at",
+      "cap_day",
+      "cap_slot",
+      "granted_limit",
+      "created_at",
+      "updated_at"
+    ]
   },
   "d1:stores": {
     "db": "d1",
@@ -1376,7 +1540,8 @@
     "action": "none",
     "piiColumns": [],
     "subjectKeys": [],
-    "note": ""
+    "note": "",
+    "reviewedNotPii": ["kind", "id", "store_id", "claim_ref", "created_at"]
   },
   "d1:platform_audit_log": {
     "db": "d1",
@@ -1388,7 +1553,8 @@
     "userIdColumns": ["actor_id"],
     "actorScrub": {
       "actor_id": null
-    }
+    },
+    "reviewedNotPii": ["id", "action", "target_type", "target_id", "store_id", "meta", "created_at"]
   },
   "d1:provider_verifications": {
     "db": "d1",
@@ -1565,6 +1731,18 @@
     "piiColumns": [],
     "subjectKeys": [],
     "note": "NZ-AN-1: feature, token counts, model, cost; subject_id is a catalogue object id, never a person",
-    "reviewedNotPii": ["input_tokens", "output_tokens"]
+    "reviewedNotPii": [
+      "input_tokens",
+      "output_tokens",
+      "id",
+      "store_id",
+      "feature",
+      "cached_hit",
+      "model",
+      "cost_micros",
+      "subject_type",
+      "subject_id",
+      "created_at"
+    ]
   }
 }

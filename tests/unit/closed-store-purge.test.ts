@@ -34,6 +34,7 @@ function harness(o: {
   exportRows?: number;
   contact?: 'sent' | 'no_contact';
   wipeThrows?: boolean;
+  proofsThrow?: boolean;
 }) {
   const calls: string[] = [];
   const alerts: string[] = [];
@@ -65,6 +66,10 @@ function harness(o: {
     wipe: async (_id, expect_) => {
       calls.push(`wipe:${expect_.fiscalDocuments}${expect_.resume ? ':resume' : ''}`);
       if (o.wipeThrows) throw new Error('do refused');
+    },
+    deleteProofFiles: async () => {
+      calls.push('proofs');
+      if (o.proofsThrow) throw new Error('r2 delete failed');
     },
     deleteDirectory: async () => void calls.push('deleteDirectory'),
     alert: async (t, b) => void alerts.push(`${t} | ${b}`),
@@ -134,6 +139,7 @@ describe('export, verification, wipe', () => {
       'ledger:wipeStartedAt',
       'wipe:3',
       'ledger:wipedAt',
+      'proofs',
       'deleteDirectory',
     ]);
   });
@@ -173,7 +179,7 @@ describe('export, verification, wipe', () => {
   it('resumes a wiped store whose directory delete failed: only the directory step runs', async () => {
     const h = harness({ ledger: { ...READY, wipedAt: NOW - DAY } });
     expect((await run(h)).outcome).toBe('purged');
-    expect(h.calls).toEqual(['deleteDirectory']);
+    expect(h.calls).toEqual(['proofs', 'deleteDirectory']);
   });
 });
 
@@ -259,7 +265,7 @@ describe('crash mid-wipe', () => {
       ledger: { ...READY, wipeStartedAt: NOW - DAY, archive: { key: 'k', rows: 3, sha256: 'abc' } },
     });
     expect((await run(h)).outcome).toBe('purged');
-    expect(h.calls).toEqual(['wipe:3:resume', 'ledger:wipedAt', 'deleteDirectory']);
+    expect(h.calls).toEqual(['wipe:3:resume', 'ledger:wipedAt', 'proofs', 'deleteDirectory']);
   });
   it('a wipe started but the DO refuses (not empty, not closed) aborts with an alert and leaves the directory', async () => {
     const h = harness({
@@ -285,5 +291,29 @@ describe('one ledger per closure', () => {
     expect(ledgerForClosure({ ...old, closedAt: 1_000 }, closure)).toMatchObject({ wipedAt: 2 });
     expect(ledgerForClosure(null, closure)).toEqual({});
     expect(ledgerForClosure({ noticeAt: 1 }, closure)).toEqual({}); // a ledger with no closure is not trusted either
+  });
+});
+
+describe('payment-proof files go BEFORE the tombstone clears their pointers', () => {
+  it('the proof objects are deleted after the wipe and before the directory step, in live mode only', async () => {
+    const live = harness({ ledger: READY });
+    await run(live);
+    expect(live.calls.indexOf('proofs')).toBeGreaterThan(live.calls.indexOf('ledger:wipedAt'));
+    expect(live.calls.indexOf('proofs')).toBeLessThan(live.calls.indexOf('deleteDirectory'));
+    const dry = harness({ ledger: READY });
+    await run(dry, NOW, false);
+    expect(dry.calls).not.toContain('proofs');
+  });
+  it('a failed object delete aborts with a P1 and the tombstone does NOT run (the pointers are still there to retry)', async () => {
+    const h = harness({ ledger: READY, proofsThrow: true });
+    const r = await run(h);
+    expect(r.outcome).toBe('aborted');
+    expect(h.calls).not.toContain('deleteDirectory');
+    expect(h.alerts[0]).toMatch(/r2 delete failed/);
+  });
+  it('the next run (wiped marker set) retries the proof files, then tombstones', async () => {
+    const h = harness({ ledger: { ...READY, wipedAt: NOW - DAY } });
+    expect((await run(h)).outcome).toBe('purged');
+    expect(h.calls).toEqual(['proofs', 'deleteDirectory']);
   });
 });
