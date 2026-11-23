@@ -8004,7 +8004,7 @@
     "requiresFeature": "يحتاج ميزة «{feature}».",
     "availableOnOrBuyOne": "متاحة في باقة {plan}. اترقّى، أو ضيف الميزة دي لوحدها.",
     "addJustThisCta": "ضيف الميزة دي لوحدها",
-    "businessOffBody": "«{feature}» جزء من باقة الأعمال بتاعتك، بس مقفولة على متجرك دلوقتي. كلّمنا وهنفتحها لك.",
+    "businessOffBody": "«{feature}» جزء من باقة {plan} بتاعتك، بس مقفولة على متجرك دلوقتي. كلّمنا وهنفتحها لك.",
     "alsoIncluded": "موجود كمان في الباقة دي"
   },
   "aiTools": {

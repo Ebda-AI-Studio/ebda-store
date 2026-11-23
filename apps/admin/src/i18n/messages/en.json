@@ -8004,7 +8004,7 @@
     "requiresFeature": "Requires the “{feature}” feature.",
     "availableOnOrBuyOne": "Available on the {plan} plan. Upgrade, or add just this feature.",
     "addJustThisCta": "Add just this feature",
-    "businessOffBody": "“{feature}” is part of your Business plan, but it is switched off for this store right now. Contact us and we will turn it on.",
+    "businessOffBody": "“{feature}” is part of your {plan} plan, but it is switched off for this store right now. Contact us and we will turn it on.",
     "alsoIncluded": "Also included in this plan"
   },
   "aiTools": {

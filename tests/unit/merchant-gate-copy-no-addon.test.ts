@@ -25,7 +25,7 @@ describe('merchant gate copy', () => {
       expect(f.availableOnOrBuyOne).toContain('{plan}');
       expect(f.addJustThisCta).toBeTruthy();
       expect(f.businessOffBody).toContain('{feature}');
-      expect(f.businessOffBody).not.toContain('{plan}');
+      expect(f.businessOffBody).toContain('{plan}'); // plan name comes from the plan-label source, never typed
     });
   }
 });

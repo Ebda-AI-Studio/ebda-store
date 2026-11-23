@@ -22,6 +22,7 @@
 
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
+import { planLabel as planLabelOf } from '../lib/plan-labels';
 import { Button } from '@/components/ui/Button';
 import { AdminLayout } from './AdminLayout';
 import { useCurrentStore } from '../hooks/useCurrentStore';
@@ -110,7 +111,10 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
           >
             <h1 className="mb-2 text-2xl font-bold text-foreground">{pageTitle ?? featureName}</h1>
             <p className="mb-6 text-base leading-relaxed text-muted-foreground">
-              {t('businessOffBody', { feature: featureName })}
+              {t('businessOffBody', {
+                feature: featureName,
+                plan: planLabelOf('business', isAr ? 'ar' : 'en'),
+              })}
             </p>
             <a href={upgradeLink} target="_blank" rel="noopener noreferrer">
               <Button type="button" variant="outline">
