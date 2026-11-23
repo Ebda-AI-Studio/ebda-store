@@ -14,6 +14,7 @@
  * Manual text input is always available.
  */
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -907,8 +908,8 @@ function CountMode({ storeId }: { storeId: string }) {
               >
                 <p className="text-sm font-medium">{s.note || t('countSession')}</p>
                 <p className="text-xs text-muted-foreground">
-                  {new Date(s.createdAt).toLocaleString(undefined, withNumerals())} · {s.lineCount}{' '}
-                  {t('linesSuffix')}
+                  {new Date(s.createdAt).toLocaleString(intlLocaleForUi(), withNumerals())} ·{' '}
+                  {s.lineCount} {t('linesSuffix')}
                 </p>
               </Button>
             ))}
@@ -1130,7 +1131,10 @@ function CountMode({ storeId }: { storeId: string }) {
         <div className="rounded-lg bg-muted/30 border border-border px-4 py-3 text-sm text-muted-foreground">
           {t('sessionReconciledOn', {
             date: activeSession.reconciledAt
-              ? new Date(activeSession.reconciledAt).toLocaleString(undefined, withNumerals())
+              ? new Date(activeSession.reconciledAt).toLocaleString(
+                  intlLocaleForUi(),
+                  withNumerals()
+                )
               : '—',
           })}
           {activeSession.adjustmentId && (

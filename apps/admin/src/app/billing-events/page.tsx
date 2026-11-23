@@ -17,7 +17,7 @@
  * Route guard: super_admin only (RequireSuperAdmin + the API's requireRole).
  */
 
-import { formatDate } from '@/lib/format';
+import { formatDate, intlLocaleForUi } from '@/lib/format';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge } from '@ebda/ui';
@@ -153,7 +153,7 @@ function LedgerPanel({
       header: t('columns.date'),
       cell: r => (
         <span className="text-muted-foreground">
-          {new Date(r.createdAt).toLocaleString(undefined, withNumerals())}
+          {new Date(r.createdAt).toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },

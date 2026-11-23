@@ -48,3 +48,22 @@ describe('maskIp (super-admin acceptance evidence, I6)', () => {
     expect(maskIp(null)).toBeNull();
   });
 });
+
+describe('baseline acceptance (Ruling CONSENT-ADMIN-1)', () => {
+  it('baselineDocs asks only for the listed documents the party has no record of', () => {
+    const out = computePendingNotices(LEGAL_POLICIES, [], [], {
+      baselineDocs: ['privacy', 'acceptableUse'],
+    });
+    expect(out.map(n => n.docKey).sort()).toEqual(['acceptableUse', 'privacy']);
+  });
+
+  it('wiring: the owner modal reads Terms + Privacy, staff see privacy + acceptable use (fails if cut)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('apps/api/src/services/legal-notice.service.ts', 'utf8');
+    expect(src).toMatch(/CONSENT_DOCS: readonly LegalDocKey\[\] = \['terms', 'privacy'\]/);
+    expect(src).toMatch(
+      /STAFF_NOTICE_DOCS: readonly LegalDocKey\[\] = \['privacy', 'acceptableUse'\]/
+    );
+    expect(src).toMatch(/'consent_gate'/);
+  });
+});

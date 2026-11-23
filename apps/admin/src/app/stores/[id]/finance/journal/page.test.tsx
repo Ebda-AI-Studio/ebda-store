@@ -35,6 +35,7 @@ vi.mock('@/lib/format', () => ({
   minorToMajor: (n: number) => String(n),
   formatPrice: (n: number) => String(n),
   formatDate: (d: string) => String(d),
+  intlLocaleForUi: () => 'en',
 }));
 vi.mock('../../../../../components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

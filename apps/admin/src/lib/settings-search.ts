@@ -75,8 +75,15 @@ function termMatches(hay: string, term: string): boolean {
 
 export interface RegistryHit {
   entry: IndexEntry;
-  /** 0 = in the entry's own label, 1 = in its page's label, 2 = only in synonyms. Lower is better. */
+  /** -1 = the entry's PRIMARY keyword (first synonym word), 0 = in its own label, 1 = in its page's label, 2 = only in synonyms. Lower is better. */
   rank: number;
+}
+
+/** The first synonym word in each language is the entry's primary keyword ("seo" for the SEO page). */
+function primaryKeywords(e: IndexEntry): string[] {
+  return [e.synEn, e.synAr]
+    .map(syn => normalize(syn ?? '').split(' ')[0])
+    .filter((w): w is string => !!w);
 }
 
 /**
@@ -94,11 +101,16 @@ export function searchRegistry(query: string, ctx: SearchContext, limit = 12): R
     if (!terms.every(t => termMatches(hay, t))) return;
     const own = normalize(`${e.en} ${e.ar}`);
     const withPage = normalize(`${e.en} ${e.ar} ${e.pageEn ?? ''} ${e.pageAr ?? ''}`);
-    const rank = terms.every(t => termMatches(own, t))
-      ? 0
-      : terms.every(t => termMatches(withPage, t))
-        ? 1
-        : 2;
+    // Typing exactly an entry's primary keyword ("SEO", "سيو") puts it above incidental synonym hits.
+    const primary = primaryKeywords(e);
+    const rank =
+      e.kind === 'page' && terms.every(t => primary.includes(t))
+        ? -1
+        : terms.every(t => termMatches(own, t))
+          ? 0
+          : terms.every(t => termMatches(withPage, t))
+            ? 1
+            : 2;
     hits.push({ entry: e, rank });
   });
   const order = new Map(ENTRIES.map((e, i) => [e.id, i]));

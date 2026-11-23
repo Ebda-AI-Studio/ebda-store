@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -231,7 +232,7 @@ export default function DeadstockPage() {
             {lastScanned && (
               <p className="text-xs text-muted-foreground">
                 {t('lastScanned', {
-                  time: new Date(lastScanned).toLocaleString(undefined, withNumerals()),
+                  time: new Date(lastScanned).toLocaleString(intlLocaleForUi(), withNumerals()),
                 })}
               </p>
             )}

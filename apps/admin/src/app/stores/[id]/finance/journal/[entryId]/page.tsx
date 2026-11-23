@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -93,7 +94,7 @@ export default function JournalDetailPage() {
     <AdminLayout
       parent={{ label: t('title'), href: backHref }}
       title={entry.entryNumber}
-      subtitle={`${new Date(entry.postedAt).toLocaleString(undefined, withNumerals())} · ${entry.source.replace(/_/g, ' ')}`}
+      subtitle={`${new Date(entry.postedAt).toLocaleString(intlLocaleForUi(), withNumerals())} · ${entry.source.replace(/_/g, ' ')}`}
     >
       <div className="max-w-3xl space-y-5">
         {/* Entry header card */}

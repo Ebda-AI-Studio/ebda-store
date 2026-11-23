@@ -11,7 +11,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
 import { reportRangeQueryString, withNumerals } from '@ebda/shared';
-import { formatPrice } from '@/lib/format';
+import { formatPrice, intlLocaleForUi } from '@/lib/format';
 
 import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -356,7 +356,7 @@ export default function FinanceDashboardPage() {
                     {t('salesOrdersCount')}
                   </p>
                   <p className="text-2xl font-semibold font-mono text-foreground">
-                    {salesStats.totalOrders.toLocaleString(undefined, withNumerals())}
+                    {salesStats.totalOrders.toLocaleString(intlLocaleForUi(), withNumerals())}
                   </p>
                   <p className="text-xs text-muted-foreground">{t('salesOrdersCountUnit')}</p>
                 </div>

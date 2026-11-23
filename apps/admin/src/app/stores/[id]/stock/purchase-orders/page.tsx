@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -118,7 +119,9 @@ export default function PurchaseOrdersPage() {
 
           {meta && (
             <p className="text-sm text-muted-foreground" data-testid="po-total">
-              {t('totalCount', { total: meta.total.toLocaleString(undefined, withNumerals()) })}
+              {t('totalCount', {
+                total: meta.total.toLocaleString(intlLocaleForUi(), withNumerals()),
+              })}
             </p>
           )}
 

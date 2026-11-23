@@ -16,6 +16,7 @@
  *  3. Submit success: toast + reset form.
  */
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
@@ -295,7 +296,9 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
               const heading = b.headings?.en || b.headings?.ar || t('untitled');
               const sent = (b.successful ?? 0) + (b.failed ?? 0);
               const ts = b.completed_at || b.queued_at;
-              const when = ts ? new Date(ts * 1000).toLocaleString(undefined, withNumerals()) : '';
+              const when = ts
+                ? new Date(ts * 1000).toLocaleString(intlLocaleForUi(), withNumerals())
+                : '';
               return (
                 <li
                   key={b.id}

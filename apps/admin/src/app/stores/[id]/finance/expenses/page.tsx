@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
@@ -331,7 +332,9 @@ export default function ExpensesPage() {
             <>
               {meta && (
                 <p className="mb-2 text-sm text-muted-foreground" data-testid="expenses-total">
-                  {t('totalCount', { total: meta.total.toLocaleString(undefined, withNumerals()) })}
+                  {t('totalCount', {
+                    total: meta.total.toLocaleString(intlLocaleForUi(), withNumerals()),
+                  })}
                 </p>
               )}
               <DataTable<ExpenseRow>

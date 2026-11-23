@@ -192,6 +192,34 @@ describe('computePendingNotices', () => {
   });
 });
 
+describe('baseline acceptance (a merchant invited by staff never clicked the wrap)', () => {
+  it('a party with no record at all is pending every document at its current version', () => {
+    const out = computePendingNotices(LEGAL_POLICIES, [], [], { baselineDocs: LEGAL_DOC_KEYS });
+    expect(out.map(n => n.docKey).sort()).toEqual(
+      ['acceptableUse', 'legal', 'merchant', 'privacy', 'terms'].sort()
+    );
+    expect(out.find(n => n.docKey === 'terms')?.version).toBe(
+      currentLegalVersion(LEGAL_POLICIES, 'terms').version
+    );
+  });
+  it('a document with ANY recorded version is not a missing baseline', () => {
+    const out = computePendingNotices(LEGAL_POLICIES, [], [{ docKey: 'terms', version: '1.0' }], {
+      baselineDocs: LEGAL_DOC_KEYS,
+    });
+    expect(out.map(n => n.docKey)).not.toContain('terms');
+    expect(out.length).toBe(4);
+  });
+  it('only the asked-for documents count (staff are shown privacy and acceptable use only)', () => {
+    const out = computePendingNotices(LEGAL_POLICIES, [], [], {
+      baselineDocs: ['privacy', 'acceptableUse'],
+    });
+    expect(out.map(n => n.docKey).sort()).toEqual(['acceptableUse', 'privacy']);
+  });
+  it('is off unless asked for, so non-merchant callers see only material notices', () => {
+    expect(computePendingNotices(LEGAL_POLICIES, [], [])).toEqual([]);
+  });
+});
+
 describe('feeNoticeTooLate (I1: 30 days measured from the SEND, not from publishedAt)', () => {
   const now = new Date('2026-10-15T12:00:00Z');
   it('refuses a fee change whose effective date is less than 30 days after the send', () => {

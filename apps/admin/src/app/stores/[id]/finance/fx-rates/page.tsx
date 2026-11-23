@@ -13,7 +13,7 @@
  * Example: { currency: 'USD', rate: 50 } means 1 USD = 50 EGP.
  */
 
-import { formatDate } from '@/lib/format';
+import { formatDate, intlLocaleForUi } from '@/lib/format';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -153,7 +153,7 @@ export default function FxRatesPage() {
       header: t('colRecorded'),
       cell: r => (
         <span className="text-muted-foreground text-xs">
-          {new Date(r.createdAt).toLocaleString(undefined, withNumerals())}
+          {new Date(r.createdAt).toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },

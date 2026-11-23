@@ -14,6 +14,7 @@
  * Route guard: super_admin only (RequireSuperAdmin + the API's requireRole).
  */
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge, Input, Modal, ModalBody, ModalFooter, useToast } from '@ebda/ui';
@@ -381,7 +382,7 @@ function PlansInner() {
       alignEnd: true,
       cell: p => (
         <span className="tabular-nums">
-          {(p.subscriberCount ?? 0).toLocaleString(undefined, withNumerals())}
+          {(p.subscriberCount ?? 0).toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },

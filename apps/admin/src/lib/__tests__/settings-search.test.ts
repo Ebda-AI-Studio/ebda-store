@@ -36,6 +36,10 @@ describe('admin settings search: the requested queries, Arabic and English', () 
     ['cash on delivery fee', 'payment.cod-fee', 1],
     ['free shipping', 'shipping.area-rates', 2],
     ['page title google', 'seo.meta-title', 2],
+    ['SEO', 'page:/seo', 1],
+    ['seo', 'page:/seo', 1],
+    ['سيو', 'page:/seo', 1],
+    ['محركات البحث', 'page:/seo', 2],
   ])('%s -> %s within the top %i', (q, id, top) => {
     expect(ids(q).slice(0, top)).toContain(id);
   });

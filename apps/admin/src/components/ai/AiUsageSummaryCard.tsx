@@ -21,6 +21,7 @@
  * renders the full-width card used on the dedicated AI Usage page.
  */
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { apiGet } from '../../lib/api';
@@ -70,7 +71,9 @@ function SpendFigure({
       </p>
       {unpriced > 0 && (
         <p className="text-xs text-warning-ink">
-          {t('spendUnpriced', { count: unpriced.toLocaleString(undefined, withNumerals()) })}
+          {t('spendUnpriced', {
+            count: unpriced.toLocaleString(intlLocaleForUi(), withNumerals()),
+          })}
         </p>
       )}
     </>
@@ -153,8 +156,8 @@ function QuotaBar({
     <div>
       <div className="mb-1 flex items-center justify-between text-xs">
         <span className="font-medium text-foreground">
-          {label} — {current.toLocaleString(undefined, withNumerals())} /{' '}
-          {cap.toLocaleString(undefined, withNumerals())} ({pct}%)
+          {label} — {current.toLocaleString(intlLocaleForUi(), withNumerals())} /{' '}
+          {cap.toLocaleString(intlLocaleForUi(), withNumerals())} ({pct}%)
         </span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -303,7 +306,7 @@ export function AiUsageSummaryCard({
               <span
                 className={`font-bold tabular-nums ${remainingWarn ? 'text-destructive-ink' : 'text-foreground'}`}
               >
-                {remaining.toLocaleString(undefined, withNumerals())}
+                {remaining.toLocaleString(intlLocaleForUi(), withNumerals())}
               </span>
             </div>
             <div className="flex items-start justify-between gap-2 text-xs">
@@ -368,19 +371,19 @@ export function AiUsageSummaryCard({
         <div className="rounded-lg bg-muted/40 px-3 py-2">
           <p className="text-xs text-muted-foreground">{t('statToday')}</p>
           <p className="text-lg font-bold tabular-nums text-primary">
-            {summary.today.toLocaleString(undefined, withNumerals())}
+            {summary.today.toLocaleString(intlLocaleForUi(), withNumerals())}
           </p>
         </div>
         <div className="rounded-lg bg-muted/40 px-3 py-2">
           <p className="text-xs text-muted-foreground">{t('statThisMonth')}</p>
           <p className="text-lg font-bold tabular-nums text-foreground">
-            {summary.thisMonth.toLocaleString(undefined, withNumerals())}
+            {summary.thisMonth.toLocaleString(intlLocaleForUi(), withNumerals())}
           </p>
         </div>
         <div className="rounded-lg bg-muted/40 px-3 py-2">
           <p className="text-xs text-muted-foreground">{t('statDailyCap')}</p>
           <p className="text-lg font-bold tabular-nums text-foreground">
-            {summary.dailyCap.toLocaleString(undefined, withNumerals())}
+            {summary.dailyCap.toLocaleString(intlLocaleForUi(), withNumerals())}
           </p>
         </div>
         <div className="rounded-lg bg-muted/40 px-3 py-2">
@@ -388,7 +391,7 @@ export function AiUsageSummaryCard({
           <p
             className={`text-lg font-bold tabular-nums ${remainingWarn ? 'text-destructive-ink' : 'text-foreground'}`}
           >
-            {remaining.toLocaleString(undefined, withNumerals())}
+            {remaining.toLocaleString(intlLocaleForUi(), withNumerals())}
           </p>
         </div>
       </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import Link from 'next/link';
 import { withNumerals } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
@@ -88,7 +89,7 @@ export function StatusBadge({ status, t }: { status: string; t: TFn }) {
   );
 }
 
-const fmt = (n: number) => n.toLocaleString(undefined, withNumerals());
+const fmt = (n: number) => n.toLocaleString(intlLocaleForUi(), withNumerals());
 
 function Stat({
   label,
@@ -237,12 +238,12 @@ export function ActiveJobCard({
   const dateText = done
     ? job.completedAt
       ? t('activeJob.statusCompletedAt', {
-          date: new Date(job.completedAt).toLocaleString(undefined, withNumerals()),
+          date: new Date(job.completedAt).toLocaleString(intlLocaleForUi(), withNumerals()),
         })
       : null
     : job.startedAt
       ? t('activeJob.statusStartedAt', {
-          date: new Date(job.startedAt).toLocaleString(undefined, withNumerals()),
+          date: new Date(job.startedAt).toLocaleString(intlLocaleForUi(), withNumerals()),
         })
       : t('activeJob.statusQueued');
   return (

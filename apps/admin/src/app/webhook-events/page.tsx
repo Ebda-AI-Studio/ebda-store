@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Badge } from '@ebda/ui';
@@ -122,7 +123,7 @@ export default function WebhookEventsPage() {
       header: t('columns.received'),
       cell: ev => (
         <span className="text-muted-foreground">
-          {new Date(ev.receivedAt).toLocaleString(undefined, withNumerals())}
+          {new Date(ev.receivedAt).toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },

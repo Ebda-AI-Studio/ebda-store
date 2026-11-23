@@ -12,6 +12,7 @@ import { LEGAL_POLICIES, type LegalPolicies } from '@ebda/shared';
 import { config } from '@api/config';
 import { meLegalAcceptanceRoutes, meLegalNoticeRoutes } from '@api/routes/legal-policy.routes';
 import { errorHandler } from '@api/middleware/error-handler';
+import { authenticate } from '@api/middleware/auth';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import { __setLegalPoliciesForTests } from '@api/services/legal-notice.service';
 
@@ -109,6 +110,7 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
     );
 
   beforeAll(async () => {
+    process.env.OWNER_CONSENT_GATE = '1';
     owner = createPrismaClient({ connectionString: OWNER_URL, max: 2, role: 'owner' });
     __setLegalPoliciesForTests(FIXTURE);
     app = express();
@@ -116,6 +118,8 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
     app.use(express.json());
     app.use('/api/v1/me/legal-notices', meLegalNoticeRoutes);
     app.use('/api/v1/me/legal-acceptances', meLegalAcceptanceRoutes);
+    // A stand-in for any admin write endpoint: the consent gate runs inside `authenticate`.
+    app.post('/api/v1/test-admin-write', authenticate, (_req, res) => res.json({ ok: true }));
     app.use(errorHandler);
     merchant = await mkUser('m', 'store_admin');
     operator = await mkUser('op', 'super_admin');
@@ -124,6 +128,16 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
     await owner.legalAcceptance.createMany({
       data: ['legal', 'privacy', 'terms', 'acceptableUse', 'merchant'].map(docKey => ({
         userId: signedUp,
+        docKey,
+        version: '1.0',
+        source: 'signup',
+      })),
+    });
+    // `merchant` has a recorded baseline (v1.0 of every document), so the notice tests below are about
+    // CHANGES. A merchant with no record at all is asked for the baseline: see the ZERO-rows test.
+    await owner.legalAcceptance.createMany({
+      data: ['legal', 'privacy', 'terms', 'acceptableUse', 'merchant'].map(docKey => ({
+        userId: merchant,
         docKey,
         version: '1.0',
         source: 'signup',
@@ -143,6 +157,7 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
   });
   beforeEach(wipe);
   afterAll(async () => {
+    delete process.env.OWNER_CONSENT_GATE;
     await wipe();
     __setLegalPoliciesForTests(null);
     await owner.store.deleteMany({ where: { id: { in: storeIds } } });
@@ -239,7 +254,7 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
     expect((await get(signedUp)).body.data.notices).toEqual([]);
   });
 
-  it('a staff-provisioned owner with ZERO acceptance rows gets the pending list and can ack', async () => {
+  it('a staff-provisioned owner with ZERO acceptance rows still gets the pending list and can ack', async () => {
     const provisioned = await mkUser('pv', 'store_admin');
     try {
       expect(await owner.legalAcceptance.count({ where: { userId: provisioned } })).toBe(0);
@@ -257,6 +272,108 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
       await owner.legalAcceptance.deleteMany({ where: { userId: provisioned } });
       await owner.user.delete({ where: { id: provisioned } });
     }
+  });
+
+  describe('owner consent gate (Ruling CONSENT-ADMIN-1)', () => {
+    const write = (userId: string) =>
+      asApp(async () =>
+        request(app)
+          .post('/api/v1/test-admin-write')
+          .set('Authorization', `Bearer ${token(userId, 'store_admin')}`)
+          .send({})
+      );
+    const accept = (userId: string, body: unknown = { accepted: true }) =>
+      asApp(async () =>
+        request(app)
+          .post('/api/v1/me/legal-notices/accept')
+          .set('Authorization', `Bearer ${token(userId, 'store_admin')}`)
+          .set('User-Agent', 'consent-test/1.0')
+          .send(body as object)
+      );
+
+    it('an owner with no record cannot call an admin write (403 CONSENT_REQUIRED), can read, and is shown both documents', async () => {
+      const fresh = await mkUser('cg', 'store_admin');
+      try {
+        const denied = await write(fresh);
+        expect(denied.status).toBe(403);
+        expect(denied.body.error.code).toBe('CONSENT_REQUIRED');
+        const read = await get(fresh);
+        expect(read.status).toBe(200);
+        expect(read.body.data.consent.required).toBe(true);
+        expect(
+          read.body.data.consent.documents.map((d: { docKey: string }) => d.docKey).sort()
+        ).toEqual(['privacy', 'terms']);
+      } finally {
+        await owner.user.delete({ where: { id: fresh } });
+      }
+    });
+
+    it('accepting records Terms + Privacy with time and user agent, then the write is allowed', async () => {
+      const fresh = await mkUser('cg2', 'store_admin');
+      try {
+        expect((await accept(fresh, {})).status).toBe(400); // never from a bare call
+        expect((await accept(fresh, { accepted: false })).status).toBe(400);
+        expect((await write(fresh)).status).toBe(403);
+        const ok = await accept(fresh);
+        expect(ok.status).toBe(200);
+        expect(ok.body.data).toEqual({ recorded: 2 });
+        const rows = await owner.legalAcceptance.findMany({
+          where: { userId: fresh },
+          select: { docKey: true, version: true, source: true, userAgent: true, acceptedAt: true },
+          orderBy: { docKey: 'asc' },
+        });
+        expect(rows.map(r => r.docKey)).toEqual(['privacy', 'terms']);
+        expect(rows.every(r => r.source === 'consent_gate')).toBe(true);
+        expect(rows.every(r => r.userAgent === 'consent-test/1.0')).toBe(true);
+        expect(rows.every(r => r.acceptedAt instanceof Date)).toBe(true);
+        expect((await write(fresh)).status).toBe(200);
+        expect((await get(fresh)).body.data.consent.required).toBe(false);
+        // idempotent
+        expect((await accept(fresh)).body.data).toEqual({ recorded: 0 });
+      } finally {
+        await owner.legalAcceptance.deleteMany({ where: { userId: fresh } });
+        await owner.user.delete({ where: { id: fresh } });
+      }
+    });
+
+    it('an owner who accepted at signup is never gated; super admin is not asked', async () => {
+      expect((await write(signedUp)).status).toBe(200);
+      expect((await get(operator, 'super_admin')).body.data.consent).toEqual({
+        required: false,
+        documents: [],
+      });
+    });
+
+    it('invited staff are shown the privacy and acceptable-use notices, can accept them, and are never blocked', async () => {
+      const staff = await mkUser('stf', 'staff');
+      try {
+        const res = await asApp(async () =>
+          request(app)
+            .get('/api/v1/me/legal-notices')
+            .set('Authorization', `Bearer ${token(staff, 'staff')}`)
+        );
+        expect(res.body.data.notices.map((n: { docKey: string }) => n.docKey).sort()).toEqual([
+          'acceptableUse',
+          'privacy',
+        ]);
+        const items = res.body.data.notices.map((n: { docKey: string; version: string }) => ({
+          docKey: n.docKey,
+          version: n.version,
+        }));
+        const done = await ack(staff, items, 'staff');
+        expect(done.body.data).toEqual({ acknowledged: 2 });
+        const wr = await asApp(async () =>
+          request(app)
+            .post('/api/v1/test-admin-write')
+            .set('Authorization', `Bearer ${token(staff, 'staff')}`)
+            .send({})
+        );
+        expect(wr.status).toBe(200);
+      } finally {
+        await owner.legalAcceptance.deleteMany({ where: { userId: staff } });
+        await owner.user.delete({ where: { id: staff } });
+      }
+    });
   });
 
   it('an impersonating session is refused on both routes and writes nothing', async () => {
@@ -284,12 +401,14 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
     const res = await ack(merchant, [{ docKey: 'privacy', version: '1.0' }]);
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('NOT_PENDING');
-    expect(await owner.legalAcceptance.count({ where: { userId: merchant } })).toBe(0);
+    expect(
+      await owner.legalAcceptance.count({ where: { userId: merchant, source: 'notice_ack' } })
+    ).toBe(0);
     // ...and it never shows as a banner either (the same shared rule).
     expect((await get(merchant)).body.data.notices).toEqual([]);
   });
 
-  it('M14: empty strings and 6+ items are 400; a duplicated item is acknowledged once; staff gets 403', async () => {
+  it('M14: empty strings and 6+ items are 400; a duplicated item is acknowledged once; staff get 422 on a non-baseline item', async () => {
     await owner.legalNoticeSend.create({ data: { docKey: 'terms', version: V, sentBy: operator } });
     expect((await ack(merchant, [{ docKey: '', version: V }])).status).toBe(400);
     expect((await ack(merchant, [{ docKey: 'terms', version: '' }])).status).toBe(400);
@@ -309,8 +428,9 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
     expect(dup.body.data).toEqual({ acknowledged: 1 });
     const staff = await mkUser('st', 'staff');
     try {
+      // Staff may acknowledge only the baseline documents shown to them, never an owner's fee notice.
       const r = await ack(staff, [{ docKey: 'terms', version: V }], 'staff');
-      expect(r.status).toBe(403);
+      expect(r.status).toBe(422);
       expect(await owner.legalAcceptance.count({ where: { userId: staff } })).toBe(0);
     } finally {
       await owner.user.delete({ where: { id: staff } });

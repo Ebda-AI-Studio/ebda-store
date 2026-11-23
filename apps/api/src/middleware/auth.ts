@@ -10,6 +10,7 @@ import { accountStateCached } from '../lib/identity-live-cache';
 import { needsLiveIdentity } from '../lib/auth-sensitivity';
 import logger from '../lib/logger';
 import { runWithImpersonation } from '../lib/impersonation-context';
+import { consentGiven, isGatedRequest, ownerConsentGateEnabled } from '../lib/owner-consent';
 import { recordTiming } from '../lib/request-timing';
 import {
   customerTokenMatchesRequestStore,
@@ -266,6 +267,26 @@ export async function authenticateAccounts(
   return { user: accountsUser(claims, account.role), claims };
 }
 
+/**
+ * Ruling CONSENT-ADMIN-1: a store owner who never accepted the Terms and Privacy policy may read but not
+ * write. Server-side so the UI modal is not the only guard. Support impersonation is exempt (not the owner's
+ * own consent to give, and not theirs to block).
+ */
+// pq-allow(unused-export): imported by tests/unit/owner-consent-gate.test.ts
+export async function enforceOwnerConsent(
+  req: Request,
+  user: { userId: string; role: string; impersonatedBy?: string }
+): Promise<void> {
+  if (user.role !== 'store_admin' || user.impersonatedBy) return;
+  if (!ownerConsentGateEnabled() || !isGatedRequest(req.method, req.originalUrl)) return;
+  if (await consentGiven(user.userId)) return;
+  throw new AppError(
+    403,
+    'CONSENT_REQUIRED',
+    'Accept the Terms and Privacy policy to continue making changes'
+  );
+}
+
 export async function authenticate(
   req: Request,
   _res: Response,
@@ -297,6 +318,7 @@ export async function authenticate(
       (req as any).tokenJti = claims.jti;
       (req as any).accountsSid = claims.sid;
       (req as any).accountsStores = claims.stores;
+      await enforceOwnerConsent(req, user);
       return next();
     } catch (err) {
       return next(
@@ -373,6 +395,7 @@ export async function authenticate(
     }
 
     req.user = payload;
+    await enforceOwnerConsent(req, payload);
     // Expose the jti on the request so downstream middleware (e.g. logout)
     // can denylist this specific token without re-decoding.
     (req as any).tokenJti = decoded?.jti;

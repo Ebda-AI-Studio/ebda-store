@@ -236,7 +236,7 @@ function PlatformAiUsagePageInner() {
       alignEnd: true,
       cell: store => (
         <span className="font-bold tabular-nums text-foreground">
-          {store.today.toLocaleString(undefined, withNumerals())}
+          {store.today.toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },
@@ -245,7 +245,7 @@ function PlatformAiUsagePageInner() {
       alignEnd: true,
       cell: store => (
         <span className="tabular-nums text-muted-foreground">
-          {store.month.toLocaleString(undefined, withNumerals())}
+          {store.month.toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },
@@ -265,7 +265,7 @@ function PlatformAiUsagePageInner() {
           <div className="font-medium text-foreground">{formatSpend(store.monthCostMicros)}</div>
           {store.monthUnpricedCalls > 0 && (
             <div className="text-xs text-warning-ink" title={t('unpricedTooltip')}>
-              +{store.monthUnpricedCalls.toLocaleString(undefined, withNumerals())}{' '}
+              +{store.monthUnpricedCalls.toLocaleString(intlLocaleForUi(), withNumerals())}{' '}
               {t('unpricedRowSuffix')}
             </div>
           )}
@@ -289,12 +289,12 @@ function PlatformAiUsagePageInner() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         <StatCard
           label={t('statCards.today')}
-          value={platform.todayCount.toLocaleString(undefined, withNumerals())}
+          value={platform.todayCount.toLocaleString(intlLocaleForUi(), withNumerals())}
           accent
         />
         <StatCard
           label={t('statCards.thisMonth')}
-          value={platform.monthCount.toLocaleString(undefined, withNumerals())}
+          value={platform.monthCount.toLocaleString(intlLocaleForUi(), withNumerals())}
         />
         <StatCard
           label={t('statCards.cacheHitRatio')}
@@ -303,7 +303,7 @@ function PlatformAiUsagePageInner() {
         <StatCard label={t('statCards.monthSpend')} value={formatSpend(platform.monthCostMicros)} />
         <StatCard
           label={t('statCards.activeStores')}
-          value={filteredStores.length.toLocaleString(undefined, withNumerals())}
+          value={filteredStores.length.toLocaleString(intlLocaleForUi(), withNumerals())}
         />
       </div>
 
@@ -321,7 +321,7 @@ function PlatformAiUsagePageInner() {
         <div className="mb-6 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-ink">
           <strong>
             {t('unpricedCallsTitle', {
-              count: platform.monthUnpricedCalls.toLocaleString(undefined, withNumerals()),
+              count: platform.monthUnpricedCalls.toLocaleString(intlLocaleForUi(), withNumerals()),
             })}
           </strong>{' '}
           {t.rich('unpricedCallsBody', {

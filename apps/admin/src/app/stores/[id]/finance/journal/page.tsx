@@ -10,7 +10,7 @@ import { apiGetPage, type PageMeta } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { Button } from '@/components/ui/Button';
 import { PageControls } from '../../../../../components/PageControls';
-import { minorToMajor, formatDate } from '@/lib/format';
+import { minorToMajor, formatDate, intlLocaleForUi } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
@@ -229,7 +229,9 @@ export default function JournalListPage() {
             <>
               {meta && (
                 <p className="text-sm text-muted-foreground" data-testid="journal-total">
-                  {t('totalCount', { total: meta.total.toLocaleString(undefined, withNumerals()) })}
+                  {t('totalCount', {
+                    total: meta.total.toLocaleString(intlLocaleForUi(), withNumerals()),
+                  })}
                 </p>
               )}
               <DataTable<JournalEntry>

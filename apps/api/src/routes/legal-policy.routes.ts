@@ -7,6 +7,8 @@ import { parseInput } from '../lib/parse-input';
 import {
   ackItemsSchema,
   ackNotices,
+  acceptOwnerConsent,
+  consentStatusFor,
   myAcceptances,
   pendingNoticesFor,
   policyOverview,
@@ -21,6 +23,7 @@ import {
  *
  *  GET  /      the signed-in user's pending material-change notices (never cached)
  *  POST /ack   { items: [{ docKey, version }] } -> records "Got it" (source notice_ack)
+ *  POST /accept { accepted: true } -> the owner's Terms + Privacy acceptance (source consent_gate)
  *
  * User-level, not store-level: no storeId, no tenantContext; the service opens its own
  * user-scoped transaction. `rejectImpersonated`: an acknowledgement is the merchant's own
@@ -37,9 +40,37 @@ meLegalNoticeRoutes.get(
   authorize('store_admin', 'staff', 'super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const notices = await pendingNoticesFor(req.user!.userId, req.user!.role);
+      const [notices, consent] = await Promise.all([
+        pendingNoticesFor(req.user!.userId, req.user!.role),
+        consentStatusFor(req.user!.userId, req.user!.role),
+      ]);
       res.set('Cache-Control', 'no-store');
-      res.json({ success: true, data: { notices } });
+      res.json({ success: true, data: { notices, consent } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /accept: the owner's affirmative acceptance of the Terms and the Privacy policy (Ruling CONSENT-ADMIN-1).
+ * The body must say `accepted: true` (the modal's ticked checkbox); the server never records consent from a bare call.
+ */
+meLegalNoticeRoutes.post(
+  '/accept',
+  authenticate,
+  rejectImpersonated,
+  authorize('store_admin'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      parseInput(z.object({ accepted: z.literal(true) }).strict(), req.body);
+      const data = await acceptOwnerConsent(req.user!.userId, req.user!.role, {
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.set('Cache-Control', 'no-store');
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }

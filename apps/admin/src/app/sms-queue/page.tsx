@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Badge } from '@ebda/ui';
@@ -127,7 +128,7 @@ export default function SmsQueuePage() {
       header: t('columns.created'),
       cell: e => (
         <span className="text-muted-foreground">
-          {new Date(e.createdAt).toLocaleString(undefined, withNumerals())}
+          {new Date(e.createdAt).toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },

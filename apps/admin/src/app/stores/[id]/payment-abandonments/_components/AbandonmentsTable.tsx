@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import type { AbandonmentRecord, ListMeta } from '../_hooks/usePaymentAbandonments';
@@ -14,7 +15,7 @@ const formatMajor = formatPrice;
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString(
-    undefined,
+    intlLocaleForUi(),
     withNumerals({
       dateStyle: 'short',
       timeStyle: 'short',
