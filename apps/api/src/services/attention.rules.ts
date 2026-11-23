@@ -30,6 +30,10 @@ export interface AttentionFacts {
   tax: { enabled: boolean; profileStatus: string | null };
   chatLinked: boolean;
   pendingStaffInvites: number;
+  /** Orders waiting for the merchant to confirm an InstaPay transfer. */
+  awaitingInstapayOrders: number;
+  /** Orders from the last 14 days whose online payment failed and that are still open. */
+  failedPaymentOrders: number;
 }
 
 export function computeAttention(f: AttentionFacts): AttentionItem[] {
@@ -208,6 +212,34 @@ export function computeAttention(f: AttentionFacts): AttentionItem[] {
         ar: 'ناس دعيتهم لسه ما قبلوش. ابعت الدعوة تاني أو الغيها.',
       },
       count: f.pendingStaffInvites,
+    });
+  }
+
+  if (f.awaitingInstapayOrders > 0) {
+    items.push({
+      id: 'instapay_orders_unconfirmed',
+      severity: 'action',
+      section: 'orders',
+      title: { en: 'InstaPay payments to confirm', ar: 'تحويلات إنستاباي محتاجة تأكيدك' },
+      message: {
+        en: 'Customers sent InstaPay transfers. Check your account and confirm the orders so they can ship.',
+        ar: 'عملاء حوّلوا فلوس بإنستاباي. راجع حسابك وأكّد الطلبات علشان تتشحن.',
+      },
+      count: f.awaitingInstapayOrders,
+    });
+  }
+
+  if (f.failedPaymentOrders > 0) {
+    items.push({
+      id: 'payments_failed',
+      severity: 'action',
+      section: 'orders',
+      title: { en: 'Orders with a failed payment', ar: 'طلبات الدفع فيها فشل' },
+      message: {
+        en: 'These customers tried to pay online and it failed. Contact them or let them retry.',
+        ar: 'عملاء حاولوا يدفعوا أونلاين والدفع فشل. كلّمهم أو سيبهم يحاولوا تاني.',
+      },
+      count: f.failedPaymentOrders,
     });
   }
 

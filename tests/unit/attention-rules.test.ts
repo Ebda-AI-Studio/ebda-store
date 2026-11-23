@@ -17,6 +17,8 @@ const clean: AttentionFacts = {
   tax: { enabled: false, profileStatus: null },
   chatLinked: true,
   pendingStaffInvites: 0,
+  awaitingInstapayOrders: 0,
+  failedPaymentOrders: 0,
 };
 const ids = (f: Partial<AttentionFacts>) => computeAttention({ ...clean, ...f }).map(i => i.id);
 
@@ -51,6 +53,8 @@ describe('computeAttention', () => {
     ['tax_review_pending', { tax: { enabled: false, profileStatus: 'pending' } }],
     ['chat_not_connected', { chatLinked: false }],
     ['staff_invites_pending', { pendingStaffInvites: 2 }],
+    ['instapay_orders_unconfirmed', { awaitingInstapayOrders: 3 }],
+    ['payments_failed', { failedPaymentOrders: 1 }],
   ] as Array<[string, Partial<AttentionFacts>]>)('%s fires', (id, facts) => {
     expect(ids(facts)).toContain(id);
   });
@@ -66,6 +70,17 @@ describe('computeAttention', () => {
       'tax_not_verified'
     );
     expect(ids({ instapayHasDestination: null })).not.toContain('instapay_incomplete');
+  });
+
+  it('order money signals carry their count and point at orders', () => {
+    const items = computeAttention({ ...clean, awaitingInstapayOrders: 4, failedPaymentOrders: 2 });
+    const byId = Object.fromEntries(items.map(i => [i.id, i]));
+    expect(byId.instapay_orders_unconfirmed).toMatchObject({
+      section: 'orders',
+      count: 4,
+      severity: 'action',
+    });
+    expect(byId.payments_failed).toMatchObject({ section: 'orders', count: 2, severity: 'action' });
   });
 
   it('a brand-new store with no products is not told to add delivery rates', () => {
@@ -118,6 +133,8 @@ describe('computeAttention', () => {
       tax: { enabled: true, profileStatus: 'none' },
       chatLinked: false,
       pendingStaffInvites: 1,
+      awaitingInstapayOrders: 2,
+      failedPaymentOrders: 1,
     });
     for (const i of all) {
       expect(ATTENTION_IDS).toContain(i.id);

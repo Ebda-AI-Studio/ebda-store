@@ -36,6 +36,7 @@ vi.mock('../../apps/api/src/lib/repo-factory', () => ({
       ]),
     },
     product: { count: h.rec('product', 2) },
+    order: { count: h.rec('order', 0) },
     storeTaxProfile: { findUnique: h.rec('tax', null) },
     storeWhatsAppLink: { findUnique: h.rec('wa', null) },
     shippingZone: { count: h.rec('zone', 0) },

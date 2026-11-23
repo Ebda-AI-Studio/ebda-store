@@ -24,6 +24,8 @@ export const ATTENTION_IDS = [
   'tax_review_pending',
   'chat_not_connected',
   'staff_invites_pending',
+  'instapay_orders_unconfirmed',
+  'payments_failed',
 ] as const;
 export type AttentionId = (typeof ATTENTION_IDS)[number];
 

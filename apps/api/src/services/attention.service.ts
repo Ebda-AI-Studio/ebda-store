@@ -53,6 +53,8 @@ export class AttentionService {
       taxProfile,
       chatLink,
       invites,
+      awaitingInstapayOrders,
+      failedPaymentOrders,
       tax,
       whatsapp,
       staffAccounts,
@@ -76,6 +78,15 @@ export class AttentionService {
       db.storeTaxProfile.findUnique({ where: { storeId }, select: { status: true } }),
       db.storeWhatsAppLink.findUnique({ where: { storeId }, select: { linked: true } }),
       countPendingInvites(storeId),
+      db.order.count({ where: { storeId, status: 'awaiting_payment_confirmation' } }),
+      db.order.count({
+        where: {
+          storeId,
+          paymentStatus: 'failed',
+          status: { in: ['pending', 'confirmed'] },
+          createdAt: { gte: new Date(Date.now() - 14 * 24 * 3600 * 1000) },
+        },
+      }),
       featureService.isFeatureEnabled(storeId, 'tax'),
       featureService.isFeatureEnabled(storeId, 'whatsapp'),
       featureService.isFeatureEnabled(storeId, 'staff_accounts'),
@@ -112,6 +123,8 @@ export class AttentionService {
       tax: { enabled: store.taxEnabled, profileStatus: taxProfile?.status ?? null },
       chatLinked: chatLink?.linked === true,
       pendingStaffInvites: invites,
+      awaitingInstapayOrders,
+      failedPaymentOrders,
     });
 
     return { items, actionCount: countActionItems(items) };

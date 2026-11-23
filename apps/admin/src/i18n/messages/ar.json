@@ -6244,7 +6244,8 @@
       "markAllRead": "تعليم الكل كمقروء",
       "clear": "مسح",
       "empty": "مفيش إشعارات لسه",
-      "reconnecting": "جارٍ إعادة الاتصال بخادم الإشعارات…"
+      "reconnecting": "جارٍ إعادة الاتصال بخادم الإشعارات…",
+      "needsAttention": "محتاج انتباهك"
     },
     "connectionStatus": {
       "testing": "جارٍ الاختبار…",
