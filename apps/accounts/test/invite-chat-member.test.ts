@@ -42,7 +42,7 @@ describe('inviteChatMember', () => {
     expect(fakes.mails).toHaveLength(1);
     expect(fakes.mails[0]).toMatchObject({
       to: email,
-      kind: 'staff_invite',
+      kind: 'chat_invite',
       ttlMinutes: 1440,
       storeName: WS,
     });
@@ -59,7 +59,7 @@ describe('inviteChatMember', () => {
     expect((await row(email))!.email_verified).toBe(1);
   });
 
-  it('EXISTING verified identity: returns its id, mails an "added" notice (no code), changes nothing', async () => {
+  it('EXISTING verified identity: returns its id, mails an "invited" notice (no code), changes nothing', async () => {
     const v = await seedUser();
     const before = await row(v.email);
     const r = await rpc().inviteChatMember({ email: v.email, firstName: 'X', workspaceName: WS });
@@ -79,7 +79,7 @@ describe('inviteChatMember', () => {
     const r = await rpc().inviteChatMember({ email, firstName: 'B', workspaceName: WS });
     expect(r).toEqual({ userId: id });
     expect(fakes.mails).toHaveLength(1);
-    expect(fakes.mails[0]).toMatchObject({ to: email, kind: 'staff_invite' });
+    expect(fakes.mails[0]).toMatchObject({ to: email, kind: 'chat_invite' });
     expect((await row(email))!.email_verified).toBe(0);
   });
 

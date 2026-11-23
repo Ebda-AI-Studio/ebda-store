@@ -81,7 +81,7 @@ export async function storeActive(storeId: string): Promise<boolean> {
 
 export interface CodeMail {
   to: string;
-  kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol';
+  kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol' | 'chat_invite';
   code: string;
   language: 'en' | 'ar';
   firstName: string;
@@ -110,6 +110,17 @@ export async function sendCodeMail(m: CodeMail): Promise<void> {
       { email: m.to, name: m.firstName, code: m.code, expiresInMinutes: m.ttlMinutes },
       m.language,
       true
+    );
+  } else if (m.kind === 'chat_invite') {
+    await sendChatMemberAddedEmail(
+      {
+        email: m.to,
+        name: m.firstName,
+        workspaceName: m.storeName ?? 'Ebda Chat',
+        chatUrl: `https://${BRAND.domains.whatsappApp}/`,
+        setPasswordUrl: `${config.adminUrl}/reset-password?${q}`,
+      },
+      m.language
     );
   } else if (m.kind === 'staff_invite') {
     await sendStaffInviteEmail(

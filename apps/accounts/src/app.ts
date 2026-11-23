@@ -491,7 +491,7 @@ async function requireSecondFactor(c: C, user: UserRow, code: unknown): Promise<
 export async function issueAndMail(
   env: Env,
   user: UserRow,
-  kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol',
+  kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol' | 'chat_invite',
   type: OtpType,
   pending?: PendingSignup,
   opts: { ttlMinutes?: number; storeName?: string } = {}
@@ -564,6 +564,8 @@ export async function inviteFor(
     role: 'store_admin' | 'staff';
     language: 'en' | 'ar';
     storeName?: string;
+    /** Mail template for the one-time code (default: staff_invite when a storeName is given). */
+    mailKind?: 'chat_invite';
   }
 ): Promise<InviteResult> {
   let user = await findUserByEmail(env.DB, input.email);
@@ -596,7 +598,7 @@ export async function inviteFor(
   await issueAndMail(
     env,
     user,
-    input.storeName ? 'staff_invite' : 'password_reset',
+    input.mailKind ?? (input.storeName ? 'staff_invite' : 'password_reset'),
     'password_reset',
     undefined,
     {
@@ -619,8 +621,8 @@ export class InviteRefused extends Error {
  * Invite a person to a standalone Ebda Chat workspace by email (Ruling CHAT-SA-6). Returns ONLY `{ userId }`, identical
  * whether the address already had an identity, so the inviter learns nothing about who is registered.
  *  - no identity: an unverified, credential-less `staff` identity (role is irrelevant to Chat; membership lives in Chat's D1)
- *    and the one-time set-password code (24 h, single use: the existing reset flow) mailed as the invitation;
- *  - ACTIVE verified identity: its id, plus an "added to <workspace>" notice (no code, no credential touched);
+ *    and the invitation mail (`chat_invite`: sign in to Chat and accept within 7 days) carrying the one-time set-password code (24 h, single use: the existing reset flow);
+ *  - ACTIVE verified identity: its id, plus an "invited to <workspace>" notice (no code, no credential touched; the invitation is accepted in Chat, 7 days);
  *  - ACTIVE but never verified (a signup nobody completed): bound to its own id only; the set-password code is mailed
  *    to the mailbox, so only that mailbox's owner can ever activate it (first verification purges anything attached earlier);
  *  - inactive, suspended or erased identity: throws InviteRefused.
@@ -655,6 +657,7 @@ export async function inviteChatMemberFor(
       role: 'staff',
       language: input.language,
       storeName: input.workspaceName,
+      mailKind: 'chat_invite',
     });
     userId = r.id;
   } else {
@@ -674,7 +677,7 @@ export async function inviteChatMemberFor(
         );
       }
     } else if (mailAllowed) {
-      await issueAndMail(env, user, 'staff_invite', 'password_reset', undefined, {
+      await issueAndMail(env, user, 'chat_invite', 'password_reset', undefined, {
         ttlMinutes: 24 * 60,
         storeName: input.workspaceName,
       });

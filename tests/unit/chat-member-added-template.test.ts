@@ -26,4 +26,29 @@ describe('chat-member-added template', () => {
       expect(t.subject[lang](evil)).not.toMatch(/[\r\n\u2028\u2029]/);
     }
   });
+
+  it('says INVITED (not added), asks to sign in to Chat and accept, valid 7 days, in both languages', () => {
+    const en = t.en(d);
+    expect(en).toMatch(/invited/i);
+    expect(en).toMatch(/accept the invitation/i);
+    expect(en).toContain('7 days');
+    expect(en).not.toMatch(/were added|has been added/i);
+    expect(t.subject.en(d)).toMatch(/invited/i);
+    const ar = t.ar(d);
+    expect(ar).toContain('7 أيام');
+    expect(ar).toContain('وافق على الدعوة');
+    expect(ar).not.toContain('اتضفت');
+  });
+
+  it('a new account gets a set-password link; an existing one gets only Chat sign-in', () => {
+    const fresh = {
+      ...d,
+      setPasswordUrl: 'https://store.ebda.app/reset-password?email=a%40b.c#code=123456',
+    };
+    expect(t.en(fresh)).toContain('reset-password');
+    expect(t.ar(fresh)).toContain('reset-password');
+    expect(t.en(d)).not.toContain('reset-password');
+    // no invitation token anywhere: only the chat url
+    expect(t.en(d)).toContain('https://wa.ebda.app/');
+  });
 });

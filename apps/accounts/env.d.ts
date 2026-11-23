@@ -13,7 +13,7 @@ export interface MailerRpc {
   /** Send a one-time code mail (verification or password reset) through the Store mail pipeline. */
   sendCode(input: {
     to: string;
-    kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol';
+    kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol' | 'chat_invite';
     code: string;
     language: 'en' | 'ar';
     firstName: string;
