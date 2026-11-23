@@ -41,21 +41,16 @@ export async function isStoreAiEnabled(storeId: string): Promise<boolean> {
 }
 
 /**
- * The AI SPEND gate every AI spend passes (directly, through `assertAiQuota`, or through `requireAiEnabled`): the merchant's
- * switch is on, the store is not suspended for billing (#836: 402, pay from Billing), and the store is operational (Ruling
- * SUSPEND-AI-1: an admin-suspended store must not keep spending the platform's AI budget; unknown status = not operational,
- * fail closed). One primary-key read, uncached (NEVER-stale: a suspension or a restore is obeyed on the very next call).
+ * The AI SPEND gate every AI spend passes (directly, through `assertAiQuota`, or through `requireAiEnabled`), in this order:
+ * suspended for billing (#836: 402, pay from Billing), not operational (Ruling SUSPEND-AI-1: an admin-suspended store must not
+ * keep spending the platform's AI budget; unknown status = not operational, fail closed), then the merchant's own switch.
+ * One primary-key read, uncached (NEVER-stale: a suspension or a restore is obeyed on the very next call).
  */
 export async function assertStoreAiEnabled(storeId: string): Promise<void> {
   const row = await readAiGate(storeId);
-  if (row?.aiFeaturesEnabled !== true) {
-    throw new AppError(
-      403,
-      AI_DISABLED_BY_MERCHANT_CODE,
-      'AI features are turned off for this store. Turn them on in AI tools.'
-    );
-  }
-  if (row.billingSuspendedReason) {
+  // A suspended store is told it is suspended, never "turn AI on in AI tools" (the merchant's switch is irrelevant until it is
+  // reactivated). A billing suspension also sets status `suspended`, so it is checked first to keep its own 402 + Billing hint.
+  if (row?.billingSuspendedReason) {
     const en =
       'AI tools are paused until the subscription is paid. Pay from the Billing page to turn them back on.';
     throw new AppError(402, AI_BILLING_SUSPENDED_CODE, en, {
@@ -63,12 +58,19 @@ export async function assertStoreAiEnabled(storeId: string): Promise<void> {
       messageAr: 'الأدوات الذكية واقفة لحد ما الاشتراك يتدفع. ادفع من صفحة الفواتير وهترجع تشتغل.',
     });
   }
-  if (!isStoreOperational(row.status))
+  if (!isStoreOperational(row?.status))
     throw new AppError(
       403,
       STORE_AI_SUSPENDED_CODE,
       'This store is suspended, so AI features are paused. Contact support to get it reactivated.'
     );
+  if (row?.aiFeaturesEnabled !== true) {
+    throw new AppError(
+      403,
+      AI_DISABLED_BY_MERCHANT_CODE,
+      'AI features are turned off for this store. Turn them on in AI tools.'
+    );
+  }
 }
 
 export async function requireAiEnabled(

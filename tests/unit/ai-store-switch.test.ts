@@ -84,6 +84,33 @@ describe('an admin-SUSPENDED store is refused AI spend (Ruling SUSPEND-AI-1)', (
       });
     }
   });
+  it('a suspended store is never told to turn AI on: suspended with the merchant switch OFF is still STORE_AI_SUSPENDED', async () => {
+    m.findUnique.mockResolvedValue({ aiFeaturesEnabled: false, status: 'suspended' });
+    await expect(assertStoreAiEnabled('s1')).rejects.toMatchObject({
+      statusCode: 403,
+      code: STORE_AI_SUSPENDED_CODE,
+    });
+  });
+  it('a billing-suspended store (status suspended + a reason) keeps its 402 Billing hint, switch on or off', async () => {
+    for (const aiFeaturesEnabled of [true, false]) {
+      m.findUnique.mockResolvedValue({
+        aiFeaturesEnabled,
+        status: 'suspended',
+        billingSuspendedReason: 'unpaid',
+      });
+      await expect(assertStoreAiEnabled('s1')).rejects.toMatchObject({
+        statusCode: 402,
+        code: 'AI_STORE_BILLING_SUSPENDED',
+      });
+    }
+  });
+  it('an active store with the switch off is the merchant-switch 403', async () => {
+    m.findUnique.mockResolvedValue({ aiFeaturesEnabled: false, status: 'active' });
+    await expect(assertStoreAiEnabled('s1')).rejects.toMatchObject({
+      statusCode: 403,
+      code: AI_DISABLED_BY_MERCHANT_CODE,
+    });
+  });
   it('the merchant switch (what the AI settings page shows) is NOT changed by the suspension', async () => {
     m.findUnique.mockResolvedValue({ aiFeaturesEnabled: true, status: 'suspended' });
     expect(await isStoreAiEnabled('s1')).toBe(true);
