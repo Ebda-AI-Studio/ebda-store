@@ -493,9 +493,13 @@ export function reverseEarnedPointsFromOrder(
     const cfg = loadLoyaltyConfig(db, a.storeId);
     if (!cfg) return null;
     const earned = earn.points as number;
-    // #631: never floored at the balance (that let redeem-then-refund keep the discount for free)
-    const toReverse = earned;
-    const newTotalEarned = Math.max(0, (lp.total_earned as number) - earned);
+    // #631: never floored at the balance (that let redeem-then-refund keep the discount for free). Partial refunds
+    // already took their share (`partialRevoked`); the whole-order reversal takes only what is left of the earn.
+    const toReverse = Math.max(
+      0,
+      earned - partialRevoked(db, a.storeId, a.orderId, earn.id as string)
+    );
+    const newTotalEarned = Math.max(0, (lp.total_earned as number) - toReverse);
     const newTier = calculateTier(newTotalEarned, cfg.settings);
 
     db.run(
@@ -525,6 +529,96 @@ export function reverseEarnedPointsFromOrder(
       pointsReversed: toReverse,
       newBalance: (lp.points as number) - toReverse,
       debt: Math.max(0, toReverse - Math.max(0, lp.points as number)),
+      replayed: false,
+    };
+  });
+}
+
+/** Points already taken back from one earn by PARTIAL refunds (`refund-revoke:<earnId>:p:<refundKey>` rows, stored negative). */
+function partialRevoked(db: SyncSql, storeId: string, orderId: string, earnId: string): number {
+  const r = db.all(
+    `SELECT COALESCE(-SUM(points), 0) AS s FROM loyalty_transactions
+      WHERE store_id = ? AND order_id = ? AND type = 'adjust' AND description LIKE ? ESCAPE '\\'`,
+    [storeId, orderId, `refund-revoke:${earnId}:p:%`]
+  )[0];
+  return Number(r?.s ?? 0);
+}
+
+/**
+ * A PARTIAL refund (amount, returned lines or store credit) takes back the matching share of the points the order earned:
+ * `floor(earned * refundedValue / orderTotal)`, at most what is still left of the earn (partials plus a whole reversal can
+ * never take more than was earned). Money rule: an external fact is never rejected, an over-large refunded value is clamped
+ * here. Like the whole reversal it is not floored at the balance (spent points become debt). Idempotent per `refundKey`
+ * through the tagged `adjust` row. `null` when the order earned nothing or has no points row.
+ */
+export function reverseEarnedPointsPartial(
+  db: SyncSql,
+  a: { storeId: string; orderId: string; refundKey: string; value: number; now?: number }
+): { pointsReversed: number; newBalance: number; replayed: boolean } | null {
+  requireId(a.storeId, 'storeId');
+  requireId(a.orderId, 'orderId');
+  const now = a.now ?? Date.now();
+  return db.transactionSync(() => {
+    const order = requireOrder(db, a.storeId, a.orderId);
+    const earn = db.all(
+      `SELECT id, customer_id, points FROM loyalty_transactions WHERE store_id = ? AND order_id = ? AND type = 'earn_purchase'`,
+      [a.storeId, a.orderId]
+    )[0];
+    if (!earn || (earn.points as number) <= 0) return null;
+    const customerId = earn.customer_id as string;
+    const lp = db.all(
+      'SELECT points, total_earned, tier FROM loyalty_points WHERE store_id = ? AND customer_id = ?',
+      [a.storeId, customerId]
+    )[0];
+    if (!lp) return null;
+    const tag = `refund-revoke:${earn.id as string}:p:${a.refundKey}`;
+    const done = db.all(
+      `SELECT id FROM loyalty_transactions WHERE store_id = ? AND order_id = ? AND type = 'adjust' AND description = ?`,
+      [a.storeId, a.orderId, tag]
+    )[0];
+    if (done) return { pointsReversed: 0, newBalance: lp.points as number, replayed: true };
+    const cfg = loadLoyaltyConfig(db, a.storeId);
+    if (!cfg) return null;
+
+    const earned = earn.points as number;
+    const total = Number(order.total);
+    const share = total > 0 ? Math.min(1, Math.max(0, a.value) / total) : 0;
+    const whole = db.all(
+      `SELECT id FROM loyalty_transactions WHERE store_id = ? AND order_id = ? AND type = 'adjust' AND description = ?`,
+      [a.storeId, a.orderId, `refund-revoke:${earn.id as string}`]
+    )[0];
+    const left = whole ? 0 : earned - partialRevoked(db, a.storeId, a.orderId, earn.id as string);
+    const toReverse = Math.min(Math.max(0, left), Math.floor(earned * share));
+    if (toReverse <= 0)
+      return { pointsReversed: 0, newBalance: lp.points as number, replayed: false };
+    const newTotalEarned = Math.max(0, (lp.total_earned as number) - toReverse);
+    const newTier = calculateTier(newTotalEarned, cfg.settings);
+    db.run(
+      `INSERT INTO loyalty_transactions (id, store_id, customer_id, order_id, type, points, description, created_at)
+       VALUES (?, ?, ?, ?, 'adjust', ?, ?, ?)`,
+      [crypto.randomUUID(), a.storeId, customerId, a.orderId, -toReverse, tag, now]
+    );
+    db.run(
+      `UPDATE loyalty_points SET points = points - ?1, total_earned = ?2, tier = ?3, updated_at = ?6
+       WHERE store_id = ?4 AND customer_id = ?5`,
+      [toReverse, newTotalEarned, newTier, a.storeId, customerId, now]
+    );
+    if (newTier !== (lp.tier as string))
+      db.run(
+        `INSERT INTO loyalty_transactions (id, store_id, customer_id, order_id, type, points, description, created_at)
+         VALUES (?, ?, ?, ?, 'tier_changed', 0, ?, ?)`,
+        [
+          crypto.randomUUID(),
+          a.storeId,
+          customerId,
+          a.orderId,
+          `Tier ${lp.tier} → ${newTier} (from partial refund)`,
+          now,
+        ]
+      );
+    return {
+      pointsReversed: toReverse,
+      newBalance: (lp.points as number) - toReverse,
       replayed: false,
     };
   });
@@ -1243,7 +1337,7 @@ export function lotRemaining(
     let need = -pts;
     const desc = typeof r.description === 'string' ? r.description : '';
     if (r.type === 'adjust' && desc.startsWith(REVOKE_PREFIX)) {
-      const own = byId.get(desc.slice(REVOKE_PREFIX.length));
+      const own = byId.get(desc.slice(REVOKE_PREFIX.length).split(':')[0]);
       if (own) {
         const t = Math.min(own.left, need);
         own.left -= t;
