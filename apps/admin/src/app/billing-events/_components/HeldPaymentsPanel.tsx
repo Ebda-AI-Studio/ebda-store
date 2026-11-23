@@ -97,6 +97,7 @@ export function HeldPaymentsPanel({
     setBusy(false);
     if (error) {
       setNoteError(t('resolveFailed'));
+      void fetchRows(); // e.g. 409 already resolved: never leave a stale open row on screen
       return;
     }
     setResolving(null);

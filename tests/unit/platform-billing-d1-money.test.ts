@@ -977,6 +977,67 @@ describe('#627 review: ONE may-settle predicate on every settle path (a held cha
     }
   );
 
+  it('resolve is retriable: a failing LEDGER close leaves the queue entry open; a failing QUEUE close is completed by the retry', async () => {
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const [h] = await listHeldBillingWebhooks({ status: 'open' });
+    const go = () =>
+      resolveHeldBillingWebhook({
+        id: h.id,
+        actorId: 'a',
+        action: 'credited',
+        note: 'credited by hand',
+        audit: async () => undefined,
+      });
+    // step 1 (ledger) throws: nothing is closed, the entry is still OPEN and un-resolved
+    db.exec(
+      `CREATE TRIGGER boom1 BEFORE UPDATE ON billing_events WHEN NEW.failure_reason LIKE 'held_resolved:%' BEGIN SELECT RAISE(ABORT, 'boom1'); END`
+    );
+    await expect(go()).rejects.toThrow();
+    db.exec('DROP TRIGGER boom1');
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(1);
+    expect(status(db)).toEqual({ s: 'pending', f: 'held:amount_mismatch' });
+    // step 2 (queue) throws AFTER the ledger closed: the ledger is final, the entry is still open
+    db.exec(
+      `CREATE TRIGGER boom2 BEFORE UPDATE ON billing_webhook_events WHEN NEW.outcome = 'held_resolved' BEGIN SELECT RAISE(ABORT, 'boom2'); END`
+    );
+    await expect(go()).rejects.toThrow();
+    db.exec('DROP TRIGGER boom2');
+    expect(status(db)).toEqual({ s: 'failed', f: 'held_resolved:credited' });
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(1);
+    // retry completes (idempotent), and a second one is the usual 409
+    await go();
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(0);
+    expect(await listHeldBillingWebhooks({ status: 'resolved' })).toHaveLength(1);
+    expect(plan(db)).toBe('free');
+    await expect(go()).rejects.toMatchObject({ statusCode: 409, code: 'HELD_PAYMENT_NOT_OPEN' });
+  });
+
+  it('a second mismatching delivery on a held row keeps the FIRST hold reason', async () => {
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    await applyWebhookEvent('stub', paid900({ eventId: 'wh-b', amountMinor: 1100 }));
+    expect(status(db)).toEqual({ s: 'pending', f: 'held:amount_mismatch' });
+  });
+
+  it('a hold on an already SUCCEEDED row queues nothing', async () => {
+    const db = rig();
+    renewal(db);
+    db.prepare(`UPDATE billing_events SET status = 'succeeded' WHERE id = ?`).run(EV);
+    vi.mocked(sendAlert).mockClear();
+    const r = await settleInTx(
+      prisma as never,
+      EV,
+      { status: 'succeeded', amountSource: 'gateway' },
+      NOW,
+      []
+    );
+    expect(r).toEqual({ transitioned: false });
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(0);
+  });
+
   it('the held-at-settle alert names the PROVIDER, not the webhook kind', async () => {
     const db = rig();
     renewal(db);

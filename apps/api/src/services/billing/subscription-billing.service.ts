@@ -589,7 +589,7 @@ export async function settleInTx(
       return { transitioned: false, refused: verdict.reason };
     // a success we cannot check: hold the row (no settle path will take it) and queue it for a person, same section
     const info = await holdLedgerRow(tx, row, verdict.reason, o);
-    return { transitioned: false, held: info };
+    return info ? { transitioned: false, held: info } : { transitioned: false };
   }
   const raw = (o.raw ?? undefined) as Prisma.InputJsonValue | undefined;
   if (o.status === 'succeeded' && row.type === 'card_setup' && !o.cardToken) {
@@ -697,10 +697,17 @@ export async function settleInTx(
  */
 async function holdLedgerRow(
   tx: Tx,
-  row: { id: string; storeId: string; provider: string; amountMinor: number; currency: string },
+  row: {
+    id: string;
+    storeId: string;
+    provider: string;
+    amountMinor: number;
+    currency: string;
+    failureReason?: string | null;
+  },
   reason: HeldBillingWebhook['reason'],
   o: Outcome
-): Promise<HeldBillingWebhook> {
+): Promise<HeldBillingWebhook | null> {
   const info: HeldBillingWebhook = {
     reason,
     kind: `settle.${o.status}`,
@@ -713,11 +720,15 @@ async function holdLedgerRow(
     expectedCurrency: row.currency,
     gotCurrency: o.currency ?? null,
     occurredAt: new Date().toISOString(),
+    // the decline reason the `held:` marker replaces stays visible to the person resolving it
+    ...(row.failureReason ? { priorFailureReason: row.failureReason } : {}),
   };
-  await tx.billingEvent.updateMany({
+  const marked = await tx.billingEvent.updateMany({
     where: { id: row.id, storeId: row.storeId, status: { in: ['pending', 'failed'] } },
     data: { failureReason: `${HELD_ROW_PREFIX}${reason}` },
   });
+  // a row that is no longer open (already succeeded) was not held: no queue entry, no alert for a hold that is not there
+  if (marked.count === 0) return null;
   await tx.billingWebhookEvent.createMany({
     data: [
       {
@@ -737,7 +748,7 @@ async function settleCharge(eventId: string, o: Outcome, now: Date) {
   const effects: BillingEffect[] = [];
   const res = await inEventStore(eventId, tx => settleInTx(tx, eventId, o, now, effects), {
     transitioned: false,
-  } as Awaited<ReturnType<typeof settleInTx>>);
+  });
   await runBillingEffects(effects);
   if (res.held)
     await alertHeldBillingWebhook(res.held.provider ?? 'unknown', `settle:${eventId}`, res.held);
@@ -1424,6 +1435,19 @@ export async function sweepStuckCharges(
     }
   }
   out.stillStuck = stuck.length;
+  // an open hold whose first P1 was lost (a crash between COMMIT and the alert) must not stay silent: every sweep re-alerts
+  try {
+    const open = await listHeldBillingWebhooks({ status: 'open', limit: 200 });
+    if (open.length > 0)
+      await sendAlert({
+        level: 'p1',
+        source: 'billing.held.open',
+        title: `Billing: ${open.length} held subscription payment(s) awaiting a person`,
+        body: `Open on the super-admin billing page (Held payments). Merchants may have paid without being upgraded.`,
+      });
+  } catch (err) {
+    logger.warn({ err }, '[billing] open-hold digest failed');
+  }
   if (stuck.length > 0) {
     void sendAlert({
       level: 'p1',
@@ -1677,7 +1701,7 @@ export interface WebhookResult {
  */
 const WEBHOOK_HELD = 'held';
 const WEBHOOK_HELD_RESOLVED = 'held_resolved';
-interface HeldBillingWebhook {
+export interface HeldBillingWebhook {
   reason:
     | 'unknown_order'
     | 'amount_mismatch'
@@ -1686,6 +1710,8 @@ interface HeldBillingWebhook {
     | 'currency_missing'
     | 'kind_mismatch'
     | 'row_resolved';
+  /** The ledger row's earlier failure reason, replaced by the `held:` marker. */
+  priorFailureReason?: string;
   /** The billing provider that owns the row (set by `holdLedgerRow`; the alert names it). */
   provider?: string;
   kind: string;
@@ -1728,7 +1754,6 @@ export async function applyWebhookEvent(
   }
   const scopedStoreId = webhookStoreId;
   const heldRef: { v: HeldBillingWebhook | null } = { v: null };
-  const heldRefused = { v: false };
   const applyInner = async (tx: Tx): Promise<WebhookResult> => {
     const ignore = async (detail: string): Promise<WebhookResult> => {
       await tx.billingWebhookEvent.updateMany({
@@ -1739,6 +1764,7 @@ export async function applyWebhookEvent(
     };
 
     if (event.kind === 'ignored') return ignore('unhandled_event');
+    let currentRow: { failureReason: string | null } | null = null;
     const hold = async (
       reason: HeldBillingWebhook['reason'],
       expected: { amountMinor: number; currency: string } | null
@@ -1761,7 +1787,13 @@ export async function applyWebhookEvent(
       });
       // the ledger row (when there is one) carries the hold too, so NO other settle path (the stuck-charge sweep, a
       // later delivery) can settle it while a person has not decided (maySettle)
-      if (event.merchantOrderId && scopedStoreId && UUID_RE.test(event.merchantOrderId))
+      // (an already-held row keeps its FIRST reason: the later delivery is still recorded on its own dedupe row)
+      if (
+        event.merchantOrderId &&
+        scopedStoreId &&
+        UUID_RE.test(event.merchantOrderId) &&
+        !currentRow?.failureReason?.startsWith('held')
+      )
         await tx.billingEvent.updateMany({
           where: {
             id: event.merchantOrderId,
@@ -1807,6 +1839,7 @@ export async function applyWebhookEvent(
             where: { id: event.merchantOrderId, storeId: scopedStoreId },
           })
         : null;
+    currentRow = row;
     if (!row || row.provider !== providerName || row.type === 'refund') {
       logger.warn({ providerName, eventId: event.eventId }, '[billing] webhook for unknown order');
       return isCharge ? hold('unknown_order', null) : ignore('unknown_order');
@@ -1858,7 +1891,7 @@ export async function applyWebhookEvent(
     }
     if (event.currency && event.currency.toUpperCase() !== String(row.currency).toUpperCase())
       return isCharge ? hold('currency_mismatch', expected) : ignore('currency_mismatch');
-    await settleInTx(
+    const settled = await settleInTx(
       tx,
       row.id,
       {
@@ -1877,12 +1910,9 @@ export async function applyWebhookEvent(
       },
       now,
       effects
-    ).then(async r => {
-      // the shared predicate refused (an open hold on the row): the delivery is recorded as held, not processed
-      if (r.refused) heldRefused.v = true;
-      return r;
-    });
-    if (heldRefused.v) {
+    );
+    // the shared predicate refused (an open hold on the row): the delivery is recorded as held, not processed
+    if (settled.refused) {
       await tx.billingWebhookEvent.updateMany({
         where: { provider: providerName, eventId: event.eventId },
         data: {
@@ -2068,6 +2098,34 @@ export async function resolveHeldBillingWebhook(args: {
     detail = { unparsed: row.detail };
   }
   await args.audit();
+  // 1) the LEDGER row first (the money truth, in its OWN store's scope): a person's decision. Idempotent: a row already
+  //    `held_resolved:<same action>` (an earlier attempt whose queue close failed) completes; a failure here leaves the
+  //    queue entry OPEN so the resolve can simply be retried.
+  const rowId = typeof detail.merchantOrderId === 'string' ? detail.merchantOrderId : null;
+  const storeId = typeof detail.storeId === 'string' ? detail.storeId : null;
+  if (rowId && storeId && UUID_RE.test(rowId))
+    await withStore(storeId, async tx => {
+      const r = await tx.billingEvent.findFirst({
+        where: { id: rowId, storeId },
+        select: { failureReason: true, status: true },
+      });
+      if (!r || r.status === 'succeeded') return;
+      if (r.failureReason?.startsWith(RESOLVED_ROW_PREFIX)) {
+        if (r.failureReason !== `${RESOLVED_ROW_PREFIX}${args.action}`)
+          throw new AppError(
+            409,
+            'HELD_PAYMENT_ACTION_CONFLICT',
+            `This payment was already resolved as ${r.failureReason.slice(RESOLVED_ROW_PREFIX.length)}`
+          );
+        return;
+      }
+      if (r.failureReason?.startsWith(HELD_ROW_PREFIX))
+        await tx.billingEvent.updateMany({
+          where: { id: rowId, storeId, failureReason: r.failureReason },
+          data: { status: 'failed', failureReason: `${RESOLVED_ROW_PREFIX}${args.action}` },
+        });
+    });
+  // 2) then the queue entry
   const done = await db.billingWebhookEvent.updateMany({
     where: { id: args.id, outcome: WEBHOOK_HELD },
     data: {
@@ -2089,21 +2147,6 @@ export async function resolveHeldBillingWebhook(args: {
       'HELD_PAYMENT_NOT_OPEN',
       'This held payment is already resolved or does not exist'
     );
-  // close the held ledger row so no settle path picks it up again (a person has decided); no dunning effects run
-  const rowId = typeof detail.merchantOrderId === 'string' ? detail.merchantOrderId : null;
-  const storeId = typeof detail.storeId === 'string' ? detail.storeId : null;
-  if (rowId && storeId && UUID_RE.test(rowId))
-    await withStore(storeId, async tx => {
-      const r = await tx.billingEvent.findFirst({
-        where: { id: rowId, storeId },
-        select: { failureReason: true, status: true },
-      });
-      if (r?.failureReason?.startsWith(HELD_ROW_PREFIX) && r.status !== 'succeeded')
-        await tx.billingEvent.updateMany({
-          where: { id: rowId, storeId, failureReason: r.failureReason },
-          data: { status: 'failed', failureReason: `held_resolved:${args.action}` },
-        });
-    });
 }
 
 /**
