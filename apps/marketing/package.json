@@ -26,7 +26,7 @@
     "qr": "tsx scripts/3d/make-qr.ts",
     "llms-full": "tsx scripts/make-llms-full.ts",
     "stills": "node scripts/3d/make-stills.mjs",
-    "check:perf": "node ../../scripts/ci/marketing-perf-budget.mjs --out out"
+    "check:perf": "node ../../scripts/ci/marketing-perf-budget.mjs --out out && node ../../scripts/ci/marketing-css-route-coverage.mjs --out out"
   },
   "dependencies": {
     "next": "^16.4.6",

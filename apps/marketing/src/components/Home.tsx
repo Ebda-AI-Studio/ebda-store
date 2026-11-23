@@ -28,6 +28,8 @@ import { FeatureVisuals } from './FeatureVisuals';
 import { HomeCapabilities } from './Capabilities';
 import { AiNative } from './AiNative';
 import { FEATURES_PAGE, THEME_COPY } from '../lib/capabilities';
+import '@/app/route-store.css';
+import '@/app/route-store-wa.css';
 
 /** The hero phone shows the last story frame: the finished store. */
 const HERO_FRAME = STORY_FRAMES[STORY_FRAMES.length - 1];

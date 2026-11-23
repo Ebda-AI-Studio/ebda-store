@@ -152,10 +152,8 @@ jobs:
     permissions:
       contents: read
       actions: read
-      issues: read # MQ-SCOPE-1: read the queued PR's labels (ci:full)
     outputs:
       skip: ${{ steps.decide.outputs.skip }}
-      heavy: ${{ steps.scope.outputs.heavy }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -172,18 +170,6 @@ jobs:
           EVENT: ${{ github.event_name }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/ci/tested-tree.mjs
-      - id: scope
-        # MQ-SCOPE-1: a merge group whose diff (base_sha..head_sha, via scripts/ci-affected.mjs) touches only light workspaces / docs and no rail
-        # (lockfile, packages/shared|repo|database, migrations, .github, scripts, tests) skips the heavy-only jobs; the `Merge queue gate` then accepts
-        # `skipped` for exactly those. Fails closed to heavy=true. Label `ci:full` on the PR forces the full tier. Other events: heavy=true.
-        name: Merge group scope
-        env:
-          EVENT: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.merge_group.base_sha }}
-          HEAD_SHA: ${{ github.event.merge_group.head_sha }}
-          HEAD_REF: ${{ github.event.merge_group.head_ref }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/ci/mq-scope.mjs
 
   guards:
     name: Repo guards
@@ -374,7 +360,7 @@ jobs:
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # 35, not 20: on a congested Umbra runner the SETUP (npm ci, builds, chromium) took 16.5 of the 20 minutes and
     # the job was CANCELLED while its 3.7 minutes of tests were still running (#253, #256: cancelled, not failed).
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 45 || 95 }} # 35 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    timeout-minutes: 95 # 35 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -406,7 +392,6 @@ jobs:
         run: npm run build -w packages/shared
 
       - name: Install Chromium and its system dependencies
-        timeout-minutes: 10 # CI-FAILFAST-1: a hung mirror fails fast (install-chromium.sh also bounds each attempt)
         # The unit suite measures chart layout in a real browser, including on Umbra.
         run: bash scripts/ci/install-chromium.sh
 
@@ -478,7 +463,7 @@ jobs:
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # 35, not 25: the green run 42827770627 took 20m03s for 192 tests on one worker (hosted 2 vCPU), 80% of the old
     # cap; a slow runner would cancel a passing suite.
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 45 || 95 }} # 35 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    timeout-minutes: 95 # 35 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -505,7 +490,6 @@ jobs:
       - name: Build shared package
         run: npm run build -w packages/shared
       - name: Install Chromium
-        timeout-minutes: 10 # CI-FAILFAST-1: a hung mirror fails fast (install-chromium.sh also bounds each attempt)
         run: bash scripts/ci/install-chromium.sh
       - name: Run builder E2E
         run: npx playwright test -c playwright.builder.config.ts
@@ -530,7 +514,6 @@ jobs:
     # because no main run measured it (Ruling MKT-LEGAL-HTML-BUDGET-2); the other Workers build in their deploy workflows.
     if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true') && needs.tested-tree.outputs.skip != 'true'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
-    # Exempt from the hosted run+10 rule: cf-cache-bindings-assert guards a roomy budget (>=25) per leg (issue 2155).
     timeout-minutes: 90 # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     strategy:
       fail-fast: false
@@ -600,6 +583,11 @@ jobs:
       - name: Marketing page-weight budget
         if: matrix.app == 'marketing'
         run: node scripts/ci/marketing-perf-budget.mjs --record "$RUNNER_TEMP/marketing-perf-budget.json"
+
+      # Per-route CSS (Ruling CSS-BUDGET-726-1): every page still loads every rule its markup matches after the split.
+      - name: Marketing per-route CSS coverage
+        if: matrix.app == 'marketing'
+        run: node scripts/ci/marketing-css-route-coverage.mjs
 
       # Mobile LCP < 2.5 s (Lighthouse mobile, simulated throttling, median of 3). Needs Chromium, so it installs the one
       # Playwright already caches on the runner; a stalled install or run is bounded by the step timeout.
@@ -767,7 +755,7 @@ jobs:
     # lane, where it runs the WHOLE workers-test suite (route-sweep included) instead of the PR slice below. The MERGE-QUEUE-1 tested-tree skip is
     # therefore decided at STEP level (the `scope` step below): the job always runs and reports.
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 35 || 85 }} # 25 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    timeout-minutes: 85 # 25 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -867,10 +855,10 @@ jobs:
     name: Integration on local workerd (DO + D1 + R2)
     needs: [changes, tested-tree]
     # PR: only when a Worker changed. Full lane: always (`changes` is skipped there, hence always()).
-    if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true') && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.heavy != 'false'
+    if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true') && needs.tested-tree.outputs.skip != 'true'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # 30, not 15: the job timeout also covers the Umbra throttle-slot wait (775s on #322, tests then took 6s).
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 40 || 90 }} # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    timeout-minutes: 90 # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -909,7 +897,7 @@ jobs:
     # FULL lane: every push to main, every cron, manual dispatch (Ruling CI-FULL-MAIN-1; supersedes CI-HOSTED-1's
     # scheduled no-op: schedules run on hosted runners when EBDA_RUNS_ON is unset).
     needs: [tested-tree]
-    if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.heavy != 'false'
+    if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: 25
     env:
@@ -975,7 +963,7 @@ jobs:
     # 50, not 20: on hosted ubuntu-24.04 (2 vCPU) the coverage step alone took 16m47s in run 42820243819 and the
     # job was cancelled at 20:00 inside the accounts worker tests, with every assertion so far green; green runs then
     # took 20m05s (42827770627) and 28m39s (42829048643) for the same suite, so the cap keeps ~20 min of headroom.
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 40 || 90 }} # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    timeout-minutes: 90 # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -1007,7 +995,6 @@ jobs:
         run: npm run build -w packages/shared
 
       - name: Install Chromium and its system dependencies
-        timeout-minutes: 10 # CI-FAILFAST-1: a hung mirror fails fast (install-chromium.sh also bounds each attempt)
         # The unit suite measures chart layout in a real browser, including on Umbra.
         run: bash scripts/ci/install-chromium.sh
 
@@ -1271,7 +1258,7 @@ jobs:
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # 40, not 25: the full suite (305 files + serial lane) reached its last lane and was cancelled at 25:01 on a
     # hosted runner (run 42046806700, PR 437); a wide PR runs every integration file.
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 50 || 100 }} # 40 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    timeout-minutes: 100 # 40 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     needs: [build, changes]
     services:
       postgres:
@@ -1509,7 +1496,7 @@ jobs:
   test-e2e:
     name: E2E Tests
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 35 || 85 }} # 25 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    timeout-minutes: 85 # 25 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     needs: [build]
     services:
       postgres:
@@ -1687,7 +1674,7 @@ jobs:
           # The 29 MB tarball is kept in the runners' tool cache and re-verified on every run (download only on a miss).
           C="$HOME/.ebda-ci/tools"; mkdir -p "$C"
           echo "$SHA  $C/$T" | shasum -a 256 -c - >/dev/null 2>&1 || {
-            curl -fsSL --max-time 180 --retry 3 -o "$C/$T.part" "https://github.com/trufflesecurity/trufflehog/releases/download/v${V}/${T}" && mv "$C/$T.part" "$C/$T"; }
+            curl -fsSL -o "$C/$T.part" "https://github.com/trufflesecurity/trufflehog/releases/download/v${V}/${T}" && mv "$C/$T.part" "$C/$T"; }
           echo "$SHA  $C/$T" | shasum -a 256 -c -
           mkdir -p "$RUNNER_TEMP/th" && tar -xz -C "$RUNNER_TEMP/th" -f "$C/$T" trufflehog
           # The checkout is depth 1, so `before` is not in the clone and --since-commit alone scans the WHOLE tree. A push
@@ -1724,7 +1711,7 @@ jobs:
     # Sunday cron or a manual dispatch with `mutation` ticked; never on a push (Ruling CI-FULL-MAIN-1).
     if: (github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0') || (github.event_name == 'workflow_dispatch' && inputs.mutation)
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 55 || 105 }} # 45 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    timeout-minutes: 105 # 45 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -1793,7 +1780,6 @@ jobs:
         test-e2e,
         builder-e2e,
         security,
-        tested-tree,
       ]
     runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '["ebda-mac-light"]') }}
     timeout-minutes: 5

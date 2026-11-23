@@ -1,5 +1,6 @@
 import { serviceInfo } from '@ebda/shared/brand';
 import type { Locale } from '../lib/site';
+import '@/app/about.css';
 
 /** One small motif per card, cycling through the studio's quiet medallions (8-fold star, octagon ring, quatrefoil: never a hexagram). */
 const MOTIFS = ['m8', 'mr', 'mq'] as const;

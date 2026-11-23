@@ -10,6 +10,8 @@ import { Header } from './Header';
 import { JsonLd } from './JsonLd';
 import { OfficeBlock } from './OfficeBlock';
 import { SiteLink } from './SiteLink';
+import '@/app/about.css';
+import '@/app/contact.css';
 
 export function ContactPage({ locale }: { locale: Locale }) {
   const c = COPY[locale];

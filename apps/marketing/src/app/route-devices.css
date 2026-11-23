@@ -1,0 +1,77 @@
+/* phone/device art shared by the 404 and /store: loaded by Devices. Split out of globals.css and motifs.css (Ruling CSS-BUDGET-726-1): a route loads only its own CSS. Blocks keep their original relative order. */
+/* ---------- devices: bezel, glass and reflections drawn in CSS ---------- */
+.dev-phone {
+  --metal: linear-gradient(150deg, #6b6f73 0%, #2a2d2f 16%, #131516 48%, #2b2e30 84%, #74787b 100%);
+  position: relative;
+  width: var(--w);
+  background: var(--metal);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2),
+    inset 0 0 0 calc(var(--w) * 0.011) #060607,
+    0 36px 50px -32px rgba(18, 19, 20, 0.55),
+    0 24px 40px -28px rgba(18, 19, 20, 0.4);
+}
+.dev-phone {
+  aspect-ratio: 9 / 19.3;
+  border-radius: calc(var(--w) * 0.165);
+  padding: calc(var(--w) * 0.034);
+}
+.dev-phone::before,
+.dev-phone::after {
+  content: '';
+  position: absolute;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #45494c, #1c1e20);
+}
+.dev-phone::before {
+  inset-inline-end: -2px;
+  top: 24%;
+  height: 11%;
+}
+.dev-phone::after {
+  inset-inline-start: -2px;
+  top: 18%;
+  height: 6%;
+}
+.dev-screen {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  container-type: inline-size;
+}
+.dev-phone .dev-screen {
+  border-radius: calc(var(--w) * 0.135);
+}
+/* the glass: a diagonal sheen and a soft corner bloom over the live content */
+.dev-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      118deg,
+      rgba(255, 255, 255, 0.15) 0%,
+      rgba(255, 255, 255, 0.05) 24%,
+      rgba(255, 255, 255, 0) 25%
+    ),
+    radial-gradient(120% 60% at 100% 0%, rgba(255, 255, 255, 0.07), transparent 60%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.dev-island {
+  position: absolute;
+  top: calc(var(--w) * 0.028);
+  left: 50%;
+  translate: -50% 0;
+  z-index: 7;
+  width: 31%;
+  height: calc(var(--w) * 0.085);
+  border-radius: 999px;
+  background: #000;
+}
+.dev-screen {
+  background: #0d0e0f;
+}

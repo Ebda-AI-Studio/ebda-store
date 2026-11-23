@@ -4,8 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 // Ruling A11Y-WINS-1: the AA contrast values of the dimmed story steps survive the scroll-glide change, and every
 // pinning / scrubbing / dimming rule sits behind the scripting + no-preference media gate (reduced motion = static story).
+// the story is /store-only, so its rules live in route-store.css (Ruling CSS-BUDGET-726-1)
 const css = readFileSync(
-  path.resolve(__dirname, '../../apps/marketing/src/app/globals.css'),
+  path.resolve(__dirname, '../../apps/marketing/src/app/route-store.css'),
   'utf8'
 );
 const GATE = '@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {';

@@ -1,6 +1,7 @@
 import { officeInfo } from '@ebda/shared/brand';
 import type { Locale } from '../lib/site';
 import { SiteLink } from './SiteLink';
+import '@/app/about.css';
 
 const COPY = {
   ar: { address: 'العنوان', map: 'افتح الموقع على الخريطة' },
