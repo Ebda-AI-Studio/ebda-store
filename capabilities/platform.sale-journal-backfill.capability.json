@@ -1,0 +1,43 @@
+{
+  "id": "platform.sale-journal-backfill",
+  "status": "live",
+  "area": "platform",
+  "version": 1,
+  "versionDate": "2026-11-23",
+  "titleAr": "ترحيل قيود المبيعات الناقصة",
+  "titleEn": "Backfill missing sale journal entries (accounting repair, paid COD and refunded card orders)",
+  "screens": ["(none)"],
+  "api": ["POST /admin/accounting/sale-journal-backfill"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["super_admin"],
+  "policy": "forbidden",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "operatorReason": {
+    "code": "money-dispute",
+    "text": "repairs ledger rows for paid orders the books missed; money data, a dry run first",
+    "validUnderRule": false
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": [
+      "ازاي ارحّل قيود المبيعات الناقصة للاوردرات المدفوعة؟",
+      "في اوردرات مدفوعة مش ظاهرة في دفتر اليومية",
+      "فين زرار ترحيل قيود المبيعات؟"
+    ],
+    "en": [
+      "How do I backfill missing sale journal entries for paid orders?",
+      "Paid orders are missing from the journal",
+      "Where do I run the sale journal repair?"
+    ]
+  },
+  "steps": ["Super-admin console only; dry run first, then the real run, resumable by cursor."],
+  "edgeCases": [
+    "Assistant must refuse and offer a handoff request with context",
+    "Idempotent: a re-run posts nothing twice"
+  ],
+  "gaps": []
+}

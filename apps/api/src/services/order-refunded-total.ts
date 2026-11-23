@@ -7,7 +7,7 @@
  * one refundable balance (packages/repo/src/do/refundable.ts): an event flagged `external`, or whose refundKey is a
  * provider refund id on a payment's `metadata.refundEventIds`, is already inside `payments.refundedAmount`.
  */
-export interface RefundEventLike {
+interface RefundEventLike {
   metadata?: unknown;
 }
 
