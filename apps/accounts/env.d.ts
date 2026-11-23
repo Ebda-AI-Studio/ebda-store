@@ -13,24 +13,24 @@ export interface MailerRpc {
   /** Send a one-time code mail (verification or password reset) through the Store mail pipeline. */
   sendCode(input: {
     to: string;
-    kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol';
+    kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol' | 'chat_invite';
     code: string;
     language: 'en' | 'ar';
     firstName: string;
     ttlMinutes: number;
     storeName?: string;
   }): Promise<void>;
-  /** A security notice with no code (a sign-in method was added; the recovery codes were regenerated). */
+  /** A security notice with no code (a sign-in method was added; the recovery codes were regenerated; a member was added to a Chat workspace). */
   sendNotice(
-    input:
-      | {
-          to: string;
-          kind: 'factor_added';
-          factor: 'totp' | 'passkey';
-          language: 'en' | 'ar';
-          firstName: string;
-        }
-      | { to: string; kind: 'recovery_codes_changed'; language: 'en' | 'ar'; firstName: string }
+    input: {
+      to: string;
+      language: 'en' | 'ar';
+      firstName: string;
+    } & (
+      | { kind: 'factor_added'; factor: 'totp' | 'passkey' }
+      | { kind: 'chat_member_added'; workspaceName: string }
+      | { kind: 'recovery_codes_changed' }
+    )
   ): Promise<void>;
 }
 
@@ -56,6 +56,8 @@ declare global {
       PRODUCTS: string;
       /** Set per deploy (`--var BUILD_COMMIT_SHA:$GITHUB_SHA`); empty locally. */
       BUILD_COMMIT_SHA?: string;
+      /** "true" shows the Ebda Chat sign-up link on the Chat sign-in page. Mirrors Chat's STANDALONE_WORKSPACES flag (open|invite -> true, off -> false); default hidden. */
+      CHAT_SIGNUP_LINK?: string;
       CF_VERSION_METADATA?: { id?: string; tag?: string };
       /** `origin=product` pairs: the only audience a browser origin may request. */
       ORIGIN_PRODUCTS: string;
