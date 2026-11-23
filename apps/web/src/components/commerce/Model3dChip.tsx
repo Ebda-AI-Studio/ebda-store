@@ -62,7 +62,7 @@ export function Model3dChip({
           e.stopPropagation();
           setOpen(true);
         }}
-        className={`flex w-fit min-h-6 cursor-pointer items-center gap-1 rounded-[var(--radius)] border border-foreground/15 px-1.5 py-0.5 text-xs font-semibold leading-normal text-foreground ${className}`.trim()}
+        className={`relative flex w-fit min-h-6 cursor-pointer items-center gap-1 rounded-[var(--radius)] border border-foreground/15 px-1.5 py-0.5 text-xs font-semibold leading-normal text-foreground transition-colors motion-reduce:transition-none before:absolute before:-inset-x-1.5 before:-inset-y-2.5 before:content-[''] hover:border-foreground/40 hover:bg-foreground/5 active:bg-foreground/10 ${className}`.trim()}
       >
         <svg
           aria-hidden="true"

@@ -61,7 +61,7 @@ export default function Model3dQuickView({
       footer={
         <Link
           href={`${storeUrl}/products/${slug}`}
-          className="inline-flex h-11 w-full items-center justify-center rounded-full bg-foreground px-5 text-sm font-semibold text-background"
+          className="inline-flex h-11 w-full items-center justify-center rounded-full bg-foreground px-5 text-sm font-semibold text-background outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 motion-reduce:transition-none"
         >
           {t('View product details', 'شوف تفاصيل المنتج')}
         </Link>
@@ -69,14 +69,17 @@ export default function Model3dQuickView({
     >
       <div className="relative aspect-square w-full overflow-hidden rounded-[var(--radius)] bg-muted/30">
         {state.kind === 'loading' ? (
-          <p role="status" className="absolute inset-0 grid place-items-center text-sm">
+          <p
+            role="status"
+            className="absolute inset-0 grid place-items-center bg-foreground/5 text-sm text-muted-foreground motion-safe:animate-pulse"
+          >
             {t('Loading 3D…', 'بنحمّل الـ 3D…')}
           </p>
         ) : null}
         {state.kind === 'none' ? (
           <p
             role="status"
-            className="absolute inset-0 grid place-items-center px-6 text-center text-sm"
+            className="absolute inset-0 grid place-items-center px-6 text-center text-sm text-muted-foreground"
           >
             {t('3D view unavailable right now.', 'عرض الـ 3D مش متاح دلوقتي.')}
           </p>
