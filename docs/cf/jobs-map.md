@@ -57,6 +57,8 @@ Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of tr
 | `accounting-post-stock-adjustment-journal` | 3-books-stock   | queue    | event   |             |
 | `accounting-profit-anomaly-cron`           | 3-books-stock   | workflow | cron    | yes         |
 | `analytics-daily-rollup`                   | 3-books-stock   | workflow | cron    | yes         |
+| `analytics-funnel-backfill`                | 3-books-stock   | workflow | event   |             |
+| `analytics-refund-correction`              | 3-books-stock   | workflow | event   |             |
 | `analytics-rollup-on-demand`               | 3-books-stock   | workflow | event   |             |
 | `gold-rate-feed-fetch`                     | 3-books-stock   | workflow | cron    |             |
 | `stock-deadstock-scan-cron`                | 3-books-stock   | workflow | cron    | yes         |

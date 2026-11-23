@@ -127,6 +127,8 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'ai-autofill-product',
   'ci-outcomes',
   'analytics-rollup-on-demand',
+  'analytics-refund-correction',
+  'analytics-funnel-backfill',
   'answer-engine-scan-on-demand',
   // sweeps with a per-store alarm (`alarm: true` + ALARM_READY): the store's own alarm runs them for a DO store
   'accounting-profit-anomaly-cron',
