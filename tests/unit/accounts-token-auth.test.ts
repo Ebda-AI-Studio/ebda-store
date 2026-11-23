@@ -55,6 +55,7 @@ let jwksFetches = 0;
 let publishedKeys: JWK[] = [pub];
 let revoked = new Set<string>();
 let revocationDown = false;
+let revocationError: string | undefined;
 
 beforeEach(() => {
   rows.clear();
@@ -70,11 +71,13 @@ beforeEach(() => {
   publishedKeys = [pub];
   revoked = new Set();
   revocationDown = false;
+  revocationError = undefined;
   configureAccountsVerifier(async () => {
     jwksFetches += 1;
     return { keys: publishedKeys };
   });
   configureRevocationCheck(async sid => {
+    if (revocationError) throw new Error(revocationError);
     if (revocationDown) throw new Error('identity down');
     return revoked.has(sid);
   });
@@ -257,6 +260,15 @@ describe('authenticate: identity-service tokens', () => {
     const { err, req } = await run(authenticate, await mint());
     expect(err).toMatchObject({ statusCode: 503, code: 'IDENTITY_UNAVAILABLE' });
     expect(req.user).toBeUndefined();
+  });
+
+  it('QA-105: a thrown identity error is ALWAYS a 503, even when its message says the session expired (never text-matched into a 401)', async () => {
+    for (const m of ['session expired', 'token invalid', 'D1_ERROR: session not found', 'boom']) {
+      revocationError = m;
+      const { err, req } = await run(authenticate, await mint());
+      expect(err).toMatchObject({ statusCode: 503, code: 'IDENTITY_UNAVAILABLE' });
+      expect(req.user).toBeUndefined();
+    }
   });
 
   it('refuses a JWKS that carries a private member', async () => {

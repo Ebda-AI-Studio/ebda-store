@@ -67,6 +67,8 @@ export function ManualRefundModal({
   return (
     <Modal isOpen={open} onClose={onClose} title={t('manualRefundTitle')} size="sm">
       <p className="text-sm text-muted-foreground">{t(manualRefundDescriptionKey(orderStatus))}</p>
+      {/* a partial / per-line refund (with restock, and for guest orders too) lives in the order page's menu, not here */}
+      <p className="mt-2 text-sm text-muted-foreground">{t('manualRefundPartialHint')}</p>
 
       <div className="mt-4 space-y-3">
         <div>
