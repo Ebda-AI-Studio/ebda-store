@@ -14,14 +14,18 @@ import { z } from 'zod/v3';
 import { args as bridgeArgs } from './schemas';
 
 /** Pinned against ebda-whatsapp's COUPON_LIMITS (src/core/store-bridge.ts) by a test in each repo: change both together. */
+// pq-allow(unused-export): contract pin, imported by tests/unit/wa-bridge/wa-bridge-owner-tools.test.ts
 export const MAX_PERCENT = 90;
+// pq-allow(unused-export): contract pin, imported by tests/unit/wa-bridge/wa-bridge-owner-tools.test.ts
 export const MAX_FIXED_MINOR = 5_000_000; // 50,000 EGP
+// pq-allow(unused-export): contract pin, imported by tests/unit/wa-bridge/wa-bridge-owner-tools.test.ts
 export const MAX_WINDOW_DAYS = 90;
+// pq-allow(unused-export): contract pin, imported by tests/unit/wa-bridge/wa-bridge-owner-tools.test.ts
 export const MAX_USAGE_LIMIT = 100_000;
 const REPLAY_WINDOW_MS = 15 * 60_000;
 
-export type OwnerFailure = 'not_found' | 'not_linked' | 'invalid' | 'unavailable';
-export type OwnerResult<T> =
+type OwnerFailure = 'not_found' | 'not_linked' | 'invalid' | 'unavailable';
+type OwnerResult<T> =
   | { ok: true; value: T }
   | { ok: false; reason: OwnerFailure; code?: string; message?: string };
 const fail = (reason: OwnerFailure, code?: string, message?: string): OwnerResult<never> => ({
@@ -31,11 +35,12 @@ const fail = (reason: OwnerFailure, code?: string, message?: string): OwnerResul
   ...(message ? { message } : {}),
 });
 
-export const topProductsArgs = z.object({
+const topProductsArgs = z.object({
   period: z.enum(['today', '7d', '30d']),
   limit: z.number().int().min(1).max(10),
 });
-export type TopProductsArgs = z.infer<typeof topProductsArgs>;
+type TopProductsArgs = z.infer<typeof topProductsArgs>;
+// pq-allow(unused-export): named by the emitted declarations of ownerTools (index.ts) and the worker RPC getTopProducts (TS4023/TS4053 without it)
 export interface TopProductsValue {
   currency: string;
   period: 'today' | '7d' | '30d';
@@ -50,7 +55,7 @@ const code = z
   .min(3)
   .max(24)
   .regex(/^[A-Za-z0-9_-]+$/);
-export const createCouponArgs = z
+const createCouponArgs = z
   .object({
     code,
     type: z.enum(['percentage', 'fixed']),
@@ -66,7 +71,8 @@ export const createCouponArgs = z
   .refine(v => (v.endsAt !== undefined) !== (v.durationDays !== undefined), {
     message: 'exactly one of endsAt / durationDays',
   });
-export type CreateCouponArgs = z.infer<typeof createCouponArgs>;
+type CreateCouponArgs = z.infer<typeof createCouponArgs>;
+// pq-allow(unused-export): named by the emitted declarations of ownerTools (index.ts) and the worker RPC createCoupon (TS4023/TS4053 without it)
 export interface CreatedCoupon {
   couponId: string;
   code: string;
@@ -89,6 +95,7 @@ interface CouponRowLite {
   createdAt: Date;
 }
 
+// pq-allow(unused-export): test seam, imported by tests/unit/wa-bridge/wa-bridge-owner-tools.test.ts
 export interface OwnerToolsPorts {
   /** The live role of the user on the store; null = not (or no longer) a member. Throws when it cannot be read. */
   memberRole(storeId: string, userId: string): Promise<'owner' | 'staff' | null>;
@@ -127,6 +134,7 @@ export interface OwnerToolsPorts {
 }
 
 /** Start of the current Cairo calendar day, as epoch ms. */
+// pq-allow(unused-export): test seam, imported by tests/unit/wa-bridge/wa-bridge-owner-tools.test.ts
 export function cairoStartOfDay(ms: number): number {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Africa/Cairo',
@@ -153,7 +161,7 @@ export function cairoStartOfDay(ms: number): number {
 
 /** A tiny per-isolate token bucket per store+method (BOUNDED-stale: sheds a runaway caller, guards no money). */
 const buckets = new Map<string, { tokens: number; at: number }>();
-export function takeToken(key: string, now: number, perMin = 30): boolean {
+function takeToken(key: string, now: number, perMin = 30): boolean {
   const b = buckets.get(key) ?? { tokens: perMin, at: now };
   b.tokens = Math.min(perMin, b.tokens + ((now - b.at) / 60_000) * perMin);
   b.at = now;
@@ -163,6 +171,7 @@ export function takeToken(key: string, now: number, perMin = 30): boolean {
   if (buckets.size > 5000) buckets.clear();
   return ok;
 }
+// pq-allow(unused-export): test seam, imported by tests/unit/wa-bridge/wa-bridge-owner-tools.test.ts
 export const resetOwnerToolBuckets = () => buckets.clear();
 
 export function createOwnerTools(ports: OwnerToolsPorts) {
