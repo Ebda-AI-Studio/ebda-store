@@ -302,6 +302,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/done/2026-10-21-phase-b2-souq.md](plans/done/2026-10-21-phase-b2-souq.md) - Phase B2 — Souq (general retail & electronics) Implementation Plan
 - [plans/done/2026-10-21-phase-b3-jasmine.md](plans/done/2026-10-21-phase-b3-jasmine.md) - Phase B3 — Jasmine (beauty & skincare) Implementation Plan
 - [plans/done/2026-10-21-phase-b4-lamma.md](plans/done/2026-10-21-phase-b4-lamma.md) - Phase B4 — Lamma (home food & home kitchens) Implementation Plan
+- [plans/2026-11-24-nz-d15b-closed-store-purge.md](plans/2026-11-24-nz-d15b-closed-store-purge.md) - NZ-D15B: closed-store purge (export, verify, wipe; dry run by default) (2026-11-24)
 - [plans/2026-11-20-admin-partial-refund-and-returns.md](plans/2026-11-20-admin-partial-refund-and-returns.md) - STORE-QA-76: merchant partial refund by line (per-line restock) and merchant-opened returns from the admin (2026-11-20)
 - [plans/2026-11-15-gsc-custom-domain-verification.md](plans/2026-11-15-gsc-custom-domain-verification.md) - GSC data for custom merchant domains: automatic META verification via the Site Verification API, then sites.add (2026-11-15)
 - [plans/2026-11-05-nz-17-postgres-removal.md](plans/2026-11-05-nz-17-postgres-removal.md) - N-17: inventory of Postgres residue, what replaces the Postgres integration suite, CI footprint (2026-11-05)
