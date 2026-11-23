@@ -156,7 +156,13 @@ export default function BankReconciliationPage() {
     {
       header: t('status'),
       mobileBadge: true,
-      cell: stmt => <OrderStatusBadge family="bankStatement" status={stmt.status} />,
+      cell: stmt => (
+        <OrderStatusBadge
+          family="bankStatement"
+          status={stmt.status}
+          label={t(`statusLabels.${stmt.status}`)}
+        />
+      ),
     },
     {
       header: '',
