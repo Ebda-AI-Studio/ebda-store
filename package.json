@@ -4,7 +4,7 @@
   "private": true,
   "description": "Ebda Store by Ebda AI Studio — self-serve e-commerce platform for Egypt",
   "author": "Ebda AI Studio <ahlan@ebda.app>",
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "homepage": "https://github.com/Ebda-AI-Studio/ebda-store",
   "repository": {
     "type": "git",
