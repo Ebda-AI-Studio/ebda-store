@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // A feature toggle must not open a Postgres interactive transaction: on the Worker Postgres is removed (POSTGRES_REMOVED), so
 // `withMoneyTx(prisma, ...)` answered 500 on PUT /stores/:id/ci/hints and every other feature switch.
 const m = vi.hoisted(() => ({
+  bust: vi.fn(),
   redisDelete: vi.fn(),
   upsert: vi.fn(async () => ({})),
   findMany: vi.fn(async () => [{ featureKey: 'customer_intelligence', enabled: true }]),
@@ -11,7 +12,7 @@ const m = vi.hoisted(() => ({
     throw new Error('POSTGRES_REMOVED: Postgres was removed from the Worker');
   }),
 }));
-vi.mock('../store.service', () => ({ bustStoreCaches: vi.fn() }));
+vi.mock('../store.service', () => ({ bustStoreCaches: m.bust }));
 vi.mock('../redis.service', () => ({
   redis: {
     get: vi.fn(async () => null),
@@ -68,5 +69,6 @@ describe('FeatureService.updateStoreFeatures: a failed multi-key write', () => {
       )
     ).rejects.toThrow('d1 down');
     expect(m.redisDelete).toHaveBeenCalledWith(expect.stringContaining('st1'));
+    expect(m.bust).toHaveBeenCalledWith('st1', 's', null);
   });
 });

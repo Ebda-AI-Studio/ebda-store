@@ -396,6 +396,8 @@ class FeatureService {
       });
     } catch (err) {
       await this.invalidateCache(storeId);
+      // the public storefront payload embeds `enabledFeatures`: drop it too, or it shows the old flags until its TTL
+      await this.bustPublicStoreCache(storeId);
       throw err;
     }
 
