@@ -106,7 +106,7 @@ import {
   analyticsNetRevenueOp,
   analyticsOrdersByOp,
   analyticsPeriodOp,
-  analyticsRepeatBuyersOp,
+  analyticsBuyerIdentitiesOp,
   taxReportLinesOp,
   analyticsSalesOp,
   analyticsStockOp,
@@ -308,7 +308,7 @@ export type MoneyOpName =
   | 'analyticsItems'
   | 'analyticsOrdersBy'
   | 'analyticsCustomers'
-  | 'analyticsRepeatBuyers'
+  | 'analyticsBuyerIdentities'
   | 'analyticsLowStock'
   | 'analyticsStock'
   | 'analyticsCashflow'
@@ -452,7 +452,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'analyticsItems',
   'analyticsOrdersBy',
   'analyticsCustomers',
-  'analyticsRepeatBuyers',
+  'analyticsBuyerIdentities',
   'analyticsLowStock',
   'analyticsStock',
   'analyticsCashflow',
@@ -980,7 +980,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   analyticsItems: (db, storeId, a) => analyticsItemsOp(db, storeId, a),
   analyticsOrdersBy: (db, storeId, a) => analyticsOrdersByOp(db, storeId, a),
   analyticsCustomers: (db, storeId, a) => analyticsCustomersOp(db, storeId, a),
-  analyticsRepeatBuyers: (db, storeId, a) => analyticsRepeatBuyersOp(db, storeId, a),
+  analyticsBuyerIdentities: (db, storeId, a) => analyticsBuyerIdentitiesOp(db, storeId, a),
   analyticsLowStock: (db, storeId, a) => analyticsLowStockOp(db, storeId, a),
   analyticsStock: (db, storeId) => analyticsStockOp(db, storeId),
   analyticsCashflow: (db, storeId, a) => analyticsCashflowOp(db, storeId, a),

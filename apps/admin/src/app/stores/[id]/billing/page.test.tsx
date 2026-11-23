@@ -436,6 +436,30 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     expect(screen.getByText(/^trial\.nextChargeLine:.*"interval":"intervalMonthly"/)).toBeTruthy();
   });
 
+  it('BILLING-INTERVAL-PENDING-1: renewal quote keeps the current interval; the pending switch is its own line', async () => {
+    mockApi(
+      billing({
+        subscription: trialing,
+        availablePlans: plans,
+        billing: {
+          ...billingFixture(),
+          billingMethod: null,
+          cardBilling: false,
+          billingInterval: 'yearly',
+          pendingBillingInterval: 'monthly',
+          nextCharge: { at: '2027-11-12T00:00:00.000Z', planCode: 'growth', amountMinor: 3141000 },
+        },
+      })
+    );
+    render(<StoreBillingPage />);
+    expect(
+      await screen.findByText(/^trial\.instapayDueLine:.*"interval":"intervalYearly"/)
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/^trial\.switchingInterval:.*"interval":"intervalMonthly"/)
+    ).toBeTruthy();
+  });
+
   it('card on file: shows •••• 4242 and Replace card starts a billing-origin card setup', async () => {
     mockApi(
       billing({
