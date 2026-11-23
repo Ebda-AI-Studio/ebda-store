@@ -553,6 +553,7 @@ describe('A9 AI top-up raises the STORE cap only; platform caps still apply', ()
     delete process.env.AI_DAILY_REQUEST_CAP;
   });
   it('P6: with the platform at 450 a +1000 store stops at its 225 share; the next store still gets its first call', async () => {
+    process.env.AI_DAILY_REQUEST_CAP = '450'; // these P6 cases model the old 450/day platform (the default is 1800 since PLANS-1)
     const { assertAiQuota } = await import('@api/lib/ai-quota');
     h.events = [
       ev({ planCode: 'addon:ai:topup_1000', forPeriodEnd: new Date(Date.now() + 10 * DAY) }),
@@ -566,8 +567,10 @@ describe('A9 AI top-up raises the STORE cap only; platform caps still apply', ()
     h.events = [];
     h.aiStoreToday.mockResolvedValue(0);
     await expect(assertAiQuota({ storeId: 's2' })).resolves.toBeUndefined();
+    delete process.env.AI_DAILY_REQUEST_CAP;
   });
   it('P6: pack-funded calls pause at 70% of the pool, base-slice calls of other stores keep working', async () => {
+    process.env.AI_DAILY_REQUEST_CAP = '450'; // these P6 cases model the old 450/day platform (the default is 1800 since PLANS-1)
     const { assertAiQuota } = await import('@api/lib/ai-quota');
     h.countAiUsage.mockResolvedValue(320); // 70% of 450 is 315
     h.events = [
@@ -582,8 +585,10 @@ describe('A9 AI top-up raises the STORE cap only; platform caps still apply', ()
     h.events = [];
     h.aiStoreToday.mockResolvedValue(10); // another store, no pack
     await expect(assertAiQuota({ storeId: 's3' })).resolves.toBeUndefined();
+    delete process.env.AI_DAILY_REQUEST_CAP;
   });
   it('P6: a top-up the platform cannot back is not sold (nothing charged); with enough capacity it is', async () => {
+    process.env.AI_DAILY_REQUEST_CAP = '450'; // these P6 cases model the old 450/day platform (the default is 1800 since PLANS-1)
     const { previewAddon } = await import('@api/services/billing/addons.service');
     const ctx = { storeId: 's1', userId: 'u1' };
     await expect(previewAddon({ ...ctx, sku: 'ai:topup_300' })).rejects.toMatchObject({
