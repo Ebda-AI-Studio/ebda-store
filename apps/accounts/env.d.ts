@@ -52,6 +52,8 @@ declare global {
       PRODUCTS: string;
       /** Set per deploy (`--var BUILD_COMMIT_SHA:$GITHUB_SHA`); empty locally. */
       BUILD_COMMIT_SHA?: string;
+      /** "true" shows the Ebda Chat sign-up link on the Chat sign-in page. Mirrors Chat's STANDALONE_WORKSPACES flag (open|invite -> true, off -> false); default hidden. */
+      CHAT_SIGNUP_LINK?: string;
       CF_VERSION_METADATA?: { id?: string; tag?: string };
       /** `origin=product` pairs: the only audience a browser origin may request. */
       ORIGIN_PRODUCTS: string;

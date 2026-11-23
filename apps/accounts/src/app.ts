@@ -39,6 +39,8 @@ import {
   rotateClient,
 } from './clients';
 import { jwks } from './keys';
+import { isDisposableEmail } from '../../../packages/shared/src/abuse/disposable-email-domains';
+import { renderSignupPage, signupReturn, SIGNUP_JS, SIGNUP_PAGE_HEADERS } from './signup-page';
 import { DUMMY_HASH, hashPassword, passwordPolicy, verifyPassword } from './password';
 import {
   CODE_GUESS,
@@ -815,10 +817,34 @@ export function createApp() {
     // `return` is Ebda Chat's parameter; `return_to` is accepted as an alias. Validated here, by the Store's allowlist.
     const returnTo = signInReturn(c.req.query('return') ?? c.req.query('return_to'));
     return new Response(
-      c.req.method === 'HEAD' ? null : renderSignInPage({ lang, product, returnTo }),
+      c.req.method === 'HEAD'
+        ? null
+        : renderSignInPage({
+            lang,
+            product,
+            returnTo,
+            showChatSignup: c.env.CHAT_SIGNUP_LINK === 'true',
+          }),
       { status: 200, headers: SIGN_IN_PAGE_HEADERS }
     );
   });
+  // Ebda Chat sign-up (Ruling CHAT-SA-1). Only `product=chat` has a page here; the Store keeps its own sign-up.
+  app.get('/signup', c => {
+    if (signInProduct(c.req.query('product')) !== 'chat')
+      return c.redirect('https://store.ebda.app/signup', 302);
+    const lang = pickStudioLang(c.req.header('accept-language'), c.req.query('lang'));
+    const returnTo = signupReturn(c.req.query('return') ?? c.req.query('return_to'));
+    return new Response(c.req.method === 'HEAD' ? null : renderSignupPage({ lang, returnTo }), {
+      status: 200,
+      headers: SIGNUP_PAGE_HEADERS,
+    });
+  });
+  app.get('/signup.js', c =>
+    c.body(SIGNUP_JS, 200, {
+      'Content-Type': 'text/javascript; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    })
+  );
   app.get('/sign-in.js', c =>
     c.body(SIGN_IN_JS, 200, {
       'Content-Type': 'text/javascript; charset=utf-8',
@@ -1061,6 +1087,8 @@ export function createApp() {
     lastName: z.string().trim().max(100).default(''),
     phone: z.string().trim().max(40).optional(),
     language: z.enum(['en', 'ar']).default('en'),
+    /** Honeypot (Chat sign-up page): a person never fills it. */
+    website: z.string().max(200).optional(),
   });
 
   app.post('/signup', async c => {
@@ -1070,6 +1098,9 @@ export function createApp() {
     if (!(await hit(c.env.DB, body.email, 'n/a', PER_EMAIL('signup-email', 3))).ok)
       throw err(429, 'TOO_MANY_ATTEMPTS');
     const passwordHash = await hashPassword(body.password); // always paid, so every branch costs the same
+    // A bot (honeypot filled) or a throwaway mailbox gets the SAME 202 and nothing is created or mailed: no oracle, same cost.
+    if (body.website || isDisposableEmail(body.email))
+      return c.json({ success: true, data: { status: 'verification_sent' } }, 202);
     // Everything else runs after the response: "new", "pending" and "already verified" answer identically and in the same time.
     queueMail(
       c,
