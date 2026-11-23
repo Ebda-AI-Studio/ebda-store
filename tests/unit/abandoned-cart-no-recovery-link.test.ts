@@ -24,6 +24,8 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@ebda/database', () => ({
   prisma: { abandonedCart: { update: h.update, groupBy: h.groupBy }, $queryRaw: h.queryRaw },
+  // the recovered-revenue SQL splices the shared revenue definition through Prisma.raw (REVENUE-DEF-1)
+  Prisma: { raw: (sql: string) => ({ sql }) },
   withRlsBypass: vi.fn(),
 }));
 vi.mock('@api/services/notification-dispatcher.service', () => ({
@@ -126,13 +128,27 @@ describe('abandoned-cart reminders carry no recovery link (issue 2035)', () => {
       recoveryRate: 12.5,
       recoveredRevenue: 12_500,
     });
-    const sql = (h.queryRaw.mock.calls[0][0] as TemplateStringsArray).join('?');
+    // the SQL text with every Prisma.raw fragment (the shared REVENUE-DEF-1 predicate and net-amount SQL) spliced in
+    const [strings, ...values] = h.queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+    const sql = strings.reduce((acc, part, i) => {
+      const v = values[i];
+      const frag =
+        v && typeof v === 'object' && 'sql' in v
+          ? (v as { sql: string }).sql
+          : i < values.length
+            ? '?'
+            : '';
+      return acc + part + frag;
+    }, '');
     expect(sql).toMatch(/JOIN public\.orders o ON o\.id = ac\.recovered_order_id/);
+    // the revenue-countable definition: cancelled / refunded / awaiting InstaPay orders and failed / refunded payments are out
     expect(sql).toMatch(
       /o\.status NOT IN \('cancelled', 'refunded', 'awaiting_payment_confirmation'\)/
     );
-    expect(sql).toMatch(/o\.payment_status <> 'failed'/);
-    expect(h.queryRaw.mock.calls[0].slice(1)).toEqual(['store-1', 'store-1']);
+    expect(sql).toMatch(/o\.payment_status NOT IN \('failed', 'refunded'\)/);
+    // and the amount is the NET of refunds (the shared refund joins are present)
+    expect(sql).toMatch(/LEFT JOIN \(SELECT order_id, SUM\(refund_amount\)/);
+    expect(values.filter(v => typeof v === 'string')).toEqual(['store-1', 'store-1']);
   });
 
   it('an empty store reads 0 (a real zero), not unknown', async () => {
