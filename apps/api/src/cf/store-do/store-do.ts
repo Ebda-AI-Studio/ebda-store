@@ -23,6 +23,7 @@
  * and lock paths are not here (PR D2).
  */
 import { DurableObject } from 'cloudflare:workers';
+import { wipeClosedStoreStorage } from './closed-store-wipe';
 import { publishIndexHealth } from './index-health';
 import { handleStoreAdmin } from '../../../../../packages/cf-migrate/src/store-admin.mjs';
 import {
@@ -1112,6 +1113,89 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       },
       s.requestId
     );
+  }
+
+  /** True when the Durable Object holds no store at all (wiped): no profile row and no fiscal row; a missing table counts as empty. */
+  private storageIsEmpty(storeId: string): boolean {
+    try {
+      const sqlx = this.ctx.storage.sql;
+      const profile = Number(
+        sqlx.exec('SELECT count(*) AS n FROM store_profile').toArray()[0]?.n ?? 0
+      );
+      const fiscalRows = Number(
+        sqlx
+          .exec('SELECT count(*) AS n FROM fiscal_documents WHERE store_id = ?', storeId)
+          .toArray()[0]?.n ?? 0
+      );
+      return profile === 0 && fiscalRows === 0;
+    } catch {
+      return true;
+    }
+  }
+
+  /**
+   * NZ-D15B (read only): the fiscal records of a CLOSED store, paged by serial, for the verified archive export of the closed-store
+   * purge. Refuses a store that is not closed (an open store is never exported or wiped through here).
+   */
+  closedFiscalPage(
+    storeId: string,
+    afterSerial: number,
+    limit: number
+  ): Result<{ rows: Array<Record<string, unknown>>; count: number; lastIssuedAt: number | null }> {
+    return run(() => {
+      this.bind(storeId);
+      if (!isStoreClosed(this.sync)) throw new StoreError('STORE_NOT_CLOSED' as never, 409);
+      const sqlx = this.ctx.storage.sql;
+      const rows = sqlx
+        .exec(
+          'SELECT * FROM fiscal_documents WHERE store_id = ? AND serial > ? ORDER BY serial LIMIT ?',
+          storeId,
+          Number(afterSerial) || 0,
+          Math.min(Math.max(Number(limit) || 1, 1), 500)
+        )
+        .toArray();
+      const agg = sqlx
+        .exec(
+          'SELECT count(*) AS n, max(issued_at) AS last FROM fiscal_documents WHERE store_id = ?',
+          storeId
+        )
+        .toArray()[0];
+      return {
+        rows,
+        count: Number(agg?.n ?? 0),
+        lastIssuedAt: agg?.last == null ? null : Number(agg.last),
+      };
+    });
+  }
+
+  /**
+   * NZ-D15B: PHYSICAL wipe of a closed store, the only one in the code base (Ruling NZ-D15B, plan N-24). Refuses unless the store is
+   * closed AND its fiscal row count still equals the count of the export the caller verified (a store that changed since is stale:
+   * refuse, the next run exports again). IRREVERSIBLE: callers gate it behind the dry-run period and the live flag.
+   */
+  async purgeClosedStore(
+    storeId: string,
+    expect: { fiscalDocuments: number; resume?: boolean }
+  ): Promise<Result<{ wiped: true; alreadyEmpty?: true }>> {
+    // A crash after the wipe started: the storage is already empty (no store profile, no fiscal row), and only a caller that
+    // wrote `wipeStartedAt` may say `resume`. An open store always has a profile, so it can never pass as "already wiped".
+    if (expect.resume && this.storageIsEmpty(storeId))
+      return { ok: true, data: { wiped: true, alreadyEmpty: true } };
+    const checked = run(() => {
+      this.bind(storeId);
+      if (!isStoreClosed(this.sync)) throw new StoreError('STORE_NOT_CLOSED' as never, 409);
+      const n = Number(
+        this.ctx.storage.sql
+          .exec('SELECT count(*) AS n FROM fiscal_documents WHERE store_id = ?', storeId)
+          .toArray()[0]?.n ?? 0
+      );
+      if (n !== Number(expect.fiscalDocuments))
+        throw new StoreError('PURGE_EXPORT_STALE' as never, 409);
+      return true;
+    });
+    if (!checked.ok) return checked;
+    await wipeClosedStoreStorage(this.ctx.storage);
+    return { ok: true, data: { wiped: true } };
   }
 
   /** PITR bookmark for "now" (SQLite-backed DOs, 30 days). Returned so the drill can record availability. */
