@@ -15,7 +15,7 @@ export const HANDLE = 'ebda@instapay';
 export const A = '11111111-1111-4111-8111-111111111111';
 export const B = '22222222-2222-4222-8222-222222222222';
 
-const MIGRATIONS = ['0001_init', '0002_invariants', '0014_instapay_auto_confirm']
+const MIGRATIONS = ['0001_init', '0002_invariants', '0016_instapay_auto_confirm']
   .map(f =>
     fs.readFileSync(
       new URL(`../../packages/cf-schema/migrations/platform/${f}.sql`, import.meta.url),

@@ -1,6 +1,6 @@
 /**
  * G5: the job map is the single table of "which Cloudflare primitive runs which Inngest function".
- * It must list exactly the functions the registry contains (109 today), no more, no fewer.
+ * It must list exactly the functions the registry contains (111 today), no more, no fewer.
  */
 import ts from 'typescript';
 import { describe, it, expect } from 'vitest';
@@ -58,7 +58,7 @@ const found = scan();
 
 describe('JOBS_MAP', () => {
   it('finds the registry (a scanner that sees nothing would pass anything)', () => {
-    expect(found.length).toBe(109);
+    expect(found.length).toBe(111);
   });
 
   it('lists exactly the registered functions', () => {
