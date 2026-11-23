@@ -625,20 +625,59 @@ export class ReturnService {
       const indeterminate =
         refundMayHaveExecuted(err) ||
         (err instanceof AppError && err.code === 'PROVIDER_REFUND_INDETERMINATE');
-      if (!indeterminate)
-        await ReturnService.updateStatusOnDo(
-          money,
-          storeId,
-          returnId,
-          'rejected',
-          userId,
-          'Partial refund did not complete'
-        ).catch(rejectErr =>
+      // REFUND-988-REV-1 R2: once the refund is RECORDED (row completed, or the completion claim still held because the
+      // provider may have paid) the return must never go back to a rejected/refundable state, or the same lines could be
+      // refunded and restocked a second time. Unknown state is treated as recorded: rejecting is the unsafe direction.
+      let state: { status: string; refundedAt: Date | null } | null = null;
+      let stateKnown = true;
+      if (!indeterminate) {
+        try {
+          state = await (
+            await storeDb(storeId)
+          ).return.findFirst({
+            where: { id: returnId, storeId },
+            select: { status: true, refundedAt: true },
+          });
+        } catch (readErr) {
+          stateKnown = false;
           logger.error(
-            { rejectErr, storeId, returnId },
-            '[ReturnService] failed partial refund left a received return behind'
-          )
+            { readErr, storeId, returnId },
+            '[ReturnService] partial refund state unreadable after failure'
+          );
+        }
+      }
+      const recorded =
+        indeterminate || !stateKnown || state?.status === 'completed' || state?.refundedAt != null;
+      if (recorded) {
+        logger.error(
+          { err, storeId, returnId, status: state?.status, needsAttention: true },
+          '[ReturnService] partial refund NEEDS ATTENTION: failed after the refund was recorded; return kept (not rejected) so its lines cannot be refunded again'
         );
+        if (state?.status === 'completed') {
+          // money + stock are committed in the DO; only the post-commit effects (accounting/notification enqueue) failed
+          const row = await ReturnService.getById(storeId, returnId);
+          return { ...row, needsAttention: true, attentionReason: 'post_refund_effects_failed' };
+        }
+        if (err instanceof AppError && err.code === 'PROVIDER_REFUND_INDETERMINATE') throw err;
+        throw new AppError(
+          502,
+          'PROVIDER_REFUND_INDETERMINATE',
+          'The refund was recorded but this return could not be finished. Do NOT refund it again: check the provider dashboard, then complete this return with "Already refunded - record only".'
+        );
+      }
+      await ReturnService.updateStatusOnDo(
+        money,
+        storeId,
+        returnId,
+        'rejected',
+        userId,
+        'Partial refund did not complete'
+      ).catch(rejectErr =>
+        logger.error(
+          { rejectErr, storeId, returnId },
+          '[ReturnService] failed partial refund left a received return behind'
+        )
+      );
       throw err;
     }
   }

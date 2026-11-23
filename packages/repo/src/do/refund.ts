@@ -761,6 +761,10 @@ export function refundOrder(
     }
 
     const restored: Array<{ orderItemId: string; quantity: number }> = [];
+    // REFUNDED quantities per line (what the customer is given back), independent of restock: a line the merchant
+    // will not put back on the shelf (skipRestock), a backordered or already-restored unit still refunds money, so
+    // the loyalty clawback below must price these, never `restored` (REFUND-988-REV-1 R1)
+    const refunded = new Map<string, number>();
     if (a.lines !== undefined) {
       const items = new Map(loadItems(db, o.id).map(i => [i.id, i]));
       const already = alreadyRestoredByItem(db, a.storeId, o.id);
@@ -771,6 +775,10 @@ export function refundOrder(
           throw new MoneyError('UNKNOWN_LINE', 'a listed line does not belong to this order', 400);
       for (const l of a.lines) {
         const item = items.get(l.orderItemId)!;
+        refunded.set(
+          item.id,
+          Math.min(item.quantity, (refunded.get(item.id) ?? 0) + Math.max(0, l.quantity))
+        );
         if (a.skipRestock?.has(item.id)) continue;
         const qty = Math.min(
           l.quantity,
@@ -827,10 +835,10 @@ export function refundOrder(
             .all('SELECT id, quantity, total FROM order_items WHERE order_id = ?', [o.id])
             .map(r => [r.id as string, r])
         );
-        for (const l of restored) {
-          const it = tot.get(l.orderItemId);
+        for (const [itemId, refundedQty] of refunded) {
+          const it = tot.get(itemId);
           if (it && Number(it.quantity) > 0)
-            value += Math.floor((Number(it.total) * l.quantity) / Number(it.quantity));
+            value += Math.floor((Number(it.total) * refundedQty) / Number(it.quantity));
         }
       } else value = amount ?? walletCredit ?? 0;
       const e = reverseEarnedPointsPartial(db, {
