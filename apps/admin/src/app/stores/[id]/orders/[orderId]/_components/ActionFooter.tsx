@@ -7,6 +7,7 @@ import { statusOptionsForRole } from '../../_components/types';
 import { PaymentLinkButton } from './PaymentLinkButton';
 import { RefreshPaymentButton } from './RefreshPaymentButton';
 import { RefundButton } from './RefundButton';
+import { PartialRefundButton } from './PartialRefundButton';
 import { InstapayRefundButton } from './InstapayRefundButton';
 import { RefreshRefundStatusButton } from './RefreshRefundStatusButton';
 import type { OrderDetail } from './types';
@@ -263,6 +264,21 @@ export function ActionFooter({
                     onRecorded={onPaymentRefreshed}
                   />
                 )}
+                {/* Partial refund (STORE-QA-76): chosen lines + quantities, per-line restock, any method. Delivered + paid orders;
+                    the server re-checks everything (refundable balance, line quantities, permission per method). */}
+                {canRefund &&
+                  order.status === 'delivered' &&
+                  (order.paymentStatus === 'paid' ||
+                    order.paymentStatus === 'partially_refunded') && (
+                    <PartialRefundButton
+                      storeId={storeId}
+                      orderId={order.id}
+                      orderNumber={order.orderNumber}
+                      currency={order.currency}
+                      disabled={isUpdating}
+                      onRefunded={onPaymentRefreshed}
+                    />
+                  )}
                 {showRefundViaProvider && canRefund && (
                   <RefundButton
                     storeId={storeId}

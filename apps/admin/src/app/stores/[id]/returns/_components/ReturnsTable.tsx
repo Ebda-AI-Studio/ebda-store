@@ -9,9 +9,9 @@ import type { ListMeta, ReturnRecord } from './types';
 
 import { formatDate } from '@/lib/format';
 
-import { formatMoney } from '@ebda/shared';
+import { formatPrice } from '@/lib/format';
 function formatCurrency(amount: number) {
-  return formatMoney(amount, 'en', { fixedDecimals: true });
+  return formatPrice(amount);
 }
 
 interface ReturnsTableProps {
