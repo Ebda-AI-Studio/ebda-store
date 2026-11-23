@@ -184,6 +184,8 @@ describe('ci.yml lanes', () => {
           .replace(/needs\.([\w-]+)\.result == 'success'/g, (_, n) => String(run(n)))
           // MERGE-QUEUE-1 part B: `tested-tree` answers skip=false unless a merge group proved the tree, so the evaluator's world (no such evidence) is `true`
           .replace(/needs\.tested-tree\.outputs\.skip != 'true'/g, 'true')
+          // MQ-SCOPE-1: `heavy` is only ever 'false' on a light merge group; every other event (and the evaluator's world) is heavy
+          .replace(/needs\.tested-tree\.outputs\.heavy != 'false'/g, 'true')
           .replace(/needs\.[\w-]+\.outputs\.\w+ (==|!=) '[^']*'/g, (_, op) =>
             String(op === '!=' ? false : false)
           )

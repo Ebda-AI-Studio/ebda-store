@@ -128,6 +128,10 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [contracts/identity-client-token-v1.3.example.json](contracts/identity-client-token-v1.3.example.json) - identity client token v1.3.example
 - [contracts/identity-token-v1.2.example.json](contracts/identity-token-v1.2.example.json) - identity token v1.2.example
 
+## design - Design and UI work
+
+- [design/DESIGNER-ONBOARDING.md](design/DESIGNER-ONBOARDING.md) - Designer onboarding: redesign branch workflow, running the marketing site, brand rules
+
 ## decisions - Decision logs
 
 - [decisions/2026-10-10-product-company-naming.md](decisions/2026-10-10-product-company-naming.md) - Product and company naming
