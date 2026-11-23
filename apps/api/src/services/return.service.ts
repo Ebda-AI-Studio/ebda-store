@@ -30,6 +30,7 @@ import { opKey } from '../lib/money-idempotency';
 import { storeDb, storeMoney, type MoneyClient } from '../lib/repo-factory';
 
 import {
+  isGuestReturnCustomer,
   minorToDecimalString,
   productReturnAdjustment,
   type ReturnLineInput,
@@ -252,15 +253,11 @@ async function lockOrderReturnsBounded(orderId: string): Promise<void> {
  * A store's customers are User rows in the identity/Postgres side, not in its Durable Object: a DO read cannot `include`
  * them (prisma-lite refuses a cross-database relation), so the DO paths read the return without `customer` and attach it here.
  */
-/** Same marker as packages/repo/src/do/returns.ts `guestReturnCustomerId` (the API cannot import the DO module). */
-const isGuestReturnCustomer = (customerId: unknown): boolean =>
-  typeof customerId === 'string' && customerId.startsWith('guest:');
-
 /**
  * A merchant-opened return on a GUEST order carries `guest:<orderId>` as its customer (GUEST-RET-1): no account exists, so the
  * identity shown is the order's own shipping-address snapshot (name / email / phone). Null when the order was not joined.
  */
-function guestCustomerOf(order: unknown): Record<string, unknown> | null {
+export function guestCustomerOf(order: unknown): Record<string, unknown> | null {
   let addr = (order as { shippingAddress?: unknown } | null | undefined)?.shippingAddress;
   if (typeof addr === 'string') {
     try {
@@ -282,7 +279,7 @@ function guestCustomerOf(order: unknown): Record<string, unknown> | null {
   };
 }
 
-async function withCustomer<T extends { customerId: string }>(
+export async function withCustomer<T extends { customerId: string }>(
   storeId: string,
   rows: T[],
   select: Prisma.UserSelect
@@ -1080,8 +1077,9 @@ export class ReturnService {
     // above; this path was broken in exactly the same way.
     // a merchant-opened return on a GUEST order has no account (customer is null): no status email / socket push
     // (the merchant opened it and already knows; the order's guest contact is not a return recipient)
+    // gated explicitly on the marker (not on whatever the include happens to select), and on the customer being resolved
     const returnCustomer = updatedReturn.customer as UpdatedReturn['customer'] | null;
-    if (returnCustomer) {
+    if (!isGuestReturnCustomer(updatedReturn.customerId) && returnCustomer) {
       void deferAfterTenantCommit('email.returnStatusUpdate', () =>
         EmailService.sendReturnStatusUpdate(
           storeId,
