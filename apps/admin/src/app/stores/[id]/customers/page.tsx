@@ -387,7 +387,7 @@ export default function StoreCustomersPage() {
 
   const emptyState = (
     <div className="force-empty-state">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
         <svg
           className="h-8 w-8 text-muted-foreground"
           fill="none"
@@ -470,7 +470,7 @@ export default function StoreCustomersPage() {
                 options={segmentOptions}
                 value={segment}
                 onChange={changeSegment}
-                className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl bg-muted p-1"
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-muted p-1"
               />
             </div>
           )}
@@ -478,7 +478,7 @@ export default function StoreCustomersPage() {
 
         {/* Error */}
         {error && (
-          <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive-ink">
+          <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive-ink">
             {error}
             <button type="button" className="ms-4 font-medium underline" onClick={fetchCustomers}>
               {t('retry')}
@@ -492,7 +492,7 @@ export default function StoreCustomersPage() {
         {searchParams?.get(ERASURE_REVIEW_PARAM) === '1' && (
           <div
             role="alert"
-            className="flex items-start justify-between gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink"
+            className="flex items-start justify-between gap-3 rounded-md border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink"
           >
             <div>
               <p className="font-semibold">{tPrivacy('erasedCrmReviewTitle')}</p>
@@ -518,7 +518,7 @@ export default function StoreCustomersPage() {
         {/* Truncation notice — the server capped the order scan on a very large
           store, so this list aggregates only the most recent orders. */}
         {truncated && (
-          <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink">
+          <div className="rounded-md border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink">
             {t('truncatedNotice')}
           </div>
         )}
@@ -526,7 +526,7 @@ export default function StoreCustomersPage() {
         {searchTruncated && (
           <div
             role="status"
-            className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink"
+            className="rounded-md border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink"
           >
             {t('searchTruncatedNotice', { shown: totalCount })}
           </div>
@@ -550,7 +550,7 @@ export default function StoreCustomersPage() {
           when the table is non-empty so merchants know how many
           customers they have at a glance. */}
         {!isLoading && totalPages > 1 && (
-          <div className="flex items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3">
+          <div className="flex items-center justify-between gap-3 rounded-md border bg-card px-4 py-3">
             <p className="text-sm text-muted-foreground">
               {t('paginationShowing', {
                 from: (page - 1) * CUSTOMERS_PAGE_SIZE + 1,
