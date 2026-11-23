@@ -1207,7 +1207,8 @@
     "action": "scrub",
     "piiColumns": ["enabled_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records. reason is the super-admin's one-line note on why an override exists (a comp, a sold add-on), about the store, not a person; expires_at is a date.",
+    "reviewedNotPii": ["reason", "expires_at"],
     "userIdColumns": ["enabled_by"],
     "actorScrub": {
       "enabled_by": null

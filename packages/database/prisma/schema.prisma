@@ -2573,6 +2573,10 @@ model StoreFeature {
   enabled    Boolean   @default(false)
   enabledAt  DateTime? @map("enabled_at")
   enabledBy  String?   @map("enabled_by")
+  /// Ruling SF-EXPIRY-1: an override past this instant is ignored (the feature falls back to the plan baseline). NULL = never expires.
+  expiresAt  DateTime? @map("expires_at")
+  /// Why the override exists (free text for the super-admin: a comp, a sold add-on, a support grant).
+  reason     String?
   updatedAt  DateTime  @updatedAt @map("updated_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)

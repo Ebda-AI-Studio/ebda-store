@@ -492,6 +492,8 @@ export const storeFeatures = sqliteTable('store_features', {
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
   enabledAt: integer('enabled_at', { mode: 'timestamp_ms' }),
   enabledBy: text('enabled_by'),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }),
+  reason: text('reason'),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),

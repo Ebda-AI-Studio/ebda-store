@@ -45,6 +45,8 @@ router.get(
               enabled: true,
               enabledAt: true,
               enabledBy: true,
+              expiresAt: true,
+              reason: true,
               updatedAt: true,
             },
           })
@@ -77,6 +79,8 @@ router.get(
         enabled: row.enabled,
         enabledAt: row.enabledAt,
         enabledBy: row.enabledBy ? (userMap.get(row.enabledBy) ?? row.enabledBy) : null,
+        expiresAt: row.expiresAt,
+        reason: row.reason,
         updatedAt: row.updatedAt,
       }));
 
@@ -162,21 +166,42 @@ router.put(
         return;
       }
 
-      const bodySchema = z.object({ enabled: z.boolean() });
+      // PATCH semantics (Ruling SF-EXPIRY-1): an omitted `expiresAt` / `reason` KEEPS the stored value, an explicit
+      // `null` clears it. A plain toggle must never silently turn a time-boxed grant permanent. A past `expiresAt`
+      // is refused: it would be a no-op override (use DELETE to clear one).
+      const bodySchema = z.object({
+        enabled: z.boolean(),
+        expiresAt: z.coerce
+          .date()
+          .refine(
+            d => d.getTime() > Date.now(),
+            'expiresAt must be in the future / يجب أن يكون تاريخ الانتهاء في المستقبل'
+          )
+          .nullable()
+          .optional(),
+        reason: z.string().trim().max(200).nullable().optional(),
+      });
       const bodyParsed = bodySchema.safeParse(req.body);
       if (!bodyParsed.success) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: '`enabled` must be a boolean' },
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: bodyParsed.error.issues[0]?.message ?? 'Invalid request body',
+          },
         });
         return;
       }
+      const meta: { expiresAt?: Date | null; reason?: string | null } = {};
+      if (bodyParsed.data.expiresAt !== undefined) meta.expiresAt = bodyParsed.data.expiresAt;
+      if (bodyParsed.data.reason !== undefined) meta.reason = bodyParsed.data.reason || null;
 
       const features = await featureService.setFeature(
         id,
         keyParsed.data,
         bodyParsed.data.enabled,
-        req.user!.userId
+        req.user!.userId,
+        meta
       );
 
       await auditLog({
@@ -185,7 +210,12 @@ router.put(
         storeId: id,
         resourceType: 'store_feature',
         resourceId: keyParsed.data,
-        details: { featureKey: keyParsed.data, enabled: bodyParsed.data.enabled },
+        details: {
+          featureKey: keyParsed.data,
+          enabled: bodyParsed.data.enabled,
+          expiresAt: meta.expiresAt,
+          reason: meta.reason,
+        },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });

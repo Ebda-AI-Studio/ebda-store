@@ -140,6 +140,7 @@ const ENTERPRISE_ADDITIONS: FeatureKey[] = [
 // super-admin StoreFeature override, so every existing merchant (on every
 // plan) is unaffected until they are explicitly opted in. Do NOT add it to
 // STARTER_CORE/PROFESSIONAL_ADDITIONS/ENTERPRISE_ADDITIONS above.
+// A sold override should carry an `expiresAt` (Ruling SF-EXPIRY-1): past it, the override is ignored and the store is back on its plan.
 
 /**
  * Features that resolve to ENABLED for a store on this plan by default.
@@ -253,3 +254,14 @@ export const PLAN_LABELS: Record<StorePlan, { en: string; ar: string }> = {
   professional: { en: 'Professional', ar: 'الاحترافية' },
   enterprise: { en: 'Enterprise', ar: 'المؤسسية' },
 };
+
+/**
+ * True when a StoreFeature override is past its `expiresAt` (Ruling SF-EXPIRY-1). An expired override never decides:
+ * the plan baseline applies. The single predicate for the feature map, the wholesale gate and the admin matrix.
+ */
+export function isOverrideExpired(
+  expiresAt: Date | string | null | undefined,
+  nowMs: number = Date.now()
+): boolean {
+  return !!expiresAt && new Date(expiresAt).getTime() <= nowMs;
+}

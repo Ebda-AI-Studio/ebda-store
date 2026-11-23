@@ -53,6 +53,14 @@ export const LATE_COLUMN_MIGRATIONS = {
   3: 'late_columns',
   7: 'billing_eta_fields',
   10: 'store_template_original',
+  17: 'store_feature_expiry',
+};
+
+// Columns that ARE in schema.prisma but reached production D1 after 0001 was applied: the generator flags them `since: n`
+// (0001 is emitted without them, the numbered migration adds each once), exactly like an `extraColumns` entry. `{ Model: { field: n } }`.
+export const latePrismaColumns = {
+  // Ruling SF-EXPIRY-1: StoreFeature override expiry + reason.
+  StoreFeature: { expiresAt: 17, reason: 17 },
 };
 
 export const extraColumns = {
