@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 
-export type AutoPromotion = { id: string; discount: number };
+type AutoPromotion = { id: string; discount: number };
 
 type PreviewLine = { productId: string; quantity: number };
 
