@@ -18,6 +18,7 @@ export type PickerItem = {
   id: string;
   kind: 'product' | 'variant';
   productId: string;
+  productSlug: string;
   name: string;
   nameAr: string | null;
   variantTitle: string | null;
@@ -35,7 +36,15 @@ export const SAMPLE_ITEM: LabelItem = {
   barcode: '2000000000015',
 };
 
-export function toLabelItem(i: PickerItem): LabelItem | null {
+/** Product page on the store's own domain, the target of the label QR. */
+const productQrUrl = (origin: string, slug: string) =>
+  origin ? qrLink('product', origin, slug) : null;
+
+/** The QR scene drawn on a label (plain: no logo, frame or call to action: dots stay big). */
+export const labelQrScene = (url: string, design: QrDesign): Scene =>
+  buildScene(url, { ...design, logo: false, frame: 'none', cta: null });
+
+export function toLabelItem(i: PickerItem, origin: string): LabelItem | null {
   if (!i.barcode) return null;
   return {
     name: i.name,
@@ -44,6 +53,7 @@ export function toLabelItem(i: PickerItem): LabelItem | null {
     variantTitleAr: i.variantTitleAr,
     priceMinor: i.priceMinor,
     barcode: i.barcode,
+    qrUrl: productQrUrl(origin, i.productSlug),
   };
 }
 
@@ -158,23 +168,18 @@ export function useLabels(storeId: string) {
     labelPresetById(deferred.preset) ?? labelPresetById(DEFAULT_LABEL_SETTINGS.preset)!;
   const chosen = Object.values(selected);
   const previewItem: LabelItem = useMemo(() => {
-    const first = chosen.map(c => toLabelItem(c.item)).find(Boolean);
-    return first ?? SAMPLE_ITEM;
+    const first = chosen.map(c => toLabelItem(c.item, origin)).find(Boolean);
+    return first ?? { ...SAMPLE_ITEM, qrUrl: productQrUrl(origin, 'sample-product') };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
+  }, [selected, origin]);
   const layout: LabelLayout = useMemo(
     () => layoutLabel(preset, previewItem, deferred),
     [preset, previewItem, deferred]
   );
   const qrScene: Scene | null = useMemo(() => {
-    if (!layout.qr || !origin) return null;
-    return buildScene(qrLink('store', origin), {
-      ...qrDesign,
-      logo: false,
-      frame: 'none',
-      cta: null,
-    });
-  }, [layout.qr, origin, qrDesign]);
+    if (!layout.qr) return null;
+    return labelQrScene(layout.qr.url, qrDesign);
+  }, [layout.qr, qrDesign]);
 
   const dirty = JSON.stringify(settings) !== saved;
   const save = useCallback(async () => {
@@ -201,7 +206,7 @@ export function useLabels(storeId: string) {
     qrOrigin: origin,
     qrDesign,
     previewItem,
-    isSample: previewItem === SAMPLE_ITEM,
+    isSample: !chosen.some(c => c.item.barcode),
     dirty,
     saving,
     saveState,
