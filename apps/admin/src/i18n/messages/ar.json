@@ -9485,6 +9485,7 @@
       "nextChargeNoAmount": "{plan} بتاريخ {date}",
       "instapayDue": "مستحق الدفع",
       "instapayDueLine": "دفع إنستاباي مستحق بحلول {date}: {amount} ({interval}) لباقة {plan}",
+      "switchingInterval": "التحويل إلى الدفع {interval} اعتبارًا من {date}، بعد تأكيد دفعتك",
       "instapayDueNoAmount": "دفع إنستاباي مستحق بحلول {date} لباقة {plan}",
       "returnsToFree": "باقتك هترجع للمجانية لو ما اتدفعتش لحد ساعتها."
     },
@@ -10074,6 +10075,7 @@
         "nextCharge": "الخصم القادم",
         "action": "إجراء"
       },
+      "switchingTo": "يتحول إلى {interval}",
       "interval": {
         "monthly": "شهريًا",
         "yearly": "سنويًا"

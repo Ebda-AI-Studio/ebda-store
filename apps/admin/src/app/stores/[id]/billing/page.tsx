@@ -858,6 +858,18 @@ export default function StoreBillingPage() {
                     </dd>
                   </div>
                 )}
+                {info.nextCharge && info.pendingBillingInterval && (
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
+                    {t('trial.switchingInterval', {
+                      interval: t(
+                        info.pendingBillingInterval === 'yearly'
+                          ? 'intervalYearly'
+                          : 'intervalMonthly'
+                      ),
+                      date: fmtBillingDate(info.nextCharge.at, locale),
+                    })}
+                  </p>
+                )}
                 {info.nextCharge && instapayDue && (
                   <p className="text-xs text-muted-foreground sm:col-span-2">
                     {t('trial.returnsToFree')}
