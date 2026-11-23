@@ -48,6 +48,7 @@ import {
   LOGIN,
   PER_EMAIL,
   PER_IP_ONLY,
+  CHAT_INVITE_MAIL,
   retryAfterSeconds,
   SECOND_FACTOR,
   type Budget,
@@ -492,7 +493,7 @@ async function requireSecondFactor(c: C, user: UserRow, code: unknown): Promise<
 export async function issueAndMail(
   env: Env,
   user: UserRow,
-  kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol',
+  kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol' | 'chat_invite',
   type: OtpType,
   pending?: PendingSignup,
   opts: { ttlMinutes?: number; storeName?: string } = {}
@@ -565,6 +566,8 @@ export async function inviteFor(
     role: 'store_admin' | 'staff';
     language: 'en' | 'ar';
     storeName?: string;
+    /** Mail template for the one-time code (default: staff_invite when a storeName is given). */
+    mailKind?: 'chat_invite';
   }
 ): Promise<InviteResult> {
   let user = await findUserByEmail(env.DB, input.email);
@@ -597,7 +600,7 @@ export async function inviteFor(
   await issueAndMail(
     env,
     user,
-    input.storeName ? 'staff_invite' : 'password_reset',
+    input.mailKind ?? (input.storeName ? 'staff_invite' : 'password_reset'),
     'password_reset',
     undefined,
     {
@@ -606,6 +609,89 @@ export async function inviteFor(
     }
   );
   return { id: user.id, created: true };
+}
+
+/** Why a Chat invite was refused. Chat shows one generic message for it; the cause is never revealed to the inviter. */
+class InviteRefused extends Error {
+  constructor() {
+    super('INVITE_REFUSED');
+    this.name = 'InviteRefused';
+  }
+}
+
+/**
+ * Invite a person to a standalone Ebda Chat workspace by email (Ruling CHAT-SA-6). Returns ONLY `{ userId }`, identical
+ * whether the address already had an identity, so the inviter learns nothing about who is registered.
+ *  - no identity: an unverified, credential-less `staff` identity (role is irrelevant to Chat; membership lives in Chat's D1)
+ *    and the invitation mail (`chat_invite`: sign in to Chat and accept within 7 days) carrying the one-time set-password code (24 h, single use: the existing reset flow);
+ *  - ACTIVE verified identity: its id, plus an "invited to <workspace>" notice (no code, no credential touched; the invitation is accepted in Chat, 7 days);
+ *  - ACTIVE but never verified (a signup nobody completed): bound to its own id only; the set-password code is mailed
+ *    to the mailbox, so only that mailbox's owner can ever activate it (first verification purges anything attached earlier);
+ *  - inactive, suspended or erased identity: throws InviteRefused.
+ * Mail is capped at 5 per address per hour (the limiter window is at most 1 h); past it the call still resolves the same id, mail is skipped.
+ */
+export async function inviteChatMemberFor(
+  env: Env,
+  input: { email: string; firstName: string; language: 'en' | 'ar'; workspaceName: string }
+): Promise<{ userId: string }> {
+  const mailAllowed = (await hit(env.DB, input.email, 'n/a', CHAT_INVITE_MAIL)).ok;
+  const user = await findUserByEmail(env.DB, input.email);
+  if (user && user.status !== 'active') throw new InviteRefused();
+  // A soft-deleted (erased) identity still owns its address: never re-invite onto it.
+  if (
+    !user &&
+    (await env.DB.prepare(
+      `SELECT 1 AS x FROM users WHERE lower(email) = lower(?1) AND deleted_at IS NOT NULL`
+    )
+      .bind(input.email)
+      .first())
+  )
+    throw new InviteRefused();
+  let userId: string;
+  if (!user) {
+    // Unreachable in practice: 5 calls in an hour for an address that never got an identity. Refuse rather than mail past the cap.
+    if (!mailAllowed) throw new InviteRefused();
+    const r = await inviteFor(env, {
+      id: crypto.randomUUID(),
+      email: input.email,
+      firstName: input.firstName,
+      lastName: '',
+      role: 'staff',
+      language: input.language,
+      storeName: input.workspaceName,
+      mailKind: 'chat_invite',
+    });
+    userId = r.id;
+  } else {
+    userId = user.id;
+    if (mailAllowed && user.email_verified) {
+      try {
+        await env.MAILER?.sendNotice({
+          to: user.email,
+          kind: 'chat_member_added',
+          language: user.language === 'ar' ? 'ar' : input.language,
+          firstName: user.first_name,
+          workspaceName: input.workspaceName,
+        });
+      } catch (e) {
+        // eslint-disable-next-line no-console -- pq-allow(no-console): structured worker log; the invite itself already resolved
+        console.error(
+          JSON.stringify({ msg: 'chat invite notice failed', error: (e as Error).message })
+        );
+      }
+    } else if (mailAllowed) {
+      await issueAndMail(env, user, 'chat_invite', 'password_reset', undefined, {
+        ttlMinutes: 24 * 60,
+        storeName: input.workspaceName,
+      });
+    }
+  }
+  // Audit trail (structured log; the durable `member.added` row is Chat's). No address, no code.
+  // eslint-disable-next-line no-console -- pq-allow(no-console): audit line, the worker log is the sink (no address, no code)
+  console.log(
+    JSON.stringify({ msg: 'audit', event: 'chat_member_invited', userId, mailed: mailAllowed })
+  );
+  return { userId };
 }
 
 /** Mail a fresh code to an existing UNVERIFIED account; carries the credential of the latest signup (see verify). */
