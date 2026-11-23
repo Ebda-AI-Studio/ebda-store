@@ -1969,7 +1969,7 @@
         "repeatSub": "{repeat} of {buyers} buyers ordered again",
         "noBuyersSub": "No orders yet",
         "ordersSub": "{count, plural, one {Across {count, number, latn} order} other {Across {count, number, latn} orders}}",
-        "spentSub": "All orders except cancelled, refunded and failed payments (unpaid COD counts)"
+        "spentSub": "All orders except cancelled, refunded and failed payments (unpaid COD counts; abandoned online checkouts do not)"
       },
       "moreMenu": "More customer options"
     },
@@ -2343,12 +2343,6 @@
         "description": "A QR for the store and barcodes for products and invoices"
       }
     },
-    "metaCatalogCard": {
-      "provisionLabel": "Provision automatically · Ebda Store assisted",
-      "provisionDescription": "Creates a new Commerce Catalog under the Ebda Store parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
-      "provisionButton": "Provision automatically",
-      "provisioningButton": "Provisioning…"
-    },
     "superAdmin": {
       "planLabel": "Store Plan",
       "loadingPlan": "Loading…",
@@ -2399,6 +2393,29 @@
       "planChangeFailed": "Could not change the plan",
       "planUpdated": "Plan updated",
       "planUpdatedBody": "Store plan changed to {plan}."
+    },
+    "chatConnect": {
+      "title": "Ebda Chat",
+      "intro": "Reply to your customers on WhatsApp from one inbox.",
+      "whatItDoes": "Connecting only creates your Ebda Chat workspace. There is no charge, no plan change, and no message is sent to anyone.",
+      "connect": "Connect Ebda Chat",
+      "connecting": "Connecting…",
+      "connected": "Connected",
+      "connectedBody": "Your store is connected to Ebda Chat.",
+      "openChat": "Open Ebda Chat",
+      "loading": "Checking Ebda Chat…",
+      "retry": "Try again",
+      "toastTitle": "Ebda Chat connected",
+      "toastBody": "Your Ebda Chat workspace is ready.",
+      "notIncluded": "Your plan does not include Ebda Chat. Upgrade your plan to connect it.",
+      "upgrade": "See plans",
+      "errRole": "Only the store owner or a store admin can connect Ebda Chat. Ask the owner to do it.",
+      "errMfa": "Turn on two-step verification for your account before connecting Ebda Chat.",
+      "errMfaLink": "Open account security",
+      "errSession": "Your session ended. Sign in again to continue.",
+      "errNetwork": "No connection right now. Check your internet and try again.",
+      "errLoad": "We could not check whether Ebda Chat is connected. Try again.",
+      "errGeneric": "Ebda Chat could not be connected. Nothing was changed. Try again in a moment."
     }
   },
   "branding": {
@@ -4905,9 +4922,8 @@
       "sentTitle": "Broadcast sent",
       "sentDescription": "Targeted {count, number, latn} subscriber(s).",
       "sendFailed": "Failed to send broadcast.",
-      "notConfiguredTitle": "Push provider not configured",
-      "notConfiguredDescription": "OneSignal credentials are missing on the API server. Set the env vars below on Railway and redeploy:",
-      "and": "and",
+      "notConfiguredTitle": "Push notifications are not available yet",
+      "notConfiguredDescription": "Push notifications are not available for your store yet. Try again later.",
       "recentTitle": "Recent broadcasts",
       "recentEmpty": "No broadcasts sent yet.",
       "refresh": "Refresh",
@@ -6315,6 +6331,7 @@
         "aiUsage": "Usage",
         "answerEngine": "Answer-Engine Insights",
         "marketingPixels": "Pixels",
+        "productFeeds": "Product feeds",
         "notifications": "Notifications",
         "newsletter": "Newsletter",
         "campaigns": "Campaigns",
@@ -6788,8 +6805,8 @@
       "viewAll": "View all",
       "salesOrdersTitle": "Sales (from Orders)",
       "salesOrdersSource": "Orders",
-      "salesOrdersRevenue": "Paid Orders Revenue",
-      "salesOrdersCount": "Paid Orders",
+      "salesOrdersRevenue": "Net Sales (unpaid COD included)",
+      "salesOrdersCount": "Orders Counted",
       "salesOrdersCountUnit": "orders in period",
       "couldntLoad": "Couldn't load",
       "loadFailedShort": "Could not load the finance dashboard."
@@ -7287,6 +7304,8 @@
         "addItem": "+ Add product",
         "selectProduct": "Select product",
         "newQty": "New quantity",
+        "selectVariant": "Select variant",
+        "variantRequired": "This product has variants. Choose a variant for each line.",
         "submitDraft": "Save as draft",
         "submitPost": "Approve adjustment",
         "typeTip": "cycle_count = routine recount correction; damage = damaged, unsellable; theft = lost to theft or shrinkage; loss = lost or misplaced (not theft or damage); write_off = deliberately removed (expired or obsolete); found = previously-missing stock located (increases quantity); return_to_supplier = sent back to supplier.",
@@ -8444,6 +8463,90 @@
       }
     }
   },
+  "productFeeds": {
+    "page": {
+      "title": "Product feeds",
+      "subtitle": "Send your whole catalogue, with sizes and colours, to Google Shopping, Facebook and Instagram, and TikTok."
+    },
+    "intro": "Each link below is a live feed of your products. Paste it once into the platform and it re-reads your prices and stock on its own schedule. Variants are sent as separate items, grouped under one product.",
+    "language": {
+      "ar": "Arabic feed",
+      "en": "English feed"
+    },
+    "copy": "Copy link",
+    "copied": "Link copied",
+    "copyFailed": "Could not copy. Select the link and copy it by hand.",
+    "parts": "Your catalogue is large, so it is split into {count} files. Add each one as its own source: the same link with &part=2, &part=3 and so on.",
+    "platforms": {
+      "google": {
+        "name": "Google Merchant Center",
+        "for": "Google Shopping ads and free product listings",
+        "format": "XML file",
+        "step1": "Open Merchant Center and go to Products, then Data sources.",
+        "step2": "Add a product source and choose to add products from a file.",
+        "step3": "Pick a scheduled fetch, then paste the link for your language.",
+        "step4": "Choose how often Google reads it. Daily is enough, because the feed is always current.",
+        "step5": "Finish by confirming your website and setting your shipping in Merchant Center, then check Diagnostics for any problems."
+      },
+      "meta": {
+        "name": "Meta Commerce Manager",
+        "for": "Facebook and Instagram catalogue ads and shops",
+        "format": "XML file",
+        "step1": "Open Commerce Manager, pick your catalogue, and go to Data sources.",
+        "step2": "Add items, then choose Data feed.",
+        "step3": "Choose a scheduled feed and paste the link for your language.",
+        "step4": "Set how often Meta reads it. Hourly or daily both work.",
+        "step5": "Open Diagnostics after the first run to see anything Meta rejected."
+      },
+      "tiktok": {
+        "name": "TikTok Catalog Manager",
+        "for": "TikTok catalogue ads",
+        "format": "CSV file",
+        "step1": "Open TikTok Ads Manager and go to Assets, then Catalog.",
+        "step2": "Create a catalogue, then add products from a data feed.",
+        "step3": "Choose a scheduled fetch and paste the CSV link for your language.",
+        "step4": "Pick your country and currency, and set how often TikTok reads it.",
+        "step5": "Check the upload report for rejected rows after the first run."
+      }
+    },
+    "steps": "Setup steps",
+    "health": {
+      "title": "Feed health",
+      "language": "Checking the {lang} feed",
+      "items": "Items in the feed",
+      "products": "Active products",
+      "excluded": "Left out",
+      "warnings": "To improve",
+      "allGood": "Every product is in the feed and nothing needs attention.",
+      "empty": "You have no active products yet, so the feeds are empty. Publish a product and it appears here.",
+      "notPublished": "Not in the feed on purpose: {draft} drafts, {archived} archived, {wholesale} wholesale-only.",
+      "shippingFlat": "Your shipping fee is the same everywhere, so it is included in the feed.",
+      "shippingVaries": "Your shipping fees differ by area, so they are not in the feed. Set shipping inside each platform instead.",
+      "truncatedIssues": "Showing the first {count} items. Fix these and refresh to see more.",
+      "scanTruncated": "Your catalogue is very large, so this report covers only part of it.",
+      "imageNote": "Platforms also check that every image is at least 500 x 500 pixels. We cannot measure that here, so upload large product photos.",
+      "refresh": "Refresh",
+      "issuesTitle": "Items that need attention",
+      "product": "Item",
+      "problem": "What to fix",
+      "excludedBadge": "Left out",
+      "warningBadge": "Improve",
+      "code": {
+        "no_image": "This item has no usable image, so it is left out. Add a product photo.",
+        "zero_price": "The price is zero, so the item is left out. Set a price.",
+        "variant_inactive": "This variant is switched off, so it is left out.",
+        "no_title": "The product has no name, so it is left out.",
+        "bundle_not_sellable": "This bundle cannot be bought right now, so it is left out.",
+        "description_missing": "No description. The title is used instead, but ads perform better with a real description.",
+        "gtin_invalid": "The barcode is not a valid product code (GTIN), so it is not sent. Enter the code printed on the package.",
+        "brand_is_store_name": "No brand is set, so your store name is used. Add a Brand row in the product facts to change it.",
+        "google_category_missing": "We could not match a Google category from your category names. Add a product fact named google_product_category if you need one.",
+        "apparel_missing_attrs": "Clothing and shoes need colour, size, gender and age group. Add them as options or product facts.",
+        "variant_options_missing": "This variant has no option values (size, colour), so platforms cannot tell it apart from its siblings."
+      }
+    },
+    "loadError": "Could not load the feed report."
+  },
   "answerEngine": {
     "page": {
       "title": "Answer-Engine Insights",
@@ -9274,7 +9377,7 @@
     "usageTitle": "Usage",
     "ordersThisMonth": "Orders this month",
     "usedOf": "{used} of {limit}",
-    "storageNotTracked": "Up to {limit} MB (usage is not tracked yet)",
+    "storageUnknown": "Not known right now",
     "includedTitle": "Included in your plan",
     "included": "Included",
     "notIncluded": "Not included",
@@ -9289,7 +9392,8 @@
       "active": "Active",
       "past_due": "Payment overdue",
       "canceled": "Canceled",
-      "comped": "Complimentary"
+      "comped": "Complimentary",
+      "awaiting_payment": "Awaiting payment"
     },
     "overLimit": {
       "title": "You passed this month's order limit",
@@ -9474,7 +9578,18 @@
     "receiptProcessing": "Your payment went through. Your receipt will print here in a moment.",
     "cancelObject": "Cancelling your plan subscription",
     "cancelAction": "Cancel subscription",
-    "adminPlanHidden": "hidden"
+    "adminPlanHidden": "hidden",
+    "stateLine": {
+      "none": "Your free plan is running.",
+      "trialing": "You are on a trial and have not paid yet.",
+      "active": "Your plan is paid and running.",
+      "awaiting_payment": "Your plan is running now, but you have not paid yet. Pay before the date below so you do not drop back to the free plan.",
+      "past_due": "Your payment is late. Pay to keep your plan running.",
+      "canceled": "Your plan was canceled.",
+      "comped": "Your plan is free as a grant from the Ebda AI Studio team."
+    },
+    "trialDaysLeft": "{count, plural, one {{count} day left} other {{count} days left}}",
+    "trialDaysLeftLabel": "Trial days left"
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
@@ -9791,7 +9906,15 @@
       "privacy": "Privacy",
       "support": "Need help?",
       "footer": "Your store. Your brand.",
-      "back": "Back to Ebda Store"
+      "back": "Back to Ebda Store",
+      "signedInAs": "Signed in as",
+      "signOut": "Sign out"
+    },
+    "platformAdmin": {
+      "title": "You're a platform admin",
+      "body": "You're a platform admin. Sign in again with two-step verification to open the admin console.",
+      "signInAgain": "Sign in again",
+      "signOut": "Sign out"
     },
     "acceptInvite": {
       "title": "Staff invitation",
@@ -11397,7 +11520,7 @@
       "editTitle": "Edit endpoint",
       "urlLabel": "Address (HTTPS)",
       "urlPlaceholder": "https://example.com/ebda-webhook",
-      "urlHelp": "It must be a public HTTPS address. Local and private addresses are not accepted.",
+      "urlHelp": "It must be a public HTTPS address on your own server. Local and private addresses and Ebda AI Studio domains (ebda.app) are not accepted.",
       "descriptionLabel": "Note (optional)",
       "eventsLabel": "Events to send",
       "customerLabel": "Include customer name, email and phone in order events",
@@ -11467,6 +11590,16 @@
     "error": {
       "WEBHOOK_URL_REJECTED": "This address cannot be used. Use a public HTTPS address.",
       "WEBHOOK_LIMIT": "You reached the maximum number of endpoints."
+    },
+    "urlError": {
+      "not_a_url": "That is not a valid link. Write the full address, like https://example.com/ebda-webhook.",
+      "https_required": "The address must start with https://. http addresses are not accepted.",
+      "credentials_not_allowed": "The address cannot contain a username or password.",
+      "port_not_allowed": "The address must use the standard HTTPS port (443), with no port number.",
+      "ip_literal_not_allowed": "Use a domain name, not an IP number.",
+      "public_hostname_required": "Use a public address with a full domain name, like example.com.",
+      "internal_hostname_not_allowed": "Local and internal addresses are not accepted. Use a public address on the internet.",
+      "platform_host_not_allowed": "The address cannot be on an Ebda AI Studio domain (ebda.app or any store of ours). Use your own server."
     }
   },
   "receiptBarcode": {
@@ -11810,7 +11943,7 @@
       "variant": "Variant",
       "price": "Price",
       "digits": "Digits under the bars",
-      "qr": "Store QR",
+      "qr": "Product page QR",
       "lang": "Label language",
       "langAr": "Arabic",
       "langEn": "English"
@@ -11838,6 +11971,7 @@
       "checking": "Checking that the barcode scans…",
       "ok": "Barcode scans correctly",
       "notPrintable": "The bars are too thin to print at this size. Choose a bigger label, plain bars, or a roll.",
+      "qrRefused": "Barcode and QR cannot both scan at this size. Choose a bigger label, or untick the QR to print the barcode only.",
       "unreadable": "The barcode could not be read back. Change the style or the size.",
       "dropped": "Left out because the label is small: {parts}.",
       "copies": "{labels} labels on {pages} pages"
