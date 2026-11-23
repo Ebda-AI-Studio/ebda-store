@@ -1,5 +1,11 @@
 import { prisma, Prisma } from '@ebda/database';
-import { searchTokens, escapeLike, normalizeArabicSearch, isPersonalDataTerm } from '@ebda/shared';
+import {
+  searchTokens,
+  searchTokensHamza,
+  escapeLike,
+  normalizeArabicSearch,
+  isPersonalDataTerm,
+} from '@ebda/shared';
 import { BoundedMap } from '../lib/bounded-map';
 import {
   EMBED_DIMS,
@@ -93,12 +99,28 @@ export function productSearchSql(
   // matches the START of a word instead (SEARCH-T14-3); anything with a longer word is unchanged.
   const wordStart = tokens.every(t => t.length < 3);
   const patterns = tokens.map(t => (wordStart ? `${escapeLike(t)}%` : `%${escapeLike(t)}%`));
+  const field = opts.field === 'name' ? 'name' : 'all';
+  const matchB = Prisma.sql`p.id IN (SELECT public.ebda_product_search_ids(
+        ${storeId}, ${field}, ${withSku}, ${storefront},
+        ${opts.includeDeleted === true}, ${wordStart}, ${patterns}::text[]))`;
+  // Ruling F7-HAMZA-2: a word also matches under the hamza fold A (مسئول = مسؤول = سئوال's seat variants), against the A docs and their own
+  // trigram indexes (migration 20261123000100). Fold B above is untouched, so every old match still holds. Skipped for a query with no Arabic letter
+  // (A and B agree on Latin text), which keeps English searches at one lookup.
+  const hamzaTokens = /[\u0600-\u06FF]/.test(raw) ? searchTokensHamza(raw) : [];
+  let match: Prisma.Sql = matchB;
+  if (hamzaTokens.length > 0) {
+    const wordStartH = hamzaTokens.every(t => t.length < 3);
+    const patternsH = hamzaTokens.map(t =>
+      wordStartH ? `${escapeLike(t)}%` : `%${escapeLike(t)}%`
+    );
+    match = Prisma.sql`(${matchB} OR p.id IN (SELECT public.ebda_product_search_ids_h(
+        ${storeId}, ${field}, ${false}, ${storefront},
+        ${opts.includeDeleted === true}, ${wordStartH}, ${patternsH}::text[])))`;
+  }
   // limit + 1: the extra row only says "there were more" (truncated).
   return Prisma.sql`SELECT p.id FROM products p
     WHERE p.store_id = ${storeId} ${deleted} ${status} ${audience}
-      AND p.id IN (SELECT public.ebda_product_search_ids(
-        ${storeId}, ${opts.field === 'name' ? 'name' : 'all'}, ${withSku}, ${storefront},
-        ${opts.includeDeleted === true}, ${wordStart}, ${patterns}::text[]))
+      AND ${match}
     ORDER BY ${orderBy}
     LIMIT ${limit + 1}`;
 }

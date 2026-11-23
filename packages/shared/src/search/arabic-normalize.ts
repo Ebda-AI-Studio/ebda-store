@@ -6,7 +6,17 @@
  */
 import { foldArabic } from '../foundation/text';
 
-export { AR_FOLD_FROM, AR_FOLD_TO } from '../foundation/text';
+// Ruling F7-HAMZA-2: search matches under TWO folds. `normalizeArabicSearch` is fold B (the original, SQL twin `ebda_ar_norm`, unchanged);
+// `normalizeArabicHamza` is fold A (SQL twin `ebda_ar_norm_h`, migration 20261123000100_search_fold_hamza). A query word matches under B OR A.
+
+export { AR_FOLD_FROM, AR_FOLD_TO, AR_FOLD_H_FROM, AR_FOLD_H_TO } from '../foundation/text';
+export {
+  foldArabicHamza as normalizeArabicHamza,
+  searchTokensHamza,
+  searchWordPairs,
+  indexTextBoth,
+  sameSearchTerm,
+} from '../foundation/text';
 
 export const normalizeArabicSearch = foldArabic;
 
