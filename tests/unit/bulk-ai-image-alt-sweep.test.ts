@@ -28,6 +28,11 @@ vi.mock('../../apps/api/src/lib/inngest/ai-retry', () => ({
   callWithRetry: (fn: () => unknown) => fn(),
 }));
 
+const mockReplaceText = vi.fn();
+vi.mock('../../apps/api/src/services/catalogue-replace-backup.service', () => ({
+  replaceTextWithBackup: (...args: unknown[]) => mockReplaceText(...args),
+}));
+
 const mockGenerateProductAltText = vi.fn();
 vi.mock('../../apps/api/src/lib/ai/product-alt-text-generator', () => ({
   generateProductAltText: (...args: unknown[]) => mockGenerateProductAltText(...args),
@@ -68,6 +73,7 @@ beforeEach(async () => {
   process.env.AI_BULK_THROTTLE_MS = '0';
   mockAssertAiQuota.mockClear();
   mockGenerateProductAltText.mockReset();
+  mockReplaceText.mockReset();
   mockFindManyProduct.mockReset();
   mockUpdateProductImage.mockReset();
   mockFindUniqueJob.mockReset();
@@ -152,5 +158,36 @@ describe('bulk-ai-image-alt sweep', () => {
     const finalCall = mockUpdateJob.mock.calls[mockUpdateJob.mock.calls.length - 1][0];
     expect(finalCall.data.failed).toBe(1);
     expect(finalCall.data.filled).toBe(0);
+  });
+
+  describe('replace existing (AITOOLS-4)', () => {
+    const withAlt = [
+      {
+        id: 'p1',
+        name: 'Product 1',
+        nameAr: null,
+        images: [{ id: 'img-1', url: 'https://x/1.jpg', alt: 'Old alt' }],
+      },
+    ];
+
+    it('without force leaves an image that already has alt alone', async () => {
+      mockFindManyProduct.mockResolvedValue(withAlt);
+      await runSweep({ jobId: 'job-1', storeId: 'store-1' });
+      expect(mockGenerateProductAltText).not.toHaveBeenCalled();
+      expect(mockReplaceText).not.toHaveBeenCalled();
+      expect(mockUpdateProductImage).not.toHaveBeenCalled();
+    });
+
+    it('force=true is ignored: an image that already has alt is never regenerated or overwritten', async () => {
+      mockFindManyProduct.mockResolvedValue(withAlt);
+      mockGenerateProductAltText.mockResolvedValue('Fresh alt');
+      mockFindUniqueJob.mockResolvedValue({ status: 'running', userId: 'u1' });
+
+      await runSweep({ jobId: 'job-1', storeId: 'store-1', force: true });
+
+      expect(mockGenerateProductAltText).not.toHaveBeenCalled();
+      expect(mockReplaceText).not.toHaveBeenCalled();
+      expect(mockUpdateProductImage).not.toHaveBeenCalled();
+    });
   });
 });

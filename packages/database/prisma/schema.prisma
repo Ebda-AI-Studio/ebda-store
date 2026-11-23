@@ -461,6 +461,7 @@ model Store {
   catalogImportItems         CatalogImportItem[]
   aiUsage                    AiUsage[]
   bulkAiJobs                 BulkAiJob[]
+  aiReplaceBackups           AiReplaceBackup[]
   faqs                       StoreFaq[]
   howtos                     StoreHowto[]
   blogPosts                  BlogPost[]
@@ -3845,6 +3846,37 @@ enum BulkImportStatus {
   running
   completed
   failed
+}
+
+// What an AI tool replaced (AITOOLS-4, NEVER-OVERWRITE-1): before a merchant-run "replace existing" AI sweep overwrites a stored
+// value it writes the previous value here (one row per entity + field per run), and only then writes the new one. Undo restores
+// `previousValue` unless the merchant edited the field after the run (current value no longer equals `newValue`).
+// Values are text; the category set is a JSON array of category ids. Listed on the AI tools page and the product page.
+model AiReplaceBackup {
+  id            String    @id @default(uuid())
+  storeId       String    @map("store_id")
+  jobId         String?   @map("job_id")
+  // translate_ar | translate_en | categorize | image_alt
+  tool          String
+  // product | category | store | product_image | product_categories
+  entityKind    String    @map("entity_kind")
+  entityId      String    @map("entity_id")
+  // The product the change belongs to (a product, its image, its categories), so a product page lists its own history.
+  productId     String?   @map("product_id")
+  field         String
+  previousValue String?   @map("previous_value")
+  newValue      String?   @map("new_value")
+  userId        String?   @map("user_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  restoredAt    DateTime? @map("restored_at")
+  restoredBy    String?   @map("restored_by")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, entityKind, entityId, field])
+  @@index([storeId, createdAt(sort: Desc)])
+  @@index([storeId, productId])
+  @@map("ai_replace_backups")
 }
 
 // Catalogue-wide AI sweep — translation or SEO generation across

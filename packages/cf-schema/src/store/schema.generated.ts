@@ -243,6 +243,28 @@ export const aiRecommendation = sqliteTable('ai_recommendation', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+export const aiReplaceBackups = sqliteTable('ai_replace_backups', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  jobId: text('job_id'),
+  tool: text('tool').notNull(),
+  entityKind: text('entity_kind').notNull(),
+  entityId: text('entity_id').notNull(),
+  productId: text('product_id'),
+  field: text('field').notNull(),
+  previousValue: text('previous_value'),
+  newValue: text('new_value'),
+  userId: text('user_id'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  restoredAt: integer('restored_at', { mode: 'timestamp_ms' }),
+  restoredBy: text('restored_by'),
+});
+
 export const answerEngineChecks = sqliteTable('answer_engine_checks', {
   id: text('id')
     .primaryKey()

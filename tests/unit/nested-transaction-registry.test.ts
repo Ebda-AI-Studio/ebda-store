@@ -106,6 +106,8 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
     '`w.$transaction` runs only in the StoreDO branch of `delete` (events + referrals + the affiliate in ONE DO batch, Ruling NZ-FEAT-1); the money balance writes keep the `hasTenantContext` branch documented in the file header',
   'services/accounting/deadstock-scan.service.ts':
     '`w.$transaction` runs only in the StoreDO branch of createClearanceCouponFromFlag (coupon + flag in ONE DO batch, Ruling NZ-MERCHANT-1); the Postgres path keeps its two writes unchanged',
+  'services/catalogue-replace-backup.service.ts':
+    '`w.$transaction` is the store writer batch (ONE DO batch, or one Postgres transaction): backup row + the replaced value, and the category-set swap; it only touches ai_replace_backups and the one product / category / image / product_categories row it replaces, and runs from a sweep (store scope, no request) or the undo route (`aiRouteContext` store scope, no prior write in the request). Ruling AITOOLS-4',
   'routes/order.routes.ts':
     'COD mark-paid / bulk-mark-paid flip existing payment + order rows. Its own commit is load-bearing today: the handler enqueues `order/created` BEFORE the request commits, and the accounting consumer must read the order as paid. Moving the flip into the request transaction needs that send moved behind deferAfterTenantCommit first — see Ruling M5-3',
 };

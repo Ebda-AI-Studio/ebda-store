@@ -117,6 +117,7 @@ export type WritableModel =
   | 'etaConnection'
   | 'etaReceipt'
   | 'bulkAiJob'
+  | 'aiReplaceBackup'
   | 'deadStockFlag'
   | 'webhookEndpoint'
   | 'webhookDelivery'

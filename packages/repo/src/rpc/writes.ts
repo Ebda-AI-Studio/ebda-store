@@ -77,6 +77,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'EtaReceipt',
   // bulk AI job rows: the stuck-job watcher resumes or fails them (Ruling CF-JOBS-4B)
   'BulkAiJob',
+  // the undo history of an AI replace run: written by the sweeps (before they overwrite), restored by the undo route (AITOOLS-4)
+  'AiReplaceBackup',
   // dead-stock flags: the weekly scan writes them (Ruling CF-JOBS-4B)
   'DeadStockFlag',
   // merchant webhooks: endpoints and the delivery log (Ruling CF-JOBS-4B)
@@ -403,6 +405,50 @@ export const DO_PROCS: Record<string, Proc> = {
     if (typeof upToId !== 'string') throw procErr('upToId');
     sql.run('DELETE FROM audit_logs WHERE created_at < ? AND id <= ?', [before, upToId]);
     return sql.all('SELECT changes() AS n', [])[0]?.n ?? 0;
+  },
+  /**
+   * A product's category set as ONE compare-and-set (Ruling AITOOLS-4): the set is replaced by `next` only while it still equals
+   * `expected` (the value the caller read, or the value the AI wrote when undoing), so a category the merchant added or removed
+   * in between is never overwritten. Returns 1 when swapped, 0 when the set changed (or the product is not this store's).
+   */
+  productCategoriesCas(sql, a) {
+    const { productId, storeId, expected, next } = a as Record<string, unknown>;
+    if (typeof productId !== 'string' || !productId) throw procErr('productId');
+    if (typeof storeId !== 'string' || !storeId) throw procErr('storeId');
+    const ids = (v: unknown, name: string): string[] => {
+      if (!Array.isArray(v) || v.length > 200 || v.some(x => typeof x !== 'string' || !x))
+        throw procErr(name);
+      return v as string[];
+    };
+    const want = ids(expected, 'expected');
+    if (!Array.isArray(next) || next.length > 200) throw procErr('next');
+    const rows = (next as Array<Record<string, unknown>>).map(r => {
+      if (typeof r?.categoryId !== 'string' || !r.categoryId) throw procErr('next.categoryId');
+      if (!Number.isInteger(r.position)) throw procErr('next.position');
+      return r as { categoryId: string; position: number };
+    });
+    if (
+      sql.all('SELECT 1 AS x FROM products WHERE id = ? AND store_id = ?', [productId, storeId])
+        .length === 0
+    )
+      return 0;
+    const cur = (
+      sql.all('SELECT category_id FROM product_categories WHERE product_id = ?', [
+        productId,
+      ]) as Array<{
+        category_id: string;
+      }>
+    )
+      .map(r => r.category_id)
+      .sort();
+    if (JSON.stringify(cur) !== JSON.stringify([...new Set(want)].sort())) return 0;
+    sql.run('DELETE FROM product_categories WHERE product_id = ?', [productId]);
+    for (const r of rows)
+      sql.run(
+        'INSERT INTO product_categories (product_id, category_id, position) VALUES (?, ?, ?)',
+        [productId, r.categoryId, r.position]
+      );
+    return 1;
   },
   /** Erasure: null `user_id` on every audit row of one user (the row stays, the person goes). */
   auditUnlinkUser(sql, a) {

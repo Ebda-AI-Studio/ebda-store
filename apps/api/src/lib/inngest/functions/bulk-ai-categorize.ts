@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
 import { storeWriter } from '../../../lib/repo-factory';
+import { replaceCategoriesWithBackup } from '../../../services/catalogue-replace-backup.service';
 import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { runInStoreScope } from '@ebda/database';
 import { config } from '../../../config';
@@ -90,6 +91,9 @@ const bulkAiCategorizeFn = inngest.createFunction(
       logger.warn('bulk-ai/categorize-requested fired without ids');
       return;
     }
+    // NEVER-OVERWRITE-1 (Ruling RF-833-2): this sweep never replaces merchant-written content, whatever a caller sends. The
+    // `force` flag on the event or the job row is ignored; only empty fields are filled.
+    const force = false as boolean;
 
     return runInStoreScope(storeId, async () => {
       // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
@@ -125,7 +129,12 @@ const bulkAiCategorizeFn = inngest.createFunction(
           // Only uncategorized products are candidates — categorized products
           // are never touched by this sweep.
           const products = await sdb.product.findMany({
-            where: { storeId, status: 'active', deletedAt: null, categories: { none: {} } },
+            where: {
+              storeId,
+              status: 'active',
+              deletedAt: null,
+              ...(force ? {} : { categories: { none: {} } }),
+            },
             select: { id: true },
           });
 
@@ -162,7 +171,7 @@ const bulkAiCategorizeFn = inngest.createFunction(
           const result: BatchResult = await step.run(`batch-${i}`, async () => {
             const currentJob = await sdb.bulkAiJob.findUnique({
               where: { id: jobId, storeId },
-              select: { status: true },
+              select: { status: true, userId: true },
             });
             if (currentJob?.status === 'cancelled') {
               return {
@@ -181,8 +190,17 @@ const bulkAiCategorizeFn = inngest.createFunction(
             // concurrently via the per-product suggest endpoint) no longer
             // matches `categories: { none: {} }` and is skipped here.
             const items = await sdb.product.findMany({
-              where: { id: { in: batchIds }, storeId, categories: { none: {} } },
-              select: { id: true, name: true, description: true },
+              where: {
+                id: { in: batchIds },
+                storeId,
+                ...(force ? {} : { categories: { none: {} } }),
+              },
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                categories: { select: { categoryId: true } },
+              },
             });
             const byId = new Map(items.map(p => [p.id, p]));
 
@@ -197,6 +215,12 @@ const bulkAiCategorizeFn = inngest.createFunction(
               const product = byId.get(id);
               if (!product) {
                 // Deleted, or already categorized since load-items.
+                bSkipped++;
+                bProcessed++;
+                continue;
+              }
+              // NEVER-OVERWRITE-1: a categorized product is left alone, even if a read returned it.
+              if (!force && product.categories.length > 0) {
                 bSkipped++;
                 bProcessed++;
                 continue;
@@ -224,12 +248,25 @@ const bulkAiCategorizeFn = inngest.createFunction(
                 if (!best) {
                   bSkipped++;
                 } else {
-                  await (
-                    await storeWriter(storeId)
-                  ).productCategory.create({
-                    data: { productId: product.id, categoryId: best.id, position: 0 },
-                  });
-                  bFilled++;
+                  if (product.categories.length === 0) {
+                    await (
+                      await storeWriter(storeId)
+                    ).productCategory.create({
+                      data: { productId: product.id, categoryId: best.id, position: 0 },
+                    });
+                    bFilled++;
+                  } else {
+                    const out = await replaceCategoriesWithBackup(
+                      { storeId, userId: currentJob?.userId ?? null, jobId, tool: 'categorize' },
+                      {
+                        productId: product.id,
+                        previousIds: product.categories.map(c => c.categoryId),
+                        nextIds: [best.id],
+                      }
+                    );
+                    if (out === 'replaced') bFilled++;
+                    else bSkipped++;
+                  }
                 }
               } catch (err) {
                 if (isAiQuotaCapError(err)) {

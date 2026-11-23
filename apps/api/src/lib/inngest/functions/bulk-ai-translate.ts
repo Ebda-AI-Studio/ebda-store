@@ -11,6 +11,10 @@ import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import { requestStoreReindex } from '../../search/reindex';
 import { storeUpdate } from '../../repo-factory';
+import {
+  replaceTextWithBackup,
+  type ReplaceCtx,
+} from '../../../services/catalogue-replace-backup.service';
 
 /**
  * Catalogue-wide translation sweep. Walks every product + category
@@ -79,6 +83,9 @@ const bulkAiTranslateFn = inngest.createFunction(
   },
   async ({ event, step }) => {
     const { jobId, storeId, direction } = event.data;
+    // NEVER-OVERWRITE-1 (Ruling RF-833-2): this sweep never replaces merchant-written content, whatever a caller sends. The
+    // `force` flag on the event or the job row is ignored; only empty fields are filled.
+    const force = false as boolean;
     if (!jobId || !storeId) {
       logger.warn('bulk-ai/translate-requested fired without ids');
       return;
@@ -87,12 +94,19 @@ const bulkAiTranslateFn = inngest.createFunction(
     // Direction `to_ar` = fill empty AR from EN; `to_en` = fill empty EN from AR.
     const fillTo: 'ar' | 'en' = direction === 'to_en' ? 'en' : 'ar';
 
-    function shouldFill(en: string | null | undefined, ar: string | null | undefined): boolean {
+    // 'fill' = exactly one side is filled (translate into the empty one); 'replace' = both are filled and the run is a
+    // replace run (the target side is regenerated from the source side, its old value backed up first).
+    function planFor(
+      en: string | null | undefined,
+      ar: string | null | undefined
+    ): 'fill' | 'replace' | null {
       const enFilled = !!en?.trim();
       const arFilled = !!ar?.trim();
-      if (enFilled === arFilled) return false; // both filled or both empty
-      return fillTo === 'ar' ? enFilled && !arFilled : arFilled && !enFilled;
+      if (enFilled !== arFilled) return (fillTo === 'ar' ? enFilled : arFilled) ? 'fill' : null;
+      return enFilled && force ? 'replace' : null;
     }
+    const shouldFill = (en: string | null | undefined, ar: string | null | undefined) =>
+      planFor(en, ar) !== null;
 
     function sourceText(en: string | null | undefined, ar: string | null | undefined): string {
       return fillTo === 'ar' ? (en ?? '') : (ar ?? '');
@@ -155,7 +169,7 @@ const bulkAiTranslateFn = inngest.createFunction(
         const result: BatchResult = await step.run(`batch-${i}`, async () => {
           const currentJob = await sdb.bulkAiJob.findUnique({
             where: { id: jobId, storeId },
-            select: { status: true },
+            select: { status: true, userId: true },
           });
           if (currentJob?.status === 'cancelled') {
             return {
@@ -180,6 +194,39 @@ const bulkAiTranslateFn = inngest.createFunction(
           async function recordError(err: BulkError) {
             if (bErrors.length < ERROR_CAP) bErrors.push(err);
             bFailed++;
+          }
+
+          // Fill into an empty field, or replace a filled one: a replace goes through the backup service (backup + write, atomic).
+          const rctx: ReplaceCtx = {
+            storeId,
+            userId: currentJob?.userId ?? null,
+            jobId,
+            tool: fillTo === 'ar' ? 'translate_ar' : 'translate_en',
+          };
+          async function put(
+            kind: 'product' | 'category',
+            id: string,
+            field: string,
+            previous: string | null | undefined,
+            next: string,
+            updates: Record<string, string>
+          ) {
+            if (!previous?.trim()) {
+              updates[field] = next;
+              return;
+            }
+            const out = await replaceTextWithBackup(rctx, {
+              entityKind: kind,
+              entityId: id,
+              field,
+              previous,
+              next,
+            });
+            if (out === 'replaced') bProductsWritten += kind === 'product' ? 1 : 0;
+            else {
+              bFilled--;
+              bSkipped++;
+            }
           }
 
           entityLoop: for (const item of batchItems) {
@@ -217,7 +264,14 @@ const bulkAiTranslateFn = inngest.createFunction(
                       }),
                     `translate:product:${p.id}:name`
                   );
-                  updates[fillTo === 'ar' ? 'nameAr' : 'name'] = r.translation;
+                  await put(
+                    'product',
+                    p.id,
+                    fillTo === 'ar' ? 'nameAr' : 'name',
+                    fillTo === 'ar' ? p.nameAr : p.name,
+                    r.translation,
+                    updates
+                  );
                   bFilled++;
                   await sleep(THROTTLE_MS);
                 } catch (err) {
@@ -251,7 +305,14 @@ const bulkAiTranslateFn = inngest.createFunction(
                       }),
                     `translate:product:${p.id}:description`
                   );
-                  updates[fillTo === 'ar' ? 'descriptionAr' : 'description'] = r.translation;
+                  await put(
+                    'product',
+                    p.id,
+                    fillTo === 'ar' ? 'descriptionAr' : 'description',
+                    fillTo === 'ar' ? p.descriptionAr : p.description,
+                    r.translation,
+                    updates
+                  );
                   bFilled++;
                   await sleep(THROTTLE_MS);
                 } catch (err) {
@@ -322,7 +383,14 @@ const bulkAiTranslateFn = inngest.createFunction(
                       }),
                     `translate:category:${c.id}:name`
                   );
-                  updates[fillTo === 'ar' ? 'nameAr' : 'name'] = r.translation;
+                  await put(
+                    'category',
+                    c.id,
+                    fillTo === 'ar' ? 'nameAr' : 'name',
+                    fillTo === 'ar' ? c.nameAr : c.name,
+                    r.translation,
+                    updates
+                  );
                   bFilled++;
                   await sleep(THROTTLE_MS);
                 } catch (err) {
@@ -354,7 +422,14 @@ const bulkAiTranslateFn = inngest.createFunction(
                       }),
                     `translate:category:${c.id}:description`
                   );
-                  updates[fillTo === 'ar' ? 'descriptionAr' : 'description'] = r.translation;
+                  await put(
+                    'category',
+                    c.id,
+                    fillTo === 'ar' ? 'descriptionAr' : 'description',
+                    fillTo === 'ar' ? c.descriptionAr : c.description,
+                    r.translation,
+                    updates
+                  );
                   bFilled++;
                   await sleep(THROTTLE_MS);
                 } catch (err) {
@@ -403,7 +478,7 @@ const bulkAiTranslateFn = inngest.createFunction(
             }
             const updates: Record<string, string> = {};
 
-            if (shouldFill(store.name, store.nameAr)) {
+            if (planFor(store.name, store.nameAr) === 'fill') {
               try {
                 const r = await callWithRetry(
                   () =>
@@ -435,7 +510,7 @@ const bulkAiTranslateFn = inngest.createFunction(
             } else bSkipped++;
             bProcessed++;
 
-            if (shouldFill(store.description, store.descriptionAr)) {
+            if (planFor(store.description, store.descriptionAr) === 'fill') {
               try {
                 const r = await callWithRetry(
                   () =>

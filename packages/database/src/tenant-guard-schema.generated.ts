@@ -147,6 +147,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       catalogImportItems: 'CatalogImportItem',
       aiUsage: 'AiUsage',
       bulkAiJobs: 'BulkAiJob',
+      aiReplaceBackups: 'AiReplaceBackup',
       faqs: 'StoreFaq',
       howtos: 'StoreHowto',
       blogPosts: 'BlogPost',
@@ -1068,6 +1069,14 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
   {
     name: 'BulkImportJob',
     table: 'bulk_import_jobs',
+    storeId: true,
+    relations: {
+      store: 'Store',
+    },
+  },
+  {
+    name: 'AiReplaceBackup',
+    table: 'ai_replace_backups',
     storeId: true,
     relations: {
       store: 'Store',

@@ -25,6 +25,7 @@ describe('generated schema is current', () => {
       'cf-0004_template_current',
       'cf-0005_reorder_rules_one_per_item',
       'cf-0006_template_expand_only',
+      'cf-0009_ai_replace_backups',
     ]);
     expect(STORE_MIGRATIONS[0].sql).toBe(read('migrations/store/0001_init.sql'));
     expect(STORE_MIGRATIONS[1].sql).toBe(read('migrations/store/0002_invariants.sql'));

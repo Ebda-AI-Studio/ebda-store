@@ -14,7 +14,10 @@
     "GET .../ai/bulk/:jobId",
     "POST .../ai/jobs/:jobId/cancel",
     "POST .../ai/products/:productId/ai/reset-field",
-    "balance-description/revert-balance"
+    "balance-description/revert-balance",
+    "GET /stores/:storeId/ai/replace-backups",
+    "GET /stores/:storeId/ai/replace-runs",
+    "POST /stores/:storeId/ai/replace-backups/undo"
   ],
   "mcpTool": null,
   "planGate": "bulk_operations (bulk)",
@@ -22,7 +25,7 @@
   "policy": "preview",
   "undo": {
     "class": "reversible",
-    "note": "yes (reset-field / revert-balance; fill-only never overwrites)"
+    "note": "yes: translate, categorize and image alt only fill empty fields for every caller (NEVER-OVERWRITE-1, a `force` flag is ignored); backups and undo cover the product page history and any run recorded before (AITOOLS-4, RF-833-2); reset-field / revert-balance as before"
   },
   "helpArticle": "ai-switch-and-category-suggestions",
   "questions": {
@@ -45,7 +48,8 @@
     "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
-    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success",
+    "Translate, categorize and image alt never replace a filled field, even when a direct API call sends force=true; the assistant must not offer or claim a replace for them"
   ],
   "gaps": []
 }

@@ -8359,7 +8359,46 @@
       "seeResults": "See what your store has now",
       "undoHint": "Not happy? Undo the language fix"
     },
-    "fillOnlyNote": "This tool only fills what is empty. It never overwrites what you or the AI already wrote."
+    "fillOnlyNote": "This tool only fills what is empty. It never overwrites what you or the AI already wrote.",
+    "replaceConsequenceUndo": "What is already there will be replaced with new AI text. The old value is saved first, so you can undo it from the undo history on this page.",
+    "undo": {
+      "title": "Undo history",
+      "intro": "Every change an AI tool made over something that was already there. Undo puts the old value back, unless you edited that field after the run. History is kept 90 days.",
+      "productTitle": "AI changes you can undo",
+      "productIntro": "The AI replaced these values on this product. Undo puts the old one back, unless you edited the field since. History is kept 90 days.",
+      "loading": "Loading…",
+      "empty": "Nothing to undo. When you tick “Replace what's already there” on a tool, the old values show up here.",
+      "errorLoad": "Could not load the undo history. Try again in a moment.",
+      "errorUndo": "Could not undo. Try again in a moment.",
+      "restored": "Restored {count} value(s).",
+      "refused": "{count} value(s) were left as they are because you changed them after the AI run.",
+      "you": "You",
+      "team": "Team member",
+      "storeItem": "Category",
+      "before": "Before",
+      "after": "After",
+      "undone": "Undone",
+      "undoChange": "Undo",
+      "undoRun": "Undo this run",
+      "undoProduct": "Undo all on this product",
+      "showChanges": "Show changes",
+      "hideChanges": "Hide changes",
+      "runCounts": "{changed} changed, {undone} undone",
+      "tools": {
+        "translate_ar": "Translate to Arabic",
+        "translate_en": "Translate to English",
+        "categorize": "Put products in categories",
+        "image_alt": "Describe product images"
+      },
+      "fields": {
+        "name": "Name (English)",
+        "nameAr": "Name (Arabic)",
+        "description": "Description (English)",
+        "descriptionAr": "Description (Arabic)",
+        "alt": "Image description",
+        "categories": "Categories"
+      }
+    }
   },
   "account": {
     "security": {

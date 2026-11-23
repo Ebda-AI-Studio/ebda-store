@@ -49,6 +49,11 @@ const REVIEWED: Record<string, { sites: number; via: Via[] }> = {
   'apps/api/src/routes/ai.routes.ts': { sites: 1, via: ['requestStoreReindex'] },
   // CSV/XLSX import create + update (`...productFields`), soft bulk delete, bulk status.
   'apps/api/src/services/bulk.service.ts': { sites: 4, via: ['requestStoreReindex'] },
+  // AITOOLS-4: replace-with-backup (the translate sweep reindexes once per batch) and undo (reindexes once after restoring).
+  'apps/api/src/services/catalogue-replace-backup.service.ts': {
+    sites: 2,
+    via: ['requestStoreReindex'],
+  },
   // Catalogue translation sweep (`data: updates` = name/nameAr/description/descriptionAr).
   'apps/api/src/lib/inngest/functions/bulk-ai-translate.ts': {
     sites: 1,

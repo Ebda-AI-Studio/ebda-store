@@ -60,6 +60,8 @@ type BulkAiTranslateEvent = EventPayload & {
     jobId: string;
     storeId: string;
     direction: 'to_ar' | 'to_en';
+    /** Ignored: translate is fill-only for every caller (NEVER-OVERWRITE-1, Ruling RF-833-2). */
+    force?: boolean;
   };
 };
 

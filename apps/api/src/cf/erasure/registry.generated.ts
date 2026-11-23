@@ -54,6 +54,9 @@ export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
   ai_recommendation: {
     kind: 'no-pii',
   },
+  ai_replace_backups: {
+    kind: 'store-owned',
+  },
   answer_engine_checks: {
     kind: 'no-pii',
   },
@@ -616,6 +619,7 @@ export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
 
 export const GENERATED_MERCHANT_PII_PLAN: Array<{ table: string; columns: string[] }> = [
   { table: 'affiliate_events', columns: ['triggered_by_user_id'] },
+  { table: 'ai_replace_backups', columns: ['user_id', 'restored_by'] },
   { table: 'bulk_ai_jobs', columns: ['user_id'] },
   { table: 'bulk_import_jobs', columns: ['user_id'] },
   { table: 'catalog_import_jobs', columns: ['created_by'] },

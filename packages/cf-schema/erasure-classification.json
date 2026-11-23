@@ -693,6 +693,19 @@
       "user_id": null
     }
   },
+  "store-do:ai_replace_backups": {
+    "db": "store-do",
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["user_id", "restored_by"],
+    "subjectKeys": ["userId"],
+    "note": "AITOOLS-4: the acting user ids are nulled on user erasure or offboarding; the previous/new values are the merchant's own catalogue text (a business record that leaves with the store)",
+    "userIdColumns": ["user_id", "restored_by"],
+    "actorScrub": {
+      "user_id": null,
+      "restored_by": null
+    }
+  },
   "store-do:store_faqs": {
     "db": "store-do",
     "class": "no-pii",

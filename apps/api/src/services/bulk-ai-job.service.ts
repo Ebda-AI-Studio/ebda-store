@@ -37,6 +37,8 @@ export async function enqueueBulkAiJob(
       kind: spec.kind,
       ...(spec.kind === 'translate' ? { direction: spec.direction } : {}),
       ...(force ? { errors: { force: true } as object } : {}),
+      // the durable copy the stuck-job watcher resumes from (a replace run must stay a replace run)
+      ...(force ? { force: true } : {}),
     },
     select: { id: true, status: true, kind: true, createdAt: true },
   });

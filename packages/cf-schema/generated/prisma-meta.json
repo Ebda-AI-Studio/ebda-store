@@ -1292,6 +1292,13 @@
           "optional": false,
           "external": true
         },
+        "aiReplaceBackups": {
+          "kind": "relation",
+          "type": "AiReplaceBackup",
+          "list": true,
+          "optional": false,
+          "external": true
+        },
         "faqs": {
           "kind": "relation",
           "type": "StoreFaq",
@@ -13995,6 +14002,128 @@
           "list": false,
           "optional": false,
           "updatedAt": true
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "AiReplaceBackup": {
+      "table": "ai_replace_backups",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [["jobId", "entityKind", "entityId", "field"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "jobId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "job_id",
+          "list": false,
+          "optional": true
+        },
+        "tool": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "tool",
+          "list": false,
+          "optional": false
+        },
+        "entityKind": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "entity_kind",
+          "list": false,
+          "optional": false
+        },
+        "entityId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "entity_id",
+          "list": false,
+          "optional": false
+        },
+        "productId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "product_id",
+          "list": false,
+          "optional": true
+        },
+        "field": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "field",
+          "list": false,
+          "optional": false
+        },
+        "previousValue": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "previous_value",
+          "list": false,
+          "optional": true
+        },
+        "newValue": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "new_value",
+          "list": false,
+          "optional": true
+        },
+        "userId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "user_id",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "restoredAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "restored_at",
+          "list": false,
+          "optional": true
+        },
+        "restoredBy": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "restored_by",
+          "list": false,
+          "optional": true
         },
         "store": {
           "kind": "relation",
