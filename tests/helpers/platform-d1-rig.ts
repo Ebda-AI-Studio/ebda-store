@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { clearCfBindings, setCfBindings } from '../../apps/api/src/cf/bindings';
 import { cutoverKey, resetCutoverCache } from '../../apps/api/src/services/platform/cutover';
+import { DEFAULT_PLAN_SEEDS } from '@ebda/shared';
 import { registerPlatformRouter } from '../../apps/api/src/services/platform/router';
 
 const DIR = new URL('../../packages/cf-schema/migrations/platform/', import.meta.url);
@@ -18,7 +19,11 @@ const MIG = fs
   .join('\n');
 
 export function installPlatformD1(
-  families: Array<'billing' | 'access' | 'platform'> = ['billing', 'access', 'platform']
+  families: Array<'billing' | 'access' | 'platform' | 'payments'> = [
+    'billing',
+    'access',
+    'platform',
+  ]
 ): DatabaseSync {
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON');
@@ -62,6 +67,33 @@ export function installPlatformD1(
   resetCutoverCache();
   registerPlatformRouter();
   return raw;
+}
+
+/** The locked plan catalog (real prices) and the 20 founding slots filled with inert rows, so period ends do not depend on that counter. */
+export function seedBillingCatalog(raw: DatabaseSync): void {
+  for (const [i, p] of DEFAULT_PLAN_SEEDS.entries())
+    raw
+      .prepare(
+        `INSERT INTO plans (id, code, name_en, name_ar, sort, is_public, price_monthly_minor, price_yearly_minor, feature_tier, limits) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        `plan-${p.code}`,
+        p.code,
+        p.nameEn,
+        p.nameAr,
+        i,
+        p.isPublic ? 1 : 0,
+        p.priceMonthlyMinor,
+        p.priceYearlyMinor,
+        p.featureTier,
+        JSON.stringify(p.limits)
+      );
+  for (let g = 1; g <= 20; g++)
+    raw
+      .prepare(
+        `INSERT INTO billing_grants (id, kind, beneficiary_id, months, status, idempotency_key) VALUES (?, 'founding', ?, 1, 'applied', ?)`
+      )
+      .run(`filler-${g}`, `test-filler-${g}`, `founding:test-filler-${g}`);
 }
 
 export const uninstallPlatformD1 = (): void => clearCfBindings();

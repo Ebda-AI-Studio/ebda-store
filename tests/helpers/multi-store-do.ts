@@ -9,6 +9,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextFunction, Request, Response } from 'express';
 import type { DatabaseSync } from 'node:sqlite';
 import {
+  applyStoreSettings,
   answerMoneyOp,
   answerStockOp,
   bootstrapStoreRows,
@@ -43,6 +44,8 @@ export interface DoStoreWorld {
   repo: { storeId: string; backend: 'do'; db: never; writer: never; money?: never; stock?: never };
   /** Present when the world was added with `{ money: true }`: the real money ops (orders, payments) on this store's DO. */
   money?: ReturnType<typeof makeMoneyClient>;
+  /** The StoreDO RPC stub (`storeRecord`, `applySettings`): answer `storeDo(id)` with it in a mocked store-backend. */
+  stub: Record<string, (...a: never[]) => Promise<unknown>>;
   rows: (sql: string, ...p: unknown[]) => Record<string, unknown>[];
   /** The store's `store_profile` / `store_config` rows (what provisioning bootstraps); needed by any `db.store` read. */
   seedProfile: (
@@ -81,6 +84,19 @@ export class DoStores {
         };
       },
     };
+    // what `storeDo(storeId)` answers in production: the DO RPC methods the Store write path calls
+    const doStub = {
+      ...stub,
+      applySettings: async (id: string, fieldsJson: string) => ({
+        ok: true as const,
+        data: applyStoreSettings(
+          sql,
+          META as never,
+          id,
+          decodeRpc<Record<string, unknown>>(fieldsJson)
+        ),
+      }),
+    };
     const storeDelegate = doStoreDelegate(storeId, stub as never, decodeRpc as never);
     const withStoreDelegate = (base: object) =>
       new Proxy(base, {
@@ -108,6 +124,7 @@ export class DoStores {
       storeId,
       sqlite,
       money,
+      stub: doStub,
       repo: {
         storeId,
         backend: 'do',
@@ -128,6 +145,11 @@ export class DoStores {
     const w = this.worlds.get(storeId);
     if (!w) throw new Error(`no DO world for store ${storeId}`);
     return w;
+  }
+
+  /** For `vi.mock('@api/lib/store-backend', ...)`: `storeDo: id => worlds.doStub(id)`. */
+  doStub(storeId: string) {
+    return this.get(storeId).stub;
   }
 
   clear(): void {
