@@ -32,6 +32,62 @@ interface RowActionsProps {
   menuLabel?: string;
 }
 
+const MENU_GUTTER = 8;
+
+export interface RowMenuPlacementInput {
+  trigger: { top: number; bottom: number; left: number; right: number };
+  menuWidth: number;
+  menuHeight: number;
+  viewport: { width: number; height: number };
+  inset?: { top: number; right: number; bottom: number; left: number };
+  rtl: boolean;
+}
+
+/**
+ * Fixed-position coordinates for the row menu. The menu's END edge aligns with the trigger's end edge (right in LTR,
+ * left in RTL); it flips above the trigger when it does not fit below; both axes are then clamped into the viewport
+ * (8px gutter + safe-area inset), so a trigger near either edge can never push the menu off-screen.
+ */
+export function placeRowMenu(i: RowMenuPlacementInput): {
+  top: number;
+  left: number;
+  maxWidth: number;
+} {
+  const inset = i.inset ?? { top: 0, right: 0, bottom: 0, left: 0 };
+  const minX = MENU_GUTTER + inset.left;
+  const maxX = i.viewport.width - MENU_GUTTER - inset.right;
+  const minY = MENU_GUTTER + inset.top;
+  const maxY = i.viewport.height - MENU_GUTTER - inset.bottom;
+  const maxWidth = Math.max(0, maxX - minX);
+  const w = Math.min(i.menuWidth, maxWidth);
+  const h = i.menuHeight;
+  const wantLeft = i.rtl ? i.trigger.left : i.trigger.right - w;
+  const left = Math.max(minX, Math.min(wantLeft, maxX - w));
+  const below = i.trigger.bottom + 4;
+  const above = i.trigger.top - 4 - h;
+  const top0 = below + h > maxY && above >= minY ? above : below;
+  const top = Math.max(minY, Math.min(top0, maxY - h));
+  return { top, left, maxWidth };
+}
+
+/** Safe-area insets (iOS notch / home indicator) in px; zeros where env() is unsupported. */
+function readSafeAreaInsets() {
+  const probe = document.createElement('div');
+  probe.style.cssText =
+    'position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
+  document.body.appendChild(probe);
+  const cs = getComputedStyle(probe);
+  const n = (v: string) => Number.parseFloat(v) || 0;
+  const out = {
+    top: n(cs.paddingTop),
+    right: n(cs.paddingRight),
+    bottom: n(cs.paddingBottom),
+    left: n(cs.paddingLeft),
+  };
+  probe.remove();
+  return out;
+}
+
 /** Normal items first (in the order given), destructive ones last. */
 export function orderRowActionItems(items: RowActionItem[]): RowActionItem[] {
   return [...items.filter(i => !i.destructive), ...items.filter(i => i.destructive)];
@@ -70,20 +126,26 @@ export function RowActions({ primary, items, menuLabel }: RowActionsProps) {
     };
   }, [open]);
 
-  // QA-86: the menu lives in a portal with fixed coordinates, so a table card's overflow (DataTable's
-  // overflow-x-auto) can never clip it. It sits under the trigger, end-aligned (left edge in RTL), and flips above
-  // the trigger when there is no room below.
+  // QA-86: the menu lives in a portal with fixed coordinates, so a table card's overflow can never clip it. Placement
+  // is a pure function (placeRowMenu): end-aligned to the trigger, flipped above when there is no room below, then
+  // clamped so the whole menu stays inside the viewport minus an 8px gutter and the iOS safe areas.
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return;
     const r = triggerRef.current.getBoundingClientRect();
-    const h = menuRef.current?.offsetHeight ?? 0;
-    const below = r.bottom + 4;
-    const top = below + h > window.innerHeight && r.top - 4 - h >= 0 ? r.top - 4 - h : below;
     const rtl = getComputedStyle(triggerRef.current).direction === 'rtl';
+    const vv = window.visualViewport;
     setPos(
-      rtl
-        ? { top, left: Math.max(8, r.left) }
-        : { top, right: Math.max(8, window.innerWidth - r.right) }
+      placeRowMenu({
+        trigger: r,
+        menuWidth: menuRef.current?.offsetWidth ?? 0,
+        menuHeight: menuRef.current?.offsetHeight ?? 0,
+        viewport: {
+          width: vv?.width ?? window.innerWidth,
+          height: vv?.height ?? window.innerHeight,
+        },
+        inset: readSafeAreaInsets(),
+        rtl,
+      })
     );
   }, [open, ordered.length]);
 
