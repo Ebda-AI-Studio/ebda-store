@@ -3,6 +3,9 @@
  * packages/cf-schema/erasure-classification.json (Ruling FOLD-ERASURE-1). The classification is the single list of what is personal:
  *   - `subjectColumns`  the row IS the person's (memberships, devices, acceptances, API keys)  -> exported, DELETED on erasure
  *   - `actorScrub`      a user id on a row that survives the user (audit, approvals, invites)  -> id exported, replaced on erasure
+ *   - `pseudonymiseColumns` + `scrubOnErasure`  the row is EVIDENCE that must outlive the person (consent proof, Ruling NZ-N27B):
+ *                       exported, then the user id becomes an opaque `erased:<uuid>` pseudonym and the personal columns are NULLed;
+ *                       the row stays (it is deleted by the retention job, 7 years)
  *   - `staff_invites`   matched by the person's e-mail address: pending ones are revoked, the address is overwritten
  * A newly classified column is therefore handled with no code change, and `tests/unit/platform-subject-coverage.test.ts` runs this
  * engine over the REAL platform schema and fails when a personal-data table is not reachable from it (or not on its allowlist).
@@ -27,6 +30,8 @@ type Entry = {
   action: string;
   subjectColumns?: string[];
   actorScrub?: Record<string, string | null>;
+  pseudonymiseColumns?: string[];
+  scrubOnErasure?: string[];
 };
 const ENTRIES = classification as unknown as Record<string, Entry>;
 
@@ -41,18 +46,23 @@ export interface PlatformPlan {
   subject: Record<string, string[]>;
   /** table -> { column: replacement }: exported as rowid + column, replaced. */
   actor: Record<string, Record<string, string | null>>;
+  /** table -> evidence rows kept for the law: user-id columns become a pseudonym, `scrub` columns become NULL (NZ-N27B). */
+  pseudonymise: Record<string, { userColumns: string[]; scrub: string[] }>;
 }
 
 export function platformPlan(): PlatformPlan {
   const subject: PlatformPlan['subject'] = {};
   const actor: PlatformPlan['actor'] = {};
+  const pseudonymise: PlatformPlan['pseudonymise'] = {};
   for (const [key, e] of Object.entries(ENTRIES)) {
     if (e.db !== 'd1') continue;
     const table = key.split(':')[1];
     if (e.subjectColumns?.length) subject[table] = e.subjectColumns;
     if (e.actorScrub && Object.keys(e.actorScrub).length) actor[table] = e.actorScrub;
+    if (e.pseudonymiseColumns?.length)
+      pseudonymise[table] = { userColumns: e.pseudonymiseColumns, scrub: e.scrubOnErasure ?? [] };
   }
-  return { subject, actor };
+  return { subject, actor, pseudonymise };
 }
 
 export interface PlatformSubject {
@@ -86,6 +96,10 @@ export async function exportPlatformSubject(
     const drop = new Set(EXPORT_EXCLUDE[table] ?? []);
     out[table] = all.map(r => Object.fromEntries(Object.entries(r).filter(([k]) => !drop.has(k))));
   }
+  for (const [table, p] of Object.entries(plan.pseudonymise)) {
+    const where = p.userColumns.map(c => `${ident(c)} = ?1`).join(' OR ');
+    out[table] = await rows(d1, `SELECT * FROM ${ident(table)} WHERE ${where}`, s.userId);
+  }
   for (const [table, cols] of Object.entries(plan.actor)) {
     const names = Object.keys(cols);
     const where = names.map(c => `${ident(c)} = ?1`).join(' OR ');
@@ -116,6 +130,10 @@ export async function countPlatformSubject(
     parts.push(
       `(SELECT count(*) FROM ${ident(table)} WHERE ${cols.map(c => `${ident(c)} = ?1`).join(' OR ')})`
     );
+  for (const [table, p] of Object.entries(plan.pseudonymise))
+    parts.push(
+      `(SELECT count(*) FROM ${ident(table)} WHERE ${p.userColumns.map(c => `${ident(c)} = ?1`).join(' OR ')})`
+    );
   for (const [table, cols] of Object.entries(plan.actor))
     parts.push(
       `(SELECT count(*) FROM ${ident(table)} WHERE ${Object.keys(cols)
@@ -143,9 +161,22 @@ export async function erasePlatformSubject(
   d1: D1Like,
   s: PlatformSubject,
   now: number = Date.now(),
-  plan: PlatformPlan = platformPlan()
+  plan: PlatformPlan = platformPlan(),
+  /** One opaque value for every evidence row of this erasure (NZ-N27B); a fresh random one unless a test pins it. */
+  pseudonym: string = `erased:${crypto.randomUUID()}`
 ): Promise<{ changed: number }> {
   const stmts: unknown[] = [];
+  // Evidence rows first: the user id is replaced, never deleted, so the consent proof survives the person.
+  for (const [table, p] of Object.entries(plan.pseudonymise)) {
+    const sets = [
+      ...p.userColumns.map(c => `${ident(c)} = ?2`),
+      ...p.scrub.map(c => `${ident(c)} = NULL`),
+    ].join(', ');
+    const where = p.userColumns.map(c => `${ident(c)} = ?1`).join(' OR ');
+    stmts.push(
+      d1.prepare(`UPDATE ${ident(table)} SET ${sets} WHERE ${where}`).bind(s.userId, pseudonym)
+    );
+  }
   for (const [table, cols] of Object.entries(plan.subject))
     stmts.push(
       d1

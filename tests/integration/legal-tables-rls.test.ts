@@ -6,7 +6,8 @@
  *   - legal_notice_sends is platform-global but under RLS: readable by any signed-in user, written
  *     only by a super_admin; legal_acceptances inserts are the user's own only; deliveries are
  *     written only by the operator;
- *   - deleting a user cascades to their legal rows, including a super-admin hard delete.
+ *   - deleting a user does NOT delete their legal rows (Ruling NZ-N27B: consent evidence outlives the person; erasure pseudonymises
+ *     the user id, and the FK to users was dropped in 20261124100000_legal_evidence_no_user_fk).
  * Raw SQL on purpose: it proves the DATABASE layer (the guard allows raw SQL under a scope).
  * The contextless read uses an UNGUARDED ebda_app client (as rls-ebda-app.test.ts does): the
  * guarded client throws TenantScopeViolation for user-keyed models, and RLS is what this proves.
@@ -290,7 +291,7 @@ describe.skipIf(!hasDb)('legal tables under strict RLS', () => {
     }
   });
 
-  it('a super-admin hard delete of a user cascades to their legal rows', async () => {
+  it('a super-admin hard delete of a user keeps their legal rows (NZ-N27B: no FK cascade)', async () => {
     const victim = await mkUser('victim', 'store_admin');
     await owner.legalAcceptance.create({
       data: { userId: victim, docKey: 'terms', version: '1.0', source: 'signup' },
@@ -298,6 +299,7 @@ describe.skipIf(!hasDb)('legal tables under strict RLS', () => {
     await asApp(() =>
       asPlatformOperator(users.op, () => prisma.user.delete({ where: { id: victim } }))
     );
-    expect(await owner.legalAcceptance.count({ where: { userId: victim } })).toBe(0);
+    expect(await owner.legalAcceptance.count({ where: { userId: victim } })).toBe(1);
+    await owner.legalAcceptance.deleteMany({ where: { userId: victim } }); // the row no longer cascades: clean up
   });
 });

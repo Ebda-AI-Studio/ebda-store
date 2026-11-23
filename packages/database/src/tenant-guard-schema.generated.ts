@@ -43,9 +43,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       triggeredAffiliateEvents: 'AffiliateEvent',
       triggeredOrderEvents: 'OrderEvent',
       staffMemberships: 'StoreStaff',
-      legalAcceptances: 'LegalAcceptance',
       passkeyCredentials: 'PasskeyCredential',
-      legalNoticeDeliveries: 'LegalNoticeDelivery',
       wholesaleApplications: 'WholesaleApplication',
     },
   },
@@ -685,9 +683,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     name: 'LegalAcceptance',
     table: 'legal_acceptances',
     storeId: false,
-    relations: {
-      user: 'User',
-    },
+    relations: {},
   },
   {
     name: 'PasskeyCredential',
@@ -707,9 +703,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     name: 'LegalNoticeDelivery',
     table: 'legal_notice_deliveries',
     storeId: false,
-    relations: {
-      user: 'User',
-    },
+    relations: {},
   },
   {
     name: 'StoreFeature',

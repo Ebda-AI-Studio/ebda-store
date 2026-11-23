@@ -1171,12 +1171,19 @@
   "d1:legal_acceptances": {
     "db": "d1",
     "class": "customer-pii",
-    "action": "delete",
+    "action": "scrub",
     "piiColumns": ["user_id", "ip", "user_agent"],
     "subjectKeys": ["userId"],
-    "note": "policy acceptance proof per user",
+    "note": "consent EVIDENCE kept (Ruling NZ-N27B): on erasure user_id becomes an opaque pseudonym and ip + user_agent are NULLed; the row (doc_key, version, accepted_at, source) stays; ip/user_agent are NULLed after 12 months, the row is deleted after RETENTION_YEARS (7)",
     "userIdColumns": ["user_id"],
-    "subjectColumns": ["user_id"]
+    "pseudonymiseColumns": ["user_id"],
+    "scrubOnErasure": ["ip", "user_agent"],
+    "retention": {
+      "ageColumn": "accepted_at",
+      "nullColumns": ["ip", "user_agent"],
+      "nullAfterMonths": 12,
+      "deleteAfterYears": 7
+    }
   },
   "d1:legal_notice_sends": {
     "db": "d1",
@@ -1194,12 +1201,17 @@
   "d1:legal_notice_deliveries": {
     "db": "d1",
     "class": "customer-pii",
-    "action": "delete",
-    "piiColumns": ["user_id"],
+    "action": "scrub",
+    "piiColumns": ["user_id", "error"],
     "subjectKeys": ["userId"],
-    "note": "",
+    "note": "delivery record kept (Ruling NZ-N27B): on erasure user_id becomes an opaque pseudonym and the free-text error (may quote an address) is NULLed; the row is deleted after RETENTION_YEARS (7). The table has NO ip or user_agent column.",
     "userIdColumns": ["user_id"],
-    "subjectColumns": ["user_id"]
+    "pseudonymiseColumns": ["user_id"],
+    "scrubOnErasure": ["error"],
+    "retention": {
+      "ageColumn": "created_at",
+      "deleteAfterYears": 7
+    }
   },
   "d1:store_features": {
     "db": "d1",

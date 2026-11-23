@@ -98,9 +98,7 @@ model User {
   triggeredAffiliateEvents AffiliateEvent[]        @relation("AffiliateEventTriggeredBy")
   triggeredOrderEvents     OrderEvent[]            @relation("OrderEventActor")
   staffMemberships         StoreStaff[]            @relation("StaffUser")
-  legalAcceptances         LegalAcceptance[]
   passkeyCredentials       PasskeyCredential[]
-  legalNoticeDeliveries    LegalNoticeDelivery[]
   wholesaleApplications    WholesaleApplication[]
 
   // Composite unique (storeId, email) — one customer account per email per
@@ -2497,8 +2495,8 @@ model LegalAcceptance {
   userAgent  String?  @map("user_agent")
   source     String
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  // NZ-N27B: NO relation to User. Erasure replaces `userId` with an opaque pseudonym and keeps the row as consent evidence, so the
+  // column must be able to hold a value that is not a user; the old `onDelete: Cascade` deleted the proof with the user.
   @@unique([userId, docKey, version])
   @@map("legal_acceptances")
 }
@@ -2555,8 +2553,7 @@ model LegalNoticeDelivery {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  // NZ-N27B: no relation to User (see LegalAcceptance): erasure pseudonymises `userId`, it never deletes the delivery record.
   @@unique([userId, docKey, version])
   @@index([docKey, version, status])
   @@map("legal_notice_deliveries")

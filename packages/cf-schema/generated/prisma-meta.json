@@ -8603,19 +8603,6 @@
           "column": "source",
           "list": false,
           "optional": false
-        },
-        "user": {
-          "kind": "relation",
-          "type": "User",
-          "list": false,
-          "optional": false,
-          "external": true,
-          "owner": true,
-          "from": ["user_id"],
-          "fromProps": ["userId"],
-          "to": ["id"],
-          "toProps": ["id"],
-          "onDelete": "Cascade"
         }
       }
     },
@@ -8738,19 +8725,6 @@
           "list": false,
           "optional": false,
           "updatedAt": true
-        },
-        "user": {
-          "kind": "relation",
-          "type": "User",
-          "list": false,
-          "optional": false,
-          "external": true,
-          "owner": true,
-          "from": ["user_id"],
-          "fromProps": ["userId"],
-          "to": ["id"],
-          "toProps": ["id"],
-          "onDelete": "Cascade"
         }
       }
     },
