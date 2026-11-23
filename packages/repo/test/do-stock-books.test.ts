@@ -398,7 +398,7 @@ describe('COD settlement import (Ruling CF-R7-2)', () => {
       carrier: 'bosta',
       rows: [row('T1', 'L1', 5000, 100), row('T2', 'L2', 1000), row('T9', 'L9', 700)],
     });
-    expect(out).toEqual({ inserted: 3, duplicates: 0, unmatched: 1 });
+    expect(out).toMatchObject({ inserted: 3, duplicates: 0, unmatched: 1 });
     expect(
       r.q('SELECT line_ref, shipment_id, net_amount FROM cod_remittances ORDER BY line_ref')
     ).toEqual([
@@ -415,7 +415,7 @@ describe('COD settlement import (Ruling CF-R7-2)', () => {
       inserted: 2,
       duplicates: 0,
     });
-    expect(r.op('importCodRemittances', { carrier: 'bosta', rows })).toEqual({
+    expect(r.op('importCodRemittances', { carrier: 'bosta', rows })).toMatchObject({
       inserted: 0,
       duplicates: 2,
       unmatched: 0,
@@ -445,5 +445,152 @@ describe('COD settlement import (Ruling CF-R7-2)', () => {
     const out = r.op('importCodRemittances', { carrier: 'bosta', rows: [row('T5', 'L5', 1)] });
     expect(out.unmatched).toBe(1);
     expect(r.q('SELECT shipment_id FROM cod_remittances')[0].shipment_id).toBeNull();
+  });
+});
+
+describe('COD statement marks the order paid (S3-O7)', () => {
+  const row = (t: string, ref: string, gross: number, fee = 0) => ({
+    trackingNumber: t,
+    lineRef: ref,
+    grossAmount: gross,
+    feeAmount: fee,
+    netAmount: gross - fee,
+    remittedAt: new Date('2026-10-01T00:00:00Z'),
+  });
+  function rigCod() {
+    const r = rig();
+    r.raw.exec(`
+      INSERT INTO orders (id, store_id, order_number, status, payment_status, subtotal, total, shipping_address, billing_address) VALUES
+        ('o1','s1','1','delivered','unpaid',5000,5000,'{}','{}'), ('o2','s1','2','delivered','unpaid',3000,3000,'{}','{}'),
+        ('o3','s1','3','cancelled','unpaid',2000,2000,'{}','{}'), ('o4','other','4','delivered','unpaid',1000,1000,'{}','{}');
+      INSERT INTO payments (id, order_id, provider, status, amount) VALUES
+        ('p1','o1','cod','cod_pending',5000), ('p2','o2','cod','cod_pending',3000), ('p3','o3','cod','cod_pending',2000), ('p4','o4','cod','cod_pending',1000);
+      INSERT INTO shipments (id, store_id, order_id, carrier, tracking_number, status, cod_amount, pickup_address, delivery_address) VALUES
+        ('sh1','s1','o1','bosta','T1','delivered',5000,'{}','{}'), ('sh2','s1','o2','bosta','T2','delivered',3000,'{}','{}'),
+        ('sh3','s1','o3','bosta','T3','delivered',2000,'{}','{}'), ('sh4','other','o4','bosta','T4','delivered',1000,'{}','{}');
+    `);
+    const pay = (o: string) =>
+      r.q('SELECT payment_status FROM orders WHERE id = ?', o)[0].payment_status;
+    const events = (o: string) =>
+      r.q(
+        'SELECT to_status, metadata FROM order_events WHERE order_id = ? ORDER BY created_at, rowid',
+        o
+      );
+    return { ...r, pay, events };
+  }
+
+  it('a matching delivered COD line pays the order, completes the payment, writes both events with the statement ref', () => {
+    const r = rigCod();
+    const out = r.op('importCodRemittances', {
+      carrier: 'bosta',
+      rows: [row('T1', 'L1', 5000, 100)],
+    });
+    expect(out.settled).toEqual([{ orderId: 'o1', paymentId: 'p1' }]);
+    expect(r.pay('o1')).toBe('paid');
+    expect(r.q("SELECT status, paid_at FROM payments WHERE id = 'p1'")[0].status).toBe('completed');
+    expect(r.events('o1').map(e => e.to_status)).toEqual(['cod_paid_by_statement']);
+    expect(JSON.parse(r.events('o1')[0].metadata).statementRef).toBe('L1');
+    expect(r.q("SELECT details FROM payment_events WHERE payment_id = 'p1'")[0].details).toContain(
+      '"statementRef":"L1"'
+    );
+  });
+
+  it('re-importing the same statement changes nothing: no second event, no second payment event, one ledger row', () => {
+    const r = rigCod();
+    const rows = [row('T1', 'L1', 5000)];
+    r.op('importCodRemittances', { carrier: 'bosta', rows });
+    const again = r.op('importCodRemittances', { carrier: 'bosta', rows });
+    expect(again).toMatchObject({ inserted: 0, duplicates: 1, settled: [], flagged: [] });
+    expect(r.events('o1')).toHaveLength(1);
+    expect(r.q('SELECT count(*) AS n FROM payment_events')[0].n).toBe(1);
+    expect(r.q('SELECT count(*) AS n FROM cod_remittances')[0].n).toBe(1);
+  });
+
+  it('an amount mismatch is booked in full, flagged on the order, and never paid', () => {
+    const r = rigCod();
+    const out = r.op('importCodRemittances', { carrier: 'bosta', rows: [row('T2', 'L2', 2500)] });
+    expect(out).toMatchObject({
+      inserted: 1,
+      settled: [],
+      flagged: [{ orderId: 'o2', reason: 'amount_mismatch' }],
+    });
+    expect(r.pay('o2')).toBe('unpaid');
+    expect(r.q("SELECT status FROM payments WHERE id = 'p2'")[0].status).toBe('cod_pending');
+    expect(
+      r.q("SELECT gross_amount FROM cod_remittances WHERE line_ref = 'L2'")[0].gross_amount
+    ).toBe(2500);
+    expect(r.events('o2').map(e => e.to_status)).toEqual(['cod_statement_mismatch']);
+  });
+
+  it('a cancelled order is untouched even when the statement amount matches', () => {
+    const r = rigCod();
+    const out = r.op('importCodRemittances', { carrier: 'bosta', rows: [row('T3', 'L3', 2000)] });
+    expect(out).toMatchObject({ inserted: 1, settled: [], flagged: [] });
+    expect(r.pay('o3')).toBe('unpaid');
+    expect(r.events('o3')).toHaveLength(0);
+  });
+
+  it("another store's order in the statement is ignored", () => {
+    const r = rigCod();
+    const out = r.op('importCodRemittances', { carrier: 'bosta', rows: [row('T4', 'L4', 1000)] });
+    expect(out).toMatchObject({ unmatched: 1, settled: [], flagged: [] });
+    expect(r.pay('o4')).toBe('unpaid');
+    expect(r.q("SELECT status FROM payments WHERE id = 'p4'")[0].status).toBe('cod_pending');
+  });
+
+  it('the same partial file uploaded again with another date is recorded but never pays the order', () => {
+    const r = rigCod();
+    r.raw.exec(
+      "UPDATE payments SET amount = 200 WHERE id = 'p1'; UPDATE shipments SET cod_amount = 200 WHERE id = 'sh1';"
+    );
+    const day = (d: string) => ({
+      ...row('T1', `D-${d}`, 100),
+      remittedAt: new Date(`${d}T00:00:00Z`),
+    });
+    const first = r.op('importCodRemittances', { carrier: 'bosta', rows: [day('2026-10-01')] });
+    expect(first.flagged).toEqual([{ orderId: 'o1', reason: 'amount_mismatch' }]);
+    const again = r.op('importCodRemittances', { carrier: 'bosta', rows: [day('2026-10-02')] });
+    expect(again).toMatchObject({
+      inserted: 1,
+      settled: [],
+      flagged: [{ orderId: 'o1', reason: 'suspected_duplicate' }],
+    });
+    expect(r.pay('o1')).toBe('unpaid');
+    expect(r.q("SELECT status FROM payments WHERE id = 'p1'")[0].status).toBe('cod_pending');
+    expect(r.q('SELECT line_ref, source FROM cod_remittances ORDER BY line_ref')).toEqual([
+      { line_ref: 'D-2026-10-01', source: 'csv' },
+      { line_ref: 'D-2026-10-02', source: 'csv:suspected_duplicate' },
+    ]);
+    expect(r.events('o1').map(e => e.to_status)).toEqual([
+      'cod_statement_mismatch',
+      'cod_statement_duplicate',
+    ]);
+  });
+
+  it('a genuine second half (different amount) still completes the order after a partial line', () => {
+    const r = rigCod();
+    r.raw.exec(
+      "UPDATE payments SET amount = 200 WHERE id = 'p1'; UPDATE shipments SET cod_amount = 200 WHERE id = 'sh1';"
+    );
+    r.op('importCodRemittances', { carrier: 'bosta', rows: [row('T1', 'A', 100)] });
+    const out = r.op('importCodRemittances', { carrier: 'bosta', rows: [row('T1', 'B', 100, 1)] });
+    expect(out.settled).toEqual([{ orderId: 'o1', paymentId: 'p1' }]);
+    expect(r.pay('o1')).toBe('paid');
+  });
+
+  it('a re-upload against an already paid order is recorded but writes no order event', () => {
+    const r = rigCod();
+    r.op('importCodRemittances', { carrier: 'bosta', rows: [row('T1', 'A', 5000)] });
+    expect(r.pay('o1')).toBe('paid');
+    const before = r.events('o1').length;
+    const again = r.op('importCodRemittances', {
+      carrier: 'bosta',
+      rows: [{ ...row('T1', 'B', 5000), remittedAt: new Date('2026-10-09T00:00:00Z') }],
+    });
+    expect(again).toMatchObject({ inserted: 1, settled: [], flagged: [] });
+    expect(r.events('o1')).toHaveLength(before);
+    expect(r.q("SELECT source FROM cod_remittances WHERE line_ref = 'B'")[0].source).toBe(
+      'csv:suspected_duplicate'
+    );
   });
 });

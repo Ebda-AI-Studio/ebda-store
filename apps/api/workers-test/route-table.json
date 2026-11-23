@@ -457,7 +457,6 @@
   "GET /stores/public/:storeId/wallet/transactions",
   "GET /stores/stores/:id/features",
   "GET /uploads/list",
-  "GET /uploads/status",
   "GET /wishlist/",
   "PATCH /admin/stores/:id/status",
   "PATCH /auth/passkeys/:id",

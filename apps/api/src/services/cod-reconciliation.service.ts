@@ -8,6 +8,9 @@
  */
 import { prisma } from '@ebda/database';
 import { storeDb, storeStock } from '../lib/repo-factory';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import { inngest } from '../lib/inngest/client';
+import logger from '../lib/logger';
 import { AppError } from '../middleware/error-handler';
 import {
   parseSettlementCsv,
@@ -88,7 +91,14 @@ export class CodReconciliationService {
       );
     }
     if (parsed.rows.length === 0) {
-      return { inserted: 0, duplicates: 0, unmatched: 0, rejected: parsed.rejected };
+      return {
+        inserted: 0,
+        duplicates: 0,
+        unmatched: 0,
+        settled: [],
+        flagged: [],
+        rejected: parsed.rejected,
+      };
     }
 
     // A store on its Durable Object keeps its remittance lines there, beside the shipments they reference (Ruling CF-R7-2):
@@ -108,6 +118,21 @@ export class CodReconciliationService {
           remittedAt: x.remittedAt,
         })),
       });
+      // S3-O7: the same post-payment fan-out as a COD order paid on delivery (journal posting); idempotent per order.
+      // Deferred to the request's commit (a scope exists on the route) and awaited, so it is neither fired inside an open
+      // transaction nor dropped when the response returns (same as order.service's codCollectedOnDelivery).
+      await Promise.all(
+        r.settled.map(o =>
+          deferAfterTenantCommit('cod.statementSettled', () =>
+            inngest.send({
+              name: 'order/created',
+              data: { orderId: o.orderId, storeId, paymentMethod: 'cod', locale: undefined },
+            })
+          ).catch((err: unknown) =>
+            logger.error({ err, orderId: o.orderId }, '[cod-statement] fan-out enqueue failed')
+          )
+        )
+      );
       return { ...r, rejected: parsed.rejected };
     }
 
@@ -140,6 +165,9 @@ export class CodReconciliationService {
       inserted: created.count,
       duplicates: parsed.rows.length - created.count,
       unmatched: parsed.rows.filter(r => !byTracking.has(r.trackingNumber)).length,
+      // S3-O7 settles on the StoreDO only (Postgres is removed in production); the same shape keeps the two backends in parity
+      settled: [],
+      flagged: [],
       rejected: parsed.rejected,
     };
   }

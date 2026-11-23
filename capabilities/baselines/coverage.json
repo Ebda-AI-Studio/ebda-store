@@ -656,7 +656,6 @@
     "route-uncovered|GET /stores/:storeId/wholesale-applications/summary",
     "route-uncovered|GET /stores/stores/:id/features",
     "route-uncovered|GET /uploads/list",
-    "route-uncovered|GET /uploads/status",
     "route-uncovered|GET /wishlist/",
     "route-uncovered|PATCH /stores/:storeId/affiliates/:id/approve",
     "route-uncovered|PATCH /stores/:storeId/affiliates/:id/reject",

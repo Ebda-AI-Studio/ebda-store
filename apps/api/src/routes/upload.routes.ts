@@ -65,19 +65,6 @@ const upload = multer({
 });
 
 /**
- * GET /uploads/status
- * Check if storage is configured
- */
-router.get('/status', authenticate, (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    data: {
-      available: StorageService.isAvailable(),
-    },
-  });
-});
-
-/**
  * Per-store upload folder whitelist. Mirrors the set in storage.service.ts —
  * we validate here too so a bad folder hint fails fast before we touch the
  * uploaded buffer or hit R2. `misc` is the default when callers don't pass
