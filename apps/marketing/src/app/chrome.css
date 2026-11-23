@@ -21,7 +21,7 @@
   justify-content: center;
   background: var(--gold);
   color: var(--night);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-weight: 600;
 }
 .nav-menu a.nav-cta:hover {
@@ -68,7 +68,7 @@
      NAV-BAR-FIT-1). English keeps the 1200px spacing. */
   html[lang='en'] .nav-links {
     gap: 18px;
-    padding-inline-start: 8px;
+    padding-inline-start: var(--space-2);
   }
 }
 
@@ -87,8 +87,8 @@
   z-index: 1;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 8px -14px -8px; /* full bleed: cancels the panel's 8px 14px padding */
+  gap: var(--space-2);
+  margin: var(--space-2) -14px -8px; /* full bleed: cancels the panel's 8px 14px padding */
   padding: 10px 14px;
   background: var(--panel);
   border-top: 1px solid var(--line);
@@ -97,7 +97,7 @@
   flex: 2 1 auto;
   align-items: center;
   min-height: 44px;
-  padding: 0 16px;
+  padding: 0 var(--space-4);
   white-space: nowrap;
 }
 .nav-menu .menu-actions .wa {
@@ -108,7 +108,9 @@
   flex: 1 1 auto;
   justify-content: center;
   padding-block: 0;
-  border-radius: 10px; /* the CTA's radius: the two read as a pair, not a bar and a pill */
+  border-radius: var(
+    --radius-md
+  ); /* the CTA's radius: the two read as a pair, not a bar and a pill */
 }
 @media (min-width: 521px) {
   /* Tablet and small laptop: the panel hangs from the sticky header, so whatever ran past the bottom of the screen could
@@ -142,12 +144,40 @@
 @media (max-width: 799px) {
   .product-row {
     gap: var(--space-3);
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
-    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    --fade-w: 28px;
+    --fade-e: var(
+      --fade-w
+    ); /* static end fade; the scroll-driven block below hides it at the end (@supports) */
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--fade-s),
+      #000 calc(100% - var(--fade-e)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--fade-s),
+      #000 calc(100% - var(--fade-e)),
+      transparent
+    );
   }
   .product-row:dir(rtl) {
-    -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent);
-    mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent);
+    -webkit-mask-image: linear-gradient(
+      to left,
+      transparent,
+      #000 var(--fade-s),
+      #000 calc(100% - var(--fade-e)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to left,
+      transparent,
+      #000 var(--fade-s),
+      #000 calc(100% - var(--fade-e)),
+      transparent
+    );
   }
   .product-links {
     gap: var(--space-4);
@@ -204,7 +234,7 @@
 .btn-sm {
   min-height: 36px;
   padding: 6px 14px;
-  font-size: 0.9375rem;
+  font-size: var(--fs-sm);
 }
 .product-cta {
   flex: none;

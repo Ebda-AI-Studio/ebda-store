@@ -8,7 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { BRAND } from '../../packages/shared/src/brand';
 
 // globals.css holds :root; chrome.css holds .band-dark (the generated site-footer block, the one that wins the cascade).
-const css = ['globals.css', 'chrome.css']
+// route-store.css holds the /store looks tabs (split out of globals.css, Ruling CSS-BUDGET-726-1).
+const css = ['globals.css', 'route-store.css', 'chrome.css']
   .map(f => readFileSync(path.resolve(__dirname, '../../apps/marketing/src/app', f), 'utf8'))
   .join('\n');
 

@@ -184,8 +184,6 @@ describe('ci.yml lanes', () => {
           .replace(/needs\.([\w-]+)\.result == 'success'/g, (_, n) => String(run(n)))
           // MERGE-QUEUE-1 part B: `tested-tree` answers skip=false unless a merge group proved the tree, so the evaluator's world (no such evidence) is `true`
           .replace(/needs\.tested-tree\.outputs\.skip != 'true'/g, 'true')
-          // MQ-SCOPE-1: `heavy` is only ever 'false' on a light merge group; every other event (and the evaluator's world) is heavy
-          .replace(/needs\.tested-tree\.outputs\.heavy != 'false'/g, 'true')
           .replace(/needs\.[\w-]+\.outputs\.\w+ (==|!=) '[^']*'/g, (_, op) =>
             String(op === '!=' ? false : false)
           )
@@ -371,6 +369,7 @@ describe('scripts/ci-affected.mjs', () => {
     expect(run('apps/marketing/src/app/chrome.css').workers).toEqual(['marketing']);
     expect(run('apps/marketing/src/components/LegalPage.tsx').workers).toEqual(['marketing']);
     expect(run('scripts/ci/marketing-perf-budget.json').workers).toEqual(['marketing']);
+    expect(run('scripts/ci/marketing-css-route-coverage.mjs').workers).toEqual(['marketing']);
     // the API is a Worker app since SP4 Stage 1 (apps/api/wrangler.jsonc)
     expect(run('apps/api/wrangler.jsonc').workers).toEqual(['api']);
     // root manifest / cf-* scripts hit every Worker app

@@ -17,6 +17,8 @@ import { Header } from './Header';
 import { Reveal } from './Motion';
 import { JsonLd } from './JsonLd';
 import { SiteLink } from './SiteLink';
+import '@/app/route-whatsapp.css';
+import '@/app/route-store-wa.css';
 
 const FEATURE_ORDER = [
   'shared_inbox',
