@@ -68,19 +68,19 @@ This is the path the migration comments in `20260808120000_fk_only_indexes`,
 `20260902120000_products_search_trgm_gin` and `20261002090000_order_search_trgm_and_fk_indexes`
 refer to.
 
-### Hamza fold re-index (`20261123000100_search_fold_hamza`, Ruling F7-HAMZA-1)
+### Hamza fold indexes (`20261123000100_search_fold_hamza`, Ruling F7-HAMZA-2)
 
-The migration replaces the body of `public.ebda_ar_norm` (hamza seats unified, NFKC first) and `REINDEX`es the five indexes built on it
-(`products_search_doc_trgm_idx`, `products_name_doc_trgm_idx`, `products_sku_norm_trgm_idx`, `users_name_norm_trgm_idx`,
-`orders_guest_name_norm_trgm_idx`). Pre-launch or on small tables the plain `REINDEX` inside the migration is fine. Post-launch, off-peak, on
-`DIRECT_URL` in psql autocommit (no BEGIN), BEFORE the deploy that carries the new vendored fold:
+The migration is ADDITIVE: the original fold B (`public.ebda_ar_norm` and every index on it) is untouched, so there is no reindex and no lock on existing
+objects. It adds `public.ebda_ar_norm_h`, the two `_h` doc functions, `public.ebda_product_search_ids_h` and two trigram GIN expression indexes
+(`products_search_doc_h_trgm_idx`, `products_name_doc_h_trgm_idx`). Pre-launch or on a small `products` table the plain `CREATE INDEX IF NOT EXISTS`
+inside the migration is fine. Post-launch, off-peak, on `DIRECT_URL` in psql autocommit (no BEGIN), BEFORE the deploy that carries the code:
 
-1. the `CREATE OR REPLACE FUNCTION public.ebda_ar_norm` statement copied verbatim from the migration;
-2. `REINDEX INDEX CONCURRENTLY public.<each of the five>;`
-3. the `NOT i.indisvalid` check above must return 0 rows.
+1. the `ebda_ar_norm_h`, `ebda_product_search_doc_h`, `ebda_product_name_doc_h` `CREATE OR REPLACE FUNCTION` statements copied verbatim from the migration;
+2. the two indexes with `CREATE INDEX CONCURRENTLY IF NOT EXISTS` (same expressions as the migration);
+3. the `NOT i.indisvalid` check above must return 0 rows; the migration then re-runs every statement as a no-op.
 
-Until step 2 finishes a search can miss rows whose index entries still hold the old fold. After the deploy, run `reindexStore` per store for the
-Durable Object search index (`verifyProductIndex` lists the stale rows). Rollback: the migration's `rollback.sql`.
+After deploy: each store's Durable Object search index gains the fold-A columns; `ensureSearchIndex` rebuilds it lazily from the dirty queue, `reindexStore`
+per store does it eagerly (`verifyProductIndex` lists the stale rows). Rollback: the migration's `rollback.sql` (code first).
 
 ### Pre-build: search normalisation (`20261019000100_search_normalisation`)
 

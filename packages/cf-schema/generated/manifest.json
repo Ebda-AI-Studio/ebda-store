@@ -1728,6 +1728,18 @@
       "name": "trust_requests_support_cap_slot",
       "table": "trust_requests",
       "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "index",
+      "name": "products_search_doc_h_trgm_idx",
+      "table": "products",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "products_name_doc_h_trgm_idx",
+      "table": "products",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
     }
   ],
   "decimals": [

@@ -14,8 +14,10 @@
 // must not see). Arabic light stemming (SEARCH-STEM-1) is an additive `stem_doc` / `stem_name_doc` column pair. Vector (Vectorize) fusion stays a separate stage: this module is the keyword arm.
 import {
   escapeLike,
+  normalizeArabicHamza,
   normalizeArabicSearch,
   searchTokens,
+  searchTokensHamza,
   stemSearchDoc,
   stemSearchToken,
 } from '../../../shared/src/search';
@@ -36,7 +38,7 @@ export const PRODUCT_SEARCH_MAX_LIMIT = 10_000;
 export const SEARCH_STATEMENTS: readonly string[] = [
   ...VECTOR_STATEMENTS,
   `CREATE VIRTUAL TABLE IF NOT EXISTS product_search_fts USING fts5(
-  doc, name_doc, sku, stem_doc, stem_name_doc, product_id UNINDEXED, store_id UNINDEXED, tokenize = 'trigram')`,
+  doc, name_doc, sku, stem_doc, stem_name_doc, doc_h, name_doc_h, product_id UNINDEXED, store_id UNINDEXED, tokenize = 'trigram')`,
   `CREATE VIRTUAL TABLE IF NOT EXISTS customer_search_fts USING fts5(
   name_doc, digits, email, kind UNINDEXED, ref_id UNINDEXED, store_id UNINDEXED, tokenize = 'trigram')`,
   `CREATE TABLE IF NOT EXISTS search_dirty (kind TEXT NOT NULL, id TEXT NOT NULL, PRIMARY KEY (kind, id)) WITHOUT ROWID`,
@@ -69,7 +71,14 @@ export function ensureSearchIndex(db: SyncSql): void {
   db.transactionSync(() => {
     // Stem columns (Ruling SEARCH-STEM-1): an index built before them is derived state, so drop it and let the dirty
     // queue below rebuild it lazily and in batches. Re-running after the rebuild finds the column and does nothing.
-    if (!fresh && !hasColumn(db, 'product_search_fts', 'stem_doc')) {
+    // Hamza-fold columns (Ruling F7-HAMZA-2) are the same kind of change: derived state, dropped and rebuilt from the dirty queue.
+    if (
+      !fresh &&
+      !(
+        hasColumn(db, 'product_search_fts', 'stem_doc') &&
+        hasColumn(db, 'product_search_fts', 'doc_h')
+      )
+    ) {
       db.run('DROP TABLE product_search_fts', []);
       fresh = true;
     }
@@ -156,6 +165,11 @@ const buildProductStemNameDoc = (p: ProductDocFields): string =>
 /** `ebda_product_name_doc` */
 export const buildProductNameDoc = (p: ProductDocFields): string =>
   normalizeArabicSearch(joinDoc(p.name, p.nameAr, p.searchTerms));
+/** Fold A twins (Ruling F7-HAMZA-2, `ebda_product_search_doc_h` / `ebda_product_name_doc_h`): the same joined text under the hamza fold. */
+export const buildProductDocHamza = (p: ProductDocFields): string =>
+  normalizeArabicHamza(joinDoc(p.name, p.nameAr, p.searchTerms, p.description, p.descriptionAr));
+export const buildProductNameDocHamza = (p: ProductDocFields): string =>
+  normalizeArabicHamza(joinDoc(p.name, p.nameAr, p.searchTerms));
 
 const clampLimit = (limit: number | undefined): number =>
   Math.min(PRODUCT_SEARCH_MAX_LIMIT, Math.max(1, Math.floor(limit ?? PRODUCT_SEARCH_ID_CAP)));
@@ -177,13 +191,15 @@ function writeIndexRow(db: SyncSql, r: Row): void {
   };
   db.run('DELETE FROM product_search_fts WHERE product_id = ?', [r.id]);
   db.run(
-    'INSERT INTO product_search_fts (doc, name_doc, sku, stem_doc, stem_name_doc, product_id, store_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO product_search_fts (doc, name_doc, sku, stem_doc, stem_name_doc, doc_h, name_doc_h, product_id, store_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       buildProductDoc(f),
       buildProductNameDoc(f),
       normalizeArabicSearch(f.sku ?? ''),
       buildProductStemDoc(f),
       buildProductStemNameDoc(f),
+      buildProductDocHamza(f),
+      buildProductNameDocHamza(f),
       r.id,
       r.store_id,
     ]
@@ -220,7 +236,7 @@ export function verifyProductIndex(
   const idx = new Map(
     db
       .all(
-        'SELECT product_id, doc, name_doc, sku, stem_doc, stem_name_doc FROM product_search_fts',
+        'SELECT product_id, doc, name_doc, sku, stem_doc, stem_name_doc, doc_h, name_doc_h FROM product_search_fts',
         []
       )
       .map(r => [r.product_id as string, r])
@@ -246,7 +262,9 @@ export function verifyProductIndex(
       row.name_doc !== buildProductNameDoc(f) ||
       row.sku !== normalizeArabicSearch(f.sku ?? '') ||
       row.stem_doc !== buildProductStemDoc(f) ||
-      row.stem_name_doc !== buildProductStemNameDoc(f)
+      row.stem_name_doc !== buildProductStemNameDoc(f) ||
+      row.doc_h !== buildProductDocHamza(f) ||
+      row.name_doc_h !== buildProductNameDocHamza(f)
     )
       stale.push(r.id as string);
     idx.delete(r.id as string);
@@ -281,7 +299,18 @@ export function trigramSimilarity(a: string, b: string): number {
 const WORD_START_BOUNDS = ['', '% ', '%/', '%(', '%-', '%,', '%.', 'ا', '% ا', 'ال', '% ال'];
 const ftsPhrase = (t: string) => `"${t.replace(/"/g, '""')}"`;
 
-/** Ids of the products matching `raw`, best name match first. */
+interface Ranked {
+  id: string;
+  exact: number;
+  name: string;
+  featured: number;
+  sim: number;
+}
+
+/**
+ * Ids of the products matching `raw`, best name match first. A word matches under fold B (the original) OR under fold A (hamza fold, Ruling
+ * F7-HAMZA-2): the two are searched against their own columns and the hits merged, so every old match still holds.
+ */
 export function searchProductIdSet(
   db: SyncSql,
   storeId: string,
@@ -289,15 +318,44 @@ export function searchProductIdSet(
   opts: ProductSearchOpts
 ): ProductSearchIdSet {
   if (!storeId) throw new MoneyError('STORE_REQUIRED', 'storeId is required', 500);
-  const tokens = searchTokens(raw);
-  if (tokens.length === 0) return { ids: [], truncated: false };
+  if (searchTokens(raw).length === 0) return { ids: [], truncated: false };
   flushSearchIndex(db);
   const limit = clampLimit(opts.limit);
+  const byId = new Map<string, Ranked>();
+  const folds: Array<'b' | 'a'> = /[\u0600-\u06FF]/.test(raw) ? ['b', 'a'] : ['b']; // Latin-only: A and B agree
+  for (const fold of folds)
+    for (const r of rankProductHits(db, storeId, raw, opts, fold)) {
+      const prev = byId.get(r.id);
+      if (!prev) byId.set(r.id, r);
+      else {
+        prev.exact = Math.max(prev.exact, r.exact);
+        prev.sim = Math.max(prev.sim, r.sim);
+      }
+    }
+  const ranked = [...byId.values()].sort((a, b) =>
+    opts.order === 'featured'
+      ? b.exact - a.exact || b.featured - a.featured || cmp(a.name, b.name) || cmp(a.id, b.id)
+      : b.exact - a.exact || b.sim - a.sim || cmp(a.id, b.id)
+  );
+  return { ids: ranked.slice(0, limit).map(r => r.id), truncated: ranked.length > limit };
+}
+
+/** The hits of ONE fold. Fold A has no stem layer and no SKU arm (stems and SKUs stay on fold B). */
+function rankProductHits(
+  db: SyncSql,
+  storeId: string,
+  raw: string,
+  opts: ProductSearchOpts,
+  fold: 'b' | 'a'
+): Ranked[] {
+  const tokens = fold === 'b' ? searchTokens(raw) : searchTokensHamza(raw);
+  if (tokens.length === 0) return [];
   const storefront = opts.scope === 'storefront';
-  const withSku = opts.withSku ?? opts.scope === 'admin';
-  const docCol = opts.field === 'name' ? 'name_doc' : 'doc';
+  const withSku = fold === 'b' && (opts.withSku ?? opts.scope === 'admin');
+  const nameCol = fold === 'b' ? 'name_doc' : 'name_doc_h';
+  const docCol = opts.field === 'name' ? nameCol : fold === 'b' ? 'doc' : 'doc_h';
   const stemCol = opts.field === 'name' ? 'stem_name_doc' : 'stem_doc';
-  const useStem = opts.stem ?? storefront;
+  const useStem = fold === 'b' && (opts.stem ?? storefront);
   // UTF-16 units, exactly like the Postgres caller's `t.length < 3`
   const wordStart = tokens.every(t => t.length < 3);
 
@@ -343,12 +401,12 @@ export function searchProductIdSet(
   const status = storefront ? "AND p.status = 'active' AND p.audience = 'public'" : '';
   const deleted = opts.includeDeleted && !storefront ? '' : 'AND p.deleted_at IS NULL';
   const rows = db.all(
-    `SELECT p.id AS id, p.name AS name, p.featured AS featured, f.name_doc AS name_doc, f.${docCol} AS hay, f.sku AS sku
+    `SELECT p.id AS id, p.name AS name, p.featured AS featured, f.${nameCol} AS name_doc, f.${docCol} AS hay, f.sku AS sku
        FROM product_search_fts f JOIN products p ON p.id = f.product_id AND p.store_id = ?
       WHERE ${where.join(' AND ')} ${status} ${deleted}`,
     [storeId, ...sqlParams]
   );
-  const q = normalizeArabicSearch(raw);
+  const q = fold === 'b' ? normalizeArabicSearch(raw) : normalizeArabicHamza(raw);
   // A row that contains every word literally (or by SKU) ranks before one that matched only through a stem.
   const literalHit = (r: Row) =>
     !useStem ||
@@ -356,20 +414,13 @@ export function searchProductIdSet(
     tokens.every(
       t => String(r.hay ?? '').includes(t) || (withSku && String(r.sku ?? '').includes(t))
     );
-  const ranked = rows
-    .map(r => ({
-      id: r.id as string,
-      exact: literalHit(r) ? 1 : 0,
-      name: (r.name as string | null) ?? '',
-      featured: Number(r.featured ?? 0),
-      sim: opts.order === 'featured' ? 0 : trigramSimilarity(String(r.name_doc ?? ''), q),
-    }))
-    .sort((a, b) =>
-      opts.order === 'featured'
-        ? b.exact - a.exact || b.featured - a.featured || cmp(a.name, b.name) || cmp(a.id, b.id)
-        : b.exact - a.exact || b.sim - a.sim || cmp(a.id, b.id)
-    );
-  return { ids: ranked.slice(0, limit).map(r => r.id), truncated: ranked.length > limit };
+  return rows.map(r => ({
+    id: r.id as string,
+    exact: literalHit(r) ? 1 : 0,
+    name: (r.name as string | null) ?? '',
+    featured: Number(r.featured ?? 0),
+    sim: opts.order === 'featured' ? 0 : trigramSimilarity(String(r.name_doc ?? ''), q),
+  }));
 }
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 export function searchProductIds(
