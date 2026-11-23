@@ -1,5 +1,6 @@
 'use client';
 
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 import { useState } from 'react';
 import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
@@ -56,7 +57,7 @@ export function PlatformCard({ platform, origin }: { platform: PlatformKey; orig
                   dir="ltr"
                   value={url}
                   onFocus={e => e.currentTarget.select()}
-                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-xs font-mono text-foreground"
+                  className={`${FIELD_CLASSES} min-w-0 flex-1 font-mono`}
                 />
                 <Button type="button" variant="outline" size="sm" onClick={() => copy(url)}>
                   {t('copy')}

@@ -1,5 +1,6 @@
 'use client';
 
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 import { useEffect, useState } from 'react';
 import { Modal, useToast } from '@ebda/ui';
 import { moveSearchToHeader } from '@ebda/shared';
@@ -153,7 +154,7 @@ export function NewReturnModal({ open, storeId, onClose, onCreated }: Props) {
                   value={term}
                   onChange={e => setTerm(e.target.value)}
                   placeholder={t('orderPlaceholder')}
-                  className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className={FIELD_CLASSES}
                   autoFocus
                 />
               </div>
@@ -232,7 +233,7 @@ export function NewReturnModal({ open, storeId, onClose, onCreated }: Props) {
                 rows={2}
                 maxLength={500}
                 placeholder={t('reasonPlaceholder')}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+                className={TEXTAREA_CLASSES}
               />
             </div>
           </>

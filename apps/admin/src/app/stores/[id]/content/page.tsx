@@ -1,5 +1,6 @@
 'use client';
 
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 import { Button } from '@/components/ui/Button';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
@@ -129,7 +130,7 @@ export default function ContentListPage() {
               dir="ltr"
               autoFocus
               aria-invalid={newSlugInvalid}
-              className="mt-1 w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={`${FIELD_CLASSES} mt-1`}
             />
           </label>
           {newSlugInvalid && (

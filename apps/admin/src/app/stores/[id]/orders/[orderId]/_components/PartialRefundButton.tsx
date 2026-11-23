@@ -1,5 +1,6 @@
 'use client';
 
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, useToast } from '@ebda/ui';
 import { minorToDecimalString } from '@ebda/shared';
@@ -214,7 +215,7 @@ export function PartialRefundButton({
                     value={method}
                     onChange={e => setMethod(e.target.value)}
                     disabled={busy}
-                    className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   >
                     {methods.map(m => (
                       <option key={m} value={m}>
@@ -242,7 +243,7 @@ export function PartialRefundButton({
                     rows={2}
                     maxLength={500}
                     placeholder={t('reasonPlaceholder')}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+                    className={TEXTAREA_CLASSES}
                   />
                 </div>
 
