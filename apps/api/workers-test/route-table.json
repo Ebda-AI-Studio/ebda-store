@@ -786,6 +786,7 @@
   "POST /stores/:storeId/wholesale-applications/:id/revoke",
   "POST /stores/public/:storeId/coupons/validate",
   "POST /stores/public/:storeId/promotions/preview",
+  "POST /stores/public/:storeId/promotions/preview-browse",
   "POST /stores/public/:storeId/shipping/calculate",
   "POST /uploads/font",
   "POST /uploads/image",
