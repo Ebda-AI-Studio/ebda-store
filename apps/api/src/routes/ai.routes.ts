@@ -37,6 +37,7 @@ import { markJobFailedOnEnqueueError } from '../lib/jobs/enqueue-fail';
 import { BulkAiEnqueueError, enqueueBulkAiJob } from '../services/bulk-ai-job.service';
 import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
 import { sendOnboardingHelpToCi } from '../lib/ci/emit';
+import { resolveAiCaps } from '../lib/usage-caps';
 
 const router = Router({ mergeParams: true });
 
@@ -1035,8 +1036,7 @@ router.get('/usage/summary', async (req: Request, res: Response, next: NextFunct
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
 
-    const dailyCap = parseInt(process.env.AI_DAILY_REQUEST_CAP ?? '450', 10);
-    const monthlyCap = parseInt(process.env.AI_MONTHLY_REQUEST_CAP ?? '20000', 10);
+    const { dailyCap, monthlyCap } = resolveAiCaps();
 
     const [todayCount, monthCount, todayCost, monthCost, last30] = await Promise.all([
       prisma.aiUsage.count({
