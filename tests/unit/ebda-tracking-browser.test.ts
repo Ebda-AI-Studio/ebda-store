@@ -27,6 +27,15 @@ function setConsent(analytics: boolean, marketing: boolean) {
   document.cookie = `${EBDA_CONSENT_COOKIE}=${serializeConsent({ analytics, marketing })}; path=/`;
 }
 const scripts = () => [...document.head.querySelectorAll('script')].map(s => s.src);
+// Match on the parsed host, never a substring of the URL (CodeQL js/incomplete-url-substring-sanitization).
+const scriptsFrom = (host: string) =>
+  scripts().filter(src => {
+    try {
+      return new URL(src).hostname === host;
+    } catch {
+      return false;
+    }
+  });
 
 beforeEach(() => {
   clearCookies();
@@ -347,7 +356,7 @@ describe('marketing Meta Pixel: consent, withdrawal, one init, Lead (no PII)', (
     t.setConsent({ analytics: false, marketing: true });
     t.start();
     t.start();
-    expect(scripts().filter(s => s.includes('connect.facebook.net'))).toHaveLength(1);
+    expect(scriptsFrom('connect.facebook.net')).toHaveLength(1);
     expect(inits()).toEqual([['init', '123456789']]); // id only: no email/phone user data
     expect(fbqOf().filter(a => a[0] === 'track' && a[1] === 'PageView')).toHaveLength(1);
     expect(fbqOf()).toContainEqual(['set', 'autoConfig', false, '123456789']);
@@ -379,7 +388,7 @@ describe('marketing Meta Pixel: consent, withdrawal, one init, Lead (no PII)', (
     t.track('contact_submitted');
     expect(fbqOf().length).toBe(afterRevoke);
     expect(afterRevoke).toBe(before + 1);
-    expect(scripts().filter(s => s.includes('connect.facebook.net'))).toHaveLength(1);
+    expect(scriptsFrom('connect.facebook.net')).toHaveLength(1);
   });
 });
 

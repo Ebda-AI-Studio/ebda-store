@@ -45,6 +45,13 @@ const SENSITIVE = new Set<string>(SENSITIVE_QUERY_PARAMS);
 // value (encodeURIComponent / URLSearchParams / the WHATWG URL parser all encode it).
 const PARAM_RE = /(^|[?&])([^=&#?\s]+)=([^&#\s"]*)/g;
 
+/** Drops one trailing `[...]` group (no `]` inside), linearly: the equivalent regex `/\[[^\]]*\]$/` is polynomial-ReDoS on `[[[[...`. */
+function stripTrailingArraySuffix(k: string): string {
+  if (!k.endsWith(']')) return k;
+  const open = k.indexOf('[', k.lastIndexOf(']', k.length - 2) + 1);
+  return open === -1 ? k : k.slice(0, open);
+}
+
 /** Lower-cased, decoded key with any array suffix (`q[]`, `q[0]`) removed. */
 function normalizeKey(key: string): string {
   let k: string;
@@ -53,7 +60,7 @@ function normalizeKey(key: string): string {
   } catch {
     k = key;
   }
-  return k.toLowerCase().replace(/\[[^\]]*\]$/, '');
+  return stripTrailingArraySuffix(k.toLowerCase());
 }
 
 function isSensitiveKey(key: string): boolean {

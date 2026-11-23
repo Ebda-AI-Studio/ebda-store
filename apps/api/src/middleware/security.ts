@@ -1707,6 +1707,28 @@ export const adminSearchLimiter = withoutLimitPlan(
   'keyed on req.user (set by authenticate, after the request-level prefetch)'
 );
 
+// Private expense-receipt download (GET /stores/:storeId/expenses/:expenseId/receipt). GETs skip the global limiter and
+// each request streams a file out of the private bucket, so it has its own cap: per USER, generous for a merchant paging
+// through a ledger, a hard stop for a script pulling every receipt.
+export const RECEIPT_READ_LIMIT_PER_MINUTE = 60;
+export const receiptReadLimiter = withoutLimitPlan(
+  rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, 'receipt-read'),
+    windowMs: 60 * 1000,
+    max: RECEIPT_READ_LIMIT_PER_MINUTE,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many receipt downloads, please slow down.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skip: skipForLoadTest,
+    keyGenerator: req => `receipt-read-${req.user?.userId ?? ipKeyGenerator(req.ip ?? '')}`,
+  }),
+  'keyed on req.user (set by authenticate, after the request-level prefetch)'
+);
+
 // Stricter limiter for payment operations
 export const paymentLimiter = plannedRateLimit('payment', {
   windowMs: 60 * 1000, // 1 minute

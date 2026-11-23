@@ -5,7 +5,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { AppError } from '../middleware/error-handler';
 import { requireFeature } from '../middleware/feature-gate';
-import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
+import { uploadLimiter, dailyUploadLimiter, receiptReadLimiter } from '../middleware/security';
 import { StorageService } from '../services/storage.service';
 import { enforceMaxDimensions } from '../services/image-resize.service';
 import { sniffImage, IMAGE_EXT, renameByKind, uploadContentError } from '../lib/upload-sniff';
@@ -378,6 +378,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  receiptReadLimiter,
   requireFeature('accounting.expenses'),
   async (req, res, next) => {
     try {
