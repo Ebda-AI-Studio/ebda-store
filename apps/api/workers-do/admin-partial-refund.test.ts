@@ -267,7 +267,7 @@ describe('STORE-QA-76 merchant partial refund / return on the StoreDO', () => {
     expect(await num(stub2, `SELECT inventory AS n FROM products WHERE id = 'p1'`)).toBe(3);
   });
 
-  it('refuses before any money moves: a whole-order return cannot skip a restock, a guest order has no return yet', async () => {
+  it('refuses before any money moves: a whole-order return cannot skip a restock', async () => {
     const store = 'qa76-refuse';
     const stub = await seed(store);
     const { returnId } = val<{ returnId: string }>(
@@ -285,19 +285,58 @@ describe('STORE-QA-76 merchant partial refund / return on the StoreDO', () => {
       code: 'FULL_RETURN_RESTOCK_ALL',
     });
     expect(await num(stub, `SELECT inventory AS n FROM products WHERE id = 'p2'`)).toBe(4);
+  });
 
+  it('GUEST-RET-1: a guest order (no customer) takes a merchant partial refund with restock + quote; no wallet/loyalty is touched, store credit is refused', async () => {
+    const store = 'guest-ret';
+    const stub = await seed(store);
     await runInDurableObject(stub, (_i, s) =>
       s.storage.sql.exec(`UPDATE orders SET customer_id = NULL`)
     );
+    // the quote no longer blocks a guest order
+    const q = val(await op(stub, store, 'analyticsRefundQuote', { orderId: 'o1', items: [T1(1)] }));
+    expect(q.returnable).toEqual({ ok: true });
+    expect(q.customerId).toBeNull();
+
+    const r = await partialRefund(stub, store, [T1(1, true), C1(1, false)]);
+    expect(r.refundAmount).toBeGreaterThan(0);
+    // the return row carries the guest marker, never a users.id
     expect(
+      await num(
+        stub,
+        `SELECT count(*) AS n FROM returns WHERE id = '${r.returnId}' AND customer_id = 'guest:o1' AND status = 'completed'`
+      )
+    ).toBe(1);
+    // restock: tee back on the shelf (3 -> 4), cap not
+    expect(await num(stub, `SELECT inventory AS n FROM products WHERE id = 'p1'`)).toBe(4);
+    expect(await num(stub, `SELECT inventory AS n FROM products WHERE id = 'p2'`)).toBe(4);
+    // no wallet was created or credited for the marker
+    expect(await num(stub, `SELECT count(*) AS n FROM customer_wallets`)).toBe(0);
+    expect(await num(stub, `SELECT count(*) AS n FROM wallet_transactions`)).toBe(0);
+    // the quote follows
+    const after = val(await op(stub, store, 'analyticsRefundQuote', { orderId: 'o1' }));
+    expect(after.refunded).toBe(r.refundAmount);
+    expect(after.refundable).toBe(25650 - r.refundAmount);
+    expect(await num(stub, `SELECT SUM(debit) - SUM(credit) AS n FROM journal_lines`)).toBe(0);
+
+    // store credit has no wallet to land in: refused before any money moves
+    const { returnId } = val<{ returnId: string }>(
       await op(stub, store, 'returnCreate', {
         orderId: 'o1',
         type: 'refund',
-        reason: 'g',
+        reason: 'credit?',
         byMerchant: true,
         items: [T1(1)],
       })
-    ).toMatchObject({ ok: false, code: 'GUEST_ORDER_RETURN_UNSUPPORTED' });
+    );
+    await op(stub, store, 'returnStatus', { returnId, status: 'received', userId: 'u' });
+    expect(
+      await op(stub, store, 'returnClaim', {
+        returnId,
+        refundMethod: 'store_credit',
+        walletFeature: true,
+      })
+    ).toMatchObject({ ok: false, code: 'GUEST_STORE_CREDIT' });
   });
 
   it('a shopper cannot forge the merchant-only flags: no_restock is dropped and the customer match + window still bind', async () => {
