@@ -20,6 +20,7 @@ import {
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 import { requireFeature } from '../middleware/feature-gate';
+import { featureService } from '../services/feature.service';
 import {
   OrderService,
   assertValidTransition,
@@ -71,7 +72,9 @@ import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.se
 import { config } from '../config';
 import type { Currency, PaymentProvider } from '../services/payment-providers/types';
 import { AppError } from '../middleware/error-handler';
-import { idempotencyKeyOf } from '../lib/money-idempotency';
+import { idempotencyKeyOf, withIdempotencyKey } from '../lib/money-idempotency';
+import { ReturnService, REFUND_METHODS } from '../services/return.service';
+import { refundMayHaveExecuted } from '../services/payment-providers/refund-outcome';
 import {
   lookupRefundTarget,
   refundThroughProvider,
@@ -1988,6 +1991,147 @@ router.post(
           refundAmount: result.amount,
           provider: result.provider,
           status: result.status,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * STORE-QA-76 - partial refund from the admin order page.
+ *
+ * GET  /stores/:storeId/orders/:orderId/refund-quote[?items=<json [{orderItemId, quantity}]>]
+ *      what the dialog shows: the ONE refundable balance, each line's remaining quantity, and (with `items`) what refunding those
+ *      lines would pay back. Read-only; the same helpers the writer enforces with.
+ * POST /stores/:storeId/orders/:orderId/partial-refund
+ *      refund the chosen lines (per-line restock) by one method. An `Idempotency-Key` header is REQUIRED (one per dialog open): the
+ *      same key answers the first result, a second one can never pay twice. The server refuses more than paid - already refunded
+ *      (#624) whatever the client sent. `orders:refund` (store admin); staff open a return from /returns instead.
+ */
+const partialRefundItemSchema = z
+  .object({
+    orderItemId: z.string().uuid(),
+    quantity: z.number().int().min(1).max(100_000),
+    restock: z.boolean().optional(),
+  })
+  .strict();
+const partialRefundItemsSchema = z
+  .array(partialRefundItemSchema)
+  .min(1)
+  .max(100)
+  .refine(a => new Set(a.map(i => i.orderItemId)).size === a.length, 'a line is listed twice');
+const partialRefundSchema = z
+  .object({
+    items: partialRefundItemsSchema,
+    reason: z.string().trim().min(1).max(500),
+    refundMethod: z.enum(REFUND_METHODS),
+  })
+  .strict();
+
+router.get(
+  '/:orderId/refund-quote',
+  authenticate,
+  authorize('store_admin', 'staff'),
+  requireStoreAccess,
+  requirePermission('returns:read'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, orderId } = req.params;
+      let items: z.infer<typeof partialRefundItemsSchema> | undefined;
+      if (typeof req.query.items === 'string' && req.query.items !== '') {
+        try {
+          items = partialRefundItemsSchema.parse(JSON.parse(req.query.items));
+        } catch {
+          throw new AppError(
+            400,
+            'VALIDATION_ERROR',
+            'items must be a JSON array of { orderItemId, quantity }'
+          );
+        }
+      }
+      const money = await storeMoney(storeId);
+      if (!money)
+        throw new AppError(409, 'RETURNS_NEED_DO_STORE', 'Refunds by line are not available here');
+      const quote = await money.analyticsRefundQuote({ orderId, items });
+      res.json({
+        success: true,
+        data: {
+          quote: {
+            ...quote,
+            // the gateway leg is `orders:refund` only (staff lack it, like the return completion)
+            canRefundToOriginal: hasPermission(req.user!.role as Role, 'orders:refund'),
+            // REFUND-GATE-1: money refunds are never plan-gated; the restock choice (the returns workflow) is
+            returnsEnabled: await featureService.isFeatureEnabled(storeId, 'returns').catch(err => {
+              // a failed lookup must not 500 the quote: off = no restock choice, the refund itself is unaffected
+              logger.error(
+                { err, storeId },
+                '[order] returns feature lookup failed; quote says off'
+              );
+              return false;
+            }),
+          },
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/:orderId/partial-refund',
+  authenticate,
+  authorize('store_admin', 'staff'),
+  rejectImpersonated, // sends money back: an impersonated session is read-only here (Ruling FP-3)
+  requireStoreAccess,
+  // money goes back to the customer: `orders:refund` like every refund route (staff lack it and open returns from /returns instead)
+  requirePermission('orders:refund'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, orderId } = req.params;
+      const user = getAuthUser(req);
+      const data = partialRefundSchema.parse(req.body ?? {});
+      const idem = idempotencyKeyOf(req.header('idempotency-key'));
+      if (!idem)
+        throw new AppError(
+          400,
+          'IDEMPOTENCY_KEY_REQUIRED',
+          'This refund needs an Idempotency-Key header (one per refund attempt). Nothing was done.'
+        );
+      const out = await withIdempotencyKey(
+        `partial-refund:${user.userId}:${orderId}`,
+        idem,
+        () => ReturnService.adminPartialRefund(storeId, user.userId, { orderId, ...data }, idem),
+        refundMayHaveExecuted,
+        { required: true }
+      );
+      const ret = out.value as { id: string; returnNumber: string; refundAmount: number };
+      await auditLog({
+        action: 'order.partial_refund',
+        userId: user.userId,
+        resourceType: 'order',
+        resourceId: orderId,
+        details: {
+          returnId: ret.id,
+          returnNumber: ret.returnNumber,
+          refundMethod: data.refundMethod,
+          refundAmount: ret.refundAmount,
+          items: data.items,
+          reason: data.reason,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({
+        success: true,
+        data: {
+          returnId: ret.id,
+          returnNumber: ret.returnNumber,
+          refundAmount: ret.refundAmount,
+          replayed: out.replayed,
         },
       });
     } catch (error) {

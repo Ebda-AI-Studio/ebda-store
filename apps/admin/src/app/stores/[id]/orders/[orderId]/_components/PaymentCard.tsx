@@ -28,7 +28,9 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
         ? t('partiallyRefunded')
         : state === 'paid'
           ? t('paid')
-          : t('unpaid');
+          : state === 'disputed'
+            ? t('disputed')
+            : t('unpaid');
   const link = order.payments?.find(p => p.paymentLink)?.paymentLink ?? null;
   const expiresAt = order.paymentConfirmationExpiresAt
     ? new Date(order.paymentConfirmationExpiresAt)
@@ -88,7 +90,9 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
       <div className="flex items-start gap-3">
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-            isPaid ? 'bg-success/10 text-success-ink' : 'bg-destructive/10 text-destructive-ink'
+            isUnpaid || state === 'disputed'
+              ? 'bg-destructive/10 text-destructive-ink'
+              : 'bg-success/10 text-success-ink'
           }`}
         >
           <svg
@@ -121,6 +125,11 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
           {!isPaid && (
             <div className="mt-1 text-sm text-muted-foreground text-end">
               {t('remain', { amount: formatMoney(remain, order.currency) })}
+            </div>
+          )}
+          {!isUnpaid && refunded > 0 && (
+            <div className="mt-1 text-sm text-muted-foreground text-end">
+              {t('refundedAmount', { amount: formatMoney(refunded, order.currency) })}
             </div>
           )}
 

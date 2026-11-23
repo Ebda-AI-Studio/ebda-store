@@ -3,6 +3,7 @@
  * stores.plan, the claim and the receipt (Postgres) follow. A reference another store holds, a lost compare-and-set or any
  * D1 refusal must leave all three untouched.
  */
+import { PLATFORM_MIGRATION_SQL } from '../helpers/platform-migrations';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -58,14 +59,7 @@ import { cutoverKey, resetCutoverCache } from '../../apps/api/src/services/platf
 import { registerPlatformRouter } from '../../apps/api/src/services/platform/router';
 import { recordManualPayment } from '../../apps/api/src/services/billing/account.service';
 
-const MIG = ['0001_init.sql', '0002_invariants.sql']
-  .map(f =>
-    fs.readFileSync(
-      new URL(`../../packages/cf-schema/migrations/platform/${f}`, import.meta.url),
-      'utf8'
-    )
-  )
-  .join('\n');
+const MIG = PLATFORM_MIGRATION_SQL;
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
 
