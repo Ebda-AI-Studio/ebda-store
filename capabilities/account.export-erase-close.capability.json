@@ -2,12 +2,14 @@
   "id": "account.export-erase-close",
   "status": "live",
   "area": "account",
-  "version": 1,
+  "version": 2,
   "versionDate": "2026-11-14",
-  "titleAr": "نزل بياناتي / اقفل حسابي",
-  "titleEn": "Download my data / erase or close my account",
-  "screens": ["/account/security"],
+  "titleAr": "نزّل بياناتي أو اقفل حسابي",
+  "titleEn": "Download all my data, or close my account",
+  "screens": ["/stores/[id]/settings", "/account/settings"],
   "api": [
+    "POST /stores/:storeId/export/preview",
+    "POST /stores/:storeId/export",
     "GET /auth/me/export",
     "POST /auth/me/erase",
     "POST /auth/me/close-account",
@@ -18,27 +20,29 @@
   "roles": ["owner", "staff"],
   "policy": "confirm",
   "undo": {
-    "class": "irreversible",
-    "note": "no (irreversible)"
+    "class": "none",
+    "note": "the export only reads; closing an account is irreversible"
   },
-  "helpArticle": null,
+  "helpArticle": "export-your-store-data",
   "questions": {
-    "ar": ["عايز اقفل حسابي", "ازاي امسح بياناتي؟", "عايز نسخة من بياناتي"],
-    "en": ["How do I close my account?", "Can I export my data?"]
+    "ar": ["عايز نسخة من بيانات متجري", "ازاي اقفل حسابي؟", "عايز انزل كل بياناتي"],
+    "en": [
+      "Can I download all my store data?",
+      "How do I close my account?",
+      "How do I export everything?"
+    ]
   },
-  "steps": ["API exists; admin UI caller not found (inferred)."],
+  "steps": [
+    "Open Settings, press Download my data",
+    "You get a zip: one NDJSON file per table plus manifest.json"
+  ],
   "edgeCases": [
-    "Money in flight or billing-parent store refuses closure",
-    "Active subscription must be cancelled first (inferred)",
-    "PDPL erasure of D1/StoreDO data flag PDPL_CF_ERASURE_ENABLED unset (register row)",
-    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
-    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
-    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
-    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+    "One export per store per hour (429 after that)",
+    "Above 20000 rows in total the export is refused with 413 EXPORT_TOO_LARGE and a plain message (an async job for bigger stores is not built)",
+    "Owner only; another store answers 404; the bundle holds only that store's rows and no API key hashes or provider credentials",
+    "Closing the account is refused while the owner has a live billed store or money in flight; the erasure job is flag-gated (PDPL_CF_ERASURE_ENABLED), flag off records the request"
   ],
   "gaps": [
-    "No merchant dashboard trigger for closure/erasure (S2c; audit gap 9)",
-    "No help article"
-  ],
-  "assistantNote": "never execute from chat; deep-link + explain consequences"
+    "Account closure from the admin app is not built (it lives in the web account settings only)"
+  ]
 }

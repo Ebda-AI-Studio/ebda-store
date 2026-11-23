@@ -654,7 +654,14 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       const meta = (await import('@ebda-src/prisma-meta')).default as unknown as Meta;
       const input = decodeRpc<{
         fields?: Record<string, unknown>;
-        json?: Record<string, { set?: Record<string, unknown>; remove?: string[] }>;
+        json?: Record<
+          string,
+          {
+            set?: Record<string, unknown>;
+            remove?: string[];
+            expect?: Record<string, Record<string, unknown>>;
+          }
+        >;
       }>(inputJson);
       return {
         ok: true,

@@ -125,3 +125,49 @@ describe('patchStoreSettings', () => {
     ).toThrow(/store_profile row is missing/);
   });
 });
+
+describe('patchStoreSettings precondition (compare-and-set, STORE-LIFECYCLE-1)', () => {
+  const req = (state: string) => ({ deletionRequest: { id: 'r1', state } });
+  it('writes only while the stored sub-fields still match; a stale caller writes nothing', () => {
+    const { sql } = rig();
+    applyStoreSettings(sql, META as never, 's1', { settings: { ...req('pending'), keep: 1 } });
+    // the executor claims: pending -> executing
+    patchStoreSettings(sql, META as never, 's1', {
+      json: {
+        settings: {
+          set: { deletionRequest: { id: 'r1', state: 'executing' } },
+          expect: { deletionRequest: { id: 'r1', state: 'pending' } },
+        },
+      },
+    });
+    // the cancel arrives second with the SAME precondition (pending): it must lose and leave `executing` untouched
+    expect(() =>
+      patchStoreSettings(sql, META as never, 's1', {
+        json: {
+          settings: {
+            set: { deletionRequest: { id: 'r1', state: 'cancelled' }, other: 2 },
+            expect: { deletionRequest: { id: 'r1', state: 'pending' } },
+          },
+        },
+      })
+    ).toThrow(expect.objectContaining({ code: 'PATCH_PRECONDITION_FAILED' }));
+    expect(read(sql, ['settings']).settings).toEqual({
+      deletionRequest: { id: 'r1', state: 'executing' },
+      keep: 1,
+    });
+  });
+  it('a different request id fails the precondition too', () => {
+    const { sql } = rig();
+    applyStoreSettings(sql, META as never, 's1', { settings: req('pending') });
+    expect(() =>
+      patchStoreSettings(sql, META as never, 's1', {
+        json: {
+          settings: {
+            set: { x: 1 },
+            expect: { deletionRequest: { id: 'other', state: 'pending' } },
+          },
+        },
+      })
+    ).toThrow();
+  });
+});

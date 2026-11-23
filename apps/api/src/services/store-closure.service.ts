@@ -33,6 +33,10 @@ export interface MoneyInFlight {
   openReturns: number;
   codOutstanding: number;
   paymentsInDispute: number;
+  /** Affiliate payouts still owed (pending / processing); parity with the Durable Object check (packages/repo closure.ts). */
+  unsettledPayouts: number;
+  /** Customer wallets holding a balance: the store owes that money back, a delete would erase it. */
+  walletBalances: number;
 }
 
 export async function moneyInFlight(
@@ -46,6 +50,8 @@ export async function moneyInFlight(
       open_returns: bigint;
       cod_outstanding: bigint;
       disputed: bigint;
+      payouts: bigint;
+      wallets: bigint;
     }>
   >`
     SELECT
@@ -68,7 +74,13 @@ export async function moneyInFlight(
       (SELECT count(*) FROM public.payments p
          JOIN public.orders o ON o.id = p.order_id
         WHERE o.store_id = ${storeId}
-          AND p.status IN ('processing', 'disputed')) AS disputed`;
+          AND p.status IN ('processing', 'disputed')) AS disputed,
+      (SELECT count(*) FROM public.affiliate_payouts ap
+        WHERE ap.store_id = ${storeId}
+          AND ap.status IN ('pending', 'processing')) AS payouts,
+      (SELECT count(*) FROM public.customer_wallets w
+        WHERE w.store_id = ${storeId}
+          AND w.balance > 0) AS wallets`;
   const r = rows[0];
   return {
     paidUndelivered: Number(r?.paid_undelivered ?? 0),
@@ -76,6 +88,8 @@ export async function moneyInFlight(
     openReturns: Number(r?.open_returns ?? 0),
     codOutstanding: Number(r?.cod_outstanding ?? 0),
     paymentsInDispute: Number(r?.disputed ?? 0),
+    unsettledPayouts: Number(r?.payouts ?? 0),
+    walletBalances: Number(r?.wallets ?? 0),
   };
 }
 

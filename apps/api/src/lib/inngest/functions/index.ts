@@ -79,6 +79,7 @@ import { bulkAiImageAlt } from './bulk-ai-image-alt';
 import { bulkAiExcerpt } from './bulk-ai-excerpt';
 import { bulkAiTags } from './bulk-ai-tags';
 import { accountErasedPropagation } from './account-erased-propagation';
+import { storeDeletionExecute } from './store-deletion-execute';
 import {
   warehouseReconcileSweepCron,
   warehouseReconcileOnDemand,
@@ -228,6 +229,8 @@ const allInngestFunctions: JobDef[] = [
   // Right-to-erasure third-party propagation: OneSignal player deletion +
   // PostHog person deletion, fired after AuthService.eraseAccount commits.
   accountErasedPropagation,
+  // A11: owner-requested store deletion after the 14-day cooling-off.
+  storeDeletionExecute,
   // Item 5 data-integrity Task 4: daily completeness sweep that reconciles
   // WarehouseStock to the authoritative Product/ProductVariant.inventory
   // aggregate for every store with a warehouse, regardless of which writer
