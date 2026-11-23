@@ -37,10 +37,10 @@ const claim = (db: DatabaseSync, kind: string) =>
     .run(`${kind}-${Math.random()}`, kind);
 
 describe('D1 0013: billing_reminders accepts the grace stages (BILL-NOTICE-1)', () => {
-  it('exists, after 0011 (0012 is reserved for the template contract step)', () => {
+  it('exists, right after 0012 (trust_requests)', () => {
     expect(M10).toBeTruthy();
     expect(files.indexOf(M10)).toBe(
-      files.findIndex(f => f.endsWith('0011_template_expand_only.sql')) + 1
+      files.findIndex(f => f.endsWith('0012_trust_requests.sql')) + 1
     );
   });
 

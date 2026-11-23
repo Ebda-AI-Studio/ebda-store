@@ -8,6 +8,7 @@ import { catalogImportUploadsSweep } from './catalog-import-uploads-sweep';
 import { bulkImportOrphanCleanup } from './bulk-import-orphan-cleanup';
 import { invoiceEmail } from './invoice-email';
 import { heartbeat } from './heartbeat';
+import { storefrontPurgeRetry, storefrontBundleBoundary } from './storefront-purge';
 import { auditLogArchive } from './audit-log-archive';
 import { bulkAiTranslate } from './bulk-ai-translate';
 import { bulkAiSeo } from './bulk-ai-seo';
@@ -47,6 +48,8 @@ import { accountingProfitAnomalyCron } from './accounting-profit-anomaly';
 import { accountingExpenseOcrProcess } from './accounting-expense-ocr-process';
 import { instapayReceiptExtract } from './instapay-receipt-extract';
 import { analyticsDailyRollupCron, analyticsRollupOnDemand } from './analytics-daily-rollup';
+import { analyticsFunnelBackfill } from './analytics-funnel-backfill';
+import { analyticsRefundCorrection } from './analytics-refund-correction';
 import { aiAutofillProduct } from './ai-autofill-product';
 import { aiAutofillCleanup } from './ai-autofill-cleanup';
 import { aiAutofillSweep } from './ai-autofill-sweep';
@@ -112,6 +115,8 @@ const allInngestFunctions: JobDef[] = [
   bulkImportOrphanCleanup,
   invoiceEmail,
   heartbeat,
+  storefrontPurgeRetry,
+  storefrontBundleBoundary,
   auditLogArchive,
   bulkAiTranslate,
   bulkAiSeo,
@@ -154,8 +159,9 @@ const allInngestFunctions: JobDef[] = [
   accountingExpenseOcrProcess,
   instapayReceiptExtract,
   analyticsDailyRollupCron,
+  analyticsRefundCorrection,
+  analyticsFunnelBackfill,
   analyticsRollupOnDemand,
-  // Phase A: product → Meta Catalog sync (native catalog bot)
   // AI-first autofill: fills product fields + kicks recommendations on create
   aiAutofillProduct,
   // AI-first autofill: purges recommendation graph rows on product delete

@@ -1,5 +1,5 @@
 /**
- * Architecture guard (design review section 7 + Task 3 money review M-4, docs/plans/2026-10-21-b2b-wholesale.md): after this
+ * Architecture guard (design review section 7 + Task 3 money review M-4, docs/plans/done/2026-10-21-b2b-wholesale.md): after this
  * change a charged or customer-visible unit price is decided in ONE place, `PriceResolver` (and the pure `resolveUnitPrice`
  * under it). Every other read of a `price` / `unitPrice` in apps/api/src is either feeding the resolver, reading a PERSISTED
  * order value, a retail display, a catalogue read, an admin display, a writer, or a bundle base price, and must say so in the
@@ -225,6 +225,31 @@ const ALLOW: Record<string, AllowEntry> = {
     reason: 'declared value from persisted lines',
     reads: { createShipmentForOrder: 1 },
   },
+  'lib/catalogue-feed/build.ts': {
+    category: 'retail-display',
+    reason: 'public ad feeds (Google/Meta/TikTok): retail price, anonymous-safe',
+    reads: { buildProductItems: 3, buildBundleItems: 4 },
+  },
+  'lib/catalogue-feed/load.ts': {
+    category: 'retail-display',
+    reason: 'public ad feeds: retail price select, public-audience products only',
+    reads: { '<module>': 2 },
+  },
+  'lib/catalogue-feed/service.ts': {
+    category: 'retail-display',
+    reason: 'public ad feeds: purchasable bundle price',
+    reads: { getMeta: 1 },
+  },
+  'lib/inngest/functions/order-capi-conversion.ts': {
+    category: 'persisted',
+    reason: 'server-side Purchase lines from persisted order items',
+    reads: { '<module>': 1 },
+  },
+  'services/pixels-capi.service.ts': {
+    category: 'persisted',
+    reason: 'server-side Purchase lines from persisted order items',
+    reads: { purchaseContents: 1, sendMetaCAPI: 1, sendTikTokCAPI: 1 },
+  },
   'lib/product-feed.ts': {
     category: 'retail-display',
     reason: 'public feed: retail price, anonymous-safe',
@@ -274,7 +299,9 @@ const ALLOW: Record<string, AllowEntry> = {
       getFilterOptions: 4,
       getSearchSuggestions: 1,
       getSuggestSuggestions: 2,
-      listPublic: 5, // +1: the `sort=on_sale` raw SQL ranks by the retail compare-at drop (ordering only; the card price still goes through b2bPublicFields), B2-28
+      listPublic: 1, // the `sort=on_sale` raw SQL ranks by the retail compare-at drop (ordering only; the card price still goes through b2bPublicFields), B2-28. PL1 moved the min/max price filter out into priceRangeWhere (-4 reads)
+      // PL1: the price filter's slider ceiling = the store's highest retail list / variant price, a display bound for the filter UI; never a charged price
+      catalogueMaxPrice: 4,
       // the DO twin of the `sort=on_sale` statement: ranks by the retail compare-at drop (ordering only, the card price still
       // goes through b2bPublicFields), P1 2026-11-09
       onSaleIdsFromDo: 4,
@@ -282,6 +309,29 @@ const ALLOW: Record<string, AllowEntry> = {
       update: 6,
       b2bPublicFields: 3, // product price + variant.price ?? product.price: hides a stale variant tier (final review minor 2)
     },
+  },
+  'smart-layer/tools/products.tools.ts': {
+    category: 'admin-display',
+    reason:
+      'merchant-facing assistant card: the list price the merchant is changing, shown before and after',
+    reads: { state: 1, createInput: 1, describe: 1 },
+  },
+  'smart-layer/tools/orders.tools.ts': {
+    category: 'admin-display',
+    reason:
+      'merchant-facing assistant confirm card: the order total / line prices the merchant is about to act on',
+    reads: { state: 1, describe: 2 },
+  },
+  'smart-layer/tools/products-confirm.tools.ts': {
+    category: 'admin-display',
+    reason:
+      'merchant-facing assistant confirm card: the list price a delete or bulk price change acts on, and the before-price the undo restores',
+    reads: { state: 1, describe: 2, afterPrice: 1, plan: 4, resolveItems: 1, run: 3 },
+  },
+  'smart-layer/tools/marketing.tools.ts': {
+    category: 'admin-display',
+    reason: 'merchant-facing assistant card: the list price a bundle or coupon is computed against',
+    reads: { state: 2 },
   },
   'mcp/tools/admin-read.tools.ts': {
     category: 'admin-display',

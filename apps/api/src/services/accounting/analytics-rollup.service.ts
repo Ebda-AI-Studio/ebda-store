@@ -28,7 +28,12 @@ import { customerKeyOf, isGuestOrder, rfmKeyFor } from '../../lib/customer-key';
 // aborted the transaction and silently doomed every later block's writes.
 import { withSavepoint } from '../../lib/savepoint';
 
+import { netRevenue, netRevenueWindows } from '../revenue.service';
+import { netOrderRevenueMinor } from '../../lib/revenue-sql';
+import { refundedMinorByOrder } from '../../lib/order-refunds';
 import {
+  NON_REVENUE_ORDER_STATUSES,
+  regionDayKey,
   regionDayStart,
   regionDayStartOffset,
   regionMonthStart,
@@ -246,13 +251,32 @@ export async function forEachPaidOrderPage(
   let cursor: string | undefined;
   for (;;) {
     const page = (await db.order.findMany({
-      where: { storeId, paymentStatus: 'paid', deletedAt: null },
+      // The ONE revenue definition, paid-only (lib/revenue-sql.ts): a paid order later cancelled/refunded is not revenue.
+      where: {
+        storeId,
+        paymentStatus: 'paid',
+        status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
+        deletedAt: null,
+      },
       select: { id: true, customerId: true, shippingAddress: true, createdAt: true, total: true },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       take: pageSize,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     })) as PagedOrder[];
     if (page.length === 0) return;
+    // Net each order of its partial refunds (same rule as the SQL: GREATEST(completed returns, payments.refunded_amount)).
+    const refunded = await refundedMinorByOrder(
+      db,
+      storeId,
+      page.map(o => o.id)
+    );
+    for (const o of page)
+      o.total = netOrderRevenueMinor({
+        total: o.total,
+        status: 'delivered',
+        paymentStatus: 'paid',
+        refundedMinor: refunded.get(o.id) ?? 0,
+      });
     onPage(page);
     if (page.length < pageSize) return;
     cursor = page[page.length - 1]!.id;
@@ -544,37 +568,34 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
     });
 
     // ordersCompleted
-    const ordersCompletedAgg = await db.order.aggregate({
-      where: {
-        storeId,
-        paymentStatus: 'paid',
-        deletedAt: null,
-        createdAt: { gte: dayStart, lt: dayEnd },
-      },
-      _count: { id: true },
-      _sum: { total: true },
+    // The ONE revenue definition, paid-only (lib/revenue-sql.ts, STORE-QA-7): refunded orders drop out, partial refunds net.
+    const completed = await netRevenue(storeId, {
+      from: dayStart,
+      to: new Date(dayEnd.getTime() - 1),
+      paidOnly: true,
     });
-    const ordersCompleted = ordersCompletedAgg._count.id;
-    const revenueFils = ordersCompletedAgg._sum.total ?? 0;
+    const ordersCompleted = completed.orders;
+    const revenueFils = completed.revenue;
 
-    // ordersAbandoned: AbandonedCart created before (dayStart - 7d) with recoveredAt IS NULL
-    // These are carts that had 7+ days to convert and did not.
-    const abandonedThreshold = new Date(dayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+    // ordersAbandoned (Ruling ANALYTICS-DAY-1, D2): carts that BECAME abandoned on this day, i.e. created exactly 7 Cairo days
+    // earlier ([dayStart-7d, dayStart-6d)) and still unrecovered. The tile sums the daily figure over its 7/30/90-day window, so a
+    // per-day FLOW is required; the old unbounded `lt` summed the whole backlog once per day (~30x on a 30-day window).
+    const abandonedFrom = regionDayStartOffset(dayStart, -7);
+    const abandonedTo = regionDayStartOffset(dayStart, -6);
     const ordersAbandoned = await db.abandonedCart.count({
       where: {
         storeId,
         recoveredAt: null,
-        createdAt: { lt: abandonedThreshold },
+        createdAt: { gte: abandonedFrom, lt: abandonedTo },
       },
     });
 
     // productViews: sum of ProductDailyView.count for this store on this calendar day.
-    // `date` in product_daily_views is a DATE stored at UTC midnight (regionDayStart output),
-    // so an exact equality match on dayStart gives the right rows.
+    // `date` in product_daily_views is the day key (UTC midnight; see regionDayKey), written by view-ingest with the same helper.
     const viewsArgs = {
       where: {
         storeId,
-        date: dayStart, // exact match — DATE column stored as Cairo-day-start instant
+        date: new Date(regionDayKey(dayStart)), // exact match on the counter day key (Ruling ANALYTICS-DAY-1)
       },
       _sum: { count: true as const },
     };
@@ -865,4 +886,87 @@ export async function runDailyRollup(storeId: string): Promise<RollupResult> {
 
   logger.info({ storeId, cohortRows, funnelDays, rfmCustomers }, 'analytics-daily-rollup: done');
   return { cohortRows, funnelDays, rfmCustomers };
+}
+
+// ---------------------------------------------------------------------------
+// Funnel revenue correction (REVENUE-DEF-1)
+// ---------------------------------------------------------------------------
+
+interface FunnelDriftDay {
+  daysAgo: number;
+  periodDate: string;
+  storedOrders: number;
+  storedRevenueFils: number;
+  correctOrders: number;
+  correctRevenueFils: number;
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * The stored `funnel_snapshots` days (within `daysBack` Cairo days, newest first) whose revenue / order count differ from the ONE
+ * revenue definition recomputed from the orders. READ-ONLY and two queries in total (the stored rows, then every day's corrected
+ * totals in ONE grouped query), however many days. The apply path is `correctFunnelRevenueDay` per returned day.
+ */
+export async function funnelDriftDays(
+  storeId: string,
+  daysBack: number
+): Promise<FunnelDriftDay[]> {
+  const db = await storeDb(storeId);
+  const today = dayStartOf(new Date());
+  const from = daysAgo(daysBack, today);
+  const rows = await db.funnelSnapshot.findMany({
+    where: { storeId, periodDate: { gte: from, lt: today } },
+    select: { periodDate: true, ordersCompleted: true, revenueFils: true },
+    orderBy: { periodDate: 'desc' },
+    take: daysBack,
+  });
+  const totals = await netRevenueWindows(
+    storeId,
+    rows.map(r => ({ from: r.periodDate, to: regionDayStartOffset(r.periodDate, 1) })),
+    { paidOnly: true }
+  );
+  const out: FunnelDriftDay[] = [];
+  rows.forEach((r, i) => {
+    const c = totals[i]!;
+    if (c.revenue === r.revenueFils && c.orders === r.ordersCompleted) return;
+    out.push({
+      daysAgo: Math.round((today.getTime() - r.periodDate.getTime()) / DAY_MS),
+      periodDate: r.periodDate.toISOString(),
+      storedOrders: r.ordersCompleted,
+      storedRevenueFils: r.revenueFils,
+      correctOrders: c.orders,
+      correctRevenueFils: c.revenue,
+    });
+  });
+  return out;
+}
+
+/**
+ * Rewrite ONLY `revenueFils` and `ordersCompleted` of the funnel row for the Cairo day `daysAgoN` days ago, from the orders.
+ * Every other column (product views, carts, sessions, checkouts, abandoned) is left exactly as the nightly run wrote it: those
+ * are recomputed from tables that move on (carts expire, views are pruned), so re-running the whole row for an old day would
+ * overwrite real history with today's smaller numbers. A day with no stored row is NOT created. Idempotent. Returns 1 when a
+ * row was updated.
+ */
+export async function correctFunnelRevenueDay(storeId: string, daysAgoN: number): Promise<number> {
+  const db = await storeDb(storeId);
+  const sw = await storeWriter(storeId);
+  const dayStart = daysAgo(daysAgoN, dayStartOf(new Date()));
+  const existing = await db.funnelSnapshot.findFirst({
+    where: { storeId, periodDate: dayStart },
+    select: { id: true, revenueFils: true, ordersCompleted: true },
+  });
+  if (!existing) return 0;
+  const [c] = await netRevenueWindows(
+    storeId,
+    [{ from: dayStart, to: regionDayStartOffset(dayStart, 1) }],
+    { paidOnly: true }
+  );
+  if (c!.revenue === existing.revenueFils && c!.orders === existing.ordersCompleted) return 0;
+  await sw.funnelSnapshot.update({
+    where: { id: existing.id, storeId },
+    data: { revenueFils: c!.revenue, ordersCompleted: c!.orders },
+  });
+  return 1;
 }

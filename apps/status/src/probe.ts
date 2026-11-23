@@ -1,4 +1,4 @@
-import { DEFAULT_TIMEOUT_MS } from './config';
+import { DEFAULT_TIMEOUT_MS, SLOW_THRESHOLD_MS } from './config';
 import type { ComponentConfig, ProbeResult } from './types';
 
 export type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
@@ -15,7 +15,8 @@ const MAX_BODY_BYTES = 64 * 1024;
 export async function probe(
   c: ComponentConfig,
   fetcher: Fetcher = (u, i) => fetch(u, i),
-  timeoutMs: number = c.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  timeoutMs: number = c.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  slowMs: number = SLOW_THRESHOLD_MS
 ): Promise<ProbeResult> {
   const started = Date.now();
   const ctrl = new AbortController();
@@ -56,7 +57,8 @@ export async function probe(
       } else {
         void res.body?.cancel().catch(() => undefined);
       }
-      return result({ ok: true, status: res.status, error: null });
+      const ms = Date.now() - started;
+      return result({ ok: true, status: res.status, error: null, slow: ms > slowMs });
     } catch (e) {
       const name = e instanceof Error ? e.name : 'Error';
       return result({ ok: false, status: null, error: `fetch failed (${name})` });
@@ -74,9 +76,10 @@ export async function probe(
 export function probeAll(
   components: readonly ComponentConfig[],
   fetcher?: Fetcher,
-  timeoutMs?: number
+  timeoutMs?: number,
+  slowMs?: number
 ): Promise<ProbeResult[]> {
-  return Promise.all(components.map(c => probe(c, fetcher, timeoutMs)));
+  return Promise.all(components.map(c => probe(c, fetcher, timeoutMs, slowMs)));
 }
 
 /**
@@ -92,4 +95,20 @@ export function probeErrorAr(error: string | null | undefined): string {
   if (error === 'body did not match') return 'الصفحة رجعت من غير المحتوى المتوقع';
   if (error.startsWith('fetch failed')) return 'الاتصال فشل';
   return 'خطأ مش معروف';
+}
+
+/** "1 probe" / "2 probes" (English). */
+export function probesEn(n: number): string {
+  return `${n} consecutive ${n === 1 ? 'probe' : 'probes'}`;
+}
+
+/**
+ * The Arabic count phrase with correct number agreement: 1 = "فحص واحد", 2 = "فحصين", 3-10 = "N فحوصات", 11+ = "N فحص".
+ * (The old text said "1 فحوصات ورا بعض نجحوا": a plural noun after a singular count, visible on every resolved incident.)
+ */
+export function probesAr(n: number): string {
+  if (n === 1) return 'فحص واحد ورا بعض';
+  if (n === 2) return 'فحصين ورا بعض';
+  if (n >= 3 && n <= 10) return `${n} فحوصات ورا بعض`;
+  return `${n} فحص ورا بعض`;
 }

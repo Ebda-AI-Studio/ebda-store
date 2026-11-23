@@ -382,6 +382,7 @@ export class AuthService {
    * every cold start, which workerd forbids (R-EBDA-001, experiment B2c).
    */
   private static readonly DUMMY_PASSWORD_HASH: string =
+    // nosemgrep: generic.secrets.security.detected-bcrypt-hash.detected-bcrypt-hash -- dummy hash for timing equalisation (random plaintext discarded), not a credential
     '$2b$12$OW.xBchkmJbVjXDhBSQ6ke4cdbV/iuOcgjbbGK9ZslpcF5fkkynha';
 
   static async register(data: {
@@ -611,13 +612,12 @@ export class AuthService {
 
     // Send verification email
     if (storeId) {
-      const verificationUrl = `${config.webUrl}/auth/verify-email?token=${token}`;
       await EmailService.sendEmailVerification(
         storeId,
         {
           email,
           name,
-          verificationUrl,
+          verificationPath: `/auth/verify-email?token=${token}`,
           expiresInHours: EMAIL_VERIFICATION_EXPIRY_HOURS,
         },
         language
@@ -2064,7 +2064,7 @@ export class AuthService {
           {
             email: user.email,
             name,
-            resetUrl: `${config.webUrl}/auth/reset-password?token=${resetToken}`,
+            resetPath: `/auth/reset-password?token=${resetToken}`,
             expiresInMinutes: RESET_TOKEN_TTL_MINUTES,
           },
           language

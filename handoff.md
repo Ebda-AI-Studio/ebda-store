@@ -15,7 +15,7 @@ Assess launch readiness, remove exposed Ebda naming, improve UI and fix wiring/e
 - Rulings: `docs/decisions/2026-10-10-product-company-naming.md` records identity, MFA compatibility, footer and graph output decisions.
 
 ## Current state
-Naming task (2026-10-10): approved plan `docs/plans/2026-10-10-ebda-store-naming.md`; branch `chore/ebda-store-naming`. Product = Ebda Store; company = Ebda AI Studio. Explicit brand contract passed 11 tests after 3 observed failures. Repo/folder move and production verification are complete for the active apps; residuals are listed above. Existing historical handoff below is preserved.
+Naming task (2026-10-10): approved plan `docs/plans/done/2026-10-10-ebda-store-naming.md`; branch `chore/ebda-store-naming`. Product = Ebda Store; company = Ebda AI Studio. Explicit brand contract passed 11 tests after 3 observed failures. Repo/folder move and production verification are complete for the active apps; residuals are listed above. Existing historical handoff below is preserved.
 
 Branch `codex/ebda-ui-ux`, worktree `/private/tmp/ebda-ui-20261005`, baseline `89461087`. Root `plan` and unrelated `.handoff/` preserved. PR #3: https://github.com/Whisky-11/ebda/pull/3. Initial UI commits `9d047026`/`0a91f0ce`; expanded launch fixes `23acd07b` committed for PR #3. PR #3 merged the earlier UI head only. PR #4 carries subsequent backend fixes; authorized merge in progress, no deploy. Local built Worker preview: http://localhost:8788/signup.
 
@@ -28,7 +28,7 @@ Local implementation and verification complete; review PR delivery complete afte
 ## Left to do
 Live launch needs migrated strict-role Neon URL, provisioned Hyperdrive/KV/queues, GitHub CF inputs, Worker secrets, sender/DNS and real provider/UAT proof. Manual API deployment workflow is now prepared, not dispatched. Dependency audit retains 14 high upstream build-tool findings (braces/extract-zip); available FTP fix applied. Live API/payment/order verification requires backend and authorized production checks. Review/merge/deployment belongs to Ahmad's subsequent authorization.
 
-Rulings UI-1 through UI-4: docs/plans/2026-10-05-ebda-merchant-ui.md. UI-5 through UI-7: verification document. Scope keeps payments/money/entitlements/merchant storefront palettes unchanged; only generated CF routing follows owner Cloudflare steering.
+Rulings UI-1 through UI-4: docs/plans/done/2026-10-05-ebda-merchant-ui.md. UI-5 through UI-7: verification document. Scope keeps payments/money/entitlements/merchant storefront palettes unchanged; only generated CF routing follows owner Cloudflare steering.
 
 Expanded proof and rulings: docs/ebda/launch-readiness-2026-10-05.md. Local API 4896, isolated PG 55439. No production writes.
 
@@ -38,12 +38,12 @@ Ruling MERGE-1 — CI Worker dry-runs explicitly exercise cache-enabled generate
 Ruling MERGE-2 — allowlist only the two exact synthetic shipping fixture values; retain full-history secret scanning. Evidence: literal fixtures in contract/integration assertions, no production use. Cost if wrong: a matching real credential would be hidden.
 
 ## Locked pricing (branch `feat/locked-pricing`, PR to main, not merged, not deployed)
-Basic / Growth / Business = EGP 1,490 / 3,490 / 9,990 (annual 25% off), 0 fee, no free plan, 14-day Growth trial. Source: docs/plans/2026-10-05-pricing-decisions.md; implementation map and rulings R-EBDA-PRICING-1..10 in docs/plans/2026-10-05-pricing-implementation.md and docs/RULINGS.md.
+Basic / Growth / Business = EGP 1,490 / 3,490 / 9,990 (annual 25% off), 0 fee, no free plan, 14-day Growth trial. Source: docs/plans/done/2026-10-05-pricing-decisions.md; implementation map and rulings R-EBDA-PRICING-1..10 in docs/plans/done/2026-10-05-pricing-implementation.md and docs/RULINGS.md.
 Done: catalog migration `20261007000000_locked_pricing` (DB == `DEFAULT_PLAN_SEEDS`, hidden free/pro/comped kept, `founding_free` added unassigned); gates at the server write path for stores 1/1/3, branding removal (Growth+Business), API access (Business), analytics tiers, order cap incl. payment-links; marketing + help (ar/en) show real prices.
 Left: parent/child billing for extra stores (R-EBDA-PRICING-6); upsell UI for 402 on gated analytics pages; Amelia still on `comped`; first store created by `POST /stores` is Basic-active with no checkout; live billing/UAT/deploy not exercised. Local PG container `ebda-pricing-pg` (Apple `container`) can be removed.
 
 ## Signup funnel (branch `feat/signup-funnel`, stacks on #10; PR to main, not merged, not deployed)
-Goal: plan choice, then card on file (nothing charged) OR InstaPay, then a 14-day Growth trial; daily reminders, charge or overdue, suspension; super-admin manual payments; store allowance; upsell UI. Plan: docs/plans/2026-10-07-signup-funnel.md. Rulings: EBDA-FUNNEL-1..15 in docs/RULINGS.md.
+Goal: plan choice, then card on file (nothing charged) OR InstaPay, then a 14-day Growth trial; daily reminders, charge or overdue, suspension; super-admin manual payments; store allowance; upsell UI. Plan: docs/plans/done/2026-10-07-signup-funnel.md. Rulings: EBDA-FUNNEL-1..15 in docs/RULINGS.md.
 State: API, migration `20261007160000_signup_funnel`, admin + marketing UI, and the unit + integration tests are done locally (local PG container `ebda-funnel-pg` :55441, redis `ebda-funnel-redis` :56391, both Apple `container`; remove when finished).
 Left: Kashier has no documented no-charge tokenization, so card-on-file needs Kashier's written enablement (Ruling 2). Kashier MIT charge path is unverified against the docs (fep host / CONTAUTH / agreement id). Production steps: set EBDA_INSTAPAY_HANDLE + EBDA_SUPPORT_WHATSAPP; move Amelia off `comped` by recording her InstaPay payment in super-admin. Not live-verified: no deploy.
 

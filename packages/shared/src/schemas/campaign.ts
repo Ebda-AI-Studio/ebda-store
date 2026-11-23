@@ -4,7 +4,7 @@ import { z } from 'zod/v3';
  * Email campaigns (D2, 2026-09-25) — the request contracts shared by the API
  * (`apps/api/src/routes/campaign.routes.ts`) and the admin editor
  * (`apps/admin/src/app/stores/[id]/campaigns`). Plan:
- * docs/plans/2026-09-25-email-campaigns.md.
+ * docs/plans/done/2026-09-25-email-campaigns.md.
  */
 
 export const CAMPAIGN_STATUSES = [

@@ -2,7 +2,7 @@
 
 Self-serve, Shopify-style store builder for Egypt, by **Ebda AI Studio**. Sign up, get a live store at `<slug>.ebda.app` with no human in the loop, then bring your own domain when you are ready. Arabic-first (RTL) with English, EGP pricing, and Egyptian payments and shipping behind pluggable interfaces.
 
-> **Proprietary commercial software.** All rights reserved. See [LICENSE](./LICENSE).
+> **Source-available under the [PolyForm Noncommercial License 1.0.0](./LICENSE).** Commercial use is not permitted. Copyright (c) 2026 Ebda AI Studio.
 
 ## Where things live
 
@@ -52,6 +52,10 @@ npm run dev:web      # or dev:api / dev:admin / dev:orders
 ```
 
 Commits use lowercase conventional-commit subjects (commitlint). Money is integer minor units; tenant isolation rules are in [CLAUDE.md](./CLAUDE.md) and `docs/RULINGS.md`.
+
+## Capability registry
+
+Every feature is registered in `capabilities/` and checked by four guards plus a help guard (`tests/unit/capability-*.test.ts`); see CONTRIBUTING.md, "How a new feature joins the capability registry".
 
 ## Plans and status
 

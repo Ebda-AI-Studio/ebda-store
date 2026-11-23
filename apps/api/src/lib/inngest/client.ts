@@ -39,6 +39,8 @@ type InvoiceEmailRequestedEvent = EventPayload & {
     orderId: string;
     storeId: string;
     to: string;
+    /** The invoice goes to the merchant's own configured address, not a customer: kept for a suspended store (Ruling SUSPEND-OUT-1). */
+    toMerchant?: boolean;
   };
 };
 
@@ -180,6 +182,17 @@ type InsightsRollupRequestedEvent = EventPayload & {
   data: {
     storeId: string;
     requestedBy?: string;
+  };
+};
+
+type InsightsFunnelBackfillRequestedEvent = EventPayload & {
+  name: 'insights/funnel-backfill-requested';
+  data: {
+    storeId: string;
+    /** How many Cairo days back to check (1..400, default 90). */
+    daysBack?: number;
+    /** false/absent = DRY RUN (report only); true = rewrite the days whose stored revenue differs. */
+    apply?: boolean;
   };
 };
 
@@ -424,6 +437,7 @@ export type AppEvent =
   | AccountingExpenseOcrProcessEvent
   | InstapayReceiptExtractEvent
   | InsightsRollupRequestedEvent
+  | InsightsFunnelBackfillRequestedEvent
   | PaymentWebhookReceivedEvent
   | ShipmentCreateRequestedEvent
   | BulkAiBalanceDescriptionsEvent

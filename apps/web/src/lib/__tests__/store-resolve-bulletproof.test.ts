@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
  * Ruling RESOLVE-BULLETPROOF-1 — each test fails without the layer it names
- * (docs/plans/2026-11-10-resolve-bulletproof.md).
+ * (docs/plans/done/2026-11-10-resolve-bulletproof.md).
  */
 
 const hoisted = vi.hoisted(() => {
@@ -357,6 +357,22 @@ describe('review follow-ups (#519)', () => {
     );
     expect(res.status).toBe(503);
     expect(res.headers.get('retry-after')).toBe('30');
+  });
+
+  it('R1: a 500 on a sitemap path leaves as 503 + Retry-After, never cached; other paths keep their 500', async () => {
+    for (const path of ['/sitemap.xml', '/sitemap-0.xml']) {
+      const res = await retryableUnavailable(new Response('boom', { status: 500 }), path);
+      expect(res.status).toBe(503);
+      expect(res.headers.get('retry-after')).toBe('30');
+      expect(res.headers.get('cache-control')).toBe('private, no-store');
+    }
+    const other = await retryableUnavailable(new Response('boom', { status: 500 }), '/products');
+    expect(other.status).toBe(500);
+    const ok = await retryableUnavailable(
+      new Response('<urlset/>', { status: 200 }),
+      '/sitemap.xml'
+    );
+    expect(ok.status).toBe(200);
   });
 
   it('edge verdicts are not extended forever during an outage (10 min cap)', async () => {

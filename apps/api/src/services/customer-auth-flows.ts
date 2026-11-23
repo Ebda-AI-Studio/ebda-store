@@ -10,7 +10,6 @@ import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { PASSWORD_RESET_TTL_MINUTES } from '@ebda/shared';
-import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
@@ -23,6 +22,7 @@ import { storeDb } from '../lib/repo-factory';
 
 const SALT_ROUNDS = 12;
 /** bcrypt of 32 random bytes whose plaintext was discarded: compared when the account is unknown (same constant as auth.service). */
+// nosemgrep: generic.secrets.security.detected-bcrypt-hash.detected-bcrypt-hash -- dummy hash for timing equalisation (random plaintext discarded), not a credential
 const DUMMY_PASSWORD_HASH = '$2b$12$OW.xBchkmJbVjXDhBSQ6ke4cdbV/iuOcgjbbGK9ZslpcF5fkkynha';
 const EMAIL_VERIFICATION_EXPIRY_HOURS = 24;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -78,7 +78,7 @@ async function sendVerification(
     {
       email: u.email,
       name: `${u.firstName} ${u.lastName}`.trim() || u.email,
-      verificationUrl: `${config.webUrl}/auth/verify-email?token=${token}`,
+      verificationPath: `/auth/verify-email?token=${token}`,
       expiresInHours: EMAIL_VERIFICATION_EXPIRY_HOURS,
     },
     lang(u.language)
@@ -366,7 +366,7 @@ export const CustomerAuthFlows = {
         {
           email: u.email,
           name: `${u.firstName} ${u.lastName}`.trim() || u.email,
-          resetUrl: `${config.webUrl}/auth/reset-password?token=${t.token}`,
+          resetPath: `/auth/reset-password?token=${t.token}`,
           expiresInMinutes: PASSWORD_RESET_TTL_MINUTES,
         },
         lang(u.language)

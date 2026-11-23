@@ -2,7 +2,7 @@
   "name": "@ebda/orders",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
     "dev": "next dev -p 3002",
     "build": "next build",
@@ -14,7 +14,7 @@
   "dependencies": {
     "@ebda/shared": "*",
     "@sentry/nextjs": "^10.53.1",
-    "next": "^16.4.3",
+    "next": "^16.4.6",
     "posthog-js": "^1.373.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

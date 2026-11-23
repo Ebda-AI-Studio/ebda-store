@@ -38,6 +38,8 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
     alarm: true,
   },
   heartbeat: { group: '1-observability', kind: 'queue', trigger: 'cron' },
+  'storefront-purge-retry': { group: '1-observability', kind: 'queue', trigger: 'event' },
+  'storefront-bundle-boundary': { group: '1-observability', kind: 'workflow', trigger: 'event' },
   'queue-depth-watch': { group: '1-observability', kind: 'queue', trigger: 'cron', alarm: true },
   'abandoned-cart-purge-weekly': {
     group: '2-housekeeping',
@@ -125,6 +127,8 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
     trigger: 'cron',
     alarm: true,
   },
+  'analytics-funnel-backfill': { group: '3-books-stock', kind: 'workflow', trigger: 'event' },
+  'analytics-refund-correction': { group: '3-books-stock', kind: 'workflow', trigger: 'event' },
   'analytics-rollup-on-demand': { group: '3-books-stock', kind: 'workflow', trigger: 'event' },
   'gold-rate-feed-fetch': {
     group: '3-books-stock',

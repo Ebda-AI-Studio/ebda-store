@@ -1,0 +1,47 @@
+{
+  "id": "billing.pay-card",
+  "status": "live",
+  "area": "billing",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اشترك وادفع بالكارت",
+  "titleEn": "Subscribe or pay by card",
+  "screens": ["/stores/[id]/billing"],
+  "api": [
+    "POST /stores/:storeId/billing/checkout",
+    "GET /stores/:storeId/billing/checkout/return",
+    "POST /stores/:storeId/billing/card-setup",
+    "POST /stores/:storeId/billing/payment-method"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "no (refund via support/super-admin)"
+  },
+  "helpArticle": "plans-and-billing",
+  "questions": {
+    "ar": [
+      "ازاي ادفع اشتراك المتجر بالكارت؟",
+      "الكارت اترفض",
+      "غير الكارت بتاعي",
+      "هل الدفع بيتجدد لوحده؟"
+    ],
+    "en": ["How do I pay by card?", "My card was declined"]
+  },
+  "steps": ["Billing > choose plan > card checkout (Kashier)."],
+  "edgeCases": [
+    "Card declined / 3DS fails: retry, other card, or InstaPay",
+    "Provider down: show status page, retry later",
+    "Unmatched subscription charges are held for review (#687)",
+    "Webhook delayed: plan activates when webhook lands",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": [],
+  "assistantNote": "payment form must be completed by the merchant"
+}

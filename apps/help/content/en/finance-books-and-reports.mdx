@@ -1,0 +1,41 @@
+---
+title: Journal, bank reconciliation, FX rates and finance reports
+description: Add accounts and journal entries, match bank lines, set exchange rates, acknowledge profit alerts and read your profit and balance sheet, or ask the assistant to prepare each one for you.
+section: Finance
+order: 5
+appPath: /stores
+keywords: journal entry accounts chart bank reconciliation match statement fx exchange rate usd anomaly profit report balance sheet vat
+capabilities:
+  - finance.journal-accounts@1
+  - finance.bank-reconciliation@1
+  - finance.fx-anomalies@1
+  - finance.overview-reports@1
+---
+
+Your books live under **Finance** in the store menu. Every entry, match and rate is one separate record, so the assistant always prepares one at a time and you approve each one.
+
+## Accounts and journal entries
+
+1. Open **Finance** then **Accounts** to add a custom account under an existing parent. The type comes from the parent.
+2. Open **Finance** then **Journal** to post a manual entry. Total debit must equal total credit, in EGP.
+3. A posted entry is not edited; you correct it with a reversing entry on the Journal page.
+
+## Bank reconciliation
+
+1. Open **Finance** then **Bank reconciliation** (Business plan) and import your statement.
+2. Each bank line can be matched to a journal entry, unmatched or ignored. Matching can be reversed with Unmatch.
+
+## FX rates and profit alerts
+
+1. Open **Finance** then **FX rates** (Business plan) and add how many EGP one unit of the currency is worth. The latest rate is used.
+2. Open **Finance** then **Anomalies** to read each profit alert and mark it as seen.
+
+## Reports
+
+The **Dashboard** and **Reports** pages show profit and loss, the balance sheet and the VAT report (Business plan), all in EGP.
+
+Revenue and profit here come from the **ledger** (posted journal entries), so a refund reverses them and unpaid cash-on-delivery orders are not in it until they are booked. The **sales** figure on the Analytics page comes from the orders themselves: every order except cancelled, refunded and failed-payment ones, including unpaid cash on delivery. Sales is not the cash you collected.
+
+## Ask the assistant
+
+Say "show my profit this month", "post this entry" or "match this bank line". For every change the assistant previews exactly what will be saved and you approve it one card at a time. Matching a bank line can be undone for 24 hours; a posted entry, a rate and an acknowledged alert cannot be undone from the assistant.

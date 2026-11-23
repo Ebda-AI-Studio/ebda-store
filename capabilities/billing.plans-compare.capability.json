@@ -1,0 +1,39 @@
+{
+  "id": "billing.plans-compare",
+  "status": "live",
+  "area": "billing",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "قارن الباقات والاسعار",
+  "titleEn": "Compare plans and prices (Basic/Growth/Business)",
+  "screens": ["/plans"],
+  "api": ["GET /stores/:storeId/billing"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": "plans-and-billing",
+  "questions": {
+    "ar": [
+      "الفرق بين الباقات ايه؟",
+      "Growth بكام؟",
+      "الباقة الاولى فيها كام منتج؟",
+      "فيه عمولة على المبيعات؟"
+    ],
+    "en": ["What's the difference between plans?", "Is there a commission?"]
+  },
+  "steps": [
+    "Answer from the plan table: Basic 1,490 EGP/mo (2 staff, 300 orders/mo), Growth 3,490 (5 staff, 3,000 orders/mo, no Ebda footer, MCP), Business 9,990 (15 staff, unlimited orders, 3 stores, wholesale); platform fee 0 bps."
+  ],
+  "edgeCases": [
+    "Prices are data in plans table, not hard-coded: assistant must read them live",
+    "Yearly = 10% discount (Basic 13,410)",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No merchant-facing plan comparison API; /admin/plans is super-admin"]
+}

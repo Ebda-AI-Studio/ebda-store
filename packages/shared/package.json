@@ -2,7 +2,7 @@
   "name": "@ebda/shared",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -27,6 +27,11 @@
       "types": "./dist/constants/index.d.ts",
       "import": "./dist/constants/index.js",
       "default": "./src/constants/index.ts"
+    },
+    "./smart-layer": {
+      "types": "./src/smart-layer-kit.ts",
+      "require": "./dist/smart-layer-kit.js",
+      "default": "./src/smart-layer-kit.ts"
     },
     "./brand": {
       "types": "./src/brand/index.ts",

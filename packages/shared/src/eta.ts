@@ -2,7 +2,7 @@ import { z } from 'zod/v3';
 
 /**
  * Egyptian Tax Authority (ETA) e-receipt connector, shared contract.
- * Plan: docs/plans/2026-10-07-egypt-vat-and-eta.md (addendum "P2-P4 build"), ruling ETA-1.
+ * Plan: docs/plans/done/2026-10-07-egypt-vat-and-eta.md (addendum "P2-P4 build"), ruling ETA-1.
  * Hosts: https://sdk.invoicing.eta.gov.eg/faq/ (read 2026-10-26).
  */
 export const ETA_ENVIRONMENTS = ['preprod', 'prod'] as const;
