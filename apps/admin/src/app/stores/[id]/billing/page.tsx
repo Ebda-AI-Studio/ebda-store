@@ -1128,7 +1128,14 @@ export default function StoreBillingPage() {
             <div className="mb-4 grid gap-3 sm:grid-cols-3">
               {data.availablePlans.map(p => {
                 const price = planPrice(p);
-                const isCurrent = p.code === data.plan.subscribedPlanCode;
+                // Current = this plan AND, for a paid plan, the interval the store is actually billed on: a yearly store is not on the
+                // monthly price of the same plan, so only the active interval tab says "current".
+                const paidPlan =
+                  p.code !== 'free' && p.code !== 'comped' && p.code !== 'founding_free';
+                const activeInterval = data.billing?.billingInterval;
+                const isCurrent =
+                  p.code === data.plan.subscribedPlanCode &&
+                  (!paidPlan || !activeInterval || activeInterval === interval);
                 const paid = p.code !== 'free' && p.code !== 'comped' && p.code !== 'founding_free';
                 const hasCard =
                   !!data.billing?.hasPaymentMethod &&

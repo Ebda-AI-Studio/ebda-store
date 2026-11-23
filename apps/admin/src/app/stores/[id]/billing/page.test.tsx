@@ -530,7 +530,7 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
           { ...plans[0], code: 'growth' },
         ],
         plan: { code: 'basic', nameEn: 'Basic', nameAr: 'أساسي', subscribedPlanCode: 'basic' },
-        billing: { ...instapayChosen, pendingPlanCode: null },
+        billing: { ...instapayChosen, pendingPlanCode: null, billingInterval: 'monthly' },
       })
     );
     apiPost.mockImplementation(async (url: string) => ({
@@ -557,6 +557,30 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     );
     expect(await screen.findByTestId('instapay-quote')).toBeTruthy();
     expect(document.getElementById('plans')).toBeTruthy();
+  });
+
+  it('a yearly Business store is "current" only under the Yearly tab, not the Monthly tab', async () => {
+    mockApi(
+      billing({
+        subscription: { ...trialing, status: 'active' },
+        availablePlans: [{ ...plans[0], code: 'business', nameEn: 'Business' }],
+        plan: {
+          code: 'business',
+          nameEn: 'Business',
+          nameAr: 'بيزنس',
+          subscribedPlanCode: 'business',
+        },
+        billing: { ...instapayChosen, pendingPlanCode: null, billingInterval: 'yearly' },
+      })
+    );
+    render(<StoreBillingPage />);
+    // default tab is Monthly: the yearly store's plan is not "current" here
+    await screen.findByText('subscribeTitle');
+    expect(screen.queryByText('currentBadge')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'intervalYearly' }));
+    expect(await screen.findByText('currentBadge')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'intervalMonthly' }));
+    await waitFor(() => expect(screen.queryByText('currentBadge')).toBeNull());
   });
 
   it('canceled store: "subscription ended" copy, never "Free plan limits apply", plan picker shown', async () => {
