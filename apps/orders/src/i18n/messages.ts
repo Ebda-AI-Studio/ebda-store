@@ -128,6 +128,8 @@ export interface Messages {
     paid: string;
     unpaid: string;
     remain: string;
+    refunded: string;
+    refundedAmount: string;
     delivery: string;
     deliverTo: string;
     deliverBy: string;
@@ -390,6 +392,8 @@ export const MESSAGES: Record<Locale, Messages> = {
       paid: 'Paid',
       unpaid: 'Unpaid',
       remain: 'Remaining: {amount}',
+      refunded: 'Refunded',
+      refundedAmount: 'Refunded {amount}',
       delivery: 'Delivery',
       deliverTo: 'Deliver to',
       deliverBy: 'Delivered by',
@@ -668,6 +672,8 @@ export const MESSAGES: Record<Locale, Messages> = {
       paid: 'مدفوع',
       unpaid: 'غير مدفوع',
       remain: 'المتبقّي: {amount}',
+      refunded: 'تم الاسترداد',
+      refundedAmount: 'تم استرداد {amount}',
       delivery: 'التوصيل',
       deliverTo: 'التوصيل إلى',
       deliverBy: 'يتم التوصيل بواسطة',

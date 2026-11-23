@@ -1561,6 +1561,8 @@
       "paid": "مدفوع",
       "unpaid": "غير مدفوع",
       "remain": "المتبقي {amount}",
+      "refunded": "تم الاسترداد",
+      "refundedAmount": "تم استرداد {amount}",
       "paymentMethod": "طريقة الدفع",
       "methodCod": "الدفع عند الاستلام",
       "paymentTransactionId": "رقم العملية",

@@ -66,7 +66,11 @@ export function orderActionVisibility(order: OrderActionInput): OrderActionVisib
   const awaitingInstapay =
     order.status === 'awaiting_payment_confirmation' &&
     payments.some(p => p.provider === 'instapay' && p.status === 'pending');
-  const showMarkPaid = order.paymentStatus !== 'paid' && !awaitingInstapay;
+  // A refunded order is settled the other way: the API refuses to mark it paid (ORDER_NOT_PAYABLE) and its
+  // paymentStatus is `refunded`, not `paid`, so the button must not come back after a refund. (A cancelled online
+  // order keeps it: Refresh payment recovers one paid late on a still-live invoice.)
+  const refunded = order.paymentStatus === 'refunded' || order.status === 'refunded';
+  const showMarkPaid = order.paymentStatus !== 'paid' && !refunded && !awaitingInstapay;
   // Paid status on an order with a provider-payment row MUST come from the
   // provider (webhook / verify), never a manual flip — financial integrity.
   // COD and InstaPay have no provider behind them: their paid status and any
