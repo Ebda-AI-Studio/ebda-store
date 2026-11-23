@@ -12315,5 +12315,38 @@
         "error": "I could not apply it. Nothing was changed, try again."
       }
     }
+  },
+  "planLimits": {
+    "upgradeCta": "Upgrade plan",
+    "maxProducts": {
+      "warnTitle": "You are close to your product limit",
+      "warnBody": "{used} of {limit} products used. Upgrade before you hit the limit so you can keep adding products.",
+      "fullTitle": "You have reached your product limit",
+      "fullBody": "Your plan allows {limit} products and you are using all of them. Upgrade to add more."
+    },
+    "maxOrdersPerMonth": {
+      "warnTitle": "You are close to this month's order limit",
+      "warnBody": "{used} of {limit} orders this month. Upgrade to keep your store inside its plan.",
+      "fullTitle": "You have reached this month's order limit",
+      "fullBody": "{used} orders against a limit of {limit}. Orders still come through, but upgrade so your store stays within its plan."
+    },
+    "maxStaff": {
+      "warnTitle": "You are close to your team seat limit",
+      "warnBody": "{used} of {limit} team seats used. Upgrade to invite more people.",
+      "fullTitle": "All your team seats are used",
+      "fullBody": "Your plan includes {limit} team seats. Upgrade to invite more people."
+    },
+    "maxStorageMb": {
+      "warnTitle": "You are close to your storage limit",
+      "warnBody": "{used} of {limit} MB used. Upgrade before image uploads stop.",
+      "fullTitle": "Your storage is full",
+      "fullBody": "{used} of {limit} MB used. Upgrade to keep uploading images and files."
+    },
+    "ai": {
+      "warnTitle": "You are close to your AI allowance",
+      "warnBody": "{used} of {limit} AI requests used ({window, select, daily {today} other {this month}}). Upgrade for a bigger allowance.",
+      "fullTitle": "You have used your AI allowance",
+      "fullBody": "{used} of {limit} AI requests used ({window, select, daily {today} other {this month}}). Upgrade for a bigger allowance."
+    }
   }
 }
