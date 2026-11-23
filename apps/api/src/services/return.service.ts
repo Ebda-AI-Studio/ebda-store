@@ -30,6 +30,7 @@ import { opKey } from '../lib/money-idempotency';
 import { storeDb, storeMoney, type MoneyClient } from '../lib/repo-factory';
 
 import {
+  isGuestReturnCustomer,
   minorToDecimalString,
   productReturnAdjustment,
   type ReturnLineInput,
@@ -252,12 +253,41 @@ async function lockOrderReturnsBounded(orderId: string): Promise<void> {
  * A store's customers are User rows in the identity/Postgres side, not in its Durable Object: a DO read cannot `include`
  * them (prisma-lite refuses a cross-database relation), so the DO paths read the return without `customer` and attach it here.
  */
-async function withCustomer<T extends { customerId: string }>(
+/**
+ * A merchant-opened return on a GUEST order carries `guest:<orderId>` as its customer (GUEST-RET-1): no account exists, so the
+ * identity shown is the order's own shipping-address snapshot (name / email / phone). Null when the order was not joined.
+ */
+// pq-allow(unused-export): test seam, imported by __tests__/return-guest.test.ts
+export function guestCustomerOf(order: unknown): Record<string, unknown> | null {
+  let addr = (order as { shippingAddress?: unknown } | null | undefined)?.shippingAddress;
+  if (typeof addr === 'string') {
+    try {
+      addr = JSON.parse(addr);
+    } catch {
+      addr = null;
+    }
+  }
+  if (!addr || typeof addr !== 'object') return null;
+  const a = addr as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  return {
+    id: null,
+    firstName: str(a.firstName),
+    lastName: str(a.lastName),
+    email: str(a.email),
+    phone: str(a.phone),
+    isGuest: true,
+  };
+}
+
+export async function withCustomer<T extends { customerId: string }>(
   storeId: string,
   rows: T[],
   select: Prisma.UserSelect
 ): Promise<Array<T & { customer: unknown }>> {
-  const ids = Array.from(new Set(rows.map(r => r.customerId)));
+  const ids = Array.from(
+    new Set(rows.map(r => r.customerId).filter(id => !isGuestReturnCustomer(id)))
+  );
   const doRows = await customerRows(storeId, ids);
   const users: Array<{ id: string }> = doRows
     ? doRows.map(u => pickSelected(u, select as Record<string, unknown>) as { id: string })
@@ -269,6 +299,8 @@ async function withCustomer<T extends { customerId: string }>(
       : [];
   const byId = new Map(users.map(u => [u.id, u]));
   return rows.map(r => {
+    if (isGuestReturnCustomer(r.customerId))
+      return { ...r, customer: guestCustomerOf((r as { order?: unknown }).order) };
     const u = byId.get(r.customerId) as ({ id: string } & Record<string, unknown>) | undefined;
     if (!u) return { ...r, customer: null };
     const { id: _id, ...rest } = u;
@@ -418,7 +450,7 @@ export class ReturnService {
         take: limit,
         include: {
           order: {
-            select: { orderNumber: true, total: true },
+            select: { orderNumber: true, total: true, shippingAddress: true },
           },
           ...(onDo
             ? {}
@@ -1044,29 +1076,35 @@ export class ReturnService {
 
     // Status was updated — same post-commit deferral as sendReturnConfirmation
     // above; this path was broken in exactly the same way.
-    void deferAfterTenantCommit('email.returnStatusUpdate', () =>
-      EmailService.sendReturnStatusUpdate(
-        storeId,
-        {
-          email: updatedReturn.customer.email,
-          customerName: `${updatedReturn.customer.firstName} ${updatedReturn.customer.lastName}`,
-          storeName: updatedReturn.store.name,
+    // a merchant-opened return on a GUEST order has no account (customer is null): no status email / socket push
+    // (the merchant opened it and already knows; the order's guest contact is not a return recipient)
+    // gated explicitly on the marker (not on whatever the include happens to select), and on the customer being resolved
+    const returnCustomer = updatedReturn.customer as UpdatedReturn['customer'] | null;
+    if (!isGuestReturnCustomer(updatedReturn.customerId) && returnCustomer) {
+      void deferAfterTenantCommit('email.returnStatusUpdate', () =>
+        EmailService.sendReturnStatusUpdate(
+          storeId,
+          {
+            email: returnCustomer.email,
+            customerName: `${returnCustomer.firstName} ${returnCustomer.lastName}`,
+            storeName: updatedReturn.store.name,
+            returnNumber: updatedReturn.returnNumber,
+            status,
+            notes,
+          },
+          returnOrderLocale
+        )
+      ).catch(err => logger.error({ err }, 'Failed to send return status email'));
+
+      // Send real-time notification to customer
+      try {
+        socketService.returnStatusNotification(updatedReturn.customerId, {
           returnNumber: updatedReturn.returnNumber,
           status,
-          notes,
-        },
-        returnOrderLocale
-      )
-    ).catch(err => logger.error({ err }, 'Failed to send return status email'));
-
-    // Send real-time notification to customer
-    try {
-      socketService.returnStatusNotification(updatedReturn.customerId, {
-        returnNumber: updatedReturn.returnNumber,
-        status,
-      });
-    } catch (notifyError) {
-      logger.error({ err: notifyError }, 'Failed to send return status notification');
+        });
+      } catch (notifyError) {
+        logger.error({ err: notifyError }, 'Failed to send return status notification');
+      }
     }
 
     return updatedReturn;
