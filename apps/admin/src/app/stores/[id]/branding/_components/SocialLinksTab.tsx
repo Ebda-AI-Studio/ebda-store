@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/Button';
 import { useMemo } from 'react';
 import { useT } from '@/i18n/useT';
+import { ProviderLogo } from '@/components/ProviderLogo';
 import { SOCIAL_PLATFORMS, type StoreBranding } from './types';
 
 interface SocialLinksTabProps {
@@ -93,7 +94,8 @@ export function SocialLinksTab({ branding, onChange }: SocialLinksTabProps) {
       <div className="bg-card rounded-xl border p-6 space-y-6">
         {SOCIAL_PLATFORMS.map(social => (
           <div key={social.key}>
-            <label className="block text-sm font-medium text-foreground mb-1">
+            <label className="mb-1 flex items-center gap-2 text-sm font-medium text-foreground">
+              <ProviderLogo code={social.key} name={t(social.labelKey)} size="sm" />
               {t(social.labelKey)}
             </label>
             <input
@@ -132,7 +134,10 @@ export function SocialLinksTab({ branding, onChange }: SocialLinksTabProps) {
                 </span>
 
                 <span className="flex-1 text-sm font-medium text-foreground">
-                  {PLATFORM_LABELS[key]}
+                  <span className="inline-flex items-center gap-2">
+                    <ProviderLogo code={key} name={PLATFORM_LABELS[key]} size="sm" />
+                    {PLATFORM_LABELS[key]}
+                  </span>
                 </span>
 
                 <div className="flex gap-1" role="group" aria-label={PLATFORM_LABELS[key]}>

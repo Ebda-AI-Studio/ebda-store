@@ -10,34 +10,38 @@ import { getProviderLogo } from '@ebda/shared';
 export function ProviderLogo({
   code,
   name,
+  size = 'md',
   className = '',
 }: {
   code: string;
   /** Provider display name: used as alt text / wordmark text. */
   name: string;
+  /** `sm` for inline use in tables and form rows. */
+  size?: 'sm' | 'md';
   className?: string;
 }) {
+  const sm = size === 'sm';
   const entry = getProviderLogo(code);
   if (entry.asset) {
     return (
       <span
-        className={`inline-flex h-10 w-16 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-white px-1.5 ${className}`}
+        className={`inline-flex ${sm ? 'h-7 w-12' : 'h-10 w-16'} flex-shrink-0 items-center justify-center rounded-lg border border-border bg-white px-1.5 ${className}`}
         data-testid={`provider-logo-${code}`}
       >
         <Image
           src={entry.asset}
           alt={name}
-          width={52}
-          height={28}
+          width={sm ? 36 : 52}
+          height={sm ? 20 : 28}
           unoptimized
-          className="max-h-7 w-auto max-w-full object-contain"
+          className={`${sm ? 'max-h-5' : 'max-h-7'} w-auto max-w-full object-contain`}
         />
       </span>
     );
   }
   return (
     <span
-      className={`inline-flex h-10 min-w-16 max-w-28 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-muted px-2 text-xs font-semibold text-foreground ${className}`}
+      className={`inline-flex ${sm ? 'h-7 min-w-12 max-w-24' : 'h-10 min-w-16 max-w-28'} flex-shrink-0 items-center justify-center rounded-lg border border-border bg-muted px-2 text-xs font-semibold text-foreground ${className}`}
       data-testid={`provider-logo-${code}`}
       role="img"
       aria-label={name}

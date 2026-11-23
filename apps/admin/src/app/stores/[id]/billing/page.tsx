@@ -31,6 +31,7 @@ import { useAuth } from '../../../../lib/auth';
 import { useT } from '../../../../i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
 import { DataTable } from '@/components/mobile/DataTable';
+import { ProviderLogo } from '@/components/ProviderLogo';
 import { InstapayPanel } from '../../../../components/billing/InstapayPanel';
 import { SupportLink } from '../../../../components/billing/SupportLink';
 import { InstapayReceiptForm } from '../../../../components/instapay/InstapayReceiptForm';
@@ -951,7 +952,10 @@ export default function StoreBillingPage() {
 
               {(instapay?.available || instapayChosen) && instapay && (
                 <div className="space-y-3 border-t pt-4">
-                  <h3 className="text-sm font-medium">{t('pay.instapay')}</h3>
+                  <h3 className="flex items-center gap-2 text-sm font-medium">
+                    <ProviderLogo code="instapay" name={t('pay.instapay')} size="sm" />
+                    {t('pay.instapay')}
+                  </h3>
                   {!instapayChosen ? (
                     <Button
                       variant="outline"
