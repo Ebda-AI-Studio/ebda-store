@@ -1,6 +1,6 @@
 // The Ebda API on Cloudflare Workers (R-EBDA-001, docs/ebda/design/cloudflare-backend.md).
 // Express runs through `httpServerHandler` (`cloudflare:node`, nodejs_compat); data is on
-// StoreDO + D1; there is no Postgres (Hyperdrive removed, NEON-ZERO N-17). NO SECRETS HERE: local secrets live in
+// StoreDO + D1; there is no Postgres (Postgres binding removed, NEON-ZERO N-17). NO SECRETS HERE: local secrets live in
 // `.dev.vars` (see `.dev.vars.example`), deployed ones in `wrangler secret put`.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -39,7 +39,7 @@
   // 2026-11-11 (Ruling PERF-PLACEMENT-1): still off; the "on" arm of the post-Neon A/B is unmeasured (no preview API), harness: loadtests/scenarios/placement-ab.js.
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
 
-  // No Hyperdrive / Postgres binding (NEON-ZERO N-17, Ruling NZ-D23): the Worker's Prisma client throws POSTGRES_REMOVED.
+  // No Postgres binding (NEON-ZERO N-17, Ruling NZ-D23): the Worker's Prisma client throws POSTGRES_REMOVED.
 
   // D1 `ebda-platform` (INFRA-CF-1 task 2.4): `stores.storage_backend` is the per-store backend switch read by
   // lib/store-backend.ts, and /health reports its counts. The zero id is a placeholder (like the zero ids above): the
