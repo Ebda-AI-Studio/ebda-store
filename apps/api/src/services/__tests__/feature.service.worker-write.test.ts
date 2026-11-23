@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // A feature toggle must not open a Postgres interactive transaction: on the Worker Postgres is removed (POSTGRES_REMOVED), so
 // `withMoneyTx(prisma, ...)` answered 500 on PUT /stores/:id/ci/hints and every other feature switch.
 const m = vi.hoisted(() => ({
+  redisDelete: vi.fn(),
   upsert: vi.fn(async () => ({})),
   findMany: vi.fn(async () => [{ featureKey: 'customer_intelligence', enabled: true }]),
   storeFind: vi.fn(async () => ({ plan: 'free', slug: 's', domain: null })),
@@ -12,7 +13,12 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock('../store.service', () => ({ bustStoreCaches: vi.fn() }));
 vi.mock('../redis.service', () => ({
-  redis: { get: vi.fn(async () => null), set: vi.fn(), delete: vi.fn(), deleteByPattern: vi.fn() },
+  redis: {
+    get: vi.fn(async () => null),
+    set: vi.fn(),
+    delete: m.redisDelete,
+    deleteByPattern: vi.fn(),
+  },
 }));
 vi.mock('../../lib/repo-factory', () => ({
   storeRepo: vi.fn(async () => ({ backend: 'pg' })),
@@ -47,5 +53,20 @@ describe('FeatureService.updateStoreFeatures on the Worker', () => {
     expect(m.withMoneyTx).not.toHaveBeenCalled();
     expect(m.upsert).toHaveBeenCalledTimes(1);
     expect(out.customer_intelligence).toBe(true);
+  });
+});
+
+describe('FeatureService.updateStoreFeatures: a failed multi-key write', () => {
+  it('drops the cached feature map and rethrows (D1 has no multi-key transaction)', async () => {
+    vi.clearAllMocks();
+    m.upsert.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error('d1 down'));
+    await expect(
+      featureService.updateStoreFeatures(
+        'st1',
+        { customer_intelligence: true, bundles: true } as never,
+        'u1'
+      )
+    ).rejects.toThrow('d1 down');
+    expect(m.redisDelete).toHaveBeenCalledWith(expect.stringContaining('st1'));
   });
 });
