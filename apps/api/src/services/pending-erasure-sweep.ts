@@ -45,7 +45,9 @@ export async function sweepPendingErasures(deps: PendingErasureDeps) {
           void alert({
             level: 'p1',
             source: 'cron.pending-erasure-sweep',
-            title: 'Shopper account closure is stuck',
+            scope: 'store',
+            store: { id: storeId, name: storeId },
+            title: `Shopper account closure is stuck (${userId})`,
             body: `A shopper closure has failed ${tries} sweeps. The sign-in record is still present. Finish it from the merchant erase route.`,
             context: { storeId, userId, tries },
           }).catch(() => undefined);

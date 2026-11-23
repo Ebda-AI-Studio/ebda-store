@@ -277,8 +277,8 @@ export default function SettingsClient() {
         );
       case 'ERASURE_INCOMPLETE':
         return t(
-          'We could not finish closing your account. It is locked and the closure will be completed shortly. Contact support if it is not.',
-          'معرفناش نكمّل قفل حسابك. الحساب اتقفل مؤقتًا وهنكمّل القفل خلال وقت قصير. كلّم الدعم لو ماخلصش.'
+          'We could not finish closing your account. It is locked and the closure will be completed within a day. Contact support if it is not.',
+          'معرفناش نكمّل قفل حسابك. الحساب اتقفل مؤقتًا وهنكمّل القفل خلال يوم. كلّم الدعم لو ماخلصش.'
         );
       default:
         return t('Failed to delete account. Please try again.', 'حذف الحساب منفعش. جرّب تاني.');

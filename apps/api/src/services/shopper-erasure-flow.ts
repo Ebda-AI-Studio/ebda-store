@@ -15,8 +15,8 @@ export const CLOSURE_REFUSALS: Record<string, { en: string; ar: string }> = {
 };
 
 export const ERASURE_INCOMPLETE_MESSAGE = {
-  en: 'We could not finish closing your account. It is locked and the closure will be completed shortly. Contact support if it is not.',
-  ar: 'معرفناش نكمّل قفل حسابك. الحساب اتقفل مؤقتًا وهنكمّل القفل خلال وقت قصير. كلّم الدعم لو ماخلصش.',
+  en: 'We could not finish closing your account. It is locked and the closure will be completed within a day. Contact support if it is not.',
+  ar: 'معرفناش نكمّل قفل حسابك. الحساب اتقفل مؤقتًا وهنكمّل القفل خلال يوم. كلّم الدعم لو ماخلصش.',
 };
 
 const both = (m: { en: string; ar: string }) => `${m.en} | ${m.ar}`;
@@ -71,7 +71,10 @@ export async function runShopperErasure<E, I>(
       void (steps.alert ?? sendAlert)({
         level: 'p1',
         source: 'auth.shopper-erasure',
-        title: 'Shopper closure stopped after the store erase',
+        scope: 'store',
+        store: { id: ctx.storeId, name: ctx.storeId },
+        // the user id is in the title: the throttle key is level + title + store, so each stuck user pages on its own
+        title: `Shopper closure stopped after the store erase (${ctx.userId})`,
         body: `The identity erase failed twice (${locked ? 'account locked' : 'account NOT locked'}). The pending-erasure sweep will retry; if it alerts again, finish it from the merchant erase route.`,
         context: { storeId: ctx.storeId, userId: ctx.userId },
       }).catch(() => undefined);

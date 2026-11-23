@@ -29,6 +29,7 @@ import {
 } from '../services/auth.service';
 import {
   authLimiter,
+  adminReadLimiter,
   refreshLimiter,
   refreshIpLimiter,
   resetEmailLimiter,
@@ -989,6 +990,7 @@ router.delete(
 router.get(
   '/me/closure-preview',
   authenticate,
+  adminReadLimiter,
   rejectAdminOnMerchantOrigin,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
