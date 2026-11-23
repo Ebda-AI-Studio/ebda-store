@@ -2,6 +2,7 @@
 
 import { Alert } from '../../../../../components/Alert';
 import { useLocale } from 'next-intl';
+import { ProviderLogo } from '@/components/ProviderLogo';
 import { useT } from '@/i18n/useT';
 
 import { INSTAPAY_DEFAULT_EXPIRY_HOURS, minorToDecimalString, roundToMinor } from '@ebda/shared';
@@ -73,12 +74,7 @@ export function ProviderCard({
     >
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
-          <div
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-white text-sm font-bold"
-            style={{ backgroundColor: provider.color }}
-          >
-            {provider.id[0].toUpperCase()}
-          </div>
+          <ProviderLogo code={provider.id} name={isAr ? provider.nameAr : provider.name} />
           <div>
             {/* The provider name leads in the admin's own language; the other is the secondary line (audit S-6). */}
             <h3 className="font-semibold text-foreground">

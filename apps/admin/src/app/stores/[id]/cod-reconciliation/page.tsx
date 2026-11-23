@@ -7,6 +7,7 @@ import { useLocale } from 'next-intl';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { OrderStatusBadge } from '../../../../components/OrderStatusBadge';
 import { apiGet, apiPost } from '../../../../lib/api';
+import { ProviderLogo } from '@/components/ProviderLogo';
 import { useT } from '@/i18n/useT';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { ShippingTabs } from '../shipping/_components/ShippingTabs';
@@ -346,7 +347,12 @@ export default function CodReconciliationPage() {
                   {report?.rows.map(r => (
                     <tr key={r.shipmentId} className="border-t border-border align-top">
                       <td className="px-3 py-2 font-medium">{r.orderNumber}</td>
-                      <td className="px-3 py-2">{carrierName(r)}</td>
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center gap-2">
+                          <ProviderLogo code={r.carrier} name={carrierName(r)} size="sm" />
+                          {carrierName(r)}
+                        </span>
+                      </td>
                       <td className="px-3 py-2 font-mono text-xs">{r.trackingNumber ?? '—'}</td>
                       <td className="px-3 py-2">{formatMoney(r.result.owed)}</td>
                       <td className="px-3 py-2">
