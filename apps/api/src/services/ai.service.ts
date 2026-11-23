@@ -72,6 +72,8 @@ export type AccountingAiFeature =
   | 'expense-ocr'
   // InstaPay transfer receipts (money batch A): pre-fills the payer's proof form.
   | 'instapay-receipt'
+  // VAT registration change request pre-check (self-service A10): extracts two fields off a tax card image.
+  | 'tax-document'
   | 'profit-anomaly'
   | 'insights-narration-cohort'
   | 'insights-narration-funnel'
