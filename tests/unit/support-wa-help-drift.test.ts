@@ -26,7 +26,7 @@ const PINNED_SHA256: Record<string, string> = {
   'ar/08-campaigns-and-opt-out.md':
     '7f9e117c3649335cf68d23258d474c82982345071b2dc7118b60e850623a545b',
   'ar/09-wallet-top-ups-and-refunds.md':
-    'faa4bec9cc1988a37d2d4cb79b13712b5d0da77242abb97591c5f8a7c54d6877',
+    'b9795ac9934070563c264da687cab52eaf92509c8c31c741887960e504146fb3',
   'ar/10-meta-fees-explained.md':
     '36d9b375852ce894e95f7f6f373b1c36b6e204da144e2b6ffcddbe4dce73826f',
   'ar/11-service-menu-hours-and-location.md':
@@ -36,7 +36,7 @@ const PINNED_SHA256: Record<string, string> = {
   'ar/13-your-customers-data.md':
     '76d0b4fe85a964ea7c8d614108ac143717078ed5dd9a6e90385141bad7866c99',
   'ar/14-team-members-and-seats.md':
-    'ae63ccbee0ecad2275405f85c06457e177afae6d759400bb42421c3504c3c63d',
+    'a4aa8d62aea37440a4c2a0269da25765121abb48e136e2863f49608d2fb88449',
   'ar/15-your-products-on-whatsapp.md':
     '6d92b917e75421bf02ddbc3a966eed284e1a1ce7faca2294776e3301a34abf9e',
   'ar/16-write-and-submit-a-template.md':
@@ -79,7 +79,7 @@ const PINNED_SHA256: Record<string, string> = {
   'en/08-campaigns-and-opt-out.md':
     '3c45c20d19d09d5ff4287ef22800ca5d07222ebb842e1ede5d494619f7767bcd',
   'en/09-wallet-top-ups-and-refunds.md':
-    '2398991f67c7c94bf8e66e0fc7a16a6ea92f7c9159b686153be5dfd2eb9caaf6',
+    'bf5ef6232e52d6e1f129638619a8f596acf5d236a504f2cf2681af8a30577064',
   'en/10-meta-fees-explained.md':
     '70800e78c6eaefacf07b0a21472bf7f954f77733a93a86ea880c4467c6ea0437',
   'en/11-service-menu-hours-and-location.md':
@@ -89,7 +89,7 @@ const PINNED_SHA256: Record<string, string> = {
   'en/13-your-customers-data.md':
     'e3643cd1b68e12fe889ae0cc24761d697b87bbe8e001e1e20fcdbf8dafeb5b8a',
   'en/14-team-members-and-seats.md':
-    'cb8d79b1873066d2b639c95cfa8ffe013f9e4ca4e88c927fc2a0acc1b3f41b82',
+    '999c1f930471900ad9b3d8f3b1c3547cf8e62f18f474007ff0edfe950498a312',
   'en/15-your-products-on-whatsapp.md':
     '579528cf2381ccd6b377725a0ca168de9269defb54d4a2a97e5e96317780f691',
   'en/16-write-and-submit-a-template.md':
