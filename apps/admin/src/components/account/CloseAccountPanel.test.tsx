@@ -58,7 +58,7 @@ describe('CloseAccountPanel', () => {
     expect(button.disabled).toBe(false);
     fireEvent.click(button);
     await waitFor(() => expect(onClosed).toHaveBeenCalledTimes(1));
-    expect(h.calls).toEqual(['/auth/me/close-account']);
+    expect(h.calls).toEqual(['/api/v1/auth/me/close-account']);
   });
 
   it('shows the server refusal and keeps the session when erasure is not enabled', async () => {

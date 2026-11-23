@@ -23,7 +23,7 @@ export function CloseAccountPanel({ onClosed }: { onClosed: () => void }) {
   const close = async () => {
     setBusy(true);
     setError(null);
-    const { data, error: err } = await apiPost<{ status: string }>('/auth/me/close-account');
+    const { data, error: err } = await apiPost<{ status: string }>('/api/v1/auth/me/close-account');
     setBusy(false);
     if (err || !data) {
       setError(err?.message || t('errorGeneric'));
