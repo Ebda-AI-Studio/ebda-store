@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
+import { pickAiText } from '@/lib/ai-text';
 import { apiGet, apiGetPage } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
@@ -46,6 +48,7 @@ interface ProfitAnomaly {
   severity: 'p0' | 'warning';
   deltaPercent: number;
   explanationEn: string;
+  explanationAr?: string | null;
   acknowledged: boolean;
   detectedAt: string;
 }
@@ -74,6 +77,7 @@ export default function FinanceDashboardPage() {
   const router = useRouter();
   const storeId = params?.id as string;
   const t = useT('finance.dashboard');
+  const locale = useLocale();
   const tc = useT('common');
 
   const [period, setPeriod] = useState<Period>('this_month');
@@ -518,8 +522,11 @@ export default function FinanceDashboardPage() {
                               {deltaPercentDisplay.toFixed(1)}%
                             </span>
                           </div>
-                          <p className="text-xs text-muted-foreground line-clamp-1">
-                            {a.explanationEn}
+                          <p
+                            className="text-xs text-muted-foreground line-clamp-1"
+                            lang={pickAiText(locale, a.explanationEn, a.explanationAr).lang}
+                          >
+                            {pickAiText(locale, a.explanationEn, a.explanationAr).text}
                           </p>
                         </div>
                       );

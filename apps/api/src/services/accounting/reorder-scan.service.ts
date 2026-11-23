@@ -210,7 +210,7 @@ function buildGeminiPrompt(candidates: ReorderCandidate[]): string {
 
   return `You are an inventory ops assistant for an Egypt retailer. For each product below,
 in <=2 sentences each, explain WHY this reorder suggestion makes sense given the velocity
-+ on-hand + lead time + open backlog. Output bilingual (English + Arabic).
++ on-hand + lead time + open backlog. Output bilingual: reasoningEn MUST be written in English only and reasoningAr in Arabic only (product names may stay as written).
 Return STRICT JSON:
 { "items": [{ "key": "<the product's key, copied exactly>", "reasoningEn": "...", "reasoningAr": "..." }] }
 
