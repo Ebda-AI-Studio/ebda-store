@@ -523,7 +523,8 @@ jobs:
     # because no main run measured it (Ruling MKT-LEGAL-HTML-BUDGET-2); the other Workers build in their deploy workflows.
     if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true') && needs.tested-tree.outputs.skip != 'true'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
-    timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 40 || 90 }} # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
+    # Exempt from the hosted run+10 rule: cf-cache-bindings-assert guards a roomy budget (>=25) per leg (issue 2155).
+    timeout-minutes: 90 # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     strategy:
       fail-fast: false
       matrix:
