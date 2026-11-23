@@ -688,6 +688,7 @@
   "POST /stores/:storeId/inventory/count-sessions/:sessionId/reconcile",
   "POST /stores/:storeId/inventory/orders/:orderId/pick",
   "POST /stores/:storeId/inventory/receive",
+  "POST /stores/:storeId/lifecycle-emails/test-send",
   "POST /stores/:storeId/locations",
   "POST /stores/:storeId/loyalty/members/:customerId/award",
   "POST /stores/:storeId/newsletter/broadcast",

@@ -8607,6 +8607,11 @@
       "ENQUEUE_FAILED": "The email could not be queued",
       "unsubscribed_by_link": "Unsubscribed from an email link"
     },
+    "colTest": "Test",
+    "testSend": "Send test to me",
+    "testSending": "Sending...",
+    "testSent": "Test email sent to {to}. It carries the real unsubscribe link.",
+    "testSendFailed": "Could not send the test email. Only the store owner can send it.",
     "loadFailed": "Could not load the email log."
   },
   "paymentAbandonments": {

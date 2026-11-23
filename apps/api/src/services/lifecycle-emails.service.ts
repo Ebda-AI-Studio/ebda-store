@@ -255,6 +255,86 @@ export async function processLifecycleEmail(
   return { status: 'sent' };
 }
 
+export type LifecycleTestResult =
+  | { status: 'sent'; to: string }
+  | { status: 'not_found' }
+  | { status: 'not_owner' }
+  | { status: 'no_recipient' }
+  | { status: 'failed'; reason: string };
+
+/**
+ * Owner-only "send this email to myself". Goes ONLY to the store owner's own address (read from the
+ * store, never from the request), only when the caller IS the owner (staff and super-admins are refused:
+ * the mail would land in the owner's inbox, not theirs), with the real signed unsubscribe link so the
+ * RFC 8058 headers can be checked on a received message. It bypasses the skip rules and the opt-out on
+ * purpose (the owner asked for it) but writes NO `store_lifecycle_emails` row: the real sequence, its
+ * once-per-store idempotency and the merchant log are untouched. A shopper address can never be reached.
+ */
+export async function sendLifecycleTestEmail(
+  storeId: string,
+  kind: LifecycleEmailKind,
+  actorUserId: string,
+  now: Date = new Date()
+): Promise<LifecycleTestResult> {
+  const ctx = await withStore(storeId, async tx => {
+    const store = await tx.store.findUnique({
+      where: { id: storeId },
+      select: {
+        name: true,
+        slug: true,
+        domain: true,
+        settings: true,
+        ownerId: true,
+        owner: { select: { email: true } },
+      },
+    });
+    if (!store) return null;
+    const sub = await tx.storeSubscription.findUnique({
+      where: { storeId },
+      select: { trialEndsAt: true },
+    });
+    return { store, trialEndsAt: sub?.trialEndsAt ?? null };
+  });
+  if (!ctx) return { status: 'not_found' };
+  const { store, trialEndsAt } = ctx;
+  if (store.ownerId !== actorUserId) return { status: 'not_owner' };
+  const to = store.owner?.email;
+  if (!to) return { status: 'no_recipient' };
+
+  const lang: 'ar' | 'en' =
+    (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'en' ? 'en' : 'ar';
+  const admin = `${(config.adminUrl ?? '').replace(/\/$/, '')}/stores/${storeId}`;
+  try {
+    await EmailService.sendLifecycleEmail(
+      {
+        kind,
+        to,
+        isTest: true,
+        storeName: store.name,
+        links: {
+          products: `${admin}/products`,
+          payment: `${admin}/payment-settings`,
+          storefront: store.domain ? `https://${store.domain}` : storeOrigin(store.slug),
+          billing: `${admin}/billing`,
+        },
+        unsubscribeUrl: lifecycleUnsubscribeUrl(storeId),
+        recoveredCarts: kind === 'trial_recap' ? 0 : undefined,
+        daysLeft: trialEndsAt
+          ? Math.max(0, Math.ceil((trialEndsAt.getTime() - now.getTime()) / 86_400_000))
+          : kind === 'trial_recap'
+            ? 4
+            : undefined,
+        referralUrl: kind === 'first_order' ? referralUrl('email', store.slug) : undefined,
+      },
+      lang
+    );
+  } catch (err) {
+    logger.warn({ err, storeId, kind }, '[lifecycle-email] test send enqueue failed');
+    return { status: 'failed', reason: 'ENQUEUE_FAILED' };
+  }
+  return { status: 'sent', to };
+}
+
 export interface LifecycleLogEntry {
   kind: LifecycleEmailKind;
   status: LifecycleStatus | 'pending';

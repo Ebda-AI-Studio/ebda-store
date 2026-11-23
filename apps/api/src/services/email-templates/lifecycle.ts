@@ -25,6 +25,8 @@ export interface LifecycleEmailData {
   daysLeft?: number;
   /** first_order: Ebda link carrying the referral UTMs. */
   referralUrl?: string;
+  /** Owner-only "send test to myself": the subject says so, so it is never mistaken for the real one. */
+  isTest?: boolean;
 }
 
 type Lang = 'en' | 'ar';
@@ -191,7 +193,8 @@ function copyFor(d: LifecycleEmailData, lang: Lang): Copy {
 }
 
 export function lifecycleSubject(d: LifecycleEmailData, lang: Lang): string {
-  return copyFor(d, lang).subject;
+  const subject = copyFor(d, lang).subject;
+  return d.isTest ? `${lang === 'ar' ? '[تجربة]' : '[Test]'} ${subject}` : subject;
 }
 
 export function lifecycleContent(d: LifecycleEmailData, lang: Lang): string {
