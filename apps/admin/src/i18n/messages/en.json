@@ -869,7 +869,10 @@
         "searchTermsDropped": "Words that will not be saved (over the limit): {count}",
         "searchTermsAtLimit": "Limit reached",
         "searchTermsNearLimit": "Almost at the limit",
-        "priceMinError": "The price must be more than zero."
+        "priceMinError": "The price must be more than zero.",
+        "slug": "Link (slug)",
+        "slugHint": "Part of the product's web address. Changing it keeps the old link working: visitors are redirected to the new one.",
+        "slugInvalid": "Use lowercase letters, numbers, Arabic letters and hyphens only."
       },
       "statusOptions": {
         "draft": "Draft",
