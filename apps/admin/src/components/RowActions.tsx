@@ -34,7 +34,7 @@ interface RowActionsProps {
 
 const MENU_GUTTER = 8;
 
-export interface RowMenuPlacementInput {
+interface RowMenuPlacementInput {
   trigger: { top: number; bottom: number; left: number; right: number };
   menuWidth: number;
   menuHeight: number;
@@ -48,6 +48,7 @@ export interface RowMenuPlacementInput {
  * left in RTL); it flips above the trigger when it does not fit below; both axes are then clamped into the viewport
  * (8px gutter + safe-area inset), so a trigger near either edge can never push the menu off-screen.
  */
+// pq-allow(unused-export): test seam, imported by apps/admin/src/components/RowActions.portal.test.tsx
 export function placeRowMenu(i: RowMenuPlacementInput): {
   top: number;
   left: number;
