@@ -236,6 +236,7 @@ const bulkAiProductFaqsFn = inngest.createFunction(
                         options: product.options,
                       },
                       count: FAQS_PER_PRODUCT,
+                      bulk: true,
                     },
                     apiKey,
                     MODEL

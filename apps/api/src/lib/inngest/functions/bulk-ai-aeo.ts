@@ -1163,7 +1163,12 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                 const generated = await callWithRetry(
                   () =>
                     generateProductMetaAeo(
-                      { storeId, storeName, product: { name: p.name, description: p.description } },
+                      {
+                        storeId,
+                        storeName,
+                        product: { name: p.name, description: p.description },
+                        bulk: true,
+                      },
                       config.googleAiKey,
                       MODEL
                     ),
