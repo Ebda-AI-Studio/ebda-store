@@ -1,11 +1,12 @@
 /**
- * Seats and invitations (Ruling ID-13): the seat check is atomic with the insert (store row locked FOR UPDATE, count inside
- * the same transaction), and pending invitations that no longer fit the plan expire on a downgrade.
+ * Seats and invitations (Ruling ID-13): pending invitations that no longer fit the plan expire on a downgrade.
+ * The seat check's atomicity with the insert is a platform-D1 batch now (access-d1.ts `addStaffWithinCap` /
+ * `acceptInviteWithinCap`), proven by tests/unit/access-d1.test.ts ("two simultaneous adds cannot both take the last seat",
+ * "accept with the seats full leaves the invitation PENDING"); the row-lock variant of this file was the removed arm.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const h = vi.hoisted(() => ({
-  calls: [] as string[],
   limit: 1 as number | null,
   staff: 0,
   pending: [] as Array<{ id: string; createdAt: number }>,
@@ -13,16 +14,7 @@ const h = vi.hoisted(() => ({
 }));
 
 const tx = {
-  $queryRaw: async (strings: TemplateStringsArray) => {
-    h.calls.push(strings.join('?').includes('FOR NO KEY UPDATE') ? 'lock-store' : 'query');
-    return [];
-  },
-  storeStaff: {
-    count: async () => {
-      h.calls.push('count');
-      return h.staff;
-    },
-  },
+  storeStaff: { count: async () => h.staff },
   staffInvite: {
     findMany: async () =>
       [...h.pending].sort((a, b) => a.createdAt - b.createdAt).map(p => ({ id: p.id })),
@@ -49,34 +41,13 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-const { assertWithinLimit } = await import('@api/services/plan-limit.service');
 const { expireInvitesBeyondSeats } = await import('@api/services/staff-invite.service');
 
 beforeEach(() => {
-  h.calls = [];
   h.limit = 1;
   h.staff = 0;
   h.pending = [];
   h.expired = [];
-});
-
-describe('seat check is atomic with the insert', () => {
-  it('with a transaction it locks the store row FIRST, then counts inside that same transaction', async () => {
-    await assertWithinLimit('s1', 'maxStaff', { tx: tx as never });
-    expect(h.calls).toEqual(['lock-store', 'count']);
-  });
-
-  it('the last seat taken (count already at the limit) is refused under the lock, so N racers cannot all pass', async () => {
-    h.staff = 1; // what the second racer sees once the first has inserted and committed
-    await expect(assertWithinLimit('s1', 'maxStaff', { tx: tx as never })).rejects.toMatchObject({
-      statusCode: expect.any(Number),
-    });
-  });
-
-  it('without a transaction nothing is locked (the cheap pre-check)', async () => {
-    await assertWithinLimit('s1', 'maxStaff');
-    expect(h.calls).not.toContain('lock-store');
-  });
 });
 
 describe('downgrade expires pending invitations that no longer fit', () => {
