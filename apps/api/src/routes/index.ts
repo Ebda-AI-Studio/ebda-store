@@ -3,6 +3,7 @@ import authRoutes from './auth.routes';
 import merchantSignupRoutes from './merchant-signup.routes';
 import onboardingRoutes from './onboarding.routes';
 import setupGuideRoutes from './setup-guide.routes';
+import attentionRoutes from './attention.routes';
 import mfaRoutes from './mfa.routes';
 import passkeyRoutes from './passkey.routes';
 import {
@@ -364,6 +365,7 @@ router.use('/stores/:storeId/returns', tenantContext, returnRoutes);
 // runInTenantContext is what still blocks this router.)
 router.use('/onboarding', onboardingRoutes);
 router.use('/stores', tenantContext, setupGuideRoutes);
+router.use('/stores', tenantContext, attentionRoutes);
 router.use('/stores', tenantContext, couponRoutes);
 router.use('/stores', tenantContext, shippingRoutes);
 router.use('/stores', tenantContext, taxRoutes);
