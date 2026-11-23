@@ -1,5 +1,5 @@
 /**
- * NO workflow can run on a GitHub-hosted runner (Ahmad 2026-11-16: never hosted runners, no hosted minutes). This file used to pin the OPPOSITE
+ * NO workflow can run on a GitHub-hosted runner (Ahmad 2026-11-16: never hosted runners on PRIVATE repos, no hosted minutes; since 2026-11-23 the public Ebda repos run hosted by setting their repo variables, the file never names an image). This file used to pin the OPPOSITE
  * policy (SP4 task 9 / CI-UMBRA-1: every `runs-on` falls back to hosted `ubuntu-24.04`); that rule is superseded. Every `runs-on` is a repo variable
  * with a Mac-label fallback: heavy `["self-hosted","ebda-mac"]`, light `["ebda-mac-light"]`. A leftover hosted fallback silently takes over the
  * moment a variable is unset, and GitHub QUEUES a job whose labels match no online runner instead of failing it, so the guard is the test.
