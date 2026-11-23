@@ -26,3 +26,18 @@ describe('production wiring', () => {
     expect(src).toMatch(/^\s*"WA_BRIDGE_REQUIRE_BUYER_PROOF":\s*"1"/m);
   });
 });
+
+describe('Chat order lookup under strict mode (flag unset)', () => {
+  it('a valid buyer key + phone still reads status and order list; no phone is refused', async () => {
+    const { createBridge } = await import('../../../apps/api/src/lib/wa/bridge/service');
+    const { makeFakePort, S, BK, BUYER } = await import('./fake-port');
+    const b = createBridge({
+      port: makeFakePort().port,
+      storefrontUrl: async () => 'https://x',
+      buyerKeySecret: () => 'ebda-suite-buyer-key-test-v1',
+      requireBuyerProof: () => buyerProofRequired(undefined),
+    });
+    expect(await b.listCustomerOrders(S, BK, 5, BUYER.phoneE164)).toMatchObject({ ok: true });
+    expect(await b.listCustomerOrders(S, BK, 5)).toMatchObject({ ok: false, reason: 'invalid' });
+  });
+});
