@@ -13,7 +13,6 @@ Arabic: كتابة وترجمة وتحسين بالذكاء الاصطناعي
 
 ### Search that understands Egyptian Arabic and Franco
 Your shoppers type the way they talk: in Egyptian Arabic, in Franco like "gazma" or "kotshy", or in English. Search understands letter variants such as أ/ا and ه/ة, and still finds the product when the spelling is not exact. Every product gets its own search words in Egyptian Arabic, Franco and English plus the common misspellings, and you can edit them. You also see what shoppers searched for and found nothing, so you can add the missing product.
-Search by meaning: shoppers type what they have in mind and search understands what they mean. We are rolling it out gradually, and it only switches on for your store once its results pass our quality check on a real catalogue. (coming soon)
 Arabic: بحث بيفهم المصري والفرانكو
 
 ### Run your store from an AI assistant
@@ -34,7 +33,7 @@ Arabic: أرقام متجرك بتتشرح
 
 ### InstaPay receipts read themselves
 The receipt a customer uploads is read automatically, so nobody types the transfer details.
-Arabic: إيصال إنستا باي بيتقري لوحده
+Arabic: إيصال إنستاباي بيتقري لوحده
 
 ### SEO and visibility in AI answers
 Search-engine titles and descriptions, redirects for old links and structured FAQs. Your store also shows up for AI assistants: we prepare an always-current store profile (llms.txt) and product feed they can read. You can also track whether AI assistants mention your store.
@@ -123,9 +122,6 @@ A: Yes, on every plan. If you would rather wait, your store runs on a free yourn
 Q: Does search understand Egyptian Arabic and Franco?
 A: Yes. A shopper can type "gazma", "كوتشي" or English, search understands letter variants, and every product gets AI search words that you can edit.
 
-Q: Is there search by meaning?
-A: It is rolling out gradually and coming soon. We will not switch it on for your store until its results pass our quality check on a real catalogue.
-
 Q: Does it recover abandoned carts?
 A: Yes, on the Growth and Business plans. The store reminds shoppers in steps by email (when they opted in at checkout, guests included), by notification. SMS is on the Business plan, through your own SMS account, when the shopper agreed to it.
 
@@ -151,7 +147,7 @@ Q: Is there a commission on orders?
 A: No. It is 0% on every plan. You pay the subscription, and the payment gateway charges its own fee when a customer pays online.
 
 Q: What is not there yet?
-A: There is no app marketplace, no custom code editor, no point-of-sale and no multi-currency store. The comparison pages for Zid and Shopify go through the details, and what is coming soon.
+A: There is no app marketplace, no custom code editor, no point-of-sale and no multi-currency store. The comparison pages for Zid and Shopify go through the details.
 
 ## Comparisons (as of November 2026)
 Competitor facts come from their public pages (Wuilt, YouCan, EasyOrders and ExpandCart were read on 22 October 2026; the others are general and say to check their sites). Check their sites before deciding.
@@ -170,7 +166,6 @@ Both Ebda Store and Zid let you open an online store in Arabic. The difference i
 - Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. Zid — Check Zid's site for webhooks and integrations.
 - Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. Zid — Check Zid's site for wholesale pricing.
 - Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. Zid — Check Zid's site for email marketing options.
-- Search by meaning: Ebda Store — Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue. Zid — Check Zid's site for how its search handles meaning.
 - App marketplace: Ebda Store — There is no app marketplace. Zid — Check Zid's site for its app store.
 - Custom code: Ebda Store — You edit in the page builder without code, and there is no custom code editor. Zid — Check Zid's site for developer and theme customisation tools.
 - Point of sale (POS): Ebda Store — There is no in-store point of sale. Zid — Check Zid's site for in-store selling options.
@@ -191,7 +186,6 @@ Shopify is a large global platform serving merchants in many countries, while Eb
 - Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. Shopify — Webhooks and a developer API are available, alongside the app store.
 - Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. Shopify — Check Shopify's site for B2B features and which plans include them.
 - Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. Shopify — Email marketing through built-in tools or apps.
-- Search by meaning: Ebda Store — Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue. Shopify — Check Shopify's site for how its search handles meaning.
 - App marketplace: Ebda Store — There is no app marketplace. Shopify — A very large app store.
 - Custom code: Ebda Store — You edit in the page builder without code, and there is no custom code editor. Shopify — A theme code editor and developer tools.
 - Point of sale (POS): Ebda Store — There is no in-store point of sale. Shopify — Shopify POS for physical shops.
@@ -212,7 +206,6 @@ Wuilt is an Egypt-focused platform with a free store, which is a real advantage 
 - Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. Wuilt — Check Wuilt's site for webhooks and integrations.
 - Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. Wuilt — Check Wuilt's site for wholesale pricing.
 - Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. Wuilt — Check Wuilt's site for email marketing options.
-- Search by meaning: Ebda Store — Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue. Wuilt — Check Wuilt's site for how its search handles meaning.
 - App marketplace: Ebda Store — There is no app marketplace. Wuilt — Check Wuilt's site for its app store.
 - Custom code: Ebda Store — You edit in the page builder without code, and there is no custom code editor. Wuilt — Check Wuilt's site for developer and theme customisation tools.
 - Point of sale (POS): Ebda Store — There is no in-store point of sale. Wuilt — Check Wuilt's site for in-store selling options.
@@ -233,7 +226,6 @@ YouCan serves merchants in many countries and bills its plans in dollars; its pa
 - Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. YouCan — Check YouCan's site for webhooks and integrations.
 - Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. YouCan — Check YouCan's site for wholesale pricing.
 - Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. YouCan — Check YouCan's site for email marketing options.
-- Search by meaning: Ebda Store — Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue. YouCan — Check YouCan's site for how its search handles meaning.
 - App marketplace: Ebda Store — There is no app marketplace. YouCan — Check YouCan's site for its app store.
 - Custom code: Ebda Store — You edit in the page builder without code, and there is no custom code editor. YouCan — Check YouCan's site for developer and theme customisation tools.
 - Point of sale (POS): Ebda Store — There is no in-store point of sale. YouCan — Check YouCan's site for in-store selling options.
@@ -254,7 +246,6 @@ EasyOrders offers a free plan and a fixed plan. We could not reach its pricing p
 - Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. EasyOrders — A public API is listed for developers.
 - Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. EasyOrders — Check EasyOrders's site for wholesale pricing.
 - Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. EasyOrders — Check EasyOrders's site for email marketing options.
-- Search by meaning: Ebda Store — Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue. EasyOrders — Check EasyOrders's site for how its search handles meaning.
 - App marketplace: Ebda Store — There is no app marketplace. EasyOrders — Check EasyOrders's site for its app store.
 - Custom code: Ebda Store — You edit in the page builder without code, and there is no custom code editor. EasyOrders — Public API and theme documentation are listed for developers.
 - Point of sale (POS): Ebda Store — There is no in-store point of sale. EasyOrders — Check EasyOrders's site for in-store selling options.
@@ -275,7 +266,6 @@ ExpandCart says it takes no commission on sales, and it offers multiple currenci
 - Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. ExpandCart — Facebook Pixel on Standard and Google Analytics on Professional are listed.
 - Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. ExpandCart — Check ExpandCart's site for wholesale pricing.
 - Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. ExpandCart — Check ExpandCart's site for email marketing options.
-- Search by meaning: Ebda Store — Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue. ExpandCart — Check ExpandCart's site for how its search handles meaning.
 - App marketplace: Ebda Store — There is no app marketplace. ExpandCart — Free marketing and SEO apps are listed on Professional, and free dropshipping apps (Knawat on Standard, AliExpress on Professional).
 - Custom code: Ebda Store — You edit in the page builder without code, and there is no custom code editor. ExpandCart — Check ExpandCart's site for developer and theme customisation tools.
 - Point of sale (POS): Ebda Store — There is no in-store point of sale. ExpandCart — Its navigation lists a point-of-sale option under Sell.
