@@ -568,7 +568,7 @@ export async function getPurchaseOrder(storeId: string, id: string) {
       supplier: true,
       items: {
         include: {
-          product: { select: { name: true, sku: true } },
+          product: { select: { name: true, nameAr: true, sku: true } },
           variant: { select: { id: true, title: true, titleAr: true } },
         },
       },

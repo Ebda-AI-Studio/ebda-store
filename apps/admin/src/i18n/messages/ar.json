@@ -1378,7 +1378,7 @@
       },
       "actions": {
         "updateStatusLabel": "تحديث حالة الطلب",
-        "updatePlaceholder": "تحديث...",
+        "updatePlaceholder": "غيّر الحالة",
         "selectOrderLabel": "تحديد الطلب {order}",
         "markPaid": "تعليم كمدفوع",
         "markPaidTitle": "تعليم استلام الدفع عند الاستلام",
@@ -1458,6 +1458,18 @@
       "agentBadge": "وكيل ذكي",
       "newOrder": "طلب تليفون جديد",
       "moreMenu": "خيارات تانية للطلبات"
+    },
+    "action": {
+      "pending": "رجّعه قيد الانتظار",
+      "awaiting_payment_confirmation": "استنى تأكيد الدفع",
+      "confirmed": "أكّد الطلب",
+      "processing": "ابدأ تجهيز الطلب",
+      "shipped": "سجّل إن الطلب اتشحن",
+      "delivered": "سجّل إن الطلب اتسلّم",
+      "cancelled": "ألغي الطلب",
+      "refunded": "سجّل إن الطلب اترد",
+      "paid": "علّم الطلب مدفوع",
+      "unpaid": "علّم الطلب غير مدفوع"
     },
     "status": {
       "pending": "قيد الانتظار",

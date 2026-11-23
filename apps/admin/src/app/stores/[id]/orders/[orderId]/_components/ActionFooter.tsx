@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { orderActionVisibility, refundViaProviderRemaining } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { statusOptionsForRole } from '../../_components/types';
+import { orderActionKey } from '../../_components/order-action';
 import { PaymentLinkButton } from './PaymentLinkButton';
 import { RefreshPaymentButton } from './RefreshPaymentButton';
 import { RefundButton } from './RefundButton';
@@ -46,6 +47,7 @@ export function ActionFooter({
 }: ActionFooterProps) {
   const t = useT('orders.detail.actions');
   const tStatus = useT('orders.status');
+  const tAction = useT('orders.action');
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -138,21 +140,11 @@ export function ActionFooter({
               '…'
             ) : (
               <>
-                <svg
-                  className="h-4 w-4 shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2.5}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-                <span className="min-w-0">{tStatus(nextStatus) || t('processed')}</span>
+                <span className="min-w-0">
+                  {orderActionKey(nextStatus)
+                    ? tAction(nextStatus)
+                    : tStatus(nextStatus) || t('processed')}
+                </span>
               </>
             )}
           </Button>

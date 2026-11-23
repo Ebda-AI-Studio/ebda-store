@@ -80,6 +80,8 @@ export interface Messages {
   };
   filters: Record<string, string>;
   status: Record<string, string>;
+  /** Verb label for the button that moves an order to this status (a status name reads as a state). */
+  action: Record<string, string>;
   /** InstaPay: the merchant confirms a manual transfer arrived (one-thumb flow). */
   instapay: {
     confirm: string;
@@ -337,6 +339,16 @@ export const MESSAGES: Record<Locale, Messages> = {
       processing: 'Processing',
       shipped: 'Shipped',
       delivered: 'Delivered',
+    },
+    action: {
+      pending: 'Move back to pending',
+      awaiting_payment_confirmation: 'Wait for payment confirmation',
+      confirmed: 'Confirm order',
+      processing: 'Start processing',
+      shipped: 'Mark as shipped',
+      delivered: 'Mark as delivered',
+      cancelled: 'Cancel order',
+      refunded: 'Mark as refunded',
     },
     status: {
       pending: 'New',
@@ -619,6 +631,16 @@ export const MESSAGES: Record<Locale, Messages> = {
       processing: 'قيد التجهيز',
       shipped: 'تم الشحن',
       delivered: 'تم التوصيل',
+    },
+    action: {
+      pending: 'رجّعه قيد الانتظار',
+      awaiting_payment_confirmation: 'استنى تأكيد الدفع',
+      confirmed: 'أكّد الطلب',
+      processing: 'ابدأ تجهيز الطلب',
+      shipped: 'سجّل إن الطلب اتشحن',
+      delivered: 'سجّل إن الطلب اتسلّم',
+      cancelled: 'ألغي الطلب',
+      refunded: 'سجّل إن الطلب اترد',
     },
     status: {
       pending: 'جديد',

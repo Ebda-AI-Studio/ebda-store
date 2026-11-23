@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
+import { localizedName } from '@/lib/localized-name';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 
@@ -19,6 +21,7 @@ interface BackorderLine {
   product: {
     id: string;
     name: string;
+    nameAr?: string | null;
     sku: string | null;
   };
   orderItem: {
@@ -148,6 +151,7 @@ function CancelModal({ backorderId, storeId, onClose, onSuccess, t }: CancelModa
 export default function BackordersPage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const locale = useLocale();
   const t = useT('stock.backorders');
   const tc = useT('common');
 
@@ -198,7 +202,7 @@ export default function BackordersPage() {
       primaryOnMobile: true,
       cell: line => (
         <>
-          <span className="font-medium">{line.product.name}</span>
+          <span className="font-medium">{localizedName(locale, line.product)}</span>
           {line.product.sku && (
             <span className="ms-1 text-xs text-muted-foreground font-mono">
               ({line.product.sku})

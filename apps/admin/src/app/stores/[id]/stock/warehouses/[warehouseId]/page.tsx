@@ -6,6 +6,8 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
+import { localizedName } from '@/lib/localized-name';
 import { ArrowStart, ArrowEnd } from '@/components/ArrowStart';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
 import { useFeatures } from '@/hooks/useFeatures';
@@ -22,6 +24,7 @@ interface StockRow {
   quantity: number;
   updatedAt: string;
   productName: string;
+  productNameAr?: string | null;
   productSku: string | null;
   variantTitle: string | null;
   variantSku: string | null;
@@ -48,6 +51,7 @@ export default function WarehouseStockPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const warehouseId = params?.warehouseId as string;
+  const locale = useLocale();
   const t = useT('stock.warehouseStock');
   const tc = useT('common');
   const { success: toastSuccess, error: toastError } = useToast();
@@ -291,7 +295,11 @@ export default function WarehouseStockPage() {
               {
                 header: t('colProduct'),
                 primaryOnMobile: true,
-                cell: row => <span className="font-medium">{row.productName}</span>,
+                cell: row => (
+                  <span className="font-medium">
+                    {localizedName(locale, { name: row.productName, nameAr: row.productNameAr })}
+                  </span>
+                ),
               },
               {
                 header: t('colSku'),
@@ -440,7 +448,10 @@ export default function WarehouseStockPage() {
           <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-xl">
             <h2 className="mb-1 text-base font-semibold">{t('adjustTitle')}</h2>
             <p className="mb-4 text-sm text-muted-foreground">
-              {adjustModal.row.productName}
+              {localizedName(locale, {
+                name: adjustModal.row.productName,
+                nameAr: adjustModal.row.productNameAr,
+              })}
               {adjustModal.row.variantTitle && (
                 <>
                   {' · '}

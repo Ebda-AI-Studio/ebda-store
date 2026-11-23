@@ -1,7 +1,9 @@
 'use client';
 
 import Image from 'next/image';
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
+import { localizedName } from '@/lib/localized-name';
 import type { LowStockProduct } from './types';
 
 interface LowStockAlertsCardProps {
@@ -14,6 +16,7 @@ interface LowStockAlertsCardProps {
  * When empty, renders a reassuring check-mark illustration.
  */
 export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
+  const locale = useLocale();
   const t = useT('analytics.lowStock');
 
   return (
@@ -43,7 +46,7 @@ export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
               {product.images?.[0]?.url ? (
                 <Image
                   src={product.images[0].url}
-                  alt={product.name}
+                  alt={localizedName(locale, product)}
                   width={40}
                   height={40}
                   className="w-10 h-10 rounded object-cover"
@@ -66,7 +69,9 @@ export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
+                <p className="text-sm font-medium text-foreground truncate">
+                  {localizedName(locale, product)}
+                </p>
                 <p className="text-xs text-muted-foreground">{product.sku}</p>
                 {/* Backorder enrichment — shown when Batch 2 data is present */}
                 <div className="flex flex-wrap gap-1 mt-1">

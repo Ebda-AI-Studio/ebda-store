@@ -182,7 +182,7 @@ router.get(
           (await storeDb(req.params.storeId)).deadStockFlag.findMany({
             where,
             include: {
-              product: { select: { id: true, name: true, sku: true } },
+              product: { select: { id: true, name: true, nameAr: true, sku: true } },
             },
             // Known values first, largest first; flags whose product has no
             // cost price (value unknown = NULL) after them. `id` keeps the

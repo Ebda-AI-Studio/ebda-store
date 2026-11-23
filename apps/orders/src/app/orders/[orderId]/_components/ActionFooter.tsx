@@ -107,21 +107,9 @@ export function ActionFooter({
               '…'
             ) : (
               <>
-                <svg
-                  className="h-4 w-4 shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2.5}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-                <span className="min-w-0">{t.status[nextStatus] ?? ta.processed}</span>
+                <span className="min-w-0">
+                  {t.action[nextStatus] ?? t.status[nextStatus] ?? ta.processed}
+                </span>
               </>
             )}
           </button>

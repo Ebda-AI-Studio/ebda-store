@@ -6,6 +6,7 @@ import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { localizedName } from '@/lib/localized-name';
 import { FormFooter } from '@/components/FormFooter';
 import { PageState } from '@/components/PageState';
 import { apiGet, apiPost } from '@/lib/api';
@@ -24,6 +25,7 @@ interface SupplierOption {
 interface ProductOption {
   id: string;
   name: string;
+  nameAr?: string | null;
   sku: string | null;
   hasVariants?: boolean;
   variantCount?: number;
@@ -163,7 +165,7 @@ export default function NewPurchaseOrderPage() {
           {products.map(p => (
             <option key={p.id} value={p.id}>
               {p.sku ? `[${p.sku}] ` : ''}
-              {p.name}
+              {localizedName(isAr ? 'ar' : 'en', p)}
             </option>
           ))}
         </select>

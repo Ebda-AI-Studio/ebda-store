@@ -130,3 +130,14 @@ describe('summarizeItems', () => {
     expect(summarizeItems(items, moreLabel, 'en')).toBe('1x Loose A, 1x Loose B +3 more');
   });
 });
+
+describe('summarizeItems localized names (O2)', () => {
+  it('uses the Arabic product name in ar, falling back to the snapshot name', () => {
+    const items = [
+      item({ id: 'a', productName: 'Low Tide Ring', productNameAr: 'خاتم المد المنخفض' }),
+      item({ id: 'b', productName: 'Sea Pendant', productNameAr: null }),
+    ];
+    expect(summarizeItems(items, moreLabel, 'ar')).toBe('1x خاتم المد المنخفض, 1x Sea Pendant');
+    expect(summarizeItems(items, moreLabel, 'en')).toBe('1x Low Tide Ring, 1x Sea Pendant');
+  });
+});

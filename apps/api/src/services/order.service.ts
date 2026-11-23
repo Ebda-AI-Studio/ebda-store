@@ -660,11 +660,36 @@ export class OrderService {
     const pageRows = cursor && ordersRaw.length > limit ? ordersRaw.slice(0, limit) : ordersRaw;
     // QA-D1: the list rows carried only `payments[]`, so a consumer reading `paymentMethod` got null. The
     // method is the provider of the completed payment, else of the newest one (same rule as the detail card).
+    // The Arabic product name is not snapshotted on the line, so look it up for this page's products (one
+    // bounded query, <= `limit` orders). A deleted product keeps the snapshot name.
+    const lineProductIds = [
+      ...new Set(
+        pageRows.flatMap(o =>
+          ((o as { items?: Array<{ productId?: string | null }> }).items ?? [])
+            .map(i => i.productId)
+            .filter((id): id is string => !!id)
+        )
+      ),
+    ];
+    const arNames = new Map<string, string | null>(
+      lineProductIds.length
+        ? (
+            await repo.db.product.findMany({
+              where: { storeId, id: { in: lineProductIds } },
+              select: { id: true, nameAr: true },
+            })
+          ).map(p => [p.id, p.nameAr] as [string, string | null])
+        : []
+    );
     const orders = pageRows.map(o => {
       const pays = ((o as { payments?: Array<{ provider: string; status: string }> }).payments ??
         []) as Array<{ provider: string; status: string }>;
       const chosen = pays.find(p => p.status === 'completed') ?? pays[0];
-      return { ...o, paymentMethod: chosen?.provider ?? null };
+      const items = (o as { items?: Array<{ productId?: string | null }> }).items?.map(i => ({
+        ...i,
+        productNameAr: (i.productId && arNames.get(i.productId)) || null,
+      }));
+      return { ...o, ...(items ? { items } : {}), paymentMethod: chosen?.provider ?? null };
     });
     const nextCursor =
       cursor && ordersRaw.length > limit ? (ordersRaw[limit] as { id: string }).id : undefined;

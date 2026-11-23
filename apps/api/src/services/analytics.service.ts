@@ -1113,6 +1113,24 @@ export class AnalyticsService {
    * Get low stock products
    */
   static async getLowStockProducts(storeId: string, threshold = 10) {
+    const rows = await this.queryLowStockProducts(storeId, threshold);
+    // The money DO and the raw SQL carry only `name`; add the Arabic name for these <= 20 rows so the AR admin
+    // does not show the English one.
+    if (rows.length === 0) return rows;
+    const ar = new Map(
+      (
+        await (
+          await storeDb(storeId)
+        ).product.findMany({
+          where: { storeId, id: { in: rows.map(r => r.id) } },
+          select: { id: true, nameAr: true },
+        })
+      ).map(p => [p.id, p.nameAr] as [string, string | null])
+    );
+    return rows.map(r => ({ ...r, nameAr: ar.get(r.id) ?? null }));
+  }
+
+  private static async queryLowStockProducts(storeId: string, threshold: number) {
     // Variant-aware. This filtered and sorted on `products.inventory`, which
     // is not stock for a variant product — so every variant product (parent 0,
     // or drifted negative) matched `lte threshold` and the admin's Low Stock

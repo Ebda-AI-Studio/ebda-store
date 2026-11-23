@@ -11,7 +11,10 @@ import type { OrderDetail } from '@/lib/orders';
 vi.mock('@/contexts/LanguageContext', () => {
   const echo = new Proxy({}, { get: (_t, key) => String(key) });
   return {
-    useLanguage: () => ({ t: { detail: { actions: echo }, status: echo }, locale: 'en' }),
+    useLanguage: () => ({
+      t: { detail: { actions: echo }, status: echo, action: echo },
+      locale: 'en',
+    }),
   };
 });
 vi.mock('./PaymentLinkButton', () => ({ PaymentLinkButton: () => null }));
