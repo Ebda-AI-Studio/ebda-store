@@ -18,7 +18,14 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['tests/unit/**/*.{test,spec}.{ts,tsx}'],
-    exclude: ['**/node_modules/**', '**/dist/**', '**/stryker-tmp/**'],
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/stryker-tmp/**',
+      // Freshness check of a generated file against a script that resolves paths from the ORIGINAL checkout; inside the
+      // Stryker sandbox the two differ, so the dry run failed (nightly mutation red since 2026-11-21). CI's unit job runs it.
+      'tests/unit/assistant-adapter.test.ts',
+    ],
     // Only load global setup — NOT setup-e2e.ts (which blocks without TEST_DATABASE_URL)
     setupFiles: ['./tests/setup-git-env.ts', './tests/setup.ts'],
     testTimeout: 30000,
