@@ -152,6 +152,17 @@ describe('feature-gated operations on the DO (Ruling NZ-FEAT-1)', () => {
       );
     });
 
+    it('qty 3 line, 12 scans -> picked is exactly 3, the other 9 are refused as already picked (ported from barcode-pick-count-race)', () => {
+      const r = rig();
+      const kinds = Array.from(
+        { length: 12 },
+        () => r.stock('pickOrderItem', { orderId: 'o1', productId: 'p1', qty: 1 }).kind
+      );
+      expect(kinds.filter(k => k === 'picked')).toHaveLength(3);
+      expect(kinds.filter(k => k === 'already_picked')).toHaveLength(9);
+      expect(r.q(`SELECT picked_qty FROM order_items WHERE id = 'i1'`)[0].picked_qty).toBe(3);
+    });
+
     it('never picks another store order or a product not on the order', () => {
       const r = rig();
       expect(r.stock('pickOrderItem', { orderId: 'o2', productId: 'p2', qty: 1 })).toEqual({
