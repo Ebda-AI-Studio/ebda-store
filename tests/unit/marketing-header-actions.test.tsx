@@ -174,7 +174,7 @@ describe('header: the bar ladder is still in chrome.css (NAV-BAR-FIT-1)', () => 
   });
   it('from 1480px the English links keep the 1200px spacing', () => {
     expect(block('(min-width: 1480px)')).toMatch(
-      /html\[lang='en'\] \.nav-links \{ gap: 18px; padding-inline-start: 8px; \}/
+      /html\[lang='en'\] \.nav-links \{ gap: 18px; padding-inline-start: (?:8px|var\(--space-2\)); \}/
     );
   });
   it('the pinned pair sits on the panel edge and a focused link scrolls clear of it', () => {

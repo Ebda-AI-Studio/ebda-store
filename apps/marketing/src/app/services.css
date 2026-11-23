@@ -38,7 +38,7 @@
 }
 .sv-hero-grid {
   display: grid;
-  gap: clamp(28px, 5vw, 64px);
+  gap: clamp(28px, 5vw, var(--space-8));
   align-items: center;
 }
 @media (min-width: 900px) {
@@ -48,7 +48,7 @@
 }
 .sv-crumb {
   margin: 0 0 20px;
-  font-size: 0.9375rem;
+  font-size: var(--fs-base);
   color: var(--muted);
 }
 .sv-crumb a {
@@ -61,8 +61,8 @@
   color: var(--fg);
 }
 .sv-eyebrow {
-  margin: 0 0 12px;
-  font-size: 1.1875rem;
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--sv-a1);
 }
@@ -81,7 +81,7 @@ html[lang='en'] .sv-hero h1 {
 .sv-lead {
   font-size: clamp(1.0625rem, 2vw, 1.3rem);
   line-height: 1.85;
-  margin: 0 0 24px;
+  margin: 0 0 var(--space-5);
   color: var(--fg);
   max-width: 40rem;
 }
@@ -110,14 +110,14 @@ html[lang='en'] .sv-hero h1 {
   border: 1px solid var(--line);
 }
 .sv-ph figcaption {
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 .sv-hero .sv-ph-hero img {
   max-height: 560px;
   object-fit: cover;
 }
 .sv-ph:not(.sv-ph-hero) {
-  margin-top: clamp(28px, 4vw, 48px);
+  margin-top: clamp(28px, 4vw, var(--space-7));
 }
 
 .sv-statement {
@@ -131,7 +131,7 @@ html[lang='en'] .sv-hero h1 {
    Marketing = bars that rise toward the sale, Design = a square that fills as the design becomes real, Events = dots from
    hollow (before) to solid (after). The marks are decoration (aria-hidden); the stops are real text. */
 .sv-pathsec {
-  padding-block: clamp(48px, 7vw, 88px);
+  padding-block: clamp(var(--space-7), 7vw, 88px);
 }
 .sv-path {
   list-style: none;
@@ -143,7 +143,7 @@ html[lang='en'] .sv-hero h1 {
 }
 .sv-path li {
   position: relative;
-  padding-inline-start: 64px;
+  padding-inline-start: var(--space-8);
 }
 .sv-path li::before {
   content: '';
@@ -168,8 +168,8 @@ html[lang='en'] .sv-hero h1 {
   justify-content: center;
 }
 .sv-path h3 {
-  margin: 0 0 4px;
-  font-size: 1.1875rem;
+  margin: 0 0 var(--space-1);
+  font-size: var(--fs-md);
 }
 .sv-path p {
   margin: 0;
@@ -209,11 +209,11 @@ html[lang='en'] .sv-hero h1 {
 @media (min-width: 900px) {
   .sv-path {
     grid-template-columns: repeat(var(--n), minmax(0, 1fr));
-    gap: 24px;
+    gap: var(--space-5);
   }
   .sv-path li {
     padding-inline-start: 0;
-    padding-block-start: 64px;
+    padding-block-start: var(--space-8);
   }
   .sv-path li::before {
     inset-inline-start: 52px;
@@ -242,7 +242,7 @@ html[lang='en'] .sv-hero h1 {
   }
 }
 .sv-group {
-  padding: 24px;
+  padding: var(--space-5);
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -250,11 +250,11 @@ html[lang='en'] .sv-hero h1 {
 }
 .sv-group h3 {
   margin: 0 0 6px;
-  font-size: 1.25rem;
+  font-size: var(--fs-lg);
   color: var(--sv-ink);
 }
 .sv-group > p {
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-4);
   line-height: 1.8;
 }
 .sv-items,
@@ -283,7 +283,7 @@ html[lang='en'] .sv-hero h1 {
 .sv-items span,
 .sv-points span {
   color: var(--muted);
-  font-size: 0.9375rem;
+  font-size: var(--fs-base);
 }
 
 /* how we work */
@@ -326,8 +326,8 @@ html[lang='en'] .sv-hero h1 {
   font-feature-settings: 'lnum';
 }
 .sv-steps h3 {
-  margin: 0 0 4px;
-  font-size: 1.1875rem;
+  margin: 0 0 var(--space-1);
+  font-size: var(--fs-md);
 }
 .sv-steps p {
   margin: 0;
@@ -335,7 +335,7 @@ html[lang='en'] .sv-hero h1 {
   line-height: 1.75;
 }
 .sv-get {
-  padding: 24px;
+  padding: var(--space-5);
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -343,7 +343,7 @@ html[lang='en'] .sv-hero h1 {
 .sv-get h3,
 .sv-sub {
   margin: 0 0 14px;
-  font-size: 1.125rem;
+  font-size: var(--fs-md);
   color: var(--sv-ink);
 }
 .sv-get ul,
@@ -377,7 +377,7 @@ html[lang='en'] .sv-hero h1 {
   inset-block-start: 0.85em;
 }
 .sv-get .sv-ph:not(.sv-ph-hero) {
-  margin-top: 24px;
+  margin-top: var(--space-5);
 }
 
 /* faq reuses .faq (globals); two columns on desktop */
@@ -388,7 +388,7 @@ html[lang='en'] .sv-hero h1 {
 @media (min-width: 900px) {
   .sv-faq {
     grid-template-columns: 0.8fr 1.2fr;
-    gap: 64px;
+    gap: var(--space-8);
     align-items: start;
   }
 }
@@ -398,16 +398,16 @@ html[lang='en'] .sv-hero h1 {
 
 /* contact close: deep ground again */
 .sv-close {
-  padding-block: clamp(48px, 7vw, 96px);
+  padding-block: clamp(var(--space-7), 7vw, var(--space-9));
   border-block-start: 2px solid var(--sv-a2);
 }
 .sv-close h2 {
   font-size: clamp(1.9rem, 5vw, 3rem);
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-4);
 }
 .sv-close-grid {
   display: grid;
-  gap: clamp(28px, 5vw, 64px);
+  gap: clamp(28px, 5vw, var(--space-8));
 }
 @media (min-width: 900px) {
   .sv-close-grid {
@@ -446,18 +446,18 @@ html[lang='en'] .sv-hero h1 {
 }
 .sv-card {
   position: relative;
-  padding: 28px 24px 24px;
+  padding: 28px var(--space-5) var(--space-5);
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   border-block-start: 4px solid var(--sv-a2);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .sv-card h3 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: var(--fs-xl);
 }
 .sv-card h3 a {
   color: var(--fg);
@@ -495,7 +495,7 @@ html[lang='en'] .sv-hero h1 {
 }
 .sv-card-cta {
   margin-block-start: auto;
-  padding-block-start: 12px;
+  padding-block-start: var(--space-3);
   font-weight: 600;
   color: var(--sv-ink);
 }
@@ -529,6 +529,6 @@ html[lang='ar'] .sv-card-cta::after {
   }
   .sv-group:last-child:nth-child(odd) .sv-items {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    column-gap: 24px;
+    column-gap: var(--space-5);
   }
 }
