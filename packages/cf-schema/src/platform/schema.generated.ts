@@ -553,6 +553,7 @@ export const storeSubscriptions = sqliteTable('store_subscriptions', {
   ordersOverLimitNotifiedAt: integer('orders_over_limit_notified_at', { mode: 'timestamp_ms' }),
   billingInterval: text('billing_interval').notNull().default('monthly'),
   pendingPlanCode: text('pending_plan_code'),
+  pendingBillingInterval: text('pending_billing_interval'),
   billingAnchorDay: integer('billing_anchor_day'),
   dunningAttempts: integer('dunning_attempts').notNull().default(0),
   pastDueSince: integer('past_due_since', { mode: 'timestamp_ms' }),
