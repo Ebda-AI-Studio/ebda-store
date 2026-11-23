@@ -56,7 +56,7 @@ export function StatsGrid({ stats, guestCheckout }: StatsGridProps) {
           <StatCard label={t('recoveryRate')} value="—" muted />
           <StatCard label={t('recoveredRevenue')} value="—" muted />
         </div>
-        <p className="text-xs text-muted-foreground">{tGuest('abandonedExplainer')}</p>
+        <p className="text-sm text-muted-foreground">{tGuest('abandonedExplainer')}</p>
       </div>
     );
   }

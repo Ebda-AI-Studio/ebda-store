@@ -885,7 +885,7 @@ export default function StoreBillingPage() {
                   </div>
                 )}
                 {info.nextCharge && info.pendingBillingInterval && (
-                  <p className="text-xs text-muted-foreground sm:col-span-2">
+                  <p className="text-sm text-muted-foreground sm:col-span-2">
                     {t('trial.switchingInterval', {
                       interval: t(
                         info.pendingBillingInterval === 'yearly'

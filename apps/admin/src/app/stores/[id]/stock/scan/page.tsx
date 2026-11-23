@@ -327,7 +327,7 @@ function BarcodeInput({
         <p className="text-xs text-destructive-ink">{t('cameraPermission')}</p>
       )}
       {cameraError === 'camera-engine' && (
-        <p className="text-xs text-destructive-ink">{t('cameraEngineFailed')}</p>
+        <p className="text-sm text-destructive-ink">{t('cameraEngineFailed')}</p>
       )}
     </div>
   );

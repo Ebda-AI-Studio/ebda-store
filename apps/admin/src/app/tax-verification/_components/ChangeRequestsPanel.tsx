@@ -81,7 +81,7 @@ export function ChangeRequestsPanel() {
   return (
     <section
       aria-labelledby="tax-changes-title"
-      className="mb-4 space-y-3 rounded-xl border border-border bg-card p-4"
+      className="mb-4 space-y-3 rounded-lg border border-border bg-card p-4"
     >
       <div>
         <h2 id="tax-changes-title" className="text-base font-semibold text-foreground">
@@ -111,7 +111,7 @@ export function ChangeRequestsPanel() {
               </ul>
             )}
             {r.precheck.extracted && (
-              <p className="text-xs text-muted-foreground" dir="auto">
+              <p className="text-sm text-muted-foreground" dir="auto">
                 {t('changes.read', {
                   trn: r.precheck.extracted.taxRegistrationNumber ?? '—',
                   name: r.precheck.extracted.legalName ?? '—',

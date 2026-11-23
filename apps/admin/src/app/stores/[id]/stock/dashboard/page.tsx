@@ -248,7 +248,7 @@ export default function StockDashboardPage() {
                 </p>
               )}
               {'hint' in kpi && kpi.hint && (
-                <p className="text-xs text-muted-foreground" data-testid="stock-value-hint">
+                <p className="text-sm text-muted-foreground" data-testid="stock-value-hint">
                   {kpi.hint}
                 </p>
               )}

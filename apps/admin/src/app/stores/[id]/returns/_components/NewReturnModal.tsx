@@ -145,7 +145,7 @@ export function NewReturnModal({ open, storeId, onClose, onCreated }: Props) {
               <div className="min-w-0 flex-1">
                 <label
                   htmlFor="new-return-order"
-                  className="mb-1 block text-xs font-medium text-foreground"
+                  className="mb-1 block text-sm font-medium text-foreground"
                 >
                   {t('orderLabel')}
                 </label>
@@ -221,7 +221,7 @@ export function NewReturnModal({ open, storeId, onClose, onCreated }: Props) {
             <div>
               <label
                 htmlFor="new-return-reason"
-                className="mb-1 block text-xs font-medium text-foreground"
+                className="mb-1 block text-sm font-medium text-foreground"
               >
                 {t('reasonLabel')}
               </label>

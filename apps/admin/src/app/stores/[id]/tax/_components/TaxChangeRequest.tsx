@@ -147,7 +147,7 @@ export function TaxChangeRequest({ storeId }: { storeId: string }) {
         <h3 data-setting-id="tax.change-request" className="text-sm font-medium text-foreground">
           {t('change.title')}
         </h3>
-        <p className="text-xs text-muted-foreground">{t('change.hint')}</p>
+        <p className="text-sm text-muted-foreground">{t('change.hint')}</p>
       </div>
       {state?.lastRejection && !state.request && (
         <p role="status" className="text-sm text-destructive-ink">

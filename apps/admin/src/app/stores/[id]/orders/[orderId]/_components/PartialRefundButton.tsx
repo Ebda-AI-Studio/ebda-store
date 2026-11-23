@@ -206,7 +206,7 @@ export function PartialRefundButton({
                 <div>
                   <label
                     htmlFor="partial-refund-method"
-                    className="mb-1 block text-xs font-medium text-foreground"
+                    className="mb-1 block text-sm font-medium text-foreground"
                   >
                     {t('methodLabel')}
                   </label>
@@ -223,7 +223,7 @@ export function PartialRefundButton({
                       </option>
                     ))}
                   </select>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {t(`methodHint.${method || 'manual'}`)}
                   </p>
                 </div>
@@ -231,7 +231,7 @@ export function PartialRefundButton({
                 <div>
                   <label
                     htmlFor="partial-refund-reason"
-                    className="mb-1 block text-xs font-medium text-foreground"
+                    className="mb-1 block text-sm font-medium text-foreground"
                   >
                     {t('reasonLabel')}
                   </label>
