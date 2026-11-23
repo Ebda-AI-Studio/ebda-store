@@ -38,7 +38,7 @@ jobs:
           PW="$RUNNER_TEMP/pw"
           mkdir -p "$PW" && cd "$PW" && npm init -y >/dev/null && npm i --no-audit --no-fund "@playwright/test@${v}"
           # macOS uses the runner's local browser cache (no apt); Linux pulls the system deps.
-          if [ "$(uname -s)" = Darwin ]; then npx playwright install chromium; else npx playwright install --with-deps chromium; fi
+          bash scripts/ci/install-chromium.sh
           # Resolve @playwright/test from the repo root without installing the whole workspace.
           ln -s "$PW/node_modules" "$GITHUB_WORKSPACE/node_modules"
           echo "PW_DIR=$PW" >> "$GITHUB_ENV"
