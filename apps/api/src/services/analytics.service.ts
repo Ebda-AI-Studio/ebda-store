@@ -2,7 +2,7 @@ import { currentStoreId, prisma, Prisma } from '@ebda/database';
 import { customerRows } from '../lib/customer-directory';
 import { ON_HAND_SQL, storeStockValueFils } from '../lib/effective-inventory-sql';
 import { storeDb, storeMoney, storeRepo } from '../lib/repo-factory';
-import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
+import { countDistinctCustomersGrouped } from '../lib/buyer-counts';
 import { redis } from './redis.service';
 import { netRevenue } from './revenue.service';
 import { topCustomersNet } from '../lib/order-refunds';
@@ -450,7 +450,7 @@ export class AnalyticsService {
   /**
    * Distinct customers with a (non-deleted) order in the store — optionally
    * only orders created in [startDate, endDate] — keyed exactly like the
-   * Customers page (`CUSTOMER_KEY_SQL`, the SQL twin of `customerKeyOf`).
+   * Customers page (`CustomerGroups`, Ruling QA98-ALIAS-1).
    * Every order status counts, as the list's rows do; the page's `buyers`
    * KPI (non-cancelled/refunded) and its zero-order registered rows are
    * intentionally different measures — docs/RULINGS.md.
@@ -460,28 +460,28 @@ export class AnalyticsService {
     startDate?: Date,
     endDate?: Date
   ): Promise<number> {
-    // Ruling NZ-INTEG-1: a Durable Object store answers from its DO (no Postgres)
-    const money = await storeMoney(storeId);
-    if (money)
-      return (
-        await money.analyticsPeriod({
-          startMs: startDate && endDate ? startDate.getTime() : 0,
-          endMs: startDate && endDate ? endDate.getTime() : 8_640_000_000_000_000,
-          nonRevenue: NON_REVENUE,
-        })
-      ).customers;
-    const windowSql =
-      startDate && endDate
-        ? Prisma.sql`AND o.created_at >= ${startDate} AND o.created_at <= ${endDate}`
+    // QA98-ALIAS-1: both backends return identity rows and the ONE customer grouping folds them (lib/buyer-counts.ts).
+    const windowed = !!(startDate && endDate);
+    const start = windowed ? startDate! : new Date(0);
+    const end = windowed ? endDate! : new Date(8_640_000_000_000_000);
+    return countDistinctCustomersGrouped(storeId, start, end, async () => {
+      // Postgres store: exact GROUP BY of the (customer id, email, phone) buckets, grouped in JS by the one customer grouping.
+      // All-time has no window clause (an extreme Date does not serialise as a query parameter).
+      const windowSql = windowed
+        ? Prisma.sql`AND o.created_at >= ${start} AND o.created_at <= ${end}`
         : Prisma.empty;
-    const rows = await prisma.$queryRaw<Array<{ n: bigint }>>`
-      SELECT COUNT(DISTINCT ${CUSTOMER_KEY_SQL})::bigint AS n
-      FROM public.orders o
-      WHERE o.store_id = ${storeId}
-        AND o.deleted_at IS NULL
-        ${windowSql}
-    `;
-    return Number(rows[0]?.n ?? 0);
+      const rows = await prisma.$queryRaw<
+        Array<{ customerId: string | null; email: string | null; phone: string | null; n: number }>
+      >`
+        SELECT NULLIF(o.customer_id::text, '') AS "customerId",
+               LOWER(CASE WHEN jsonb_typeof(o.shipping_address -> 'email') = 'string' THEN o.shipping_address ->> 'email' END) AS email,
+               CASE WHEN jsonb_typeof(o.shipping_address -> 'phone') = 'string' THEN o.shipping_address ->> 'phone' END AS phone,
+               COUNT(*)::int AS n
+        FROM public.orders o
+        WHERE o.store_id = ${storeId} AND o.deleted_at IS NULL ${windowSql}
+        GROUP BY 1, 2, 3`;
+      return rows.map(r => ({ ...r, n: Number(r.n) }));
+    });
   }
 
   /**
@@ -522,7 +522,7 @@ export class AnalyticsService {
       return {
         revenue: d.revenue,
         orders: d.orders,
-        customers: d.customers,
+        customers: await AnalyticsService.countDistinctCustomers(storeId, startDate, endDate),
         profit: d.costedLines === 0 ? (d.missingLines > 0 ? null : 0) : (d.profit ?? 0),
         itemsMissingCost: d.missingLines,
         revenueMissingCost: d.missingRevenue,
