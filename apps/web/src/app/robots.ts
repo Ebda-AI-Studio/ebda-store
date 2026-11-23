@@ -4,7 +4,13 @@ import { API_URL } from '../lib/api';
 import { getSiteUrl } from '../lib/structured-data';
 import { hideTags, hidesFromSearch } from '../lib/hide-from-search';
 
-const DEMO_PRIVATE_PATHS = ['/account/', '/checkout/', '/cart/', '/auth/', '/affiliate/'];
+const PRIVATE_ROOTS = ['/account/', '/checkout/', '/cart/', '/auth/', '/affiliate/'];
+/** Private routes are served under the language prefix too (LOCALE-PATHS-4): `/en/cart/` must stay out of the index as `/cart/` does. */
+const DEMO_PRIVATE_PATHS = [
+  ...PRIVATE_ROOTS,
+  ...PRIVATE_ROOTS.map(p => `/ar${p}`),
+  ...PRIVATE_ROOTS.map(p => `/en${p}`),
+];
 
 /**
  * Whether the store that owns this host must stay out of search: the demo showroom (`isDemo`, Ruling B1-14) or a store whose merchant switched on "hide from search engines". Asks the
@@ -57,7 +63,7 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/account/', '/checkout/', '/cart/', '/auth/', '/affiliate/'],
+      disallow: DEMO_PRIVATE_PATHS,
     },
     sitemap: `${base}/sitemap.xml`,
   };

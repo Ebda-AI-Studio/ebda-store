@@ -3,7 +3,7 @@
  * service already resolved and gated; no query runs without it. Money (prices, totals, stock, COD fee) is the checkout engine's
  * (`money.createOrder`), exactly the path the storefront uses; this file only translates chat shapes into it.
  */
-import { storefrontOrigin } from '@ebda/shared';
+import { storefrontOrigin, catalogueItemId } from '@ebda/shared';
 import { visibleProductWhere } from '../../visible-product';
 import { storeRepo, storeMoney, storeWriter, type CreateOrderArgs } from '../../repo-factory';
 import { lookupStore } from '../../definer';
@@ -151,7 +151,7 @@ const PRODUCT_SELECT = {
   images: { take: 1, orderBy: { position: 'asc' } },
 } as const;
 
-/** One catalog row per sellable thing: each variant of a variant product, else the simple product itself (retailer id = product id). */
+/** One catalog row per sellable thing: each variant of a variant product, else the simple product itself. `retailerId` is THE catalogue item id (`catalogueItemId`, @ebda/shared; Ruling FEEDS-2) - the same id the Google/Meta/TikTok feeds and the storefront pixel use. */
 async function rowsForProducts(
   storeId: string,
   d: Db,
@@ -182,7 +182,7 @@ async function rowsForProducts(
       if (onlyIds && !onlyIds.has(p.id)) continue;
       out.push({
         ...common,
-        retailerId: p.id,
+        retailerId: catalogueItemId({ productId: p.id }),
         title: p.name,
         priceMinor: p.price,
         availability: p.trackInventory === false || p.inventory > 0 ? 'in_stock' : 'out_of_stock',
@@ -193,7 +193,7 @@ async function rowsForProducts(
         if (onlyIds && !onlyIds.has(v.id)) continue;
         out.push({
           ...common,
-          retailerId: v.id,
+          retailerId: catalogueItemId({ productId: p.id, variantId: v.id }),
           title: v.title ? `${p.name} - ${v.title}` : p.name,
           priceMinor: v.price ?? p.price,
           availability:
