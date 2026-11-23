@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import { BRAND } from '@ebda/shared';
 import { config } from '../config';
 import logger from '../lib/logger';
@@ -131,10 +130,29 @@ function toAlertMessage(opts: AlertOptions): AlertMessage {
  * suppress a genuinely-new alert for store B that happens to share
  * a title. Platform alerts share a single bucket (no storeId).
  */
-function throttleKey(level: AlertLevel, title: string, storeId?: string): string {
+export function throttleKey(level: AlertLevel, title: string, storeId?: string): string {
   const seed = storeId ? `${level}:${title}:${storeId}` : `${level}:${title}`;
-  const hash = crypto.createHash('sha1').update(seed).digest('hex').slice(0, 16);
-  return `alert-throttle:${hash}`;
+  return `alert-throttle:${bucketHash(seed)}`;
+}
+
+/**
+ * A bucket name, not a secret: cyrb53 (two 32-bit multiply/xor lanes, 53 bits), so no `crypto` hash is involved. The
+ * previous sha1 digest of `level:title:storeId` made CodeQL report js/weak-cryptographic-algorithm and
+ * js/insufficient-password-hash on every PR touching this file, because alert titles carry text from sign-in and
+ * password flows ("Password changed"); nothing here is ever a credential. 53 bits keep an accidental collision of two live
+ * alert titles at about 1 in 9e15, and a collision would only throttle a similar alert, never leak or authorise anything.
+ */
+function bucketHash(str: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 2654435761);
+    h2 = Math.imul(h2 ^ c, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0');
 }
 
 /**
