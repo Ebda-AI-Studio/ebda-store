@@ -8,7 +8,7 @@
 # (<projects>/<biz>/internal-projects/<repo> or <biz>/clients/<client>/<repo>), which must stay on main read-only, and
 # local main moves ahead of origin.
 # pre-commit / pre-merge-commit: exit 1 (message names new-task-worktree.sh) when ALL hold: MAIN worktree
-#   (git-dir == git-common-dir), path in a business-folder slot under $OS_PROJECTS_DIR (default ~/Desktop/projects),
+#   (git-dir == git-common-dir), path in a business-folder slot under $OS_PROJECTS_DIR (from os_config_load),
 #   HEAD is main/master. Fast-forward merges run no pre-merge-commit and stay allowed.
 # post-merge: WARNS (exit 0) when root main ended up not contained in origin/<branch>.
 # Escape hatch: EBDA_ALLOW_ROOT_COMMIT=1 (each use logged to ~/Library/Logs/root-commit-guard.log).
@@ -22,7 +22,15 @@ cdir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || e
 top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 [ -n "$top" ] || exit 0
 top="$(cd "$top" 2>/dev/null && pwd -P)" || exit 0
-proj="$(cd "${OS_PROJECTS_DIR:-$HOME/Desktop/projects}" 2>/dev/null && pwd -P)" || exit 0
+# projects root: the OS config owns it ($OS_PROJECTS_DIR); a caller outside the dispatcher (husky) gets it from the installed
+# loader. Unknown root = fail open (never block on what we cannot see).
+if [ -z "${OS_PROJECTS_DIR:-}" ]; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/os-config.sh" 2>/dev/null || . "$HOME/.claude/scripts/lib/os-config.sh" 2>/dev/null || true
+  command -v os_config_load >/dev/null 2>&1 && os_config_load
+fi
+[ -n "${OS_PROJECTS_DIR:-}" ] || exit 0
+proj="$(cd "$OS_PROJECTS_DIR" 2>/dev/null && pwd -P)" || exit 0
 case "$top" in
   "$proj"/*/internal-projects/*|"$proj"/*/clients/*/*) ;;
   *) exit 0 ;;
