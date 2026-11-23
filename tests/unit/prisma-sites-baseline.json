@@ -103,6 +103,7 @@
   "services/sms-consent.service.ts": 1,
   "services/sms-queue.service.ts": 3,
   "services/store.service.ts": 4,
+  "services/tax-change.service.ts": 1,
   "services/usage-aggregates.service.ts": 12,
   "services/variant.service.ts": 4,
   "services/wallet.service.ts": 2,
