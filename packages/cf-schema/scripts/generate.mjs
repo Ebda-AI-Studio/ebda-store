@@ -21,6 +21,7 @@ import {
   extraColumns,
   extraIndexes,
   extraModels,
+  latePrismaColumns,
 } from './cf-additions.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -50,12 +51,12 @@ export function build() {
   const clone = m => JSON.parse(JSON.stringify(m));
   const addCols = m => {
     const c = clone(m);
-    for (const col of extraColumns[m.name] ?? []) {
-      // A column that is ALSO a Prisma field (Postgres has it too) only needs `since`: D1 gets it from the numbered
-      // migration instead of 0001, and the field is not emitted twice.
-      const own = c.fields.find(x => x.name === col.name);
-      if (own && col.cfSince) own.cfSince = col.cfSince;
-      else c.fields.push(clone(col));
+    for (const col of extraColumns[m.name] ?? []) c.fields.push(clone(col));
+    for (const [fieldName, since] of Object.entries(latePrismaColumns[m.name] ?? {})) {
+      const field = c.fields.find(x => x.name === fieldName);
+      if (!field)
+        throw new Error(`latePrismaColumns: ${m.name}.${fieldName} is not in schema.prisma`);
+      field.cfSince = since;
     }
     for (const [mn, cols] of extraIndexes)
       if (mn === m.name) c.indexes.push({ fields: cols.map(field => ({ field })), map: null });

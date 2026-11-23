@@ -10003,6 +10003,7 @@
       "failed": "فاشلة",
       "refunded": "مستردة"
     },
+    "switchingTo": "يتحول إلى {interval}",
     "interval": {
       "monthly": "شهري",
       "yearly": "سنوي"

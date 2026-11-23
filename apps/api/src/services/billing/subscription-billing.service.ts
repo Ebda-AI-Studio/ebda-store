@@ -376,6 +376,8 @@ async function applySuccess(
         billingAnchorDay: anchor,
         trialEndsAt: null,
         pendingPlanCode: null,
+        // a renewal at the stored interval settles any pick: the old pick must not outlive it
+        pendingBillingInterval: null,
         dunningAttempts: 0,
         nextRetryAt: null,
       },
@@ -414,6 +416,8 @@ async function applyCardSaved(tx: Tx, row: LedgerRow, o: Outcome, now: Date): Pr
     data: {
       provider: row.provider,
       billingMethod: 'card',
+      // a card store renews at its stored interval: an InstaPay checkout pick no longer applies
+      pendingBillingInterval: null,
       providerPaymentMethodRef: encryption.encrypt(o.cardToken),
       paymentMethodLast4: last4,
       paymentMethodBrand: o.cardBrand ? o.cardBrand.slice(0, 32) : null,
@@ -2494,6 +2498,7 @@ export async function listSubscriptionsForAdmin(
       planCode: sub.planCode,
       chosenPlanCode: sub.pendingPlanCode,
       billingInterval: sub.billingInterval,
+      pendingBillingInterval: sub.pendingBillingInterval,
       status: sub.status,
       trialEndsAt: sub.status === 'trialing' ? sub.trialEndsAt : null,
       card: sub.providerPaymentMethodRef
@@ -2511,6 +2516,9 @@ export async function listSubscriptionsForAdmin(
       nextRetryAt: sub.nextRetryAt,
       currentPeriodEnd: sub.currentPeriodEnd,
       nextCharge: nextChargeOf(sub, plans, vat),
+      pendingNextCharge: isInterval(sub.pendingBillingInterval)
+        ? nextChargeOf(sub, plans, vat, sub.pendingBillingInterval)
+        : null,
     }));
 }
 
