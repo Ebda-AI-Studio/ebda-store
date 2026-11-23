@@ -2,7 +2,7 @@
 
 Self-serve, Shopify-style store builder for Egypt, by **Ebda AI Studio**. Sign up, get a live store at `<slug>.ebda.app` with no human in the loop, then bring your own domain when you are ready. Arabic-first (RTL) with English, EGP pricing, and Egyptian payments and shipping behind pluggable interfaces.
 
-> **Proprietary commercial software.** All rights reserved. See [LICENSE](./LICENSE).
+> **Source-available under the [PolyForm Noncommercial License 1.0.0](./LICENSE).** Commercial use is not permitted. Copyright (c) 2026 Ebda AI Studio.
 
 ## Where things live
 
