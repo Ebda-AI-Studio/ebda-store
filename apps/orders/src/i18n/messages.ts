@@ -395,6 +395,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       unpaid: 'Unpaid',
       remain: 'Remaining: {amount}',
       refunded: 'Refunded',
+      disputed: 'Disputed',
       refundedAmount: 'Refunded {amount}',
       delivery: 'Delivery',
       deliverTo: 'Deliver to',

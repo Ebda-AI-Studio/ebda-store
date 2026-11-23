@@ -9,12 +9,12 @@
  * Durable Object store keeps `payment_status` (keepPaymentStatus, packages/repo/src/do/refund.ts), so a delivered,
  * never-paid COD order is Refunded with nothing owed, and a paid one is Refunded, not Paid.
  */
-export interface OrderPaymentStateInput {
+interface OrderPaymentStateInput {
   status: string;
   paymentStatus: string;
 }
 
-export interface OrderPaymentSummaryInput extends OrderPaymentStateInput {
+interface OrderPaymentSummaryInput extends OrderPaymentStateInput {
   total: number;
   walletAmount?: number | null;
   payments?: ReadonlyArray<{ refundedAmount?: number | null }> | null;
@@ -25,9 +25,9 @@ export interface OrderPaymentSummaryInput extends OrderPaymentStateInput {
   refundedTotal?: number | null;
 }
 
-export type OrderPaymentState = 'paid' | 'refunded' | 'disputed' | 'unpaid';
+type OrderPaymentState = 'paid' | 'refunded' | 'disputed' | 'unpaid';
 
-export interface OrderPaymentSummary {
+interface OrderPaymentSummary {
   state: OrderPaymentState;
   /** Piastres handed back so far (0 when none or unknown). */
   refunded: number;

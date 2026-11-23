@@ -24,11 +24,12 @@ import { d1All } from '../../services/platform/billing-d1';
 import { featureService } from '../../services/feature.service';
 import { allStoresDirectory } from '../jobs/store-db';
 import { lookupStore } from '../definer';
+import { decodeCursor } from '../wa/buyer-key-backfill';
 import logger from '../logger';
 import { storeMoney, storeRepo } from '../repo-factory';
 import { partialRefunds, pendingPreSaleRefunds, replayRefunds } from './refund-replay';
 
-export interface SaleBackfillStoreReport {
+interface SaleBackfillStoreReport {
   storeId: string;
   scanned: number;
   /** orders that have no sale entry and would be (dry run) / were posted */
@@ -43,7 +44,7 @@ export interface SaleBackfillStoreReport {
   storeSkipped: 'gone' | 'not_do' | 'error' | 'accounting_off' | 'plan_gate' | null;
   done: boolean;
 }
-export interface SaleBackfillResult {
+interface SaleBackfillResult {
   dryRun: boolean;
   stores: SaleBackfillStoreReport[];
   totals: {
@@ -67,15 +68,6 @@ const DEFAULT_BUDGET = 200;
 const LIST_CAP = 200;
 const encodeSaleCursor = (c: Cursor): string =>
   Buffer.from(JSON.stringify(c)).toString('base64url');
-function decodeSaleCursor(raw: string | undefined): Cursor | null {
-  if (!raw) return null;
-  try {
-    const c = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as Cursor;
-    return typeof c.s === 'string' && (c.o === null || typeof c.o === 'string') ? c : null;
-  } catch {
-    return null;
-  }
-}
 
 const codeOf = (err: unknown): string =>
   String((err as { code?: unknown })?.code ?? (err as Error)?.name ?? 'unknown').slice(0, 64);
@@ -203,7 +195,7 @@ export async function runSaleJournalBackfill(opts: {
   storeId?: string;
 }): Promise<SaleBackfillResult> {
   const budget = Math.max(1, Math.min(opts.budget ?? DEFAULT_BUDGET, SALE_BACKFILL_MAX_BUDGET));
-  const cur = decodeSaleCursor(opts.cursor);
+  const cur = decodeCursor(opts.cursor);
   const stores = await d1All<{ id: string }>(
     `SELECT id FROM stores WHERE deleted_at IS NULL AND storage_backend = 'do' ${opts.storeId ? 'AND id = ?2' : ''} AND id >= ?1 ORDER BY id`,
     cur?.s ?? '',
