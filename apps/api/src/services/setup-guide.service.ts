@@ -105,11 +105,12 @@ export class SetupGuideService {
 
     // the catalogue, zones, orders and gateways live in the store's backend (Durable Object or Postgres)
     const db = await storeDb(storeId);
-    const [products, zones, areaRates, orders, otherMethods] = await Promise.all([
+    const [products, zones, areaRates, orders, paidOrders, otherMethods] = await Promise.all([
       db.product.count({ where: { storeId, deletedAt: null } }),
       db.shippingZone.count({ where: { storeId, isActive: true } }),
       db.shippingAreaRate.count({ where: { storeId, isActive: true } }),
       db.order.count({ where: { storeId } }),
+      db.order.count({ where: { storeId, paymentStatus: 'paid' } }),
       db.paymentConfig.count({ where: { storeId, isEnabled: true, provider: { not: 'cod' } } }),
     ]);
 
@@ -150,6 +151,7 @@ export class SetupGuideService {
       requiredDone: required.filter(i => i.done).length,
       requiredTotal: required.length,
       dismissed: stored.dismissed === true,
+      paidOrders,
     };
   }
 

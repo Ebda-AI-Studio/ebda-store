@@ -12315,5 +12315,17 @@
         "error": "I could not apply it. Nothing was changed, try again."
       }
     }
+  },
+  "launchChip": {
+    "stepsLabel": "{done} of {total} steps",
+    "ordersLabel": "{done} of {goal} paid orders",
+    "openAria": "Launch readiness: {label}. Open the checklist",
+    "stepsTitle": "Get ready to launch",
+    "stepsHint": "Finish these steps so customers can start ordering.",
+    "ordersTitle": "Your first {goal} paid orders",
+    "ordersHint": "Share your store link with customers. This badge goes away after {goal} paid orders.",
+    "viewOrders": "See orders",
+    "open": "Open",
+    "done": "Done"
   }
 }

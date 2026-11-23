@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
   updates: [] as unknown[],
   copies: [] as unknown[],
   sql: [] as string[],
+  getDb: null as unknown,
 }));
 
 vi.mock('@ebda/database', () => ({
@@ -24,9 +25,10 @@ vi.mock('@ebda/database', () => ({
 }));
 vi.mock('../../apps/api/src/lib/repo-factory', () => ({
   storeWritesToDo: async () => h.onDo,
-  storeDb: async () => ({
-    store: { findUnique: async () => ({ settings: h.settings }) },
-  }),
+  storeDb: async () =>
+    h.getDb ?? {
+      store: { findUnique: async () => ({ settings: h.settings }) },
+    },
   storeUpdate: async (_db: unknown, args: unknown) => void h.updates.push(args),
   copyStoreSettings: async (_id: string, f: unknown) => void h.copies.push(f),
 }));
@@ -39,6 +41,7 @@ beforeEach(() => {
   h.updates.length = 0;
   h.copies.length = 0;
   h.sql.length = 0;
+  h.getDb = null;
   vi.spyOn(SetupGuideService, 'get').mockResolvedValue({} as never);
 });
 
@@ -66,5 +69,34 @@ describe('setup guide writers (N-19)', () => {
     expect(h.updates[1]).toMatchObject({
       data: { settings: { keep: 1, setupGuide: { manual: { a: true }, dismissed: false } } },
     });
+  });
+});
+
+describe('SetupGuideService.get paidOrders (launch chip goal)', () => {
+  it('counts only paymentStatus=paid orders, separately from all orders', async () => {
+    vi.restoreAllMocks();
+    const orderCount = vi.fn(async (a: { where: { paymentStatus?: string } }) =>
+      a.where.paymentStatus === 'paid' ? 3 : 7
+    );
+    h.getDb = {
+      store: {
+        findUnique: async () => ({
+          settings: {},
+          logo: null,
+          theme: null,
+          look: null,
+          domain: null,
+        }),
+      },
+      product: { count: async () => 1 },
+      shippingZone: { count: async () => 0 },
+      shippingAreaRate: { count: async () => 0 },
+      order: { count: orderCount },
+      paymentConfig: { count: async () => 0 },
+    };
+    const g = await SetupGuideService.get('s1');
+    expect(g.paidOrders).toBe(3);
+    expect(g.items.find(i => i.key === 'test_order')?.done).toBe(true);
+    expect(orderCount).toHaveBeenCalledWith({ where: { storeId: 's1', paymentStatus: 'paid' } });
   });
 });
