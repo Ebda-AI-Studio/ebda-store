@@ -6,6 +6,7 @@ export * from './brand';
 // loader, so it must stay free of extensionless relative imports (the API integration job failed on exactly that).
 export * from './brand/billing-vat';
 export * from './buyer-key';
+export * from './guest-return';
 export * from './whatsapp-optin-wording';
 export * from './server-owned-settings';
 export * from './auth/jwt-claims';

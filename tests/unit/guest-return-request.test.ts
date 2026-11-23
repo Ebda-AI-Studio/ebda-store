@@ -10,26 +10,29 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { prismaMock, orderDb, emailServiceMock, loggerMock, socketMock } = vi.hoisted(() => ({
-  prismaMock: {
-    order: { findFirst: vi.fn() },
-    return: { findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
-    orderEvent: { findMany: vi.fn().mockResolvedValue([]) },
-    $executeRaw: vi.fn().mockResolvedValue(1),
-    $queryRaw: vi.fn().mockResolvedValue([{ locked: true }]),
-  },
-  orderDb: {
-    order: { findFirst: vi.fn(), findMany: vi.fn() },
-    orderItem: { findMany: vi.fn() },
-    return: { findMany: vi.fn(), count: vi.fn() },
-  },
-  emailServiceMock: {
-    sendReturnConfirmation: vi.fn().mockResolvedValue(undefined),
-    sendReturnStatusUpdate: vi.fn().mockResolvedValue(undefined),
-  },
-  loggerMock: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
-  socketMock: { newReturnNotification: vi.fn(), returnStatusNotification: vi.fn() },
-}));
+const { prismaMock, orderDb, emailServiceMock, loggerMock, socketMock, moneyMock, doState } =
+  vi.hoisted(() => ({
+    moneyMock: { returnCreate: vi.fn() },
+    doState: { money: true },
+    prismaMock: {
+      order: { findFirst: vi.fn() },
+      return: { findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
+      orderEvent: { findMany: vi.fn().mockResolvedValue([]) },
+      $executeRaw: vi.fn().mockResolvedValue(1),
+      $queryRaw: vi.fn().mockResolvedValue([{ locked: true }]),
+    },
+    orderDb: {
+      order: { findFirst: vi.fn(), findMany: vi.fn() },
+      orderItem: { findMany: vi.fn() },
+      return: { findMany: vi.fn(), count: vi.fn(), findFirst: vi.fn() },
+    },
+    emailServiceMock: {
+      sendReturnConfirmation: vi.fn().mockResolvedValue(undefined),
+      sendReturnStatusUpdate: vi.fn().mockResolvedValue(undefined),
+    },
+    loggerMock: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+    socketMock: { newReturnNotification: vi.fn(), returnStatusNotification: vi.fn() },
+  }));
 
 vi.mock('@ebda/database', () => ({
   prisma: prismaMock,
@@ -42,7 +45,13 @@ vi.mock('@ebda/database', () => ({
 }));
 vi.mock('@api/lib/repo-factory', () => ({
   storeDb: vi.fn(async () => orderDb),
-  storeMoney: vi.fn(async () => null),
+  storeMoney: vi.fn(async () => (doState.money ? moneyMock : null)),
+}));
+vi.mock('@api/lib/customer-directory', () => ({
+  customerRow: vi.fn(),
+  customerRows: vi.fn(async () => []),
+  isLiveCustomer: () => true,
+  pickSelected: (u: Record<string, unknown>) => u,
 }));
 vi.mock('@api/services/email.service', () => ({ EmailService: emailServiceMock }));
 vi.mock('@api/services/socket.service', () => ({ socketService: socketMock }));
@@ -102,12 +111,15 @@ function seedGuestOrder(): void {
   });
   prismaMock.return.findMany.mockResolvedValue([]);
   prismaMock.orderEvent.findMany.mockResolvedValue([]);
-  prismaMock.return.create.mockResolvedValue({
+  moneyMock.returnCreate.mockResolvedValue({ returnId: 'ret-1' });
+  orderDb.return.findFirst.mockResolvedValue({
     id: 'ret-1',
     returnNumber: 'RET-X',
     status: 'pending',
+    customerId: `guest:${ORDER_ID}`,
     items: [],
   });
+  doState.money = true;
 }
 
 async function failure(p: Promise<unknown>): Promise<AppError> {
@@ -125,7 +137,7 @@ beforeEach(() => {
 });
 
 describe('ReturnService.createForGuest', () => {
-  it('creates the return for a guest order proven by order number + phone, through create()', async () => {
+  it('creates the return for a guest order proven by order number + phone, as a guest:true DO return (never a null customerId)', async () => {
     const r = await withDeferredWork({ storeId: STORE }, () =>
       ReturnService.createForGuest(STORE, {
         ...base,
@@ -134,15 +146,13 @@ describe('ReturnService.createForGuest', () => {
       })
     );
     expect(r).toMatchObject({ returnNumber: 'RET-X' });
-    const data = prismaMock.return.create.mock.calls[0][0].data;
-    expect(data).toMatchObject({ storeId: STORE, orderId: ORDER_ID, customerId: null });
+    const args = moneyMock.returnCreate.mock.calls[0][0];
+    expect(args).toMatchObject({ orderId: ORDER_ID, guest: true });
+    expect(args.customerId).toBeUndefined();
     // no lines named = the whole order
-    expect(data.items.create).toHaveLength(1);
-    // the same eligibility query as the signed-in path: delivered only, guest order only
-    expect(prismaMock.order.findFirst.mock.calls[0][0].where).toMatchObject({
-      status: 'delivered',
-      customerId: null,
-    });
+    expect(args.items).toHaveLength(1);
+    // only a guest order (customer_id null) is looked up by number; delivered-only is enforced by the DO's returnCreate
+    expect(orderDb.order.findFirst.mock.calls[0][0].where).toMatchObject({ customerId: null });
   });
 
   it('accepts the email as the second factor, case-insensitive', async () => {
@@ -153,17 +163,17 @@ describe('ReturnService.createForGuest', () => {
         email: ' Guest@Example.COM ',
       })
     );
-    expect(prismaMock.return.create).toHaveBeenCalledTimes(1);
+    expect(moneyMock.returnCreate).toHaveBeenCalledTimes(1);
   });
 
-  it('a request moves no money: only the return row is written', async () => {
+  it('a request moves no money: it asks the DO for a return row only (no refund method, no completion)', async () => {
     await withDeferredWork({ storeId: STORE }, () =>
       ReturnService.createForGuest(STORE, { ...base, orderNumber: 'ORD-1001', phone: PHONE })
     );
-    const data = prismaMock.return.create.mock.calls[0][0].data;
-    expect(data.status).toBe('pending');
-    expect(data).not.toHaveProperty('refundMethod');
-    expect(data).not.toHaveProperty('refundedAt');
+    const args = moneyMock.returnCreate.mock.calls[0][0];
+    expect(args).not.toHaveProperty('refundMethod');
+    expect(args).not.toHaveProperty('byMerchant');
+    expect(moneyMock.returnCreate).toHaveBeenCalledTimes(1);
   });
 
   it('wrong phone, wrong email, unknown order, no factor: ONE identical failure, no row', async () => {
@@ -218,24 +228,38 @@ describe('ReturnService.createForGuest', () => {
   });
 });
 
+describe('createForGuest on a store without a StoreDO', () => {
+  it('answers RETURNS_NEED_DO_STORE: the guest marker lives on the StoreDO only', async () => {
+    doState.money = false;
+    const e = await failure(
+      ReturnService.createForGuest(STORE, { ...base, orderNumber: 'ORD-1001', phone: PHONE })
+    );
+    expect(e.code).toBe('RETURNS_NEED_DO_STORE');
+    expect(prismaMock.return.create).not.toHaveBeenCalled();
+  });
+});
+
 describe('the merchant returns list', () => {
-  it('shows a guest return with the contact left on the order (no customer row)', async () => {
+  it('shows a guest:<orderId> return with the contact left on the order, and looks up no account for it', async () => {
     orderDb.return.findMany.mockResolvedValue([
-      { id: 'ret-1', orderId: ORDER_ID, customerId: null, customer: null },
-      { id: 'ret-2', orderId: 'o2', customerId: 'c1', customer: { firstName: 'Reg' } },
-    ]);
-    orderDb.return.count.mockResolvedValue(2);
-    orderDb.order.findMany.mockResolvedValue([
       {
-        id: ORDER_ID,
-        shippingAddress: { firstName: 'Gus', lastName: 'Tee', phone: PHONE, email: EMAIL },
+        id: 'ret-1',
+        orderId: ORDER_ID,
+        customerId: `guest:${ORDER_ID}`,
+        order: {
+          orderNumber: 'ORD-1001',
+          shippingAddress: { firstName: 'Gus', lastName: 'Tee', phone: PHONE, email: EMAIL },
+        },
       },
     ]);
+    orderDb.return.count.mockResolvedValue(1);
     const { returns } = await ReturnService.list(STORE, {});
-    expect(returns[0].customer).toMatchObject({ firstName: 'Gus', lastName: 'Tee', email: EMAIL });
-    expect(returns[1].customer).toEqual({ firstName: 'Reg' });
-    // one order read, for the guest row only
-    expect(orderDb.order.findMany).toHaveBeenCalledTimes(1);
+    expect(returns[0].customer).toMatchObject({
+      firstName: 'Gus',
+      lastName: 'Tee',
+      email: EMAIL,
+      isGuest: true,
+    });
   });
 });
 

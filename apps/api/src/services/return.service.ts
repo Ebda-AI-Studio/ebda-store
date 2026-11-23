@@ -31,6 +31,7 @@ import { opKey } from '../lib/money-idempotency';
 import { storeDb, storeMoney, type MoneyClient } from '../lib/repo-factory';
 
 import {
+  isGuestReturnCustomer,
   minorToDecimalString,
   productReturnAdjustment,
   type ReturnLineInput,
@@ -48,8 +49,9 @@ interface CreateReturnItemInput {
 
 interface CreateReturnData {
   orderId: string;
-  /** null = a GUEST return (Ruling GUEST-RET-1, `createForGuest`): the order has no customer row. */
-  customerId: string | null;
+  customerId: string;
+  /** Ruling GUEST-RETURN-MARKER-1: a shopper-opened return on a guest order (`createForGuest`); `customerId` is then unused. */
+  guest?: boolean;
   type: 'return' | 'exchange' | 'refund';
   reason: string;
   reasonDetail?: string;
@@ -254,13 +256,41 @@ async function lockOrderReturnsBounded(orderId: string): Promise<void> {
  * A store's customers are User rows in the identity/Postgres side, not in its Durable Object: a DO read cannot `include`
  * them (prisma-lite refuses a cross-database relation), so the DO paths read the return without `customer` and attach it here.
  */
-async function withCustomer<T extends { customerId: string | null }>(
+/**
+ * A merchant-opened return on a GUEST order carries `guest:<orderId>` as its customer (GUEST-RET-1): no account exists, so the
+ * identity shown is the order's own shipping-address snapshot (name / email / phone). Null when the order was not joined.
+ */
+// pq-allow(unused-export): test seam, imported by __tests__/return-guest.test.ts
+export function guestCustomerOf(order: unknown): Record<string, unknown> | null {
+  let addr = (order as { shippingAddress?: unknown } | null | undefined)?.shippingAddress;
+  if (typeof addr === 'string') {
+    try {
+      addr = JSON.parse(addr);
+    } catch {
+      addr = null;
+    }
+  }
+  if (!addr || typeof addr !== 'object') return null;
+  const a = addr as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  return {
+    id: null,
+    firstName: str(a.firstName),
+    lastName: str(a.lastName),
+    email: str(a.email),
+    phone: str(a.phone),
+    isGuest: true,
+  };
+}
+
+export async function withCustomer<T extends { customerId: string }>(
   storeId: string,
   rows: T[],
   select: Prisma.UserSelect
 ): Promise<Array<T & { customer: unknown }>> {
-  // a guest return (GUEST-RET-1) has a null (PG) or '' (DO) customer: nothing to look up
-  const ids = Array.from(new Set(rows.map(r => r.customerId).filter((id): id is string => !!id)));
+  const ids = Array.from(
+    new Set(rows.map(r => r.customerId).filter(id => !isGuestReturnCustomer(id)))
+  );
   const doRows = await customerRows(storeId, ids);
   const users: Array<{ id: string }> = doRows
     ? doRows.map(u => pickSelected(u, select as Record<string, unknown>) as { id: string })
@@ -272,9 +302,9 @@ async function withCustomer<T extends { customerId: string | null }>(
       : [];
   const byId = new Map(users.map(u => [u.id, u]));
   return rows.map(r => {
-    const u = (r.customerId ? byId.get(r.customerId) : undefined) as
-      | ({ id: string } & Record<string, unknown>)
-      | undefined;
+    if (isGuestReturnCustomer(r.customerId))
+      return { ...r, customer: guestCustomerOf((r as { order?: unknown }).order) };
+    const u = byId.get(r.customerId) as ({ id: string } & Record<string, unknown>) | undefined;
     if (!u) return { ...r, customer: null };
     const { id: _id, ...rest } = u;
     const keep = Object.fromEntries(Object.keys(select).map(k => [k, rest[k]]));
@@ -304,40 +334,6 @@ function contactOfOrder(order: { shippingAddress?: unknown }): { email: string; 
     email: str(a.email),
     name: `${str(a.firstName)} ${str(a.lastName)}`.trim(),
   };
-}
-
-/**
- * A guest return (Ruling GUEST-RET-1) has no customer row: give the merchant's views (list, detail) the contact the
- * guest left on the order in the same `customer` shape, so the returns list and drawer render it like any other.
- * One order read for the whole page, and only when a row is a guest return.
- */
-async function fillGuestCustomers<T extends { customerId: string | null; orderId: string }>(
-  storeId: string,
-  rows: T[]
-): Promise<T[]> {
-  const guests = rows.filter(r => !r.customerId && !(r as { customer?: unknown }).customer);
-  if (guests.length === 0) return rows;
-  const orders = await (
-    await storeDb(storeId)
-  ).order.findMany({
-    where: { id: { in: Array.from(new Set(guests.map(g => g.orderId))) }, storeId },
-    select: { id: true, shippingAddress: true },
-  });
-  const byId = new Map(
-    orders.map(o => [o.id, (o.shippingAddress ?? {}) as Record<string, unknown>])
-  );
-  const str = (v: unknown) => (typeof v === 'string' ? v : '');
-  for (const g of guests) {
-    const a = byId.get(g.orderId) ?? {};
-    (g as { customer?: unknown }).customer = {
-      id: '',
-      email: str(a.email),
-      firstName: str(a.firstName),
-      lastName: str(a.lastName),
-      phone: str(a.phone),
-    };
-  }
-  return rows;
 }
 
 type UpdatedReturn = Prisma.ReturnGetPayload<{
@@ -379,10 +375,15 @@ export class ReturnService {
   }
 
   /** create on a store's Durable Object: the whole validation and both row sets are one section; the email/socket tail is the Postgres path's. */
-  private static async createOnDo(money: MoneyClient, storeId: string, data: CreateReturnData) {
+  private static async createOnDo(
+    money: MoneyClient,
+    storeId: string,
+    data: Omit<CreateReturnData, 'customerId'> & { customerId?: string }
+  ) {
     const { returnId } = await money.returnCreate({
       orderId: data.orderId,
-      customerId: data.customerId,
+      customerId: data.guest ? undefined : data.customerId,
+      guest: data.guest,
       type: data.type,
       reason: data.reason,
       reasonDetail: data.reasonDetail,
@@ -402,16 +403,17 @@ export class ReturnService {
     });
     const doCustomer = data.customerId ? await customerRow(storeId, data.customerId) : null;
     // a deleted / erased / suspended customer is not mailed (N-9); a guest has no customer row at all
-    const customer = !data.customerId
-      ? null
-      : doCustomer !== undefined
-        ? doCustomer && isLiveCustomer(doCustomer)
-          ? doCustomer
-          : null
-        : await prisma.user.findFirst({
-            where: { id: data.customerId, storeId },
-            select: { email: true, firstName: true, lastName: true },
-          });
+    const customer =
+      data.guest || !data.customerId
+        ? null
+        : doCustomer !== undefined
+          ? doCustomer && isLiveCustomer(doCustomer)
+            ? doCustomer
+            : null
+          : await prisma.user.findFirst({
+              where: { id: data.customerId, storeId },
+              select: { email: true, firstName: true, lastName: true },
+            });
     const order = orderRow ? { ...orderRow, customer } : null;
     const store = await withStore(storeId, tx =>
       tx.store.findFirst({ where: { id: storeId }, select: { name: true } })
@@ -468,6 +470,10 @@ export class ReturnService {
     }
   ) {
     const { orderNumber, phone, email, ...data } = input;
+    // the `guest:<orderId>` marker (GUEST-RETURN-MARKER-1) lives on the StoreDO; the retired Postgres path cannot hold it
+    const money = await storeMoney(storeId);
+    if (!money)
+      throw new AppError(409, 'RETURNS_NEED_DO_STORE', 'Returns for this store are not available');
     const db = await storeDb(storeId);
     const order = await db.order.findFirst({
       where: { storeId, orderNumber: orderNumber.trim(), customerId: null },
@@ -522,12 +528,12 @@ export class ReturnService {
       bundleGroupIds = groups.length ? groups : undefined;
       if (!items.length) items = undefined;
     }
-    return ReturnService.create(storeId, {
+    return ReturnService.createOnDo(money, storeId, {
       ...data,
       items,
       bundleGroupIds,
       orderId: order.id,
-      customerId: null,
+      guest: true,
     });
   }
 
@@ -567,7 +573,7 @@ export class ReturnService {
         take: limit,
         include: {
           order: {
-            select: { orderNumber: true, total: true },
+            select: { orderNumber: true, total: true, shippingAddress: true },
           },
           ...(onDo
             ? {}
@@ -605,7 +611,6 @@ export class ReturnService {
         })
       : listed;
 
-    await fillGuestCustomers(storeId, returns as never[]);
     return {
       returns: returns as typeof listed,
       meta: {
@@ -673,10 +678,8 @@ export class ReturnService {
         lastName: true,
         phone: true,
       });
-      await fillGuestCustomers(storeId, [withUser as never]);
       return withUser as typeof found;
     }
-    await fillGuestCustomers(storeId, [found as never]);
     const returnRequest = found;
 
     return returnRequest;
@@ -855,7 +858,6 @@ export class ReturnService {
         },
       },
     });
-    const orderContact = order ? contactOfOrder(order) : null;
     const orderLocale = (order?.locale ?? undefined) as 'en' | 'ar' | undefined;
 
     if (!order) {
@@ -1104,10 +1106,9 @@ export class ReturnService {
       EmailService.sendReturnConfirmation(
         storeId,
         {
-          email: order.customer?.email || orderContact?.email || '',
+          email: order.customer?.email || '',
           customerName:
             `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
-            orderContact?.name ||
             'Customer',
           storeName: order.store.name,
           returnNumber,
@@ -1126,7 +1127,6 @@ export class ReturnService {
         orderNumber: order.orderNumber,
         customerName:
           `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
-          orderContact?.name ||
           'Customer',
       });
     } catch (notifyError) {
@@ -1197,7 +1197,9 @@ export class ReturnService {
 
     const returnOrderLocale = (updatedReturn.order?.locale ?? undefined) as 'en' | 'ar' | undefined;
     // A guest return (GUEST-RET-1) has no customer row: its status mail goes to the contact on the order.
-    const guestContact = updatedReturn.customer
+    // Gated explicitly on the `guest:<orderId>` marker (GUEST-RETURN-MARKER-1), never on whether a customer happened to resolve.
+    const isGuest = isGuestReturnCustomer(updatedReturn.customerId);
+    const guestContact = !isGuest
       ? null
       : contactOfOrder(
           (await (
@@ -1210,32 +1212,38 @@ export class ReturnService {
 
     // Status was updated — same post-commit deferral as sendReturnConfirmation
     // above; this path was broken in exactly the same way.
-    void deferAfterTenantCommit('email.returnStatusUpdate', () =>
-      EmailService.sendReturnStatusUpdate(
-        storeId,
-        {
-          email: updatedReturn.customer?.email ?? guestContact?.email ?? '',
-          customerName: updatedReturn.customer
-            ? `${updatedReturn.customer.firstName} ${updatedReturn.customer.lastName}`
-            : guestContact?.name || 'Customer',
-          storeName: updatedReturn.store.name,
-          returnNumber: updatedReturn.returnNumber,
-          status,
-          notes,
-        },
-        returnOrderLocale
-      )
-    ).catch(err => logger.error({ err }, 'Failed to send return status email'));
+    // a guest return mails the contact on the order (the shopper asked for it); no account, so never a socket push
+    const statusEmail = isGuest ? guestContact?.email : updatedReturn.customer?.email;
+    if (statusEmail) {
+      void deferAfterTenantCommit('email.returnStatusUpdate', () =>
+        EmailService.sendReturnStatusUpdate(
+          storeId,
+          {
+            email: statusEmail,
+            customerName: isGuest
+              ? guestContact?.name || 'Customer'
+              : `${updatedReturn.customer?.firstName ?? ''} ${updatedReturn.customer?.lastName ?? ''}`.trim() ||
+                'Customer',
+            storeName: updatedReturn.store.name,
+            returnNumber: updatedReturn.returnNumber,
+            status,
+            notes,
+          },
+          returnOrderLocale
+        )
+      ).catch(err => logger.error({ err }, 'Failed to send return status email'));
+    }
 
     // Send real-time notification to customer
-    try {
-      if (updatedReturn.customerId)
+    if (!isGuest && updatedReturn.customerId) {
+      try {
         socketService.returnStatusNotification(updatedReturn.customerId, {
           returnNumber: updatedReturn.returnNumber,
           status,
         });
-    } catch (notifyError) {
-      logger.error({ err: notifyError }, 'Failed to send return status notification');
+      } catch (notifyError) {
+        logger.error({ err: notifyError }, 'Failed to send return status notification');
+      }
     }
 
     return updatedReturn;
@@ -1585,18 +1593,6 @@ export class ReturnService {
       // commit or roll back together; the idempotency key (the return id)
       // makes a replayed completion a no-op rather than a second credit.
       let walletCreditAmount: number | undefined;
-      // GUEST-RET-1: a guest return has no wallet; store credit would be money into nowhere.
-      if (
-        refundMethod === 'store_credit' &&
-        !returnRequest.customerId &&
-        (await featureService.isFeatureEnabled(storeId, 'customer_wallet'))
-      ) {
-        throw new AppError(
-          400,
-          'GUEST_RETURN_NO_WALLET',
-          'A guest return has no wallet. Refund it to the original method or by bank transfer instead.'
-        );
-      }
       if (
         refundMethod === 'store_credit' &&
         isInventoryRestoring &&
@@ -1654,12 +1650,7 @@ export class ReturnService {
         });
       }
 
-      if (
-        walletCreditAmount != null &&
-        walletCreditAmount > 0 &&
-        returnRequest.orderId &&
-        returnRequest.customerId
-      ) {
+      if (walletCreditAmount != null && walletCreditAmount > 0 && returnRequest.orderId) {
         await WalletService.creditForReturn({
           storeId,
           customerId: returnRequest.customerId,
@@ -1673,7 +1664,7 @@ export class ReturnService {
       // transaction as the completion row. Keyed on the return, so a replayed
       // completion credits nothing more. The GL reads this ledger row to book
       // the share against the wallet liability (resolveReturnRefundLegs).
-      if (walletShare > 0 && returnRequest.orderId && returnRequest.customerId) {
+      if (walletShare > 0 && returnRequest.orderId) {
         await WalletService.creditReturnWalletShare({
           storeId,
           customerId: returnRequest.customerId,

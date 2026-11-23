@@ -168,20 +168,24 @@ describe('returnCreate', () => {
   });
 });
 
-describe('returnCreate: a GUEST return (Ruling GUEST-RET-1)', () => {
-  it('creates the return for a guest order (customer null), only for a guest order, and money does not move', () => {
+describe('returnCreate: a GUEST return (Ruling GUEST-RET-1 / GUEST-RETURN-MARKER-1)', () => {
+  it('creates the return for a guest order (`guest:<orderId>` marker), only for a guest order, and money does not move', () => {
     const f = fixture();
     f.x(`UPDATE orders SET customer_id = NULL`);
-    const guest = (customerId: string | null) =>
+    const guest = (customerId?: string) =>
       f.op('returnCreate', {
         orderId: 'o1',
-        customerId,
+        ...(customerId ? { customerId } : { guest: true }),
         type: 'return',
         reason: 'changed my mind',
         items: [{ orderItemId: 'i1', productId: 'p1', productName: 'Tee', quantity: 1 }],
       }).returnId as string;
-    const id = guest(null);
-    expect(f.ret(id)).toMatchObject({ status: 'pending', refund_amount: 10000, customer_id: null });
+    const id = guest();
+    expect(f.ret(id)).toMatchObject({
+      status: 'pending',
+      refund_amount: 10000,
+      customer_id: 'guest:o1',
+    });
     // a request is no refund: no ledger line, no wallet row, no claim
     expect(f.ret(id).refunded_at).toBeNull();
     expect(f.one('SELECT count(*) n FROM wallet_transactions').n).toBe(0);
@@ -194,7 +198,7 @@ describe('returnCreate: a GUEST return (Ruling GUEST-RET-1)', () => {
       refusal(() =>
         f.op('returnCreate', {
           orderId: 'o1',
-          customerId: null,
+          guest: true,
           type: 'return',
           reason: 'x',
           items: [{ orderItemId: 'i1', productId: 'p1', productName: 'Tee', quantity: 1 }],
@@ -207,7 +211,7 @@ describe('returnCreate: a GUEST return (Ruling GUEST-RET-1)', () => {
     f.x(`UPDATE orders SET customer_id = NULL`);
     const id = f.op('returnCreate', {
       orderId: 'o1',
-      customerId: null,
+      guest: true,
       type: 'return',
       reason: 'x',
       items: [{ orderItemId: 'i1', productId: 'p1', productName: 'Tee', quantity: 1 }],
@@ -217,7 +221,7 @@ describe('returnCreate: a GUEST return (Ruling GUEST-RET-1)', () => {
       refusal(() =>
         f.op('returnClaim', { returnId: id, refundMethod: 'store_credit', walletFeature: true })
       ).code
-    ).toBe('GUEST_RETURN_NO_WALLET');
+    ).toBe('GUEST_STORE_CREDIT');
   });
 });
 

@@ -273,7 +273,7 @@ describe('StoreDO.moneyOp returns', () => {
   });
 });
 
-// Ruling GUEST-RET-1: a guest order (customer_id NULL) can be returned; returns.customer_id is nullable on EVERY StoreDO.
+// Ruling GUEST-RET-1: a guest order (customer_id NULL) can be returned; the row stores the `guest:<orderId>` marker (GUEST-RETURN-MARKER-1).
 describe('StoreDO guest returns (Ruling GUEST-RET-1)', () => {
   it('creates a real return row for a guest order, only for a guest order, and moves no money', async () => {
     const store = 'guest-ret-1';
@@ -284,6 +284,7 @@ describe('StoreDO guest returns (Ruling GUEST-RET-1)', () => {
     // a named customer does not reach a guest order
     const wrong = await op(stub, store, 'returnCreate', {
       orderId: 'o1',
+      guest: false,
       customerId: 'cust',
       type: 'return',
       reason: 'x',
@@ -293,7 +294,7 @@ describe('StoreDO guest returns (Ruling GUEST-RET-1)', () => {
     const made = val<{ returnId: string }>(
       await op(stub, store, 'returnCreate', {
         orderId: 'o1',
-        customerId: null,
+        guest: true,
         type: 'return',
         reason: 'changed my mind',
         items: [tee(1)],
@@ -310,7 +311,7 @@ describe('StoreDO guest returns (Ruling GUEST-RET-1)', () => {
           .one() as Record<string, unknown>
     );
     expect(row).toMatchObject({
-      customer_id: null,
+      customer_id: 'guest:o1',
       status: 'pending',
       refunded_at: null,
       refund_amount: 10000,
@@ -320,7 +321,7 @@ describe('StoreDO guest returns (Ruling GUEST-RET-1)', () => {
     const s2 = await seed('guest-ret-2');
     const refused = await op(s2, 'guest-ret-2', 'returnCreate', {
       orderId: 'o1',
-      customerId: null,
+      guest: true,
       type: 'return',
       reason: 'x',
       items: [tee(1)],
@@ -342,68 +343,6 @@ describe('StoreDO guest returns (Ruling GUEST-RET-1)', () => {
       refundMethod: 'store_credit',
       walletFeature: true,
     });
-    expect(claim.ok ? 'ok' : claim.code).toBe('GUEST_RETURN_NO_WALLET');
-  });
-
-  it('a DO already migrated at the old schema is upgraded: cf-0008 makes customer_id nullable and turns the old guest rows into NULL', async () => {
-    const store = 'guest-ret-upgrade';
-    const stub = await seed(store);
-    await runInDurableObject(stub, (_i, state) => {
-      const sql = state.storage.sql;
-      const x = (q: string, ...p: unknown[]) => sql.exec(q, ...p);
-      // put returns.customer_id back to the pre-0008 shape: NOT NULL, and drop cf-0008 from the history
-      x('DROP INDEX IF EXISTS returns_customer_id_idx');
-      x('ALTER TABLE returns RENAME COLUMN customer_id TO customer_id_new');
-      x(`ALTER TABLE returns ADD COLUMN customer_id TEXT NOT NULL DEFAULT ''`);
-      x('ALTER TABLE returns DROP COLUMN customer_id_new');
-      x("DELETE FROM _migrations WHERE id = 'cf-0008_returns_customer_nullable'");
-      const notNull = () =>
-        x(
-          "SELECT \"notnull\" AS n FROM pragma_table_info('returns') WHERE name = 'customer_id'"
-        ).one().n as number;
-      expect(notNull()).toBe(1);
-      const ins = (id: string, cust: string, no: string) =>
-        x(
-          `INSERT INTO returns (id, store_id, order_id, customer_id, return_number, type, status, reason, refund_amount, created_at, updated_at)
-           VALUES (?, ?, 'o1', ?, ?, 'return', 'pending', 'r', 0, ?, ?)`,
-          id,
-          store,
-          cust,
-          no,
-          now,
-          now
-        );
-      ins('r-guest', '', 'RET-G');
-      ins('r-cust', 'cust', 'RET-C');
-      // children that a table rebuild would have cascaded away
-      x(
-        `INSERT INTO return_items (id, return_id, order_item_id, product_id, product_name, quantity) VALUES ('ri1', 'r-guest', 'i1', 'p1', 'Tee', 1)`
-      );
-      x(
-        `INSERT INTO customer_wallets (id, store_id, customer_id, balance, created_at, updated_at) VALUES ('w1', ?, 'cust', 5, ?, ?)`,
-        store,
-        now,
-        now
-      );
-      x(
-        `INSERT INTO wallet_transactions (id, wallet_id, store_id, customer_id, type, amount, balance_after, idempotency_key, return_id, created_at) VALUES ('wt1', 'w1', ?, 'cust', 'refund_credit', 5, 5, 'k1', 'r-cust', ?)`,
-        store,
-        now
-      );
-
-      expect(runMigrations(state.storage)).toEqual(['cf-0008_returns_customer_nullable']);
-
-      expect(notNull()).toBe(0);
-      expect(x("SELECT customer_id AS c FROM returns WHERE id = 'r-guest'").one().c).toBeNull();
-      expect(x("SELECT customer_id AS c FROM returns WHERE id = 'r-cust'").one().c).toBe('cust');
-      expect(x('SELECT count(*) AS n FROM return_items').one().n).toBe(1);
-      expect(x("SELECT return_id AS r FROM wallet_transactions WHERE id = 'wt1'").one().r).toBe(
-        'r-cust'
-      );
-      expect(
-        x("SELECT count(*) AS n FROM sqlite_master WHERE name = 'returns_customer_id_idx'").one().n
-      ).toBe(1);
-      expect(runMigrations(state.storage)).toEqual([]);
-    });
+    expect(claim.ok ? 'ok' : claim.code).toBe('GUEST_STORE_CREDIT');
   });
 });

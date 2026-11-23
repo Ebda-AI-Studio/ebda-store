@@ -2331,7 +2331,7 @@ CREATE TABLE IF NOT EXISTS "returns" (
   "id" TEXT NOT NULL,
   "store_id" TEXT NOT NULL,
   "order_id" TEXT NOT NULL,
-  "customer_id" TEXT,
+  "customer_id" TEXT NOT NULL,
   "return_number" TEXT NOT NULL,
   "type" TEXT NOT NULL DEFAULT 'return',
   "status" TEXT NOT NULL DEFAULT 'pending',

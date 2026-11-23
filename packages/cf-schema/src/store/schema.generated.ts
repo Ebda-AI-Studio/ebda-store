@@ -2339,7 +2339,7 @@ export const returns = sqliteTable('returns', {
     .$defaultFn(() => crypto.randomUUID()),
   storeId: text('store_id').notNull(),
   orderId: text('order_id').notNull(),
-  customerId: text('customer_id'),
+  customerId: text('customer_id').notNull(),
   returnNumber: text('return_number').notNull(),
   type: text('type', { enum: ['return', 'exchange', 'refund'] })
     .notNull()

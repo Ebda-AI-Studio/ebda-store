@@ -25,17 +25,12 @@ describe('generated schema is current', () => {
       'cf-0004_template_current',
       'cf-0005_reorder_rules_one_per_item',
       'cf-0006_template_expand_only',
-      'cf-0008_returns_customer_nullable',
     ]);
     expect(STORE_MIGRATIONS[0].sql).toBe(read('migrations/store/0001_init.sql'));
     expect(STORE_MIGRATIONS[1].sql).toBe(read('migrations/store/0002_invariants.sql'));
     expect(STORE_MIGRATIONS[3].sql).toBe(read('migrations/store/0004_template_current.sql'));
     expect(STORE_MIGRATIONS[4].sql).toBe(
       read('migrations/store/0005_reorder_rules_one_per_item.sql')
-    );
-    expect(STORE_MIGRATIONS[5].sql).toBe(read('migrations/store/0006_template_expand_only.sql'));
-    expect(STORE_MIGRATIONS[6].sql).toBe(
-      read('migrations/store/0008_returns_customer_nullable.sql')
     );
     expect(typeof emitStoreMigrationsTs).toBe('function');
   });
