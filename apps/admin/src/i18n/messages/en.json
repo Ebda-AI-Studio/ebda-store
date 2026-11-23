@@ -1753,6 +1753,55 @@
         "object": "Order {number}",
         "consequence": "The order is cancelled and its status cannot be restored.",
         "confirmLabel": "Cancel the order"
+      },
+      "partialRefund": {
+        "button": "Partial refund",
+        "title": "Refund part of order {orderNumber}",
+        "loading": "Loading the order's refund balance…",
+        "loadFailed": "Could not load the refund balance. Close this window and try again.",
+        "paid": "Paid",
+        "alreadyRefunded": "Already refunded",
+        "remaining": "Can still be refunded",
+        "blocked": {
+          "NOT_DELIVERED": "Only a delivered order can be partly refunded here. Mark it delivered first.",
+          "GUEST_ORDER": "This order was placed as a guest, so a partial refund by line is not available for it yet."
+        },
+        "nothingLeft": "This order has nothing left to refund.",
+        "methodLabel": "How is the money going back?",
+        "methods": {
+          "original_payment": "Original payment method",
+          "cash": "Cash",
+          "bank_transfer": "Bank transfer",
+          "manual": "Already refunded - record only"
+        },
+        "methodHint": {
+          "original_payment": "The refund is sent to the payment provider for this amount.",
+          "cash": "You hand the money back yourself. The store records it.",
+          "bank_transfer": "You send the money yourself. The store records it.",
+          "manual": "The money already went back some other way. The store only records it."
+        },
+        "reasonLabel": "Reason (required)",
+        "reasonPlaceholder": "Damaged in transit, wrong size, customer request…",
+        "pickLines": "Tick the lines you are refunding.",
+        "estimating": "Working out the amount…",
+        "estimate": "This refund pays back about {amount} {currency}, the items' share of any discount and tax.",
+        "toastSuccessTitle": "Refund done",
+        "toastSuccessBody": "{amount} {currency} was refunded.",
+        "refunding": "Refunding…",
+        "confirm": "Refund now",
+        "errors": {
+          "REFUND_EXCEEDS_ORDER": "This would refund more than the customer paid. Nothing was refunded.",
+          "NOTHING_REFUNDABLE": "This order has nothing left to refund.",
+          "INVALID_QUANTITY": "One of the quantities is more than what is still open on that line. Reopen this window and try again.",
+          "FULL_RETURN_RESTOCK_ALL": "Refunding every line puts every line back on the shelf. Leave one unit out, or keep restocking on.",
+          "GUEST_ORDER_RETURN_UNSUPPORTED": "This order was placed as a guest, so a refund by line is not available for it yet.",
+          "INVALID_ORDER": "This order cannot be refunded here. It must be delivered.",
+          "PROVIDER_REFUND_INDETERMINATE": "The refund reached the payment provider but could not be finished here. Do NOT refund again. Check the provider dashboard first.",
+          "PROVIDER_REFUND_FAILED": "The payment provider refused the refund. Nothing was refunded. Try again or pick another method.",
+          "IDEMPOTENCY_IN_PROGRESS": "This refund is already being processed. Check the order before trying again.",
+          "FORBIDDEN": "Your role cannot refund to the original payment. Pick cash, bank transfer or record-only.",
+          "UNKNOWN": "The refund did not go through. Nothing was refunded. Try again."
+        }
       }
     },
     "layout": {
@@ -4378,7 +4427,8 @@
   "returns": {
     "page": {
       "title": "Returns & Exchanges",
-      "subtitle": "Manage return requests and refunds"
+      "subtitle": "Manage return requests and refunds",
+      "newReturn": "New return"
     },
     "stats": {
       "total": "Total Returns",
@@ -4483,7 +4533,8 @@
         "MANUAL_PROVIDER_REFUND": "This order was paid by InstaPay, which cannot refund through the system. Send the money back from your InstaPay app, then complete the return with \"Already refunded — record only\".",
         "OVERRIDE_NOT_APPLICABLE": "A refund override only applies to a partial return of a tier-priced item. Complete the return without it.",
         "OVERRIDE_OUT_OF_RANGE": "The override must be between 0 and the standard refund for that item.",
-        "OVERRIDE_UNKNOWN_ITEM": "The override names an item that is not on this return. Reopen the dialog and try again."
+        "OVERRIDE_UNKNOWN_ITEM": "The override names an item that is not on this return. Reopen the dialog and try again.",
+        "FULL_RETURN_RESTOCK_ALL": "Every line of this order is in this return, so every line goes back on the shelf. Open a new return that leaves one unit out if some goods are not coming back to stock."
       }
     },
     "modal": {
@@ -4558,6 +4609,37 @@
           "amount": "Enter an amount between 0 and {max}.",
           "reason": "Write a reason (at least 3 characters)."
         }
+      }
+    },
+    "newReturn": {
+      "title": "New return",
+      "orderLabel": "Order number",
+      "orderPlaceholder": "For example ORD-1042",
+      "search": "Find order",
+      "noDeliveredOrder": "No delivered order matches that number.",
+      "pick": "Choose",
+      "loading": "Loading the order…",
+      "loadFailed": "Could not load the order. Close this window and try again.",
+      "blocked": {
+        "NOT_DELIVERED": "Only a delivered order can be returned. Mark it delivered first.",
+        "GUEST_ORDER": "This order was placed as a guest, so a return cannot be opened for it from here yet."
+      },
+      "forOrder": "Return for order {number}",
+      "reasonLabel": "Reason (required)",
+      "reasonPlaceholder": "Wrong size, damaged, changed their mind…",
+      "creating": "Opening the return…",
+      "create": "Open return",
+      "toastSuccessTitle": "Return opened",
+      "toastSuccessBody": "Return {number} is waiting for your approval.",
+      "errors": {
+        "INVALID_QUANTITY": "One of the quantities is more than what is still open on that line.",
+        "INVALID_ORDER": "This order cannot be returned. It must be delivered.",
+        "INVALID_ITEM": "One of the lines does not belong to this order.",
+        "GUEST_ORDER_RETURN_UNSUPPORTED": "This order was placed as a guest, so a return cannot be opened for it from here yet.",
+        "NO_ITEMS": "Tick at least one line.",
+        "bundle_returns_are_atomic": "A bundle can only be returned as a complete box.",
+        "FORBIDDEN": "Your role cannot open returns.",
+        "UNKNOWN": "The return was not opened. Try again."
       }
     }
   },
@@ -5069,7 +5151,8 @@
         "totalEarned": "Total Earned",
         "totalRedeemed": "Total Redeemed",
         "actions": "Actions"
-      }
+      },
+      "owed": "Owes {count} points (spent before a refund)"
     },
     "award": {
       "title": "Award Points",
@@ -8468,6 +8551,16 @@
         "errorInvalid": "Enter a valid phone number, with the country code if it is not an Egyptian number.",
         "errorThrottle": "Too many attempts. Wait a few minutes and try again.",
         "errorGeneric": "Could not change the number. Try again."
+      },
+      "closeAccount": {
+        "title": "Close my account",
+        "description": "Permanently erases your personal data and closes your account. Stores you own must be transferred or closed first, and an account with a live paid store cannot be closed. Legally required order and tax records are kept without your identity. This cannot be undone.",
+        "confirmLabel": "Type {word} to confirm",
+        "confirmWord": "CLOSE",
+        "button": "Close my account permanently",
+        "closing": "Closing…",
+        "done": "Your account was closed.",
+        "errorGeneric": "Could not close the account. Try again, or contact support."
       }
     }
   },
@@ -12363,5 +12456,15 @@
         "error": "I could not apply it. Nothing was changed, try again."
       }
     }
+  },
+  "refundLines": {
+    "legend": "Choose what is being refunded or returned",
+    "unitPrice": "{price} {currency} each",
+    "nothingLeft": "Nothing left to return on this line",
+    "remaining": "{remaining} of {ordered} still open",
+    "quantity": "Quantity",
+    "restock": "Put back on the shelf",
+    "notTracked": "Stock is not tracked for this product",
+    "wholeOrderRestockNote": "These lines cover the whole order, so every line is put back on the shelf. To skip restocking, leave one unit out."
   }
 }

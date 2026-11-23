@@ -462,7 +462,8 @@ function computeLineAdjustments(
 export interface ReturnCreateArgs {
   storeId: string;
   orderId: string;
-  customerId: string;
+  /** the shopper (required unless `byMerchant`, which uses the order's own customer) */
+  customerId?: string;
   type: string;
   reason: string;
   reasonDetail?: string;
@@ -474,10 +475,22 @@ export interface ReturnCreateArgs {
     quantity: number;
     reason?: string;
     condition?: string;
+    /** merchant-created returns only: `false` = the goods do NOT go back on the shelf (stored as condition `no_restock`). */
+    restock?: boolean;
   }>;
   bundleGroupIds?: string[];
+  /**
+   * STORE-QA-76: the MERCHANT opens this return from the admin (a phone request, a partial refund). The order's own customer
+   * is used (no customer match), the customer-facing return window does not bind the merchant's own decision, and the item
+   * list may carry a per-line `restock` choice. Never set from a shopper-facing route. A guest order (no customer) is refused
+   * until the nullable-customer return lands (GUEST-RET-1).
+   */
+  byMerchant?: boolean;
   now?: number;
 }
+
+/** return_items.condition marker: the merchant chose not to restock this line (damaged / not resellable). */
+const NO_RESTOCK_CONDITION = 'no_restock';
 
 function returnNumber(now: number): string {
   const b = new Uint8Array(3);
@@ -513,12 +526,24 @@ export function createReturn(db: SyncSql, a: ReturnCreateArgs): { returnId: stri
 
   return db.transactionSync(() => {
     const o = db.all(
-      `SELECT id, order_number, updated_at, delivered_at FROM orders
-        WHERE id = ?1 AND store_id = ?2 AND customer_id = ?3 AND status = 'delivered' AND deleted_at IS NULL`,
-      [sid(a.orderId, 'orderId'), storeId, sid(a.customerId, 'customerId')]
+      a.byMerchant
+        ? `SELECT id, order_number, updated_at, delivered_at, customer_id FROM orders
+            WHERE id = ?1 AND store_id = ?2 AND status = 'delivered' AND deleted_at IS NULL`
+        : `SELECT id, order_number, updated_at, delivered_at, customer_id FROM orders
+            WHERE id = ?1 AND store_id = ?2 AND customer_id = ?3 AND status = 'delivered' AND deleted_at IS NULL`,
+      a.byMerchant
+        ? [sid(a.orderId, 'orderId'), storeId]
+        : [sid(a.orderId, 'orderId'), storeId, sid(a.customerId, 'customerId')]
     )[0];
     if (!o)
       throw new MoneyError('INVALID_ORDER', 'Order not found or not eligible for return', 400);
+    if (a.byMerchant && typeof o.customer_id !== 'string')
+      throw new MoneyError(
+        'GUEST_ORDER_RETURN_UNSUPPORTED',
+        'This order was placed as a guest; a return cannot be opened for it yet.',
+        409
+      );
+    const returnCustomerId = a.byMerchant ? (o.customer_id as string) : (a.customerId as string);
     const lines = orderLines(db, o.id as string);
 
     // the merchant's published return window binds the seller (evaluateReturnWindow)
@@ -527,7 +552,7 @@ export function createReturn(db: SyncSql, a: ReturnCreateArgs): { returnId: stri
         | { return_window_days: number | null }
         | undefined
     )?.return_window_days;
-    if (days !== null && days !== undefined) {
+    if (!a.byMerchant && days !== null && days !== undefined) {
       const closesAt = days > 0 ? num(o.delivered_at ?? o.updated_at) + days * DAY_MS : null;
       if (days <= 0 || now > (closesAt as number))
         throw new MoneyError(
@@ -654,7 +679,7 @@ export function createReturn(db: SyncSql, a: ReturnCreateArgs): { returnId: stri
         returnId,
         storeId,
         o.id,
-        a.customerId,
+        returnCustomerId,
         returnNumber(now),
         a.type,
         reason,
@@ -676,7 +701,11 @@ export function createReturn(db: SyncSql, a: ReturnCreateArgs): { returnId: stri
           sid(item.productName, 'productName'),
           item.quantity,
           optStr(item.reason, 2000),
-          optStr(item.condition, 200),
+          a.byMerchant && item.restock === false
+            ? NO_RESTOCK_CONDITION
+            : item.condition === NO_RESTOCK_CONDITION
+              ? null // the marker is the merchant's alone: a shopper-supplied value never skips a restock
+              : optStr(item.condition, 200),
         ]
       );
     return { returnId };
@@ -875,6 +904,8 @@ export interface ReturnPlan {
   walletShare: number;
   skipProvider: boolean;
   items: Array<{ orderItemId: string; quantity: number }>;
+  /** order items whose goods the merchant chose NOT to put back on the shelf (STORE-QA-76): no stock move, no inventory GL reversal */
+  noRestockItemIds: string[];
   /** open (unreleased) refund claims for `return:<id>`: a gateway refund of this return may already have gone out */
   outstandingClaims: string[];
 }
@@ -977,6 +1008,7 @@ function planReturn(
     orderItemId: r.order_item_id as string,
     quantity: num(r.quantity),
     productName: r.product_name as string,
+    noRestock: r.condition === NO_RESTOCK_CONDITION,
   }));
   const isInventoryRestoring = type === 'return' || type === 'refund';
   const isGatewayRefund = GATEWAY_REFUND_METHODS.includes(refundMethod);
@@ -996,6 +1028,15 @@ function planReturn(
     price: l.price,
     priceSource: l.priceSource,
   }));
+
+  // a whole-order return runs the whole-order reversal (every unit back, the full inventory GL reversal): it cannot honour a
+  // per-line "do not restock", so the merchant is told before any money moves (STORE-QA-76)
+  if (isFullReturn && items.some(i => i.noRestock))
+    throw new MoneyError(
+      'FULL_RETURN_RESTOCK_ALL',
+      'A return of every line restocks every line. Leave one unit out of the return, or restock all lines.',
+      409
+    );
 
   // An EXCHANGE must never move money (see ReturnService.complete).
   if (isGatewayRefund && type === 'exchange')
@@ -1061,6 +1102,7 @@ function planReturn(
     walletShare,
     skipProvider,
     items: items.map(i => ({ orderItemId: i.orderItemId, quantity: i.quantity })),
+    noRestockItemIds: items.filter(i => i.noRestock).map(i => i.orderItemId),
     outstandingClaims: orderId ? outstandingClaims(db, storeId, orderId, `return:${returnId}`) : [],
   };
 }
@@ -1252,6 +1294,7 @@ export function finishReturn(
           lines: plan.items,
           refundKey: a.returnId,
           external: true,
+          skipRestock: new Set(plan.noRestockItemIds),
           now,
         });
         // arm THIS return for the stuck-reversal sweep (OrderService.applyRefundEffects' partial arm)
@@ -1555,9 +1598,18 @@ export function postPartialReturnJournal(
 
     // COGS adjustment: only when the sale booked COGS and that entry still stands
     if (cogsOriginal && cogsOriginal.status !== 'reversed') {
+      // a line the merchant did not restock never came back into inventory: its COGS stays expensed (written off)
+      const notRestocked = new Set(
+        db
+          .all(`SELECT order_item_id FROM return_items WHERE return_id = ?1 AND condition = ?2`, [
+            refundKey,
+            NO_RESTOCK_CONDITION,
+          ])
+          .map(r => r.order_item_id as string)
+      );
       const eligible = returnedLines.filter(({ line }) => {
         const full = lines.find(l => l.id === line.id);
-        return !!full?.costPrice && full.costPrice > 0;
+        return !!full?.costPrice && full.costPrice > 0 && !notRestocked.has(line.id);
       });
       const cogsLines: JournalLine[] = [];
       let totalCogs = 0;
@@ -1667,4 +1719,156 @@ export function postAmountOnlyRefundJournal(
     });
     return { posted: 1 };
   });
+}
+
+// ---------------------------------------------------------------- admin refund quote (STORE-QA-76)
+
+export interface OrderRefundQuote {
+  orderId: string;
+  orderNumber: string;
+  status: string;
+  paymentStatus: string;
+  currency: string;
+  customerId: string | null;
+  total: number;
+  paid: number;
+  refunded: number;
+  /** the ONE refundable balance across every channel (#624), never below 0 */
+  refundable: number;
+  /** the provider of the newest captured payment (null: COD / unpaid), so the admin offers only the methods that can work */
+  paymentProvider: string | null;
+  /** can a return be opened for this order right now (delivered, has a customer)? `reason` says why not */
+  returnable: { ok: true } | { ok: false; reason: 'NOT_DELIVERED' | 'GUEST_ORDER' };
+  lines: Array<{
+    orderItemId: string;
+    productId: string;
+    name: string;
+    unitPrice: number;
+    quantity: number;
+    /** units still open to a return: ordered - claimed by a live return - backorder cancels */
+    remaining: number;
+    trackInventory: boolean;
+    bundleGroupId: string | null;
+  }>;
+  /** only when `items` was asked: what completing those lines would pay back (piastres), capped at `refundable` */
+  estimate: number | null;
+  /** only when `items` was asked: they cover every line, so the whole-order path (and its restock-everything rule) applies */
+  coversWholeOrder: boolean;
+}
+
+/**
+ * Read-only: what the admin refund / new-return dialogs show before anything moves. The figures come from the same helpers
+ * the writers use (`refundableBalance`, the claimed-quantity rule of `createReturn`, `allocatePartialReturn`), so the number
+ * shown is the number the server enforces.
+ */
+export function quoteOrderRefund(
+  db: SyncSql,
+  a: { storeId: string; orderId: string; items?: Array<{ orderItemId: string; quantity: number }> }
+): OrderRefundQuote {
+  const storeId = sid(a.storeId, 'storeId');
+  const orderId = sid(a.orderId, 'orderId');
+  const order = orderMoney(db, storeId, orderId);
+  if (!order) throw new MoneyError('ORDER_NOT_FOUND', 'order not found', 404);
+  const head = db.all(
+    'SELECT payment_status, currency FROM orders WHERE id = ?1 AND store_id = ?2',
+    [orderId, storeId]
+  )[0];
+  const paymentStatus = String(head?.payment_status ?? '');
+  const bal = refundableBalance(db, storeId, orderId);
+  const lines = orderLines(db, orderId);
+  const claimed = backorderCancelled(db, storeId, orderId).qty;
+  for (const r of db.all(
+    `SELECT ri.order_item_id, ri.quantity FROM return_items ri JOIN returns r ON r.id = ri.return_id
+      WHERE r.store_id = ?1 AND r.order_id = ?2 AND r.status NOT IN ('rejected', 'cancelled')`,
+    [storeId, orderId]
+  ))
+    claimed.set(
+      r.order_item_id as string,
+      (claimed.get(r.order_item_id as string) ?? 0) + num(r.quantity)
+    );
+  const tracked = new Set(
+    db
+      .all('SELECT id FROM products WHERE store_id = ?1 AND track_inventory = 1', [storeId])
+      .map(r => r.id as string)
+  );
+  const provider =
+    (db.all(
+      `SELECT provider FROM payments WHERE order_id = ?1 AND status IN ('completed', 'partially_refunded', 'refunded')
+        ORDER BY created_at DESC, rowid DESC LIMIT 1`,
+      [orderId]
+    )[0]?.provider as string | undefined) ?? null;
+
+  let estimate: number | null = null;
+  let coversWholeOrder = false;
+  if (a.items !== undefined) {
+    const want = new Map<string, number>();
+    for (const i of a.items) {
+      if (!Number.isInteger(i.quantity) || i.quantity < 1)
+        throw new MoneyError('INVALID_QUANTITY', 'Quantity must be at least 1', 400);
+      want.set(i.orderItemId, (want.get(i.orderItemId) ?? 0) + i.quantity);
+    }
+    for (const [lineId, q] of want) {
+      const line = lines.find(l => l.id === lineId);
+      if (!line) throw new MoneyError('INVALID_ITEM', `Order item ${lineId} not found`, 400);
+      if (q + (claimed.get(lineId) ?? 0) > line.quantity)
+        throw new MoneyError(
+          'INVALID_QUANTITY',
+          'Quantity exceeds remaining returnable quantity for this item',
+          400
+        );
+    }
+    coversWholeOrder = lines.length > 0 && lines.every(l => (want.get(l.id) ?? 0) >= l.quantity);
+    if (coversWholeOrder) estimate = Math.max(0, bal.refundable);
+    else {
+      const { prevQty, prevAdjustment } = priorReversed(db, storeId, orderId);
+      const alloc = allocatePartialReturn({
+        subtotal: order.subtotal,
+        discount: order.discount,
+        tax: order.tax,
+        taxIncludedInPrice: order.taxIncludedInPrice,
+        lines: lines.map(l => ({
+          id: l.id,
+          quantity: l.quantity,
+          price: l.price,
+          priceSource: l.priceSource,
+        })),
+        prevQty,
+        requested: [...want].map(([orderItemId, quantity]) => ({ orderItemId, quantity })),
+        prevAdjustment,
+        thisAdjustment: 0,
+      });
+      estimate = Math.min(alloc.cashCredit, Math.max(0, bal.refundable));
+    }
+  }
+  return {
+    orderId,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    paymentStatus,
+    currency: String(head?.currency ?? 'EGP'),
+    customerId: order.customerId,
+    total: order.total,
+    paid: bal.paid,
+    refunded: bal.refunded,
+    refundable: Math.max(0, bal.refundable),
+    paymentProvider: provider,
+    returnable:
+      order.status !== 'delivered'
+        ? { ok: false, reason: 'NOT_DELIVERED' }
+        : order.customerId === null
+          ? { ok: false, reason: 'GUEST_ORDER' }
+          : { ok: true },
+    lines: lines.map(l => ({
+      orderItemId: l.id,
+      productId: l.productId,
+      name: l.productName,
+      unitPrice: l.price,
+      quantity: l.quantity,
+      remaining: Math.max(0, l.quantity - (claimed.get(l.id) ?? 0)),
+      trackInventory: tracked.has(l.productId),
+      bundleGroupId: l.bundleGroupId,
+    })),
+    estimate,
+    coversWholeOrder,
+  };
 }
