@@ -220,6 +220,21 @@ export interface BridgePort {
     shipment: { status: string; trackingUrl: string | null } | null;
   } | null>;
   customerOrders(storeId: string, buyerKey: string, limit: number): Promise<OrderSummary[]>;
+  /** Retailer ids of the lines of this buyer's order (matched on number AND buyer key), or null = no such order. */
+  orderSeedIds(storeId: string, orderNumber: string, buyerKey: string): Promise<string[] | null>;
+  /**
+   * Recommendations for the seeds, read from THIS store only: active, public (audience), in stock, one row per product, priced
+   * by the store right now. Honours the merchant's automatic-recommendations switch (curated picks only when off).
+   */
+  recommend(
+    storeId: string,
+    a: {
+      seedIds: string[];
+      mode: 'similar' | 'complement';
+      limit: number;
+      maxPriceMinor?: number;
+    }
+  ): Promise<CatalogRow[]>;
 }
 
 export interface BridgeDeps {
@@ -519,6 +534,25 @@ export function createBridge(deps: BridgeDeps) {
           return o ? ok(o) : fail('not_found', 'order');
         }
       ),
+
+    getRecommendations: (storeId: string, req: unknown) =>
+      run('getRecommendations', storeId, args.getRecommendations, req, async (s, a) => {
+        let seeds = a.seedIds;
+        if (a.orderNumber !== undefined) {
+          // The order's lines are the seeds, but only for the buyer who owns it (number AND key; a bad pair answers like no order).
+          if (!(await keyBound(a.buyerKey!, a.phoneE164))) return fail('invalid', 'buyer');
+          const fromOrder = await port.orderSeedIds(s, a.orderNumber, a.buyerKey!);
+          if (!fromOrder) return fail('not_found', 'order');
+          seeds = [...new Set([...fromOrder, ...seeds])].slice(0, 5);
+        }
+        const items = await port.recommend(s, {
+          seedIds: seeds,
+          mode: a.mode,
+          limit: a.limit,
+          ...(a.maxPriceMinor !== undefined ? { maxPriceMinor: a.maxPriceMinor } : {}),
+        });
+        return ok({ items });
+      }),
 
     listCustomerOrders: (storeId: string, buyerKey: string, limit: number, phoneE164?: string) =>
       run(

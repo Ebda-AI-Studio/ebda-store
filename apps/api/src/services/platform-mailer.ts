@@ -27,6 +27,10 @@ import {
   type FactorAddedNoticeData,
 } from './email-templates/factor-added-notice';
 import {
+  chatMemberAddedTemplate,
+  type ChatMemberAddedData,
+} from './email-templates/chat-member-added';
+import {
   factorEnrolCodeTemplate,
   type FactorEnrolCodeData,
 } from './email-templates/factor-enrol-code';
@@ -306,6 +310,32 @@ export async function sendFactorAddedNoticeEmail(
     subject: factorAddedNoticeTemplate.subject[lang](data),
     html,
     ...(studio ? { fromName: BRAND.name } : {}),
+    replyTo: BRAND.supportEmail,
+  });
+}
+
+/** An existing identity was added to a standalone Ebda Chat workspace. Master-brand sender (the identity service). */
+export async function sendChatMemberAddedEmail(
+  data: ChatMemberAddedData,
+  language?: Lang
+): Promise<void> {
+  const lang: Lang = language ?? resolveDefaultLanguage(undefined);
+  const html = renderBrandedShell(chatMemberAddedTemplate[lang](data), {
+    name: BRAND.name,
+    nameAr: BRAND.nameAr,
+    logo: BRAND_EMAIL_LOGO_URL,
+    theme: null,
+    email: null,
+    phone: null,
+    address: null,
+    defaultLanguage: lang,
+    hidePoweredBy: true,
+  });
+  await deliver({
+    to: data.email,
+    subject: chatMemberAddedTemplate.subject[lang](data),
+    html,
+    fromName: BRAND.name,
     replyTo: BRAND.supportEmail,
   });
 }
