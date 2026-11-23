@@ -66,7 +66,7 @@ interface ProductForJsonLd {
  * schema.org `3DModel` nodes for a product's models: the GLB always, the USDZ only when the
  * merchant uploaded one. Empty when there is no model URL (never a node without `contentUrl`).
  */
-export function model3dJsonLd(
+function model3dJsonLd(
   model: ProductForJsonLd['model3d'],
   name: string
 ): Array<Record<string, string>> {
