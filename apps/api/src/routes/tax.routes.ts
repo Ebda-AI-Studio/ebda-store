@@ -18,7 +18,7 @@ import {
   withdrawTaxChange,
 } from '../services/tax-change.service';
 import { tenantContext } from '../middleware/tenant-context';
-import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
+import { uploadLimiter, dailyUploadLimiter, adminReadLimiter } from '../middleware/security';
 import { AppError } from '../middleware/error-handler';
 import { parseInput } from '../lib/parse-input';
 
@@ -386,6 +386,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  adminReadLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       res.json({ success: true, data: await getTaxChangeForMerchant(req.params.storeId) });

@@ -1707,6 +1707,27 @@ export const adminSearchLimiter = withoutLimitPlan(
   'keyed on req.user (set by authenticate, after the request-level prefetch)'
 );
 
+// Owner/admin GETs that read one small record (the CodeQL js/missing-rate-limiting class: GETs skip the global limiter).
+// Per USER (a store's staff share one office IP), generous for normal page loads and polling, a hard stop for a script.
+export const ADMIN_READ_LIMIT_PER_MINUTE = 120;
+export const adminReadLimiter = withoutLimitPlan(
+  rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, 'admin-read'),
+    windowMs: 60 * 1000,
+    max: ADMIN_READ_LIMIT_PER_MINUTE,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skip: skipForLoadTest,
+    keyGenerator: req => `admin-read-${req.user?.userId ?? ipKeyGenerator(req.ip ?? '')}`,
+  }),
+  'keyed on req.user (set by authenticate, after the request-level prefetch)'
+);
+
 // Stricter limiter for payment operations
 export const paymentLimiter = plannedRateLimit('payment', {
   windowMs: 60 * 1000, // 1 minute
