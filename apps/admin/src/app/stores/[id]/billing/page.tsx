@@ -22,6 +22,7 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge, Select, useToast } from '@ebda/ui';
+import { billingDisplayStatus, showPeriodEnd, trialDaysLeft } from '@/lib/billing-state';
 import { Button } from '@/components/ui/Button';
 import { formatMoney, type PlanLimits, withNumerals } from '@ebda/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -40,7 +41,7 @@ import {
 } from '../../../../components/billing/format';
 import { EbdaBillingReceipt } from '../../../../components/billing/EbdaBillingReceipt';
 import { pickReceiptCharge } from '../../../../components/billing/receipt-charge';
-import { billingNotice, noticeText } from '../../../../components/billing/notice';
+import { billingNotice, isRenewalOnly, noticeText } from '../../../../components/billing/notice';
 import { startCardSetup, useCardReturn } from '../../../../components/billing/useCardReturn';
 import type {
   BillingInfo,
@@ -496,6 +497,9 @@ export default function StoreBillingPage() {
   const planPrice = (p: PlanSummary) =>
     interval === 'yearly' ? p.priceYearlyMinor : p.priceMonthlyMinor;
 
+  // Clock read after mount (render stays deterministic); 0 = not yet known -> no renewal wording.
+  const [nowMs, setNowMs] = useState(0);
+  useEffect(() => setNowMs(Date.now()), []);
   const info = data?.billing;
   const notice = billingNotice(info);
   const noticeCopy = info && notice ? noticeText(notice, info, tNotice, locale) : null;
@@ -506,7 +510,17 @@ export default function StoreBillingPage() {
   const instapayChosen = info?.billingMethod === 'instapay';
   // InstaPay-only deployment (BILLING_PROVIDER=none) or a store that pays by transfer: a payment is DUE, nothing is
   // charged automatically (Ruling BILLING-NONE-COPY-1).
-  const instapayDue = info?.cardBilling === false || instapayChosen;
+  // Renewal wording only while the next charge is still ahead: a charge already at/behind today with nothing paid is a
+  // payment awaited (#1042/#896: awaiting badge, no "renews on" date), whatever the 7-day notice window says.
+  const nextChargeAhead = !!info?.nextCharge && Date.parse(info.nextCharge.at) > nowMs;
+  const renewalOnly =
+    isRenewalOnly(data?.subscription.status, info, !!quote) &&
+    (nextChargeAhead || !info?.nextCharge);
+  const instapayDue = !renewalOnly && (info?.cardBilling === false || instapayChosen);
+  // QA-88: a payment is due and nothing is paid yet -> say so instead of "active".
+  const displayStatus = data
+    ? billingDisplayStatus(data.subscription.status, !!info?.nextCharge && instapayDue)
+    : 'none';
   // What the merchant is shown to transfer: the plan just picked, else the stored quote.
   const payDetails = instapay && quote ? { ...instapay, ...quote } : instapay;
   const showCardControls =
@@ -712,14 +726,16 @@ export default function StoreBillingPage() {
               </div>
               <Badge
                 variant={
-                  data.subscription.status === 'past_due'
+                  displayStatus === 'past_due'
                     ? 'destructive'
-                    : data.subscription.status === 'comped'
+                    : displayStatus === 'comped' || displayStatus === 'trialing'
                       ? 'info'
-                      : 'success'
+                      : displayStatus === 'awaiting_payment'
+                        ? 'warning'
+                        : 'success'
                 }
               >
-                {t(`status.${data.subscription.status}`)}
+                {t(`status.${displayStatus}`)}
               </Badge>
             </div>
             <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
@@ -729,14 +745,15 @@ export default function StoreBillingPage() {
                   <dd>{fmtDate(data.subscription.trialEndsAt)}</dd>
                 </div>
               )}
-              {data.subscription.currentPeriodEnd && (
-                <div className="flex justify-between gap-2">
-                  <dt className="text-muted-foreground">
-                    {data.subscription.cancelAtPeriodEnd ? t('endsOn') : t('renewsOn')}
-                  </dt>
-                  <dd>{fmtDate(data.subscription.currentPeriodEnd)}</dd>
-                </div>
-              )}
+              {data.subscription.currentPeriodEnd &&
+                showPeriodEnd(displayStatus, data.subscription.cancelAtPeriodEnd) && (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-muted-foreground">
+                      {data.subscription.cancelAtPeriodEnd ? t('endsOn') : t('renewsOn')}
+                    </dt>
+                    <dd>{fmtDate(data.subscription.currentPeriodEnd)}</dd>
+                  </div>
+                )}
               {data.billing?.pendingPlanCode && (
                 <div className="flex justify-between gap-2 sm:col-span-2">
                   <dt className="text-muted-foreground">
@@ -776,19 +793,23 @@ export default function StoreBillingPage() {
                 <h2 className="text-base font-semibold">{t('trial.title')}</h2>
                 <Badge
                   variant={
-                    data.subscription.status === 'past_due'
+                    displayStatus === 'past_due'
                       ? 'destructive'
-                      : data.subscription.status === 'trialing' ||
-                          data.subscription.status === 'comped'
+                      : displayStatus === 'trialing' || displayStatus === 'comped'
                         ? 'info'
-                        : data.subscription.status === 'active'
-                          ? 'success'
-                          : 'secondary'
+                        : displayStatus === 'awaiting_payment'
+                          ? 'warning'
+                          : displayStatus === 'active'
+                            ? 'success'
+                            : 'secondary'
                   }
                 >
-                  {t(`status.${data.subscription.status}`)}
+                  {t(`status.${displayStatus}`)}
                 </Badge>
               </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {t(`stateLine.${displayStatus}`)}
+              </p>
               <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
                 {(info.trialEndsAt ?? data.subscription.trialEndsAt) && (
                   <div className="flex justify-between gap-2">
@@ -796,6 +817,18 @@ export default function StoreBillingPage() {
                     <dd>{fmtDate(info.trialEndsAt ?? data.subscription.trialEndsAt)}</dd>
                   </div>
                 )}
+                {displayStatus === 'trialing' &&
+                  trialDaysLeft(info.trialEndsAt ?? data.subscription.trialEndsAt) !== null && (
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">{t('trialDaysLeftLabel')}</dt>
+                      <dd>
+                        {t('trialDaysLeft', {
+                          count:
+                            trialDaysLeft(info.trialEndsAt ?? data.subscription.trialEndsAt) ?? 0,
+                        })}
+                      </dd>
+                    </div>
+                  )}
                 {info.pendingPlanCode && (
                   <div className="flex justify-between gap-2">
                     <dt className="text-muted-foreground">{t('trial.chosenPlan')}</dt>
@@ -808,24 +841,41 @@ export default function StoreBillingPage() {
                 {info.nextCharge && (
                   <div className="flex justify-between gap-2 sm:col-span-2">
                     <dt className="text-muted-foreground">
-                      {t(instapayDue ? 'trial.instapayDue' : 'trial.nextCharge')}
+                      {t(
+                        instapayDue
+                          ? 'trial.instapayDue'
+                          : renewalOnly
+                            ? 'trial.nextRenewal'
+                            : 'trial.nextCharge'
+                      )}
                     </dt>
                     <dd className="text-end tabular-nums">
                       {info.nextCharge.amountMinor !== null
-                        ? t(instapayDue ? 'trial.instapayDueLine' : 'trial.nextChargeLine', {
-                            amount: formatMoney(info.nextCharge.amountMinor, locale, {
-                              fixedDecimals: true,
-                            }),
-                            interval: t(
-                              info.billingInterval === 'yearly'
-                                ? 'intervalYearly'
-                                : 'intervalMonthly'
-                            ),
-                            plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
-                            date: fmtBillingDate(info.nextCharge.at, locale),
-                          })
+                        ? t(
+                            instapayDue
+                              ? 'trial.instapayDueLine'
+                              : renewalOnly
+                                ? 'trial.renewalLine'
+                                : 'trial.nextChargeLine',
+                            {
+                              amount: formatMoney(info.nextCharge.amountMinor, locale, {
+                                fixedDecimals: true,
+                              }),
+                              interval: t(
+                                info.billingInterval === 'yearly'
+                                  ? 'intervalYearly'
+                                  : 'intervalMonthly'
+                              ),
+                              plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
+                              date: fmtBillingDate(info.nextCharge.at, locale),
+                            }
+                          )
                         : t(
-                            instapayDue ? 'trial.instapayDueNoAmount' : 'trial.nextChargeNoAmount',
+                            instapayDue
+                              ? 'trial.instapayDueNoAmount'
+                              : renewalOnly
+                                ? 'trial.renewalNoAmount'
+                                : 'trial.nextChargeNoAmount',
                             {
                               plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
                               date: fmtBillingDate(info.nextCharge.at, locale),
@@ -833,6 +883,18 @@ export default function StoreBillingPage() {
                           )}
                     </dd>
                   </div>
+                )}
+                {info.nextCharge && info.pendingBillingInterval && (
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
+                    {t('trial.switchingInterval', {
+                      interval: t(
+                        info.pendingBillingInterval === 'yearly'
+                          ? 'intervalYearly'
+                          : 'intervalMonthly'
+                      ),
+                      date: fmtBillingDate(info.nextCharge.at, locale),
+                    })}
+                  </p>
                 )}
                 {info.nextCharge && instapayDue && (
                   <p className="text-xs text-muted-foreground sm:col-span-2">
@@ -899,6 +961,13 @@ export default function StoreBillingPage() {
                     >
                       {t('pay.useInstapay')}
                     </Button>
+                  ) : renewalOnly ? (
+                    <p
+                      className="text-sm text-muted-foreground"
+                      data-testid="instapay-renewal-note"
+                    >
+                      {t('pay.instapayRenewalNote')}
+                    </p>
                   ) : (
                     <div id="instapay-pay" className="space-y-4">
                       {quote && (
@@ -992,16 +1061,32 @@ export default function StoreBillingPage() {
                   />
                 );
               })}
-              <div className="flex items-baseline justify-between gap-2 text-sm">
-                <span className="font-medium">{tLimits('maxStorageMb')}</span>
-                <span className="text-muted-foreground">
-                  {data.limits.maxStorageMb === null
-                    ? t('unlimited')
-                    : t('storageNotTracked', {
-                        limit: data.limits.maxStorageMb.toLocaleString('en'),
-                      })}
-                </span>
-              </div>
+              {data.usage.maxStorageMb === null ? (
+                // QA-STOR-1: the storage counter could not be read right now: say so, never show 0
+                <div
+                  className="flex items-baseline justify-between gap-2 text-sm"
+                  data-testid="storage-usage-unknown"
+                >
+                  <span className="font-medium">{tLimits('maxStorageMb')}</span>
+                  <span className="text-muted-foreground">
+                    {t('storageUnknown')} ·{' '}
+                    {data.limits.maxStorageMb === null
+                      ? t('unlimited')
+                      : data.limits.maxStorageMb.toLocaleString('en')}
+                  </span>
+                </div>
+              ) : (
+                <UsageBar
+                  label={tLimits('maxStorageMb')}
+                  used={data.usage.maxStorageMb}
+                  limit={data.limits.maxStorageMb}
+                  unlimitedLabel={t('unlimited')}
+                  usedOfLabel={t('usedOf', {
+                    used: data.usage.maxStorageMb.toLocaleString('en'),
+                    limit: (data.limits.maxStorageMb ?? 0).toLocaleString('en'),
+                  })}
+                />
+              )}
             </div>
           </section>
 
