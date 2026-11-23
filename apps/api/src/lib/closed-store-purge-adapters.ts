@@ -8,12 +8,17 @@ import { d1All, d1Run } from '../services/platform/billing-d1';
 import { StorageService } from '../services/storage.service';
 import { sendClosedStorePurgeNoticeEmail } from '../services/platform-mailer';
 import { sendAlert } from '../services/alerts.service';
-import { STORE_SCOPED_TABLES } from '../cf/erasure/platform-subject';
+import { PLATFORM_RECORDS_LAST_AT_SQL, tombstoneStatements } from './store-tombstone';
 import { storeDo } from './store-backend';
-import { retireStoreDirectoryRow } from './store-directory-sync';
 import { getAccountsBrief } from './identity-client';
 import logger from './logger';
-import type { ArchiveManifest, ClosedStore, PurgeLedger, PurgePorts } from './closed-store-purge';
+import {
+  ledgerForClosure,
+  type ArchiveManifest,
+  type ClosedStore,
+  type PurgeLedger,
+  type PurgePorts,
+} from './closed-store-purge';
 
 type Answer<T> = { ok: true; data: T } | { ok: false; code: string; status: number };
 interface PurgeStub {
@@ -35,8 +40,11 @@ const must = <T>(a: Answer<T>, what: string): T => {
   return a.data;
 };
 
-const archiveKey = (storeId: string) => `closed-store-archive/${storeId}/fiscal.ndjson`;
-const ledgerKey = (storeId: string) => `closed-store-purge/${storeId}/ledger.json`;
+// One archive and one ledger PER CLOSURE (closedAt in the name): a store id that is re-created and closed again never reuses, or
+// is judged by, an earlier closure's archive or ledger.
+const archiveKey = (s: ClosedStore) =>
+  `closed-store-archive/${s.storeId}/fiscal-${s.closedAt}.ndjson`;
+const ledgerKey = (s: ClosedStore) => `closed-store-purge/${s.storeId}/ledger-${s.closedAt}.json`;
 const PAGE = 200;
 
 /** NDJSON of every fiscal record, in serial order, plus row count and sha256 of exactly those bytes. */
@@ -66,7 +74,7 @@ export function closedStorePurgePorts(): PurgePorts {
   return {
     async listClosed(): Promise<ClosedStore[]> {
       const rows = await d1All<{ id: string; deleted_at: number }>(
-        `SELECT "id", "deleted_at" FROM "stores" WHERE "deleted_at" IS NOT NULL AND "storage_backend" = 'do' ORDER BY "deleted_at" LIMIT 500`
+        `SELECT "id", "deleted_at" FROM "stores" WHERE "deleted_at" IS NOT NULL AND "storage_backend" = 'do' AND "slug" NOT LIKE 'purged-%' ORDER BY "deleted_at" LIMIT 500`
       );
       return rows.map(r => ({ storeId: r.id, closedAt: Number(r.deleted_at) }));
     },
@@ -74,16 +82,22 @@ export function closedStorePurgePorts(): PurgePorts {
       const d = must(await stub(storeId).closedFiscalPage(storeId, 0, 1), 'fiscal summary');
       return { count: d.count, lastIssuedAt: d.lastIssuedAt };
     },
+    async platformRecordsLastAt(storeId) {
+      const r = (await d1All<{ last: number | null }>(PLATFORM_RECORDS_LAST_AT_SQL, storeId))[0];
+      return r?.last == null ? null : Number(r.last);
+    },
     ledger: {
-      async get(storeId): Promise<PurgeLedger> {
-        const b = await readObject(ledgerKey(storeId));
-        return b ? (JSON.parse(b.toString('utf8')) as PurgeLedger) : {};
+      async get(s): Promise<PurgeLedger> {
+        const b = await readObject(ledgerKey(s));
+        if (!b) return {};
+        // a ledger of another closure is ignored (the key already carries closedAt; this is the second lock)
+        return ledgerForClosure(JSON.parse(b.toString('utf8')) as PurgeLedger, s);
       },
-      async put(storeId, patch) {
-        const current = await this.get(storeId);
+      async put(s, patch) {
+        const current = await this.get(s);
         await StorageService.putPrivateAt(
-          ledgerKey(storeId),
-          Buffer.from(JSON.stringify({ ...current, ...patch })),
+          ledgerKey(s),
+          Buffer.from(JSON.stringify({ ...current, ...patch, closedAt: s.closedAt })),
           'application/json'
         );
       },
@@ -111,8 +125,9 @@ export function closedStorePurgePorts(): PurgePorts {
         throw err; // not recorded as sent: the next run tries again
       }
     },
-    async exportFiscal(storeId): Promise<ArchiveManifest> {
-      const key = archiveKey(storeId);
+    async exportFiscal(s): Promise<ArchiveManifest> {
+      const storeId = s.storeId;
+      const key = archiveKey(s);
       const existing = await readObject(key);
       if (existing) return { key, ...summarise(existing) }; // write-once: a verified archive is never replaced
       const lines: string[] = [];
@@ -138,9 +153,8 @@ export function closedStorePurgePorts(): PurgePorts {
       must(await stub(storeId).purgeClosedStore(storeId, expect), 'store wipe');
     },
     async deleteDirectory(storeId) {
-      for (const t of STORE_SCOPED_TABLES)
-        await d1Run(`DELETE FROM "${t}" WHERE "store_id" = ?1`, storeId);
-      await retireStoreDirectoryRow(storeId, { soft: false });
+      // TOMBSTONE, never DELETE: billing_events, instapay_receipts, manual_payment_claims ... reference stores(id) ON DELETE CASCADE
+      for (const st of tombstoneStatements(storeId)) await d1Run(st.sql, ...st.params);
     },
     alert: (title, body) => sendAlert({ level: 'p1', source: 'closed-store-purge', title, body }),
     log: (msg, fields) => logger.info(fields ?? {}, msg),

@@ -122,4 +122,32 @@ describe('NZ-D15B: closed-store fiscal export + wipe', () => {
     );
     expect(tables).toEqual([]);
   });
+
+  it('resume after a crash mid-wipe: an already-empty DO counts as wiped, an OPEN store never does', async () => {
+    const wiped = await store('cp-resume');
+    await settle(wiped.stub, wiped.orders);
+    await wiped.stub.closeIfNoMoneyInFlight('cp-resume');
+    await wiped.stub.purgeClosedStore('cp-resume', { fiscalDocuments: 3 });
+    // the second call is the re-run after the crash: no store profile, no fiscal row left
+    expect(
+      await wiped.stub.purgeClosedStore('cp-resume', { fiscalDocuments: 3, resume: true })
+    ).toEqual({
+      ok: true,
+      data: { wiped: true, alreadyEmpty: true },
+    });
+    // without `resume` the same empty store is refused (only a caller that wrote wipeStartedAt may say it)
+    expect(await wiped.stub.purgeClosedStore('cp-resume', { fiscalDocuments: 3 })).toMatchObject({
+      ok: false,
+      code: 'STORE_NOT_CLOSED',
+    });
+    // an OPEN store with `resume` is refused: it has a profile and fiscal rows
+    const open = await store('cp-resume-open');
+    expect(
+      await open.stub.purgeClosedStore('cp-resume-open', { fiscalDocuments: 3, resume: true })
+    ).toMatchObject({
+      ok: false,
+      code: 'STORE_NOT_CLOSED',
+    });
+    expect((await fiscal(open.stub)).length).toBe(3);
+  });
 });

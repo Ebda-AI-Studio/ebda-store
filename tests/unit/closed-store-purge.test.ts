@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PURGE_DRY_RUN_UNTIL,
   PURGE_NOTICE_DAYS,
+  ledgerForClosure,
   purgeDueAt,
   purgeIsLive,
   purgeOneClosedStore,
@@ -27,6 +28,7 @@ const yearsBefore = (n: number, from = NOW) => {
 function harness(o: {
   store?: Partial<ClosedStore>;
   fiscal?: { count: number; lastIssuedAt: number | null };
+  platformLast?: number | null;
   ledger?: PurgeLedger;
   readBack?: (m: ArchiveManifest) => { rows: number; sha256: string } | null;
   exportRows?: number;
@@ -46,9 +48,13 @@ function harness(o: {
   const ports: PurgePorts = {
     listClosed: async () => [store],
     fiscalSummary: async () => fiscal,
+    platformRecordsLastAt: async () => o.platformLast ?? null,
     ledger: {
       get: async () => ledger,
-      put: async (_id, patch) => void Object.assign(ledger, patch),
+      put: async (_s, patch) => {
+        calls.push(`ledger:${Object.keys(patch).join('+')}`);
+        Object.assign(ledger, patch);
+      },
     },
     notifyOwner: async () => (calls.push('notify'), o.contact ?? 'sent'),
     exportFiscal: async () => (calls.push('export'), manifest),
@@ -57,7 +63,7 @@ function harness(o: {
       o.readBack ? o.readBack(manifest) : { rows: manifest.rows, sha256: manifest.sha256 }
     ),
     wipe: async (_id, expect_) => {
-      calls.push(`wipe:${expect_.fiscalDocuments}`);
+      calls.push(`wipe:${expect_.fiscalDocuments}${expect_.resume ? ':resume' : ''}`);
       if (o.wipeThrows) throw new Error('do refused');
     },
     deleteDirectory: async () => void calls.push('deleteDirectory'),
@@ -97,7 +103,7 @@ describe('notice before the wipe', () => {
   it('a due store with no notice gets one and is NOT wiped on the same run', async () => {
     const h = harness({});
     expect((await run(h)).outcome).toBe('notice_sent');
-    expect(h.calls).toEqual(['notify']);
+    expect(h.calls).toEqual(['notify', 'ledger:noticeAt+noticeOutcome']);
     expect(h.ledger.noticeAt).toBe(NOW);
   });
   it('a store with no contact is recorded as such and still waits the full window', async () => {
@@ -121,7 +127,15 @@ describe('export, verification, wipe', () => {
   it('exports, reads back, wipes with the verified row count, then deletes the directory, in that order', async () => {
     const h = harness({ ledger: READY });
     expect(await run(h)).toEqual({ storeId: 's1', outcome: 'purged' });
-    expect(h.calls).toEqual(['export', 'readBack', 'wipe:3', 'deleteDirectory']);
+    expect(h.calls).toEqual([
+      'export',
+      'ledger:archive',
+      'readBack',
+      'ledger:wipeStartedAt',
+      'wipe:3',
+      'ledger:wipedAt',
+      'deleteDirectory',
+    ]);
   });
   it('a read-back that differs aborts, alerts, and deletes NOTHING', async () => {
     for (const bad of [
@@ -139,7 +153,7 @@ describe('export, verification, wipe', () => {
   it('an export with fewer rows than the store holds aborts before the read-back', async () => {
     const h = harness({ ledger: READY, exportRows: 2 });
     expect((await run(h)).outcome).toBe('aborted');
-    expect(h.calls).toEqual(['export']);
+    expect(h.calls).toEqual(['export', 'ledger:archive']);
   });
   it('a wipe the DO refuses aborts with an alert and leaves the directory row', async () => {
     const h = harness({ ledger: READY, wipeThrows: true });
@@ -167,7 +181,7 @@ describe('dry run (the default for the first 30 days)', () => {
   it('runs the export and the verification but never wipes', async () => {
     const h = harness({ ledger: READY });
     expect((await run(h, NOW, false)).outcome).toBe('dry_run_verified');
-    expect(h.calls).toEqual(['export', 'readBack']);
+    expect(h.calls).toEqual(['export', 'ledger:archive', 'readBack']);
   });
   it('a corrupt export is still caught in a dry run', async () => {
     const h = harness({ ledger: READY, readBack: () => ({ rows: 1, sha256: 'x' }) });
@@ -204,5 +218,72 @@ describe('the run', () => {
       ['good', 'purged'],
     ]);
     expect(calls).toEqual(['wipe:good']);
+  });
+});
+
+describe("the clock counts Ebda's own billing records too (review of #1109)", () => {
+  it('a store with no fiscal document but a recent invoice / payment proof is NOT purged 90 days after closure', async () => {
+    const closed = NOW - 120 * DAY;
+    const h = harness({
+      ledger: READY,
+      fiscal: { count: 0, lastIssuedAt: null },
+      store: { closedAt: closed },
+      platformLast: NOW - 100 * DAY,
+    });
+    expect((await run(h)).outcome).toBe('not_due');
+    expect(h.calls).toEqual([]);
+  });
+  it('due = 7 years after the LATER of the last fiscal document and the last platform record', () => {
+    const s = { storeId: 's', closedAt: Date.UTC(2030, 0, 1) };
+    const fiscalAt = Date.UTC(2028, 0, 1);
+    const platformAt = Date.UTC(2031, 5, 1);
+    expect(purgeDueAt(s, { count: 1, lastIssuedAt: fiscalAt }, platformAt)).toBe(
+      Date.UTC(2038, 5, 1)
+    );
+    expect(purgeDueAt(s, { count: 1, lastIssuedAt: fiscalAt }, Date.UTC(2027, 0, 1))).toBe(
+      Date.UTC(2035, 0, 1)
+    );
+    expect(purgeDueAt(s, { count: 0, lastIssuedAt: null }, platformAt)).toBe(Date.UTC(2038, 5, 1));
+  });
+});
+
+describe('crash mid-wipe', () => {
+  it('writes wipeStartedAt BEFORE the wipe (a crash between the two is resumable)', async () => {
+    const h = harness({ ledger: READY });
+    await run(h);
+    expect(h.calls.indexOf('ledger:wipeStartedAt')).toBeGreaterThan(-1);
+    expect(h.calls.indexOf('ledger:wipeStartedAt')).toBeLessThan(h.calls.indexOf('wipe:3'));
+  });
+  it('a run that finds wipeStartedAt resumes at the wipe (resume flag, verified row count), then the directory, without re-exporting', async () => {
+    const h = harness({
+      ledger: { ...READY, wipeStartedAt: NOW - DAY, archive: { key: 'k', rows: 3, sha256: 'abc' } },
+    });
+    expect((await run(h)).outcome).toBe('purged');
+    expect(h.calls).toEqual(['wipe:3:resume', 'ledger:wipedAt', 'deleteDirectory']);
+  });
+  it('a wipe started but the DO refuses (not empty, not closed) aborts with an alert and leaves the directory', async () => {
+    const h = harness({
+      ledger: { ...READY, wipeStartedAt: NOW - DAY, archive: { key: 'k', rows: 3, sha256: 'abc' } },
+      wipeThrows: true,
+    });
+    expect((await run(h)).outcome).toBe('aborted');
+    expect(h.calls).not.toContain('deleteDirectory');
+  });
+});
+
+describe('one ledger per closure', () => {
+  const closure = { storeId: 's1', closedAt: 1_000 };
+  it('a ledger written for another closure of the same store id is ignored', () => {
+    const old: PurgeLedger = {
+      closedAt: 500,
+      noticeAt: 1,
+      noticeOutcome: 'sent',
+      wipedAt: 2,
+      archive: { key: 'k', rows: 9, sha256: 'x' },
+    };
+    expect(ledgerForClosure(old, closure)).toEqual({});
+    expect(ledgerForClosure({ ...old, closedAt: 1_000 }, closure)).toMatchObject({ wipedAt: 2 });
+    expect(ledgerForClosure(null, closure)).toEqual({});
+    expect(ledgerForClosure({ noticeAt: 1 }, closure)).toEqual({}); // a ledger with no closure is not trusted either
   });
 });

@@ -114,6 +114,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [cf/neon-zero-routes-b.md](cf/neon-zero-routes-b.md) - NEON-ZERO routes group B (per-store admin): sweep before/after and what is left
 - [cf/orders-on-do.md](cf/orders-on-do.md) - Orders on the store Durable Object: create, confirm, cancel, expire hold (INFRA-CF-1 PR D2b-2)
 - [cf/loyalty-do-migration.md](cf/loyalty-do-migration.md) - Loyalty on Durable Object stores: one-off ledger migration (Ruling FP-2)
+- [runbooks/closed-store-purge.md](runbooks/closed-store-purge.md) - Closed-store purge (NZ-D15B): before the first live run, the R2 lock on the archive, what to do when it alerts
 - [runbooks/customer-auth-cutover.md](runbooks/customer-auth-cutover.md) - Customer auth cutover to the store Durable Object: copy, verify, flip (N-9)
 - [cf/default-category-backfill.md](cf/default-category-backfill.md) - Default category Arabic name: backfill for DO stores
 - [cf/opus-review-closure.md](cf/opus-review-closure.md) - Opus review of #356 closed item by item with the proving test and its result, the leftovers closed, and the merge point for feat/cf-r6b (INFRA-CF-1)

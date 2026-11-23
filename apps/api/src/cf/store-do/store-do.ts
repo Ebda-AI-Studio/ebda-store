@@ -1115,6 +1115,24 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     );
   }
 
+  /** True when the Durable Object holds no store at all (wiped): no profile row and no fiscal row; a missing table counts as empty. */
+  private storageIsEmpty(storeId: string): boolean {
+    try {
+      const sqlx = this.ctx.storage.sql;
+      const profile = Number(
+        sqlx.exec('SELECT count(*) AS n FROM store_profile').toArray()[0]?.n ?? 0
+      );
+      const fiscalRows = Number(
+        sqlx
+          .exec('SELECT count(*) AS n FROM fiscal_documents WHERE store_id = ?', storeId)
+          .toArray()[0]?.n ?? 0
+      );
+      return profile === 0 && fiscalRows === 0;
+    } catch {
+      return true;
+    }
+  }
+
   /**
    * NZ-D15B (read only): the fiscal records of a CLOSED store, paged by serial, for the verified archive export of the closed-store
    * purge. Refuses a store that is not closed (an open store is never exported or wiped through here).
@@ -1157,8 +1175,12 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
    */
   async purgeClosedStore(
     storeId: string,
-    expect: { fiscalDocuments: number }
-  ): Promise<Result<{ wiped: true }>> {
+    expect: { fiscalDocuments: number; resume?: boolean }
+  ): Promise<Result<{ wiped: true; alreadyEmpty?: true }>> {
+    // A crash after the wipe started: the storage is already empty (no store profile, no fiscal row), and only a caller that
+    // wrote `wipeStartedAt` may say `resume`. An open store always has a profile, so it can never pass as "already wiped".
+    if (expect.resume && this.storageIsEmpty(storeId))
+      return { ok: true, data: { wiped: true, alreadyEmpty: true } };
     const checked = run(() => {
       this.bind(storeId);
       if (!isStoreClosed(this.sync)) throw new StoreError('STORE_NOT_CLOSED' as never, 409);
