@@ -32,6 +32,8 @@ export const FEATURE_KEYS_ARRAY = [
   'affiliate',
   'marketing_pixels',
   'agent_feed',
+  // Product feeds for Google Merchant Center, Meta Commerce Manager and TikTok Catalog (2026-11-14, Ruling FEEDS-1).
+  'product_feeds',
   'agent_checkout',
   'answer_engine_insights',
   'shipping_carriers',
@@ -371,6 +373,17 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'ينشر خلاصة منتجات قابلة للقراءة آليًا على /feeds/products.json حتى تتمكن مساعدات الذكاء الاصطناعي ووكلاء التسوق (ChatGPT وPerplexity وزواحف الوكلاء) من قراءة منتجات المتجر والاستشهاد بها والتوصية بها. تتبع اصطلاحات حقول خلاصة منتجات OpenAI.',
     category: 'marketing',
     tier: 'addon',
+  },
+  product_feeds: {
+    key: 'product_feeds',
+    name: 'Product Feeds (Google, Meta, TikTok)',
+    nameAr: 'خلاصات المنتجات (جوجل وميتا وتيك توك)',
+    description:
+      'Publishes the full product catalogue, variants included, as feeds for Google Merchant Center (Shopping and free listings), Meta Commerce Manager (Facebook and Instagram catalogue ads) and TikTok Catalog Manager, at /feeds/google.xml, /feeds/meta.xml and /feeds/tiktok.csv, with a feed health report in the admin.',
+    descriptionAr:
+      'ينشر كتالوج المنتجات كاملًا بما فيه الأنواع (المقاسات والألوان) كخلاصات لـ Google Merchant Center (إعلانات الشراء والقوائم المجانية) وMeta Commerce Manager (إعلانات الكتالوج على فيسبوك وإنستجرام) وTikTok Catalog Manager، على /feeds/google.xml و/feeds/meta.xml و/feeds/tiktok.csv، مع تقرير صحة الخلاصة في لوحة التحكم.',
+    category: 'marketing',
+    tier: 'core',
   },
   agent_checkout: {
     key: 'agent_checkout',
