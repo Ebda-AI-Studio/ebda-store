@@ -327,6 +327,7 @@ export const SIGN_IN_JS = `(function () {
     b.disabled = on;
     b.textContent = on ? msgs[label] : b.getAttribute('data-label');
   }
+  // pq-allow(duplicate-helper): twin of apps/accounts/src/signup-page.ts (a served script cannot share code with another page's script)
   function post(path, body) {
     return fetch(path, {
       method: 'POST',

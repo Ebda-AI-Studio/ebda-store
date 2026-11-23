@@ -100,7 +100,7 @@ const MESSAGES = {
   },
 } as const;
 
-export interface SignupPageInput {
+interface SignupPageInput {
   lang: SignInLang;
   /** Already validated by `signupReturn`. */
   returnTo: string;
@@ -209,6 +209,7 @@ export const SIGNUP_JS = `(function () {
     b.disabled = on;
     b.textContent = on ? msgs[label] : b.getAttribute('data-label');
   }
+  // pq-allow(duplicate-helper): twin of apps/accounts/src/sign-in-page.ts (a served script cannot share code with another page's script)
   function post(path, body) {
     return fetch(path, {
       method: 'POST',

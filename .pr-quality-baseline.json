@@ -345,7 +345,6 @@
     "unused-export|apps/accounts/src/password.ts|BCRYPT_COST",
     "unused-export|apps/accounts/src/sign-in-page.ts|DEFAULT_RETURN",
     "unused-export|apps/accounts/src/sign-in-page.ts|SIGN_IN_PAGE_CSP",
-    "unused-export|apps/accounts/src/sign-in-page.ts|SignInLang",
     "unused-export|apps/accounts/src/sign-in-page.ts|SignInPageInput",
     "unused-export|apps/accounts/src/throttle.ts|ACCOUNT_CAP",
     "unused-export|apps/accounts/src/throttle.ts|BRAKE_FREE",

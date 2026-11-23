@@ -328,6 +328,7 @@ Names only. "Set" says where it lives: wrangler var (committed in the Worker's `
 - `JWT_PREVIOUS_PUBLIC_JWKS` — optional; previous public keys kept during rotation. Set: Worker secret/var.
 - `MFA_KEY` — required for MFA; encrypts MFA secrets. Set: Worker secret.
 - `STORE_DIRECTORY`, `MAILER` — service bindings to `ebda-api` entrypoints (`StoreDirectory`, `IdentityMailer`), declared in `apps/accounts/wrangler.jsonc`.
+- `CHAT_SIGNUP_LINK` — var, default `"false"`. `"true"` shows the "have an invitation? create your account" link on the Chat sign-in page (accounts `/login?product=chat`), pointing at accounts `/signup?product=chat` (Ruling CHAT-SA-1). Mirror of Ebda Chat's `STANDALONE_WORKSPACES` flag: set `true` when that flag is not `off`. Hidden by default; the signup page itself is always reachable.
 - `WHATSAPP_OTP` — service binding to the `ebda-wa` Worker's `PlatformOtp` entrypoint (Rulings ID-WA-OTP-1, WA-OTP-SENDER-1): the password-reset code also goes over WhatsApp from the platform number. Absent = channel off (fail closed); `ebda-wa` must be deployed first. `WHATSAPP_OTP_ENABLED` (var, default "false") must be "true" too; leave it off until the platform number exists.
 
 ### Status Worker `ebda-status` (`apps/status`)
