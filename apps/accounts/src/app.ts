@@ -610,7 +610,7 @@ export async function inviteFor(
 }
 
 /** Why a Chat invite was refused. Chat shows one generic message for it; the cause is never revealed to the inviter. */
-export class InviteRefused extends Error {
+class InviteRefused extends Error {
   constructor() {
     super('INVITE_REFUSED');
     this.name = 'InviteRefused';
@@ -672,6 +672,7 @@ export async function inviteChatMemberFor(
           workspaceName: input.workspaceName,
         });
       } catch (e) {
+        // eslint-disable-next-line no-console -- pq-allow(no-console): structured worker log; the invite itself already resolved
         console.error(
           JSON.stringify({ msg: 'chat invite notice failed', error: (e as Error).message })
         );
@@ -684,6 +685,7 @@ export async function inviteChatMemberFor(
     }
   }
   // Audit trail (structured log; the durable `member.added` row is Chat's). No address, no code.
+  // eslint-disable-next-line no-console -- pq-allow(no-console): audit line, the worker log is the sink (no address, no code)
   console.log(
     JSON.stringify({ msg: 'audit', event: 'chat_member_invited', userId, mailed: mailAllowed })
   );
