@@ -18,10 +18,10 @@ const SAMPLE = 'ORD-48213';
 function Preview({ shape }: { shape: string }) {
   const svg = useMemo(() => renderBarcodeSvg({ value: SAMPLE, shape, label: false }), [shape]);
   return (
-    <bdi dir="ltr" className="block">
+    <bdi dir="ltr" className="block max-w-full overflow-hidden">
       <span
         aria-hidden="true"
-        className="block text-foreground [&>svg]:mx-auto [&>svg]:h-16 [&>svg]:w-auto"
+        className="block max-w-full text-foreground [&>svg]:mx-auto [&>svg]:h-16 [&>svg]:w-auto [&>svg]:max-w-full"
         // Built by our own encoder from a constant; nothing user-supplied.
         dangerouslySetInnerHTML={{ __html: svg }}
       />
@@ -113,13 +113,13 @@ export function ReceiptBarcodePicker({
               role="radio"
               aria-checked={on}
               onClick={() => setChoice(id)}
-              className={`flex flex-col items-center gap-1 rounded-lg border p-2 text-xs ${
+              className={`flex min-w-0 flex-col items-center gap-1 overflow-hidden rounded-lg border p-2 text-xs ${
                 on
                   ? 'border-primary bg-primary/10 text-foreground'
                   : 'border-border bg-background text-muted-foreground hover:bg-muted'
               }`}
             >
-              <span className="flex h-16 w-full items-center justify-center">
+              <span className="flex h-16 w-full min-w-0 items-center justify-center overflow-hidden">
                 {id === 'off' ? (
                   <span className="text-muted-foreground">-</span>
                 ) : (
