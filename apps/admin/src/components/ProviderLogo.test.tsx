@@ -7,11 +7,11 @@ import { ProviderLogo } from './ProviderLogo';
 describe('ProviderLogo', () => {
   it('renders an img with the provider name as alt for a vendored asset', () => {
     render(<ProviderLogo code="paymob" name="Paymob" />);
-    expect(screen.getByAltText('Paymob')).toBeTruthy();
+    expect(screen.getByAltText('Paymob logo')).toBeTruthy();
   });
   it('renders a labelled wordmark when there is no asset', () => {
-    render(<ProviderLogo code="geidea" name="Geidea" />);
-    expect(screen.getByRole('img', { name: 'Geidea' })).toBeTruthy();
+    render(<ProviderLogo code="snapchat" name="Snapchat" />);
+    expect(screen.getByRole('img', { name: 'Snapchat' })).toBeTruthy();
   });
   it('renders something accessible for every catalog provider', () => {
     for (const p of PROVIDER_CATALOG) {
@@ -21,8 +21,16 @@ describe('ProviderLogo', () => {
     }
   });
 
-  it('renders a labelled wordmark for every social platform and an unknown key', () => {
-    for (const code of [...SOCIAL_LOGO_CODES, 'wikidata']) {
+  it('renders the official logo for geidea and every social platform except snapchat', () => {
+    for (const code of ['geidea', ...SOCIAL_LOGO_CODES.filter(c => c !== 'snapchat')]) {
+      const { unmount } = render(<ProviderLogo code={code} name={code} size="sm" />);
+      expect(screen.getByAltText(`${code} logo`)).toBeTruthy();
+      unmount();
+    }
+  });
+
+  it('renders a labelled wordmark for snapchat and an unknown key', () => {
+    for (const code of ['snapchat', 'wikidata']) {
       const { unmount } = render(<ProviderLogo code={code} name={code} size="sm" />);
       expect(screen.getByRole('img', { name: code })).toBeTruthy();
       unmount();

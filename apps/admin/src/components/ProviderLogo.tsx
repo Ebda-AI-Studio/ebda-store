@@ -30,7 +30,7 @@ export function ProviderLogo({
       >
         <Image
           src={entry.asset}
-          alt={name}
+          alt={`${name} logo`}
           width={sm ? 36 : 52}
           height={sm ? 20 : 28}
           unoptimized

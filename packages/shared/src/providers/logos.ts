@@ -15,8 +15,8 @@ export interface ProviderLogoEntry {
   missing: 'brand-kit-needed' | 'not-a-brand' | null;
 }
 
-const asset = (code: string): ProviderLogoEntry => ({
-  asset: `/provider-logos/${code}.webp`,
+const asset = (code: string, ext: 'webp' | 'svg' = 'webp'): ProviderLogoEntry => ({
+  asset: `/provider-logos/${code}.${ext}`,
   missing: null,
 });
 
@@ -29,18 +29,19 @@ export const PROVIDER_LOGOS: Record<string, ProviderLogoEntry> = {
   shipblu: asset('shipblu'),
   mylerz: asset('mylerz'),
   aramex: asset('aramex'),
-  // No official asset in the repo: Ahmad to supply from the provider brand kit.
-  geidea: { asset: null, missing: 'brand-kit-needed' },
-  // Social platforms (social links, branding): no official asset in the repo, so wordmark tiles.
-  // Official marks come from each platform's brand kit (Ahmad to supply); never drawn or downloaded here.
-  instagram: { asset: null, missing: 'brand-kit-needed' },
-  facebook: { asset: null, missing: 'brand-kit-needed' },
-  twitter: { asset: null, missing: 'brand-kit-needed' },
-  tiktok: { asset: null, missing: 'brand-kit-needed' },
-  youtube: { asset: null, missing: 'brand-kit-needed' },
+  // Geidea: official logo SVG from geidea.net's own asset CDN (no public brand kit page exists; see SOURCES.md).
+  geidea: asset('geidea', 'svg'),
+  // Social platforms: official marks from each platform's brand-resource page, unaltered (see SOURCES.md).
+  instagram: asset('instagram'),
+  facebook: asset('facebook'),
+  twitter: asset('twitter', 'svg'),
+  tiktok: asset('tiktok'),
+  youtube: asset('youtube'),
+  // Snapchat: the official Ghost-logo download on snap.com/brand-guidelines returns 403 (AccessDenied),
+  // so there is no official file yet: wordmark tile until Snap's asset link is fixed or Ahmad supplies it.
   snapchat: { asset: null, missing: 'brand-kit-needed' },
-  linkedin: { asset: null, missing: 'brand-kit-needed' },
-  whatsapp: { asset: null, missing: 'brand-kit-needed' },
+  linkedin: asset('linkedin'),
+  whatsapp: asset('whatsapp', 'svg'),
   // Not brands: generic methods.
   cod: { asset: null, missing: 'not-a-brand' },
   manual: { asset: null, missing: 'not-a-brand' },
