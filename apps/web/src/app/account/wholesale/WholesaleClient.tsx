@@ -179,6 +179,8 @@ export default function WholesaleClient() {
             <input
               required
               type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               minLength={6}
               maxLength={40}
               dir="ltr"

@@ -1,5 +1,5 @@
 import { z } from 'zod/v3';
-import { isSafeUrl } from '@ebda/shared';
+import { isSafeUrl, phoneSchema } from '@ebda/shared';
 
 // CLEARABLE variants (STORE-QA-60). `optionalStr`/`optionalUrl` fold '' and null into `undefined`, and `undefined` in a Prisma
 // update means "leave the column alone" - so a merchant who emptied a SEO title or removed a logo got a 200 and the old value
@@ -29,3 +29,9 @@ export const clearableSafeUrl = z.preprocess(
     .nullable()
     .optional()
 );
+// A phone-shaped setting (G12 + STORE-QA-60): blank CLEARS it (null), absent leaves it, anything else must be a real phone number.
+export const clearablePhone = () =>
+  z.preprocess(
+    v => (typeof v === 'string' && v.trim() === '' ? null : v),
+    phoneSchema.nullable().optional()
+  );

@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
+import { phoneOrBlankSchema } from '@ebda/shared';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -37,7 +38,7 @@ publicRouter.param('storeId', tenantContext);
 const applySchema = z.object({
   name: z.string().min(1).max(100),
   email: z.string().email(),
-  phone: z.string().max(30).optional(),
+  phone: phoneOrBlankSchema.optional(),
   instagram: z.string().max(100).optional(),
   tiktok: z.string().max(100).optional(),
 });
@@ -45,7 +46,7 @@ const applySchema = z.object({
 const createSchema = z.object({
   name: z.string().min(1).max(100),
   email: z.string().email(),
-  phone: z.string().max(30).optional(),
+  phone: phoneOrBlankSchema.optional(),
   instagram: z.string().max(100).optional(),
   tiktok: z.string().max(100).optional(),
   commissionRate: z.number().min(0).max(100).optional(),

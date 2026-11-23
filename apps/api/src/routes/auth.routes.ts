@@ -56,7 +56,7 @@ import {
   OWNER_HAS_BILLED_STORE_MESSAGE_AR,
 } from '../services/account-closure-guard';
 
-import { JWT_AUDIENCES_ACCEPTED, JWT_ISSUERS_ACCEPTED } from '@ebda/shared';
+import { JWT_AUDIENCES_ACCEPTED, JWT_ISSUERS_ACCEPTED, phoneOrBlankSchema } from '@ebda/shared';
 const router = Router();
 
 // LAUNCH-RL: IP-wide bucket in front of the per-IP+email authLimiter (email rotation cannot bypass it).
@@ -1128,7 +1128,7 @@ router.put(
           z.string().min(1, 'First name is required').optional()
         ),
         lastName: z.string().optional(),
-        phone: z.string().optional(),
+        phone: phoneOrBlankSchema.optional(),
       });
 
       const data = updateSchema.parse(req.body);

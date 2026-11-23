@@ -51,6 +51,7 @@ import {
   JWT_AUDIENCE,
   JWT_ISSUER,
   REGION,
+  phoneOrBlankSchema,
   zonedLocalToUtc,
 } from '@ebda/shared';
 import { InstapayReceiptService } from '../services/payment-providers/instapay-receipt.service';
@@ -1376,7 +1377,7 @@ router.put(
         firstName: z.string().min(1).max(100).optional(),
         lastName: z.string().min(1).max(100).optional(),
         email: z.string().email().max(255).optional(),
-        phone: z.string().max(40).optional().nullable(),
+        phone: phoneOrBlankSchema.optional().nullable(),
         role: z.enum(['super_admin', 'store_admin', 'customer']).optional(),
         status: z.enum(['active', 'inactive', 'suspended']).optional(),
         password: z.string().min(8).max(255).optional(),

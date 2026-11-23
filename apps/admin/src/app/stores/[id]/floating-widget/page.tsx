@@ -426,7 +426,9 @@ export default function FloatingWidgetPage() {
                               {t('whatsappPhoneLabel')}
                             </span>
                             <input
-                              type="text"
+                              type="tel"
+                              inputMode="tel"
+                              autoComplete="tel"
                               value={b.whatsappPhone ?? ''}
                               onChange={e => updateButton(b.id, { whatsappPhone: e.target.value })}
                               placeholder={
@@ -477,7 +479,9 @@ export default function FloatingWidgetPage() {
                             {t('phoneNumberLabel')}
                           </span>
                           <input
-                            type="text"
+                            type="tel"
+                            inputMode="tel"
+                            autoComplete="tel"
                             value={b.phoneNumber ?? ''}
                             onChange={e => updateButton(b.id, { phoneNumber: e.target.value })}
                             placeholder={

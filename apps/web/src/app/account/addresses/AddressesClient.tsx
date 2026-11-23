@@ -283,6 +283,8 @@ export default function AddressesClient() {
             <Input
               label={t('Phone Number', 'رقم الموبايل')}
               type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               value={formData.phone}
               onChange={e => setFormData({ ...formData, phone: e.target.value })}
               placeholder={REGION.phone.placeholderIntl}

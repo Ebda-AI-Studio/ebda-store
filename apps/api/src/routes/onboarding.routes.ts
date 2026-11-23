@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
+import { phoneOrBlankSchema } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireVerifiedEmail } from '../middleware/require-verified-email';
@@ -196,7 +197,7 @@ const paymentSchema = z
       .object({
         enabled: z.boolean(),
         handle: z.string().trim().max(120).optional(),
-        phone: z.string().trim().max(32).optional(),
+        phone: phoneOrBlankSchema.optional(),
         accountName: z.string().trim().max(80).optional(),
       })
       .strict()

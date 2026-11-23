@@ -528,6 +528,8 @@ export default function NewOrderPage() {
             <Input
               label={t('customerSection.phoneLabel')}
               type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               value={phone}
               onChange={setPhone}
               dir="ltr"
@@ -868,17 +870,31 @@ interface InputProps {
   value: string;
   onChange: (v: string) => void;
   type?: string;
+  inputMode?: 'tel';
+  autoComplete?: string;
   required?: boolean;
   className?: string;
   dir?: 'ltr' | 'rtl';
 }
 
-function Input({ label, value, onChange, type = 'text', required, className, dir }: InputProps) {
+function Input({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  inputMode,
+  autoComplete,
+  required,
+  className,
+  dir,
+}: InputProps) {
   return (
     <label className={`flex flex-col gap-1 text-sm ${className ?? ''}`}>
       <span className="text-muted-foreground">{label}</span>
       <input
         type={type}
+        inputMode={inputMode}
+        autoComplete={autoComplete}
         value={value}
         onChange={e => onChange(e.target.value)}
         required={required}

@@ -445,6 +445,8 @@ export default function AffiliatesPage() {
                   </label>
                   <input
                     type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     value={invitePhone}
                     onChange={e => setInvitePhone(e.target.value)}
                     maxLength={30}
