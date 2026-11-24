@@ -157,6 +157,7 @@ jobs:
       skip: ${{ steps.decide.outputs.skip }}
       heavy: ${{ steps.scope.outputs.heavy }}
       docs_only: ${{ steps.scope.outputs.docs_only }}
+      marketing: ${{ steps.scope.outputs.marketing }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -251,7 +252,8 @@ jobs:
 
       # Ebda must not ship upstream-product branding; always cheap, always run.
       - name: No-inherited-branding test
-        if: github.event_name != 'push'
+        # a merge group (like a push) already runs this file in the full unit shards: only a pull request needs it here
+        if: github.event_name == 'pull_request'
         run: npx vitest run tests/unit/no-force-branding.test.ts --reporter=verbose --retry=0
 
       # Prettier on the files the PR changed (the main lane checks the whole
@@ -530,7 +532,7 @@ jobs:
     # PR: only the Workers the PR touched. Full lane (main push, nightly, dispatch; `changes` is skipped there, hence
     # always()): marketing, so its page-weight budget is proven on main too. It broke unseen on main on 2026-11-10
     # because no main run measured it (Ruling MKT-LEGAL-HTML-BUDGET-2); the other Workers build in their deploy workflows.
-    if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true') && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.docs_only != 'true'
+    if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true') && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.docs_only != 'true' && (github.event_name != 'merge_group' || needs.tested-tree.outputs.marketing != 'false')
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # Exempt from the hosted run+10 rule: cf-cache-bindings-assert guards a roomy budget (>=25) per leg (issue 2155).
     timeout-minutes: 90 # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)

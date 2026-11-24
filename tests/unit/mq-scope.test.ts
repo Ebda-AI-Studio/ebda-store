@@ -78,6 +78,62 @@ describe('merge queue gate with a light merge group', () => {
   });
 });
 
+describe('CI-CAPACITY-1: the marketing dry-run only runs for a group that can move it', () => {
+  const marketing = (files: string[], labels: string[] = []) =>
+    decideScope({ files, labels }).marketing;
+  it('an API-only, admin-only or web-only group skips it', () => {
+    expect(marketing(['apps/api/src/routes/store.routes.ts', 'tests/unit/x.test.ts'])).toBe(true); // a test file is a rail: strict
+    expect(marketing(['apps/api/src/routes/store.routes.ts'])).toBe(false);
+    expect(marketing(['apps/admin/src/app/page.tsx'])).toBe(false);
+    expect(marketing(['apps/web/src/app/page.tsx', 'apps/api/src/a.ts'])).toBe(false);
+  });
+  it('marketing itself, and anything on a rail, runs it (strict: shared packages, root config, workflow, scripts, lockfile, tests)', () => {
+    for (const f of [
+      'apps/marketing/src/a.ts',
+      'packages/shared/src/a.ts',
+      'packages/database/src/a.ts',
+      'packages/repo/src/a.ts',
+      'package.json',
+      'package-lock.json',
+      'tsconfig.base.json',
+      '.github/workflows/ci.yml',
+      'scripts/ci/mq-scope.mjs',
+      'tests/unit/a.test.ts',
+      'apps/api/migrations/0001.sql',
+    ])
+      expect(marketing(['apps/api/src/a.ts', f]), f).toBe(true);
+  });
+  it('fails closed: the ci:full label and an empty diff never skip it', () => {
+    expect(marketing(['apps/api/src/a.ts'], ['ci:full'])).toBe(true);
+    expect(marketing([])).toBe(true);
+  });
+  it('the gate accepts a skipped worker-dry-run only when marketing=false, and never a failed one', () => {
+    const ids = ['guards', 'worker-dry-run', 'security'];
+    const n = (dry: string) =>
+      Object.fromEntries(ids.map(i => [i, { result: i === 'worker-dry-run' ? dry : 'success' }]));
+    expect(verdict('merge_group', n('skipped'), { heavy: 'true', marketing: 'false' }).ok).toBe(
+      true
+    );
+    expect(verdict('merge_group', n('skipped'), { heavy: 'true', marketing: 'true' }).ok).toBe(
+      false
+    );
+    expect(verdict('merge_group', n('skipped'), { heavy: 'true' }).ok).toBe(false);
+    expect(verdict('merge_group', n('failure'), { heavy: 'true', marketing: 'false' }).ok).toBe(
+      false
+    );
+    expect(verdict('merge_group', n('cancelled'), { heavy: 'true', marketing: 'false' }).ok).toBe(
+      false
+    );
+  });
+  it('ci.yml: the dry-run waits on the scope output for a merge group only, and tested-tree exports it', () => {
+    const ci = readFileSync(path.resolve(__dirname, '../../.github/workflows/ci.yml'), 'utf8');
+    expect(ci).toContain('marketing: ${{ steps.scope.outputs.marketing }}');
+    expect(ci).toContain(
+      "(github.event_name != 'merge_group' || needs.tested-tree.outputs.marketing != 'false')"
+    );
+  });
+});
+
 describe('ci.yml wiring', () => {
   const ci = readFileSync(path.resolve(__dirname, '../../.github/workflows/ci.yml'), 'utf8');
   const job = (id: string) =>
