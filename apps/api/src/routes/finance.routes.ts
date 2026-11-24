@@ -47,7 +47,7 @@ import { idempotencyKeyOf } from '../lib/money-idempotency';
 import { postManualEntry, reverseManualEntry } from '../services/accounting/journal.service';
 import { postPayout, payoutSchema } from '../services/accounting/payout.service';
 import { StoreService } from '../services/store.service';
-import { auditLog } from '../middleware/security';
+import { adminReadLimiter, auditLog } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
 import { trialBalance, profitAndLoss, balanceSheet } from '../services/accounting/reports.service';
 import { dashboardStockValues } from '../services/accounting/dashboard-stock';
@@ -456,6 +456,8 @@ const readLock = (settings: unknown): AccountingLock | null => {
 router.get(
   '/:storeId/finance/period-lock',
   authenticate,
+  // Before every authorization-performing handler (CodeQL js/missing-rate-limiting reads the order): keyed on req.user.
+  adminReadLimiter,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
