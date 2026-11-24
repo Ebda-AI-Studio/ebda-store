@@ -42,4 +42,15 @@ describe('EmptyProductsState', () => {
     expect(screen.getByText('title')).toBeTruthy();
     expect(screen.queryByText('showDrafts')).toBeNull();
   });
+
+  it('IM1: an empty catalogue offers import & export next to add, and a filtered empty view does not', () => {
+    const { rerender } = render(
+      <EmptyProductsState storeId="s1" hasActiveFilters={false} listUrl="/stores/s1/products" />
+    );
+    expect(screen.getByText('importExport').closest('a')?.getAttribute('href')).toBe(
+      '/stores/s1/bulk'
+    );
+    rerender(<EmptyProductsState storeId="s1" hasActiveFilters listUrl="/stores/s1/products" />);
+    expect(screen.queryByText('importExport')).toBeNull();
+  });
 });

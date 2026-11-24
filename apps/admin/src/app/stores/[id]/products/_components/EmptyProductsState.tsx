@@ -56,12 +56,16 @@ export function EmptyProductsState({
         </Button>
       )}
       {!hasActiveFilters && (
-        <Link
-          href={`/stores/${storeId}/products/new?returnTo=${encodeURIComponent(listUrl)}`}
-          className="mt-4 inline-block"
-        >
-          <Button size="sm">{t('addProduct')}</Button>
-        </Link>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          <Link href={`/stores/${storeId}/products/new?returnTo=${encodeURIComponent(listUrl)}`}>
+            <Button size="sm">{t('addProduct')}</Button>
+          </Link>
+          <Link href={`/stores/${storeId}/bulk`}>
+            <Button size="sm" variant="outline">
+              {t('importExport')}
+            </Button>
+          </Link>
+        </div>
       )}
     </div>
   );

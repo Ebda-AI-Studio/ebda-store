@@ -121,6 +121,12 @@ const nextConfig = {
     return [
       // QA-TRUST-1: /legal /privacy /terms and /llms.txt are real URLs (one 308 hop to ebda.app)
       ...trustRedirects(),
+      // /products/import is not a product id: the CSV/XLSX/photo import lives on the Bulk page.
+      {
+        source: '/stores/:id/products/import',
+        destination: '/stores/:id/bulk',
+        permanent: false,
+      },
       {
         source: '/stores/:id/layout',
         destination: '/stores/:id/builder',
