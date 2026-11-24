@@ -25,7 +25,7 @@ interface OrderPaymentSummaryInput extends OrderPaymentStateInput {
   refundedTotal?: number | null;
 }
 
-export type OrderPaymentState = 'paid' | 'partially_refunded' | 'refunded' | 'disputed' | 'unpaid';
+type OrderPaymentState = 'paid' | 'partially_refunded' | 'refunded' | 'disputed' | 'unpaid';
 
 interface OrderPaymentSummary {
   /** `partially_refunded` / `refunded` also follow the RECORDED money, not only the status columns (a returns-path refund keeps `paymentStatus` paid). */
