@@ -658,7 +658,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                       // store or pollute analytics. The maintenance screen only
                       // needs the store's branding + theme + language, all of
                       // which already live above this guard.
-                      <div id="main-content">
+                      <div id="main-content" data-store-suspended="1">
                         <StoreMaintenance />
                       </div>
                     ) : (
