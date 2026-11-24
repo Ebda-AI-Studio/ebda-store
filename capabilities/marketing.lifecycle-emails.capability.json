@@ -7,14 +7,11 @@
   "titleAr": "رسائل البداية",
   "titleEn": "Setup / lifecycle emails (welcome, tips)",
   "screens": ["/stores/[id]/lifecycle-emails"],
-  "api": [
-    "GET /stores/:storeId/lifecycle-emails",
-    "POST /stores/:storeId/lifecycle-emails/test-send"
-  ],
+  "api": ["GET /stores/:storeId/lifecycle-emails"],
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "staff", "super_admin"],
-  "policy": "confirm",
+  "policy": "free",
   "undo": {
     "class": "none",
     "note": "n/a"
@@ -24,14 +21,11 @@
     "ar": ["ايه الرسايل اللي بتتبعت للعميل؟", "ايه الايميلات التلقائية؟", "ليه جالي ايميل ترحيب"],
     "en": ["What automatic emails are sent?"]
   },
-  "steps": [
-    "View the list.",
-    "Owner only: press Send test to me on a row to receive that email at your own address."
-  ],
+  "steps": ["View-only list."],
   "edgeCases": [
     "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No per-email edit; no help article"]
+  "gaps": ["View only; no per-email edit; no help article"]
 }
