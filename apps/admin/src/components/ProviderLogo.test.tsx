@@ -7,7 +7,7 @@ import { ProviderLogo } from './ProviderLogo';
 describe('ProviderLogo', () => {
   it('renders an img with the provider name as alt for a vendored asset', () => {
     render(<ProviderLogo code="paymob" name="Paymob" />);
-    expect(screen.getByAltText('Paymob logo')).toBeTruthy();
+    expect(screen.getByAltText('Paymob')).toBeTruthy();
   });
   it('renders a labelled wordmark when there is no asset', () => {
     render(<ProviderLogo code="snapchat" name="Snapchat" />);
@@ -24,7 +24,7 @@ describe('ProviderLogo', () => {
   it('renders the official logo for geidea and every social platform except snapchat', () => {
     for (const code of ['geidea', ...SOCIAL_LOGO_CODES.filter(c => c !== 'snapchat')]) {
       const { unmount } = render(<ProviderLogo code={code} name={code} size="sm" />);
-      expect(screen.getByAltText(`${code} logo`)).toBeTruthy();
+      expect(screen.getByAltText(code)).toBeTruthy();
       unmount();
     }
   });

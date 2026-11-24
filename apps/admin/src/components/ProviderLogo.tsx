@@ -14,7 +14,7 @@ export function ProviderLogo({
   className = '',
 }: {
   code: string;
-  /** Provider display name: used as alt text / wordmark text. */
+  /** Provider display name (already localised by the caller): the logo's alt text, and the wordmark text without an asset. */
   name: string;
   /** `sm` for inline use in tables and form rows. */
   size?: 'sm' | 'md';
@@ -30,7 +30,7 @@ export function ProviderLogo({
       >
         <Image
           src={entry.asset}
-          alt={`${name} logo`}
+          alt={name}
           width={sm ? 36 : 52}
           height={sm ? 20 : 28}
           unoptimized
