@@ -3,7 +3,7 @@ import { createDoPort, storefrontUrlFor } from './do-port';
 import { suiteBuyerKeySecret } from '../config';
 import logger from '../../logger';
 import { createOwnerTools, type OrderRowLite } from './owner-tools';
-import { refundedMinorByOrder } from '../../order-refunds';
+import { refundedTotalByOrder } from '../../order-refunds';
 import { latestPaymentIsOnline } from '../../revenue-sql';
 import { memberRole } from '../../store-members';
 import { isWhatsAppLinked } from '../link';
@@ -60,7 +60,7 @@ export const ownerTools = () =>
           ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         });
         if (page.length === 0) break;
-        const refunded = await refundedMinorByOrder(
+        const refunded = await refundedTotalByOrder(
           db,
           storeId,
           page.map(o => o.id)
