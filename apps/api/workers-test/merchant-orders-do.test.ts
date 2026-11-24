@@ -875,6 +875,42 @@ describe.skipIf(e.E2E_DB === '1')(
 
       expect.soft(reachReport(await pgReaches(true)), steps.join('\n')).toBe('');
     }, 120_000);
+    it('SUSPEND-AI-1: an admin-suspended store is refused AI spend on its Durable Object, and obeyed on the very next call after reactivation', async () => {
+      await pgReaches(true);
+      await authState('user:tv:super-ai-susp', [['set', 'user:tv:super-ai-susp', '0', {}]]);
+      const su = await accessToken({
+        userId: 'super-ai-susp',
+        jti: 'j-ai-susp-su',
+        role: 'super_admin',
+      });
+      const status = (to: string) =>
+        api(`/stores/${storeId}/status`, {
+          method: 'PATCH',
+          headers: { authorization: `Bearer ${su}` },
+          body: JSON.stringify({ status: to }),
+        });
+      const ai = async () => {
+        const r = await api(`/stores/${storeId}/ai/seo`, {
+          method: 'POST',
+          headers: merchant,
+          body: JSON.stringify({ kind: 'store' }),
+        });
+        return { status: r.status, body: await r.text() };
+      };
+      const sus = await status('suspended');
+      expect(sus.status, await sus.clone().text()).toBe(200);
+      try {
+        const refused = await ai();
+        expect(refused.status, refused.body).toBe(403);
+        expect(refused.body).toContain('STORE_AI_SUSPENDED');
+      } finally {
+        const act = await status('active');
+        expect(act.status, await act.clone().text()).toBe(200);
+      }
+      // reactivated: the very next call is no longer refused for the suspension (it goes on to the model / its own checks)
+      const after = await ai();
+      expect(after.body).not.toContain('STORE_AI_SUSPENDED');
+    }, 120_000);
     it('STORE-QA-74: a refund is in the NEXT revenue read (finance Net sales / analytics were stale until the TTL)', async () => {
       await pgReaches(true);
       const S = `/stores/${storeId}`;

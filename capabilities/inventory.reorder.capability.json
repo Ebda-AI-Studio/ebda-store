@@ -24,7 +24,7 @@
   },
   "helpArticle": "stock-alerts-and-reorder-rules",
   "questions": {
-    "ar": ["اشتري كام من المنتج ده؟", "ايه البضاعة الراكدة؟"],
+    "ar": ["اشتري كام من المنتج ده؟", "ايه البضاعة الراكدة؟", "فين اقتراحات اعادة الطلب؟"],
     "en": ["What should I reorder?"]
   },
   "steps": ["Reorder page."],
