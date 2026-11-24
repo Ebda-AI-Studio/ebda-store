@@ -27,6 +27,27 @@ const POINTER = {
   terms: { ar: 'شوف التفاصيل في صفحة الشروط والسياسات.', en: 'See the Terms and Policies page for the details.' },
 };
 
+// A numbered or bulleted line (ASCII or Arabic-Indic numerals, written as escapes: DIGITS-1). An unsourced claim in a step must not turn the step into the pointer sentence
+// ("1. See the Plans page"): the step is dropped and the remaining numbered steps are renumbered.
+const LIST_ITEM = /^\s*(?:[-*\u2022]|(?:\d+|[\u0660-\u0669]+)[.)\u060C-]?)\s+/;
+const NUMBERED = /^(\s*)(\d+)([.)])(\s+)/;
+
+/** `dropped`: the numbers of the numbered lines that were dropped. A block whose first surviving item is "2." because "1." was dropped restarts at 1. */
+function renumber(text: string, dropped: ReadonlySet<number>): string {
+  const lines = text.split('\n');
+  let next = 0;
+  let prevNumbered = false;
+  return lines.map((l) => {
+    const m = NUMBERED.exec(l);
+    if (!m) { prevNumbered = false; next = 0; return l; }
+    if (!prevNumbered) { next = Number(m[2]); while (next > 1 && dropped.has(next - 1)) next--; }
+    prevNumbered = true;
+    const out = `${m[1]}${next}${m[3]}${m[4]}${l.slice(m[0].length)}`;
+    next++;
+    return out;
+  }).join('\n');
+}
+
 const canon = (n: string): string => {
   const t = n.replace(/,(?=\d{3}(?:\D|$))/g, '').replace(',', '.');
   const f = Number(t);
@@ -56,7 +77,9 @@ export function checkBindingClaims(reply: string, sources: BindingSource[], tool
   const hasLegal = sources.some((s) => s.kind === 'legal' || s.kind === 'billing');
   const removed: Array<{ sentence: string; reason: ClaimReason }> = [];
 
-  const out = sentences(reply).map((raw) => {
+  const pieces = sentences(reply);
+  const flagged = new Set<number>();
+  const out = pieces.map((raw, idx) => {
     const sentence = raw.trim();
     if (!sentence) return raw;
     const f = foldArabic(sentence);
@@ -79,9 +102,21 @@ export function checkBindingClaims(reply: string, sources: BindingSource[], tool
     if (!reason && unsupported(DURATION)) reason = 'duration';
     if (!reason) return raw;
     removed.push({ sentence, reason });
+    flagged.add(idx);
     const kind = reason === 'policy_term' || reason === 'duration' ? 'terms' : 'plans';
     const pointer = POINTER[kind][isArabic(sentence) ? 'ar' : 'en'];
     return raw.replace(sentence, pointer);
   });
-  return { text: out.join(''), removed };
+  // A flagged piece on a list line drops that WHOLE line (the "2." marker is a piece of its own, split off by the sentence splitter).
+  let droppedItem = false;
+  const droppedNums = new Set<number>();
+  let start = 0;
+  for (let i = 0; i < pieces.length; i++) {
+    if (!pieces[i]!.endsWith('\n') && i < pieces.length - 1) continue;
+    const range = Array.from({ length: i - start + 1 }, (_, k) => start + k);
+    if (range.some((k) => flagged.has(k)) && LIST_ITEM.test(range.map((k) => pieces[k]).join(''))) { const n = NUMBERED.exec(range.map((k) => pieces[k]).join(''))?.[2]; if (n) droppedNums.add(Number(n)); for (const k of range) out[k] = ''; droppedItem = true; }
+    start = i + 1;
+  }
+  const joined = out.join('');
+  return { text: droppedItem ? renumber(joined, droppedNums) : joined, removed };
 }

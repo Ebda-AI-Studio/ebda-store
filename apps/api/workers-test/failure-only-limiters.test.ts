@@ -156,6 +156,7 @@ const COUNTED_ON_ANY_STORE = [
   'POST /public/orders/:id/verify-payment',
   'POST /public/orders/quote',
   'POST /public/pricing/resolve',
+  'POST /public/returns/guest',
   'POST /public/reviews/submit',
   'POST /public/sms-consent/unsubscribe',
   'POST /public/wholesale/apply',
