@@ -74,7 +74,7 @@ export default function StoreActivityPage() {
       {error && (
         <div
           role="alert"
-          className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-ink"
+          className="mb-6 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-ink"
         >
           {t('error')}
         </div>
@@ -83,7 +83,7 @@ export default function StoreActivityPage() {
         <p className="text-sm text-muted-foreground">{t('empty')}</p>
       )}
       {items.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
           <table className="w-full text-sm" aria-label={t('tableLabel')}>
             <thead className="text-start text-xs text-muted-foreground">
               <tr>
@@ -104,14 +104,14 @@ export default function StoreActivityPage() {
                     </span>
                     <span className="ms-2 text-muted-foreground">{i.resourceType}</span>
                     {Object.keys(i.details).length > 0 && (
-                      <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
+                      <p className="mt-1 text-sm text-muted-foreground" dir="ltr">
                         {Object.entries(i.details)
                           .map(([k, v]) => `${k}: ${String(v)}`)
                           .join(' · ')}
                       </p>
                     )}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs" dir="ltr">
+                  <td className="px-4 py-3 font-mono text-sm" dir="ltr">
                     {i.ip ?? '-'}
                   </td>
                 </tr>

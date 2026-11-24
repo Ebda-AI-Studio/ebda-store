@@ -48,7 +48,7 @@ export function ProductInfoSections({
 
   return (
     <>
-      <div className="rounded-xl border bg-card p-6">
+      <div className="rounded-md border bg-card p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">
           {tSections('productDetails')}
         </h2>
@@ -96,7 +96,7 @@ export function ProductInfoSections({
         )}
       </div>
 
-      <div className="rounded-xl border bg-card p-6">
+      <div className="rounded-md border bg-card p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('pricing')}</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
@@ -124,7 +124,7 @@ export function ProductInfoSections({
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card p-6">
+      <div className="rounded-md border bg-card p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('inventory')}</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
@@ -163,7 +163,7 @@ export function ProductInfoSections({
       </div>
 
       {product.images && product.images.length > 0 && (
-        <div className="rounded-xl border bg-card p-6">
+        <div className="rounded-md border bg-card p-6">
           <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('images')}</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             {product.images.map(image => (
@@ -210,7 +210,7 @@ export function ProductSidebar({ product }: ProductSidebarProps) {
   return (
     <>
       {product.categories && product.categories.length > 0 && (
-        <div className="rounded-xl border bg-card p-6">
+        <div className="rounded-md border bg-card p-6">
           <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('categories')}</h2>
           <div className="flex flex-wrap gap-2">
             {product.categories.map(c => (
@@ -223,7 +223,7 @@ export function ProductSidebar({ product }: ProductSidebarProps) {
       )}
 
       {product.tags && product.tags.length > 0 && (
-        <div className="rounded-xl border bg-card p-6">
+        <div className="rounded-md border bg-card p-6">
           <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('tags')}</h2>
           <div className="flex flex-wrap gap-2">
             {product.tags.map(tg => (
@@ -235,7 +235,7 @@ export function ProductSidebar({ product }: ProductSidebarProps) {
         </div>
       )}
 
-      <div className="rounded-xl border bg-card p-6">
+      <div className="rounded-md border bg-card p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('flags')}</h2>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -259,7 +259,7 @@ export function ProductSidebar({ product }: ProductSidebarProps) {
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card p-6">
+      <div className="rounded-md border bg-card p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('timestamps')}</h2>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">

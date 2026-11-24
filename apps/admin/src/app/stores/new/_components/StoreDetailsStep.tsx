@@ -4,6 +4,7 @@ import { Input } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { STORE_HOST_SUFFIX } from '@/lib/store-url';
 import type { FormData } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface StoreDetailsStepProps {
   formData: FormData;
@@ -58,7 +59,7 @@ export function StoreDetailsStep({
               value={formData.storeSlug}
               onChange={e => onSlugChange(e.target.value.toLowerCase())}
               placeholder={t('storeSlugPlaceholder')}
-              className="flex-1 px-3 py-2 text-sm focus:outline-none"
+              className={`${FIELD_CLASSES} flex-1`}
             />
             <span
               dir="ltr"
