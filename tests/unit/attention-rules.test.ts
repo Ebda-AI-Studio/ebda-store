@@ -1,7 +1,27 @@
 /** "Needs attention": every signal on and off, plan-gated signals never fire, action count. */
 import { describe, it, expect } from 'vitest';
-import { computeAttention, type AttentionFacts } from '../../apps/api/src/services/attention.rules';
-import { ATTENTION_IDS, countActionItems, actionCountsBySection } from '@ebda/shared';
+import { computeAttention } from '../../apps/api/src/services/attention.rules';
+import { countActionItems, actionCountsBySection } from '@ebda/shared';
+
+type AttentionFacts = Parameters<typeof computeAttention>[0];
+// the ids the product ships (the registry in packages/shared/src/attention.ts is module-private: nothing outside imports it)
+const ATTENTION_IDS = [
+  'domain_unverified',
+  'email_dns_missing',
+  'gateway_connection_failed',
+  'gateway_untested',
+  'instapay_incomplete',
+  'no_delivery_rates',
+  'billing_past_due',
+  'billing_claim_pending',
+  'orders_over_limit',
+  'tax_not_verified',
+  'tax_review_pending',
+  'chat_not_connected',
+  'staff_invites_pending',
+  'instapay_orders_unconfirmed',
+  'payments_failed',
+];
 
 const clean: AttentionFacts = {
   features: { tax: true, whatsapp: true, staffAccounts: true },
