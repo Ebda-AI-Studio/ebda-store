@@ -1,5 +1,6 @@
 'use client';
 
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -76,7 +77,7 @@ function PeriodLockCard({ storeId }: { storeId: string }) {
   }
 
   return (
-    <section className="mb-4 max-w-5xl rounded-xl border border-border bg-card p-4 space-y-3">
+    <section className="mb-4 max-w-5xl rounded-lg border border-border bg-card p-4 space-y-3">
       <h2 className="text-sm font-semibold">{t('lockTitle')}</h2>
       <p className="text-sm text-muted-foreground">{t('lockHelp')}</p>
       <p className="text-sm" data-testid="period-lock-status">
@@ -89,7 +90,7 @@ function PeriodLockCard({ storeId }: { storeId: string }) {
             type="date"
             value={draft}
             onChange={e => setDraft(e.target.value)}
-            className="block border border-border rounded-md px-3 py-2 text-base sm:text-sm"
+            className={`${FIELD_CLASSES} sm:w-auto`}
           />
         </label>
         <Button onClick={() => void save(draft || null)} disabled={!draft}>

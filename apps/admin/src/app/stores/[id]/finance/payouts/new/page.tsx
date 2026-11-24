@@ -1,5 +1,6 @@
 'use client';
 
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { FormFooter } from '@/components/FormFooter';
@@ -82,14 +83,16 @@ export default function NewPayoutPage() {
     }
   }
 
-  const field = 'w-full border border-border rounded-md px-3 py-2 text-base sm:text-sm';
-
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
       <div className="max-w-2xl space-y-4">
         <label className="block space-y-1">
           <span className="text-sm font-medium">{t('from')}</span>
-          <select value={fromId} onChange={e => setFromId(e.target.value)} className={field}>
+          <select
+            value={fromId}
+            onChange={e => setFromId(e.target.value)}
+            className={FIELD_CLASSES}
+          >
             <option value="">{t('select')}</option>
             {sources.map(a => (
               <option key={a.id} value={a.id}>
@@ -100,7 +103,11 @@ export default function NewPayoutPage() {
         </label>
         <label className="block space-y-1">
           <span className="text-sm font-medium">{t('bank')}</span>
-          <select value={bankId} onChange={e => setBankId(e.target.value)} className={field}>
+          <select
+            value={bankId}
+            onChange={e => setBankId(e.target.value)}
+            className={FIELD_CLASSES}
+          >
             <option value="">{t('select')}</option>
             {assets
               .filter(a => !SOURCE_CODES.includes(a.code))
@@ -121,7 +128,7 @@ export default function NewPayoutPage() {
               step="0.01"
               value={gross}
               onChange={e => setGross(e.target.value)}
-              className={field}
+              className={FIELD_CLASSES}
             />
           </label>
           <label className="block space-y-1">
@@ -133,7 +140,7 @@ export default function NewPayoutPage() {
               step="0.01"
               value={fee}
               onChange={e => setFee(e.target.value)}
-              className={field}
+              className={FIELD_CLASSES}
             />
           </label>
         </div>
@@ -147,7 +154,7 @@ export default function NewPayoutPage() {
               type="date"
               value={date}
               onChange={e => setDate(e.target.value)}
-              className={field}
+              className={FIELD_CLASSES}
             />
           </label>
           <label className="block space-y-1">
@@ -157,7 +164,7 @@ export default function NewPayoutPage() {
               maxLength={120}
               value={reference}
               onChange={e => setReference(e.target.value)}
-              className={field}
+              className={FIELD_CLASSES}
             />
           </label>
         </div>

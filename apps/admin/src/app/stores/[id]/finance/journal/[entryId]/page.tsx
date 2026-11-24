@@ -1,5 +1,6 @@
 'use client';
 
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -156,7 +157,7 @@ export default function JournalDetailPage() {
         </div>
 
         {canReverse && entry.source === 'manual' && entry.status === 'posted' && (
-          <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <div className="rounded-lg border border-border bg-card p-5 space-y-3">
             {!reversing ? (
               <Button variant="secondary" onClick={() => setReversing(true)}>
                 {t('reverseButton')}
@@ -171,7 +172,7 @@ export default function JournalDetailPage() {
                     onChange={e => setReason(e.target.value)}
                     maxLength={500}
                     rows={2}
-                    className="w-full border border-border rounded-md px-3 py-2 text-base sm:text-sm"
+                    className={TEXTAREA_CLASSES}
                   />
                 </label>
                 {reverseError && <p className="text-sm text-destructive-ink">{reverseError}</p>}
