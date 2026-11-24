@@ -487,6 +487,9 @@ export const PAGES: PageEntry[] = [
     feature: 'staff_accounts',
     syn: { en: 'team members roles permissions invite employee', ar: 'موظفين فريق صلاحيات دعوة' },
   }),
+  page('/activity', 'activity.title', 'owner', {
+    syn: { en: 'audit log history who changed activity', ar: 'سجل نشاط مين غيّر تاريخ' },
+  }),
   page('/features', 'features.page.manageTitle', 'super_admin', {
     syn: { en: 'feature flags addons enable', ar: 'مزايا اضافات تفعيل' },
   }),
@@ -688,6 +691,10 @@ export const SETTINGS: SettingEntry[] = [
   setting('tax.rates', '/tax', 'tax.rates.title', 'owner', {
     en: 'vat rate 14% add tax rate percentage',
     ar: 'معدل الضريبة نسبة 14 اضافة ضريبة',
+  }),
+  setting('tax.change-request', '/tax', 'taxVerification.change.title', 'owner', {
+    en: 'change tax number legal name vat registration verified update trn',
+    ar: 'تغيير الرقم الضريبي الاسم القانوني التسجيل الضريبي تحديث',
   }),
   setting('tax.time-zone', '/tax', 'tax.timeZone.title', 'owner', {
     en: 'time zone timezone cairo clock',
@@ -1043,7 +1050,7 @@ export const SETTINGS_LABEL_BASELINE: Record<string, number> = {
   '/delivery': 14,
   '/shipping': 22, // T4: first-run card (fee, free-over)
   '/payment-settings': 24, // +6: the instalments card (enable, months, markup, provider ar/en, min price), anchored payment.instalments
-  '/tax': 16,
+  '/tax': 20,
   '/pwa': 14, // T4: the on/off switch moved from the header into the body
   '/language': 0,
   '/domain': 1,

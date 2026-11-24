@@ -1077,6 +1077,7 @@ export async function handleOrderRefunded(
             notificationDispatcher.dispatch(storeId, 'refund_processed', {
               customerName,
               customerPhone: guestPhone || undefined,
+              customerId: order.customerId ?? undefined,
               orderNumber: order.orderNumber,
               amount: fromMinor(refundAmount),
               storeId,
