@@ -50,7 +50,10 @@ import { sendAlert } from '../../apps/api/src/services/alerts.service';
 import { registerPlatformRouter } from '../../apps/api/src/services/platform/router';
 import { approveAddonClaim } from '../../apps/api/src/services/billing/addon-instapay';
 import { activeAddons } from '../../apps/api/src/services/billing/addon-grant';
-import { listHeldBillingWebhooks } from '../../apps/api/src/services/billing/subscription-billing.service';
+import {
+  listHeldBillingWebhooks,
+  resolveHeldBillingWebhook,
+} from '../../apps/api/src/services/billing/subscription-billing.service';
 import { planCodeOfSku } from '../../apps/api/src/services/billing/addon-catalog';
 
 const MIG = PLATFORM_MIGRATION_SQL;
@@ -194,5 +197,79 @@ describe('InstaPay add-on approval through the REAL settle + may-settle (review 
     // a retry refuses the same way and still grants nothing
     await expect(act()).rejects.toMatchObject({ code: 'ADDON_PAYMENT_HELD' });
     expect(await addons()).toHaveLength(0);
+  });
+});
+
+describe('resolving a held add-on payment closes the merchant claim behind it (follow-up to #1128)', () => {
+  const resolve = (id: string, action: 'credited' | 'refunded' | 'not_ours') =>
+    resolveHeldBillingWebhook({
+      id,
+      actorId: 'admin-1',
+      action,
+      note: 'checked with the merchant',
+      audit: async () => {},
+    });
+  const claimRow = (db: DatabaseSync) =>
+    db
+      .prepare(
+        'SELECT status s, payer_reference p, review_note n, billing_event_id b FROM manual_payment_claims WHERE id = ?'
+      )
+      .get(CLAIM) as { s: string; p: string; n: string | null; b: string | null };
+  const heldClaim = async () => {
+    const db = rig();
+    seed(db, 5000, 4000);
+    await expect(act()).rejects.toMatchObject({ code: 'ADDON_PAYMENT_HELD' });
+    const [h] = await listHeldBillingWebhooks({ status: 'open' });
+    return { db, h };
+  };
+
+  it.each(['refunded', 'not_ours'] as const)(
+    '%s: the claim is rejected with the note, its reference is freed and it no longer reads pending',
+    async action => {
+      const { db, h } = await heldClaim();
+      expect(claimRow(db).s).toBe('pending'); // the stuck shape this closes
+      await resolve(h.id, action);
+      const c = claimRow(db);
+      expect(c.s).toBe('rejected');
+      expect(c.n).toBe('checked with the merchant');
+      expect(c.p).toContain('#rejected-'); // the unique transfer reference is free for re-filing
+      expect(await addons()).toHaveLength(0);
+    }
+  );
+
+  it('credited with NO granted add-on: rejected with a note that says so, never confirmed', async () => {
+    const { db, h } = await heldClaim();
+    await resolve(h.id, 'credited');
+    const c = claimRow(db);
+    expect(c.s).toBe('rejected');
+    expect(c.n).toMatch(/^Credited by hand, but no active add-on of this kind was found/);
+  });
+
+  it('credited with the add-on actually granted: confirmed against that term', async () => {
+    const { db, h } = await heldClaim();
+    db.prepare(
+      `INSERT INTO billing_events (id, store_id, type, plan_code, billing_interval, amount_minor, currency, provider, idempotency_key, status, for_period_end)
+       VALUES ('99999999-9999-4999-8999-999999999999', ?, 'upgrade', ?, 'monthly', 5000, 'EGP', 'manual', 'manual:granted', 'succeeded', ?)`
+    ).run(STORE, planCodeOfSku(SKU), Date.now() + 20 * 86_400_000);
+    await resolve(h.id, 'credited');
+    expect(claimRow(db)).toMatchObject({
+      s: 'confirmed',
+      b: '99999999-9999-4999-8999-999999999999',
+    });
+  });
+
+  it('a failing queue close leaves the claim already closed, and the retry completes without touching it twice', async () => {
+    const { db, h } = await heldClaim();
+    db.exec(
+      `CREATE TRIGGER fail_queue_close BEFORE UPDATE ON billing_webhook_events WHEN NEW.outcome = 'held_resolved'
+       BEGIN SELECT RAISE(ABORT, 'injected: queue close failed'); END`
+    );
+    await expect(resolve(h.id, 'refunded')).rejects.toThrow();
+    expect(claimRow(db).s).toBe('rejected');
+    db.exec('DROP TRIGGER fail_queue_close');
+    await resolve(h.id, 'refunded');
+    expect(claimRow(db).s).toBe('rejected');
+    expect(claimRow(db).p.match(/#rejected-/g)).toHaveLength(1);
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(0);
   });
 });

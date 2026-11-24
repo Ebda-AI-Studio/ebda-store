@@ -2279,9 +2279,20 @@ export async function resolveHeldBillingWebhook(args: {
     await withStore(storeId, async tx => {
       const r = await tx.billingEvent.findFirst({
         where: { id: rowId, storeId },
-        select: { failureReason: true, status: true },
+        select: { failureReason: true, status: true, planCode: true, idempotencyKey: true },
       });
       if (!r || r.status === 'succeeded') return;
+      // an add-on's InstaPay CLAIM closes with its held ledger row (idempotent: a retry after a failed queue close repeats it)
+      const closeClaim = async () => {
+        const { closeAddonClaimForResolvedHold } = await import('./addon-claim-close.js');
+        await closeAddonClaimForResolvedHold(tx, {
+          storeId,
+          row: { id: rowId, planCode: r.planCode, idempotencyKey: r.idempotencyKey },
+          action: args.action,
+          note: args.note,
+          actorId: args.actorId,
+        });
+      };
       if (r.failureReason?.startsWith(RESOLVED_ROW_PREFIX)) {
         if (queueAlreadyClosed) return; // both halves done already: the usual "not open" below
         if (r.failureReason !== `${RESOLVED_ROW_PREFIX}${args.action}`)
@@ -2290,6 +2301,7 @@ export async function resolveHeldBillingWebhook(args: {
             'HELD_PAYMENT_ACTION_CONFLICT',
             `This payment was already resolved as ${r.failureReason.slice(RESOLVED_ROW_PREFIX.length)}`
           );
+        await closeClaim();
         return;
       }
       if (r.failureReason?.startsWith(HELD_ROW_PREFIX)) {
@@ -2305,6 +2317,7 @@ export async function resolveHeldBillingWebhook(args: {
           data: { status: 'failed', failureReason: `${RESOLVED_ROW_PREFIX}${args.action}` },
         });
         ledgerClosedNow = closed.count > 0;
+        await closeClaim();
       }
     });
   // 2) then the queue entry (already closed by an earlier attempt / build: nothing left to do here unless the ledger half was owed)

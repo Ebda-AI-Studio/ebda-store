@@ -911,7 +911,7 @@ export async function listClaimsForAdmin(status: 'pending' | 'confirmed' | 'reje
 }
 
 /** A rejected/voided claim frees its transfer reference (the claim's unique index) for re-filing. */
-const freedReference = (ref: string, claimId: string, tag: 'rejected' | 'voided') =>
+export const freedReference = (ref: string, claimId: string, tag: 'rejected' | 'voided') =>
   `${ref}#${tag}-${claimId.slice(0, 8)}`.slice(0, 120);
 
 async function rejectClaimInner(args: {
