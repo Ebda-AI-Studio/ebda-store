@@ -2133,7 +2133,12 @@ async function settleRefundInTx(
   succeeded: boolean,
   reason: string | undefined,
   /** a full refund that ends access pushes its `downgraded` effect here; the caller runs it after the tx */
-  effects: BillingEffect[]
+  effects: BillingEffect[],
+  /**
+   * Finish an interrupted settlement: the refund row already reads `succeeded` but the charge it refunds was not flipped yet
+   * (D1 has no interactive transaction). Every step below is compare-and-set, so repeating it only completes what is missing.
+   */
+  resume = false
 ): Promise<void> {
   const upd = await tx.billingEvent.updateMany({
     where: { id: refundId, storeId, status: 'pending' },
@@ -2141,8 +2146,9 @@ async function settleRefundInTx(
       ? { status: 'succeeded' }
       : { status: 'failed', failureReason: reason ?? 'refund_failed' },
   });
-  if (upd.count === 0 || !succeeded) return;
+  if (!succeeded || (upd.count === 0 && !resume)) return;
   const refund = await tx.billingEvent.findUnique({ where: { id: refundId, storeId } });
+  if (upd.count === 0 && refund?.status !== 'succeeded') return;
   if (!refund?.relatedEventId) return;
   const charge = await tx.billingEvent.findUnique({
     where: { id: refund.relatedEventId, storeId },
@@ -2317,9 +2323,25 @@ export async function reverseInstapayAddonPayment(args: {
     );
   const key = `addon-reverse:${charge.id}`;
   const existing = await withStore(storeId, tx =>
-    tx.billingEvent.findFirst({ where: { storeId, idempotencyKey: key }, select: { id: true } })
+    tx.billingEvent.findFirst({
+      where: { storeId, idempotencyKey: key },
+      select: { id: true, status: true },
+    })
   );
-  if (existing) return { refundEventId: existing.id, duplicate: true };
+  if (existing) {
+    // D1 has no interactive transaction: the refund row and its settlement are two steps. A run interrupted between them
+    // leaves a PENDING row, and answering "duplicate" for it would leave the purchase unrefunded and the add-on on while the
+    // admin was told it was reversed. So a still-pending row is settled now, and so is a `succeeded` refund whose charge was
+    // not flipped yet (every settlement step is compare-and-set, so a repeat only completes what is missing).
+    if (
+      existing.status === 'pending' ||
+      (existing.status === 'succeeded' && charge.status === 'succeeded')
+    ) {
+      await settleAddonReversal(storeId, existing.id, args);
+      return { refundEventId: existing.id, duplicate: false };
+    }
+    return { refundEventId: existing.id, duplicate: true };
+  }
   if (charge.status !== 'succeeded')
     throw new AppError(409, 'NOT_REVERSIBLE', 'Only a succeeded payment can be reversed');
   const refundId = await claimEvent({
@@ -2333,11 +2355,30 @@ export async function reverseInstapayAddonPayment(args: {
     relatedEventId: charge.id,
   });
   if (!refundId) {
+    // lost the claim race: the winner is (or was) settling; finish a pending row instead of reporting a bare duplicate
     const raced = await withStore(storeId, tx =>
-      tx.billingEvent.findFirst({ where: { storeId, idempotencyKey: key }, select: { id: true } })
+      tx.billingEvent.findFirst({
+        where: { storeId, idempotencyKey: key },
+        select: { id: true, status: true },
+      })
     );
+    if (
+      raced?.status === 'pending' ||
+      (raced?.status === 'succeeded' && charge.status === 'succeeded')
+    )
+      await settleAddonReversal(storeId, raced.id, args);
     return { refundEventId: raced?.id ?? '', duplicate: true };
   }
+  await settleAddonReversal(storeId, refundId, args);
+  return { refundEventId: refundId, duplicate: false };
+}
+
+/** Settle the pending outside-the-gateway refund row of an InstaPay add-on reversal (guarded on pending, safe to repeat). */
+async function settleAddonReversal(
+  storeId: string,
+  refundId: string,
+  args: { reason: string; actorId: string }
+): Promise<void> {
   const effects: BillingEffect[] = [];
   await withStore(storeId, async tx => {
     await tx.billingEvent.updateMany({
@@ -2350,11 +2391,10 @@ export async function reverseInstapayAddonPayment(args: {
         } as Prisma.InputJsonValue,
       },
     });
-    await settleRefundInTx(tx, storeId, refundId, true, undefined, effects);
+    await settleRefundInTx(tx, storeId, refundId, true, undefined, effects, true);
   });
   await runBillingEffects(effects);
   await restoreRevokedGrants().catch(() => undefined);
-  return { refundEventId: refundId, duplicate: false };
 }
 
 // ───────────────────────────── read models (UI) ───────────────────────────
