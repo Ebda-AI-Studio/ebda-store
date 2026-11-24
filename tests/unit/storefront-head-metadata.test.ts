@@ -56,6 +56,30 @@ beforeEach(() => {
   state.urlLang = undefined;
 });
 
+describe('root layout generateMetadata: the phone-app switch gates the manifest link (PW1)', () => {
+  it('switch OFF: no manifest link, so the store is not installable', async () => {
+    state.store = { ...BASE, pwaEnabled: false };
+    const { generateMetadata } = await import('../../apps/web/src/app/layout');
+    expect((await generateMetadata()).manifest).toBeUndefined();
+  });
+  it('switch never set: no manifest link either', async () => {
+    state.store = { ...BASE };
+    const { generateMetadata } = await import('../../apps/web/src/app/layout');
+    expect((await generateMetadata()).manifest).toBeUndefined();
+  });
+  it('switch ON but the platform feature is off: no manifest link', async () => {
+    state.store = { ...BASE, pwaEnabled: true, enabledFeatures: ['reviews'] };
+    const { generateMetadata } = await import('../../apps/web/src/app/layout');
+    expect((await generateMetadata()).manifest).toBeUndefined();
+  });
+  it('switch ON: the manifest is linked in the page language', async () => {
+    state.store = { ...BASE, pwaEnabled: true, enabledFeatures: ['pwa'] };
+    state.urlLang = 'ar';
+    const { generateMetadata } = await import('../../apps/web/src/app/layout');
+    expect((await generateMetadata()).manifest).toBe('/ar/manifest.webmanifest');
+  });
+});
+
 describe('root layout generateMetadata', () => {
   it('#1844: a suspended store is noindex in the head', async () => {
     state.store = { ...BASE, status: 'suspended' };
@@ -97,6 +121,10 @@ describe('the manifest link follows the language in the URL (Ruling PWA-MANIFEST
     (await import('../../apps/web/src/app/layout')).generateMetadata() as Promise<{
       manifest?: unknown;
     }>;
+  // These tests are about the LANGUAGE of the link, so the store has its phone-app switch on (PW1 has its own tests).
+  beforeEach(() => {
+    state.store = { ...BASE, pwaEnabled: true, enabledFeatures: ['pwa'] };
+  });
 
   it('a /en page links the English manifest, a /ar page the Arabic one, whatever the cookie says', async () => {
     state.urlLang = 'en';

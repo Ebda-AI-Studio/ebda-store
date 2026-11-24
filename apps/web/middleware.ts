@@ -701,7 +701,7 @@ export const config = {
      * Match all request paths except:
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - sw.js
+     * (sw.js is NOT excluded: it answers per store, see app/sw.js/route.ts, PW1)
      * - public folder
      * - .well-known/security.txt (RFC 9116 — must serve the STATIC file on
      *   every host, incl. custom domains, without tenant rewrites). Narrowed
@@ -733,6 +733,6 @@ export const config = {
      * NextResponse.next() with no rewrite, and Next serves the static
      * /public/favicon.ico exactly as before.
      */
-    '/((?!_next/static|_next/image|sw\\.js|api/|public/|\\.well-known/security\\.txt).*)',
+    '/((?!_next/static|_next/image|api/|public/|\\.well-known/security\\.txt).*)',
   ],
 };

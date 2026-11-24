@@ -261,7 +261,8 @@ describe('middleware — /manifest.webmanifest gets the same store context as a 
   });
 
   it('still skips the static files it exists to skip (control)', () => {
-    expect(matcher.test('/sw.js')).toBe(false);
+    // /sw.js is per store now (PW1): it needs the same store context the manifest does
+    expect(matcher.test('/sw.js')).toBe(true);
     expect(matcher.test('/_next/static/chunks/a.js')).toBe(false);
     expect(matcher.test('/.well-known/security.txt')).toBe(false);
     expect(matcher.test('/api/store-favicon')).toBe(false);

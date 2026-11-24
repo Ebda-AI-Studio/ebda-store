@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
  * bytes Next produced from the file convention (`JSON.stringify` of the object) and the same two headers.
  */
 
-const built = { current: {} as Record<string, unknown> };
+const built = { current: {} as Record<string, unknown> | null };
 vi.mock('../../lib/pwa/store-manifest', () => ({
   buildStoreManifest: async () => built.current,
 }));
@@ -17,6 +17,15 @@ const { GET } = await import('./route');
 
 afterEach(() => {
   built.current = {};
+});
+
+describe('/manifest.webmanifest route: switch off (PW1)', () => {
+  it('answers 404 when the store has no manifest, so a direct fetch cannot install it either', async () => {
+    built.current = null;
+    const res = await GET();
+    expect(res.status).toBe(404);
+    expect(res.headers.get('content-type')).not.toMatch(/manifest/);
+  });
 });
 
 describe('/manifest.webmanifest route', () => {

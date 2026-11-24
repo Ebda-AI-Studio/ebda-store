@@ -30,11 +30,14 @@ vi.mock('next/headers', () => ({
   }),
 }));
 
-const { buildStoreManifest: manifest } = await import('./store-manifest');
+const { buildStoreManifest: rawManifest } = await import('./store-manifest');
+/** The manifest of a store that has the phone app on (the null answer has its own tests). */
+const manifest = async () => (await rawManifest())!;
 
 function makeStore(overrides: Record<string, unknown> = {}) {
   return {
     id: 'store-1',
+    pwaEnabled: true,
     name: 'Demo Shop',
     nameAr: 'وادي الجوز',
     slug: 'demo-shop',
@@ -621,5 +624,42 @@ describe('manifest: the language in the URL decides, a cookie the browser never 
     expect(JSON.stringify(await manifest())).toBe(shared);
     urlRef.lang = 'en';
     expect(JSON.stringify(await manifest())).not.toBe(shared);
+  });
+});
+
+describe('manifest: the phone-app switch and the merchant branding (PW1, PW2)', () => {
+  it('PW1: switch off, never set, or feature off: no manifest at all', async () => {
+    cookieRef.lang = undefined;
+    for (const o of [
+      { pwaEnabled: false },
+      { pwaEnabled: undefined },
+      { pwaEnabled: true, enabledFeatures: ['reviews'] },
+    ]) {
+      storeRef.current = makeStore(o);
+      expect(await rawManifest()).toBeNull();
+    }
+  });
+
+  it('PW1 control: switch on and the pwa feature on serves it', async () => {
+    storeRef.current = makeStore({ pwaEnabled: true, enabledFeatures: ['pwa'] });
+    expect((await manifest())?.display).toBe('standalone');
+  });
+
+  it('PW2: with no favicon the merchant logo is the home-screen icon, not the platform default', async () => {
+    storeRef.current = makeStore({ logo: 'https://cdn.example/amelia-logo.png' });
+    const m = await manifest();
+    expect(m?.icons?.map(i => i.src)).toEqual([
+      'https://cdn.example/amelia-logo.png',
+      'https://cdn.example/amelia-logo.png',
+    ]);
+  });
+
+  it('PW2: a store name longer than 12 characters gets a caption that fits (first word, else cut)', async () => {
+    storeRef.current = makeStore({ name: 'Amelia Aurum Jewellery', nameAr: undefined });
+    expect((await manifest())?.short_name).toBe('Amelia');
+    storeRef.current = makeStore({ name: 'Supercalifragilistic', nameAr: undefined });
+    expect((await manifest())?.short_name).toBe('Supercalifra');
+    // the full name stays the full name
+    expect((await manifest())?.name).toBe('Supercalifragilistic');
   });
 });

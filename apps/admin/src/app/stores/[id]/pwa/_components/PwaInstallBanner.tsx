@@ -60,7 +60,7 @@ export function PwaInstallBanner({ settings, pwaEnabled, onChange }: PwaInstallB
         />
 
         {/* Offline-support toggle removed: the storefront service worker has no
-            fetch handler and caches nothing (apps/web/public/sw.js is push-only),
+            fetch handler and caches nothing (apps/web/src/lib/pwa/sw-source.ts is push-only),
             so this toggle was a no-op that promised offline caching we don't do. */}
         <ToggleRow
           title={t('push.title')}
