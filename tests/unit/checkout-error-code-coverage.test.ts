@@ -216,6 +216,9 @@ function unconditionallyAnsweredBundleCodes(bundleSrc: string): string[] {
  * "I did not write copy for it yet" is not a reason.
  */
 const DELIBERATELY_GENERIC: Record<string, string> = {
+  // Ruling T01-SHIP-1: the shipping-fee lookup failed (a database blip). Nothing was written, so a retry gets the real fee.
+  SHIPPING_UNAVAILABLE:
+    'the delivery fee could not be worked out for a moment — transient, the order was refused before any write, and a retry succeeds once the lookup answers',
   // Payment leg (#1826). Both leave the order PENDING — no compensating
   // rollback runs for them — and a retry creates a fresh order that can
   // succeed. The stranded pending order holds its stock until

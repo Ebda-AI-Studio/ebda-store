@@ -308,6 +308,7 @@ vi.mock('@api/lib/logger', () => ({
 }));
 
 import { OrderService } from '@api/services/order.service';
+import { ShippingService } from '@api/services/shipping.service';
 import { AppError } from '@api/middleware/error-handler';
 import { CartService } from '@api/services/cart.service';
 
@@ -386,6 +387,13 @@ async function chargedDiscount(): Promise<number> {
 
 describe('coupon on a cart containing a bundle — quote must equal charge', () => {
   beforeEach(() => {
+    // a failed shipping lookup is refused (T01-SHIP-1); these tests are about bundles, so the store has no zones: 0
+    vi.spyOn(ShippingService, 'calculateShipping').mockResolvedValue({
+      shippingCost: 0,
+      freeShipping: false,
+      matched: false,
+      storeHasAreaRates: false,
+    } as never);
     vi.clearAllMocks();
     mockPrisma.bundle.findFirst.mockResolvedValue(BUNDLE_ROW);
     mockPrisma.bundleItem.findMany.mockResolvedValue(BUNDLE_ITEM_ROWS);
@@ -523,6 +531,12 @@ describe('coupon on a cart containing a bundle — quote must equal charge', () 
  */
 describe('a bundle edited mid-checkout is refused, not a 500', () => {
   beforeEach(() => {
+    vi.spyOn(ShippingService, 'calculateShipping').mockResolvedValue({
+      shippingCost: 0,
+      freeShipping: false,
+      matched: false,
+      storeHasAreaRates: false,
+    } as never);
     vi.clearAllMocks();
     mockPrisma.bundle.findFirst.mockResolvedValue(BUNDLE_ROW);
     mockPrisma.coupon.findFirst.mockResolvedValue(couponRow());
