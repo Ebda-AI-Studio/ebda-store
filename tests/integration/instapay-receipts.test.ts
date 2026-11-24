@@ -51,6 +51,7 @@ import {
   recordManualRefund,
   rejectClaim,
 } from '@api/services/billing/account.service';
+import { getSubscriptionBillingState } from '@api/services/billing/subscription-billing.service';
 import { ProvisioningService } from '@api/services/provisioning.service';
 import {
   fieldsFrom,
@@ -687,6 +688,101 @@ describe.skipIf(!hasDb)('InstaPay receipts (money batch A)', () => {
         })
       );
       expect(await subOf(t.storeId)).toMatchObject({ status: 'active', planCode: 'growth' });
+    });
+
+    // Ruling BILLING-INTERVAL-PENDING-1: an interval picked at checkout on an ACTIVE subscription is a choice until its
+    // payment is recorded (Amelia: a yearly grant, then a monthly pick, showed "(Monthly)" next to a period a year out).
+    describe('BILLING-INTERVAL-PENDING-1: active store picks another interval', () => {
+      async function activeYearly(tag: string) {
+        const t = await trialStore(tag);
+        const end = new Date(Date.now() + 365 * 86_400_000);
+        await owner.storeSubscription.update({
+          where: { storeId: t.storeId },
+          data: {
+            status: 'active',
+            planCode: 'growth',
+            billingInterval: 'yearly',
+            currentPeriodStart: new Date(),
+            currentPeriodEnd: end,
+            trialEndsAt: null,
+            pendingPlanCode: null,
+            billingMethod: 'instapay',
+          },
+        });
+        return { t, end };
+      }
+
+      it('pick monthly, no payment: stays yearly, renewal quote yearly, payment quote monthly', async () => {
+        const { t, end } = await activeYearly('pendyr');
+        const details = await asApp(() =>
+          chooseInstapayPlan({ storeId: t.storeId, planCode: 'growth', interval: 'monthly' })
+        );
+        const sub = await subOf(t.storeId);
+        expect(sub).toMatchObject({ billingInterval: 'yearly', pendingBillingInterval: 'monthly' });
+        expect(sub.currentPeriodEnd!.getTime()).toBe(end.getTime());
+        const state = await asApp(() => getSubscriptionBillingState(t.storeId));
+        expect(state.billingInterval).toBe('yearly');
+        expect(state.pendingBillingInterval).toBe('monthly');
+        // the renewal quote is the YEARLY price at the period end; the transfer asked for is the MONTHLY one
+        expect(state.nextCharge!.at.getTime()).toBe(end.getTime());
+        expect(state.nextCharge!.amountMinor!).toBeGreaterThan(details!.amountMinor!);
+        expect(state.instapay.amountMinor).toBe(details!.amountMinor);
+        expect(details!.interval).toBe('monthly');
+      });
+
+      it('pay: monthly applies when the payment is recorded; pending is cleared', async () => {
+        const { t } = await activeYearly('pendpay');
+        const details = await asApp(() =>
+          chooseInstapayPlan({ storeId: t.storeId, planCode: 'growth', interval: 'monthly' })
+        );
+        const { claim, receipt } = await asApp(() =>
+          submitTestSubscriptionReceipt(t.storeId, { amountMinor: details!.amountMinor! })
+        );
+        expect(claim.billingInterval).toBe('monthly');
+        await asApp(() =>
+          recordManualPayment({
+            storeId: t.storeId,
+            planCode: claim.planCode,
+            interval: 'monthly',
+            amountMinor: claim.amountMinor,
+            method: 'instapay',
+            reference: receipt.fields.reference!,
+            paidAt: new Date(),
+            actorId: superAdmin.id,
+            claimId: claim.id,
+          })
+        );
+        expect(await subOf(t.storeId)).toMatchObject({
+          status: 'active',
+          billingInterval: 'monthly',
+          pendingBillingInterval: null,
+        });
+      });
+
+      it('abandon: picking the current interval again (or never paying) leaves the interval untouched', async () => {
+        const { t } = await activeYearly('pendabn');
+        await asApp(() =>
+          chooseInstapayPlan({ storeId: t.storeId, planCode: 'growth', interval: 'monthly' })
+        );
+        await asApp(() =>
+          chooseInstapayPlan({ storeId: t.storeId, planCode: 'growth', interval: 'yearly' })
+        );
+        expect(await subOf(t.storeId)).toMatchObject({
+          billingInterval: 'yearly',
+          pendingBillingInterval: null,
+        });
+      });
+
+      it('a trialing store still writes the interval directly (no active period to protect)', async () => {
+        const t = await trialStore('pendtrial');
+        await asApp(() =>
+          chooseInstapayPlan({ storeId: t.storeId, planCode: 'basic', interval: 'yearly' })
+        );
+        expect(await subOf(t.storeId)).toMatchObject({
+          billingInterval: 'yearly',
+          pendingBillingInterval: null,
+        });
+      });
     });
 
     it('paying for a store beyond the store allowance is refused with the store to pay on', async () => {

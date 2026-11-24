@@ -23,8 +23,12 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": [],
-    "en": []
+    "ar": [
+      "فين سجل المراجعة بتاع المنصة؟",
+      "مين عمل التغيير ده في المنصة؟",
+      "ازاي ادور في سجل العمليات؟"
+    ],
+    "en": ["Where is the platform audit log?"]
   },
   "steps": ["Super-admin console only."],
   "edgeCases": [

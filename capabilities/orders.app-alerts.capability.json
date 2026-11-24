@@ -18,7 +18,11 @@
   },
   "helpArticle": "notifications-and-order-alerts",
   "questions": {
-    "ar": ["ازاي يرن الموبايل لما ييجي اوردر؟", "تطبيق ادارة الطلبات"],
+    "ar": [
+      "ازاي يرن الموبايل لما ييجي اوردر؟",
+      "تطبيق ادارة الطلبات",
+      "الاوردر الجديد مش بيطلع اشعار"
+    ],
     "en": ["How do I get a sound alert for new orders?"]
   },
   "steps": [
