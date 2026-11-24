@@ -33,7 +33,11 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { refundCharge, settleInTx } from '@api/services/billing/subscription-billing.service';
+import {
+  refundCharge,
+  reverseInstapayAddonPayment,
+  settleInTx,
+} from '@api/services/billing/subscription-billing.service';
 
 const NOW = new Date('2026-11-14T10:00:00.000Z');
 const row = {
@@ -140,10 +144,10 @@ describe('add-on payment settlement', () => {
 const refundTx: any = {
   billingEvent: {
     findUnique: vi.fn(),
+    findFirst: vi.fn(async (): Promise<any> => null),
     findMany: async () => [],
-    findFirst: async () => null,
-    createMany: async () => ({ count: 1 }),
-    updateMany: async () => ({ count: 1 }),
+    createMany: vi.fn(async (_a?: any) => ({ count: 1 })),
+    updateMany: vi.fn(async (_a?: any) => ({ count: 1 })),
     aggregate: async () => ({ _sum: { amountMinor: 9900 } }),
   },
   billingGrant: { findMany: async () => [], updateMany: async () => ({ count: 0 }) },
@@ -209,6 +213,18 @@ describe('refund of an add-on payment', () => {
     expect(moved.data.forPeriodEnd.getTime() - NOWMS).toBeGreaterThan(29.99 * 86_400_000);
     expect(moved.data.forPeriodEnd.getTime() - NOWMS).toBeLessThan(30.01 * 86_400_000);
   });
+  it('an InstaPay add-on payment is never sent to the card gateway for a refund (push-only: staff refund outside it)', async () => {
+    const refund = vi.fn(async () => ({ status: 'succeeded', refundId: 'r1' }));
+    refundTx.billingEvent.findUnique.mockImplementation(async ({ where }: any) =>
+      where.id === 'c1'
+        ? { ...charge('addon:feature:loyalty'), provider: 'instapay', providerRef: 'TXN123' }
+        : { id: where.id, relatedEventId: 'c1', storeId: 's1' }
+    );
+    await expect(
+      refundCharge({ eventId: 'c1', provider: { name: 'kashier', refund } as any })
+    ).rejects.toMatchObject({ code: 'NOT_REFUNDABLE' });
+    expect(refund).not.toHaveBeenCalled();
+  });
   it('a plan refund does not touch the feature cache from this path', async () => {
     refundTx.billingEvent.findUnique.mockImplementation(async ({ where }: any) =>
       where.id === 'c1' ? charge('growth') : { id: where.id, relatedEventId: 'c1', storeId: 's1' }
@@ -240,5 +256,83 @@ describe('refund of an add-on payment', () => {
       refundTx.storeSubscription.findUnique.mockResolvedValue(null);
     }
     expect(refundTx.storeSubscription.update).toHaveBeenCalled();
+  });
+});
+
+describe('P5: reversing an approved InstaPay add-on purchase', () => {
+  const instapayCharge = (over: Record<string, unknown> = {}) => ({
+    id: 'c1',
+    storeId: 's1',
+    subscriptionId: null,
+    type: 'upgrade',
+    status: 'succeeded',
+    providerRef: 'TXN1',
+    provider: 'instapay',
+    amountMinor: 9900,
+    planCode: 'addon:feature:loyalty',
+    ...over,
+  });
+  const use = (charge: Record<string, unknown>) =>
+    refundTx.billingEvent.findUnique.mockImplementation(async ({ where }: any) =>
+      where.id === 'c1' ? charge : { id: where.id, relatedEventId: 'c1', storeId: 's1' }
+    );
+  beforeEach(() => {
+    inv.entity.mockResolvedValue('s1');
+    refundTx.billingEvent.findFirst.mockReset().mockResolvedValue(null);
+    refundTx.billingEvent.createMany.mockClear();
+    refundTx.billingEvent.updateMany.mockClear();
+  });
+
+  it('records ONE refund row (provider instapay, outside the gateway), flips the payment to refunded and drops the cache', async () => {
+    use(instapayCharge());
+    const out = await reverseInstapayAddonPayment({
+      eventId: 'c1',
+      reason: 'fake receipt',
+      actorId: 'admin1',
+    });
+    expect(out.duplicate).toBe(false);
+    const row = refundTx.billingEvent.createMany.mock.calls[0][0].data[0];
+    expect(row).toMatchObject({
+      type: 'refund',
+      provider: 'instapay',
+      amountMinor: 9900,
+      relatedEventId: 'c1',
+      idempotencyKey: 'addon-reverse:c1',
+    });
+    const flips = refundTx.billingEvent.updateMany.mock.calls
+      .map((c: any[]) => c[0])
+      .filter((a: any) => a.data?.status === 'refunded');
+    expect(flips).toHaveLength(1);
+    expect(inv.invalidate).toHaveBeenCalledWith('s1');
+  });
+
+  it('a replay changes nothing and returns the first reversal', async () => {
+    use(instapayCharge({ status: 'refunded' }));
+    refundTx.billingEvent.findFirst.mockResolvedValue({ id: 'r-first' });
+    const out = await reverseInstapayAddonPayment({
+      eventId: 'c1',
+      reason: 'again',
+      actorId: 'admin1',
+    });
+    expect(out).toEqual({ refundEventId: 'r-first', duplicate: true });
+    expect(refundTx.billingEvent.createMany).not.toHaveBeenCalled();
+  });
+
+  it('only an InstaPay add-on payment: a card add-on or a plan payment is refused untouched', async () => {
+    for (const over of [{ provider: 'kashier' }, { planCode: 'growth' }]) {
+      use(instapayCharge(over));
+      await expect(
+        reverseInstapayAddonPayment({ eventId: 'c1', reason: 'x'.repeat(5), actorId: 'a' })
+      ).rejects.toMatchObject({ code: 'NOT_AN_INSTAPAY_ADDON' });
+    }
+    expect(refundTx.billingEvent.createMany).not.toHaveBeenCalled();
+  });
+
+  it('a payment that never succeeded cannot be reversed', async () => {
+    use(instapayCharge({ status: 'pending' }));
+    await expect(
+      reverseInstapayAddonPayment({ eventId: 'c1', reason: 'nope', actorId: 'a' })
+    ).rejects.toMatchObject({ code: 'NOT_REVERSIBLE' });
+    expect(refundTx.billingEvent.createMany).not.toHaveBeenCalled();
   });
 });

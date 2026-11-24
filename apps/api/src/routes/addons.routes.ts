@@ -12,6 +12,8 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog } from '../middleware/security';
 import { idempotencyKeyOf } from '../lib/money-idempotency';
 import { AppError } from '../middleware/error-handler';
+import { instapayReceiptFieldsSchema } from '@ebda/shared';
+import { addonInstapayInstructions, submitAddonReceipt } from '../services/billing/addon-instapay';
 import {
   cancelAddon,
   listAddons,
@@ -109,6 +111,44 @@ router.post('/:sku/cancel', ...write, async (req: Request, res: Response, next: 
     next(err);
   }
 });
+/** InstaPay for one add-on: handle, QR, the exact total and the reference. Read-only; nothing is created. */
+router.get('/:sku/instapay', ...read, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sku = skuSchema.parse(req.params.sku);
+    res.json({ success: true, data: await addonInstapayInstructions(req.params.storeId, sku) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * The merchant's checked receipt for an add-on paid by InstaPay (the screenshot goes up through the existing
+ * POST /billing/receipts). Opens an entry in the super-admin approval queue and NEVER turns anything on.
+ */
+router.post(
+  '/:sku/instapay/receipts/:receiptId/submit',
+  ...write,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sku = skuSchema.parse(req.params.sku);
+      const receiptId = z.string().uuid().parse(req.params.receiptId);
+      const fields = instapayReceiptFieldsSchema.parse(req.body);
+      const out = await submitAddonReceipt({
+        storeId: req.params.storeId,
+        sku,
+        receiptId,
+        fields,
+      });
+      await audit(req, 'billing.addon_instapay_claimed', { sku, claimId: out.claim.id });
+      res.status(201).json({
+        success: true,
+        data: { claim: { id: out.claim.id, status: out.claim.status }, receipt: out.receipt },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 router.post('/:sku/resume', ...write, async (req: Request, res: Response, next: NextFunction) => {
   try {

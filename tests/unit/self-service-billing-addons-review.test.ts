@@ -81,6 +81,7 @@ vi.mock('@api/lib/ai-quota', () => ({
   storeAiAllowance: async () => ({ baseCap: 450, extra: 0, cap: 450, used: 0, remaining: 450 }),
   storeAiExtraRequests: async () => 0,
   maxStoreDailyRequests: () => 900,
+  storeAiUsageByFeature: async () => [],
 }));
 vi.mock('@api/lib/money-idempotency', () => ({
   idempotencyKeyOf: (v?: string) => v,
@@ -155,10 +156,12 @@ function fakeTx() {
     store: {
       findUnique: async () => ({
         name: 'Shop',
+        plan: 'starter',
         settings: {},
         owner: { email: 'm@x.test', firstName: 'M' },
       }),
     },
+    manualPaymentClaim: { count: async () => 0 },
     storeSubscription: { findUnique: async () => h.sub },
     storeFeature: {
       findFirst: vi.fn(async () => h.offRow),

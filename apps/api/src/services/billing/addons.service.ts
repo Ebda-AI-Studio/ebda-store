@@ -33,6 +33,7 @@ import {
   type AddonItem,
 } from './addon-catalog';
 import { activeAddons, appendRenewalMarker } from './addon-grant';
+import { canBuyFeatureOnPlan } from '@ebda/shared';
 
 const TOOL = 'billing.addon-purchase';
 
@@ -67,23 +68,44 @@ const subject = (a: {
 });
 
 /** Everything a quote and a purchase must agree on; refuses what must not be sold. */
-async function quote(storeId: string, sku: string) {
+export async function quoteAddon(
+  storeId: string,
+  sku: string,
+  opts: { card: boolean } = { card: true }
+) {
   const item = itemOf(sku);
   await assertPayableStore(storeId);
-  if (resolveTrialCardMode() !== 'card_on_file') {
+  if (opts.card && resolveTrialCardMode() !== 'card_on_file') {
     throw new AppError(409, 'CARD_PAYMENTS_DISABLED', 'Card payments are not available yet');
   }
   const [store, sub, running] = await Promise.all([
     withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { name: true, settings: true, owner: { select: { email: true, firstName: true } } },
+        select: {
+          name: true,
+          plan: true,
+          settings: true,
+          owner: { select: { email: true, firstName: true } },
+        },
       })
     ),
     withStore(storeId, tx => tx.storeSubscription.findUnique({ where: { storeId } })),
     withStore(storeId, tx => activeAddons(tx, storeId, new Date())),
   ]);
   if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  // An InstaPay payment for this add-on is already waiting for a super admin: never sell it a second way meanwhile.
+  const waiting = await withStore(storeId, tx =>
+    tx.manualPaymentClaim.count({
+      where: { storeId, status: 'pending', planCode: planCodeOfSku(sku) },
+    })
+  );
+  if (waiting > 0)
+    throw new AppError(
+      409,
+      'ADDON_AWAITING_CONFIRMATION',
+      'This add-on is already waiting for confirmation'
+    );
   if (!store.owner?.email)
     throw new AppError(409, 'NO_BILLING_EMAIL', 'The store owner has no email address');
   if (sub?.status === 'comped')
@@ -98,6 +120,17 @@ async function quote(storeId: string, sku: string) {
         'AI_CAPACITY_UNAVAILABLE',
         'The shared AI capacity cannot back this top-up right now. Nothing was charged.'
       );
+  }
+  if (item.kind === 'feature' && !canBuyFeatureOnPlan(String(store.plan), item.featureKey!)) {
+    // Business holds every feature; Free picks a plan first; Basic/Growth only buy what their own plan lacks.
+    const topPlan = store.plan === 'enterprise';
+    throw new AppError(
+      409,
+      topPlan ? 'ALREADY_INCLUDED' : 'ADDON_NOT_FOR_PLAN',
+      topPlan
+        ? 'Your plan already includes this feature'
+        : 'This feature cannot be added to your current plan. Choose a plan first.'
+    );
   }
   if (item.kind === 'feature') {
     // A super-admin "off" (abuse, dispute) is never sold around: the owner contacts support instead.
@@ -123,7 +156,7 @@ async function quote(storeId: string, sku: string) {
 }
 
 export async function previewAddon(a: { storeId: string; userId: string; sku: string }) {
-  const { item, amount } = await quote(a.storeId, a.sku);
+  const { item, amount } = await quoteAddon(a.storeId, a.sku);
   const t = terms(item, amount.totalMinor);
   return {
     sku: item.sku,
@@ -151,7 +184,7 @@ export async function purchaseAddon(a: {
     `addon-checkout:${a.storeId}`,
     a.idempotencyKey,
     async () => {
-      const { item, store, amount } = await quote(a.storeId, a.sku);
+      const { item, store, amount } = await quoteAddon(a.storeId, a.sku);
       const subj = subject({
         storeId: a.storeId,
         userId: a.userId,

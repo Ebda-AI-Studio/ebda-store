@@ -710,6 +710,13 @@ async function settleCharge(eventId: string, o: Outcome, now: Date) {
   return res;
 }
 
+/**
+ * A super admin approved an InstaPay payment for a pending ledger row (add-on purchase): settle it through the SAME
+ * guarded pending -> succeeded transition a card webhook uses, so the grant happens exactly once and a replay is a no-op.
+ */
+export const settleApprovedPayment = (eventId: string, providerRef: string, now: Date) =>
+  settleDefinitive(eventId, { status: 'succeeded', providerRef }, now);
+
 /** Test seam: the pause between settle retries (ms per attempt). */
 export const settleRetry = { delayMs: 250, attempts: 3 };
 
@@ -1363,6 +1370,7 @@ export async function sweepStuckCharges(
           storeId: true,
           idempotencyKey: true,
           providerRef: true,
+          provider: true,
           createdAt: true,
         },
       }),
@@ -1370,7 +1378,9 @@ export async function sweepStuckCharges(
       onStoreError: (storeId, err) => logger.error({ err, storeId }, '[billing] stuck scan failed'),
     }
   );
-  const rows = parts.flatMap(p => p.value);
+  // An InstaPay add-on row is pending only between the claim and a super admin's approval retry: the card gateway has
+  // never heard of it, so asking it would answer "never taken" and fail a payment that was made.
+  const rows = parts.flatMap(p => p.value).filter(r => r.provider !== 'instapay');
   let active: BillingProvider | null = provider ?? null;
   if (!active && rows.length > 0) {
     try {
@@ -2192,6 +2202,10 @@ export async function refundCharge(args: {
     // A manual payment was never taken by the gateway; a card setup took nothing.
     throw new AppError(409, 'NOT_REFUNDABLE', 'Refund manual payments outside the gateway');
   }
+  if (charge.provider === 'instapay') {
+    // InstaPay is push-only: its providerRef is the payer's transfer id, which the card gateway cannot refund.
+    throw new AppError(409, 'NOT_REFUNDABLE', 'Refund InstaPay payments outside the gateway');
+  }
   if (charge.status !== 'succeeded' || !charge.providerRef) {
     throw new AppError(409, 'NOT_REFUNDABLE', 'Only a succeeded charge can be refunded');
   }
@@ -2273,6 +2287,74 @@ export async function refundCharge(args: {
     logger.error({ err, refundId }, '[billing] refund outcome unknown — left pending');
     throw new AppError(502, 'BILLING_PROVIDER_ERROR', 'Refund outcome unknown; check the ledger');
   }
+}
+
+/**
+ * Reverse an approved InstaPay ADD-ON purchase (money-abuse audit P5): the receipt was a mistake or a fake. Super admin
+ * only (route). The money goes back OUTSIDE the gateway (InstaPay is push-only), so this records it and ends the
+ * entitlement: a `refund` ledger row (provider `instapay`, key `addon-reverse:<id>`, once) settles through the same
+ * transition a gateway refund uses, which flips the payment to `refunded` (the term ends AT ONCE: entitlement reads only
+ * succeeded rows), revokes grants and emits `addon_granted` (drops the feature cache and the public store payload).
+ * A replay returns the first reversal; nothing is ever reversed twice.
+ */
+export async function reverseInstapayAddonPayment(args: {
+  eventId: string;
+  reason: string;
+  actorId: string;
+}): Promise<{ refundEventId: string; duplicate: boolean }> {
+  const storeId = await getEntityStoreId('billing_event', args.eventId);
+  const charge = storeId
+    ? await withStore(storeId, tx =>
+        tx.billingEvent.findUnique({ where: { id: args.eventId, storeId } })
+      )
+    : null;
+  if (!charge || !storeId) throw new AppError(404, 'NOT_FOUND', 'No such charge');
+  if (charge.type !== 'upgrade' || !isAddonRow(charge) || charge.provider !== 'instapay')
+    throw new AppError(
+      409,
+      'NOT_AN_INSTAPAY_ADDON',
+      'Only an InstaPay add-on payment can be reversed here'
+    );
+  const key = `addon-reverse:${charge.id}`;
+  const existing = await withStore(storeId, tx =>
+    tx.billingEvent.findFirst({ where: { storeId, idempotencyKey: key }, select: { id: true } })
+  );
+  if (existing) return { refundEventId: existing.id, duplicate: true };
+  if (charge.status !== 'succeeded')
+    throw new AppError(409, 'NOT_REVERSIBLE', 'Only a succeeded payment can be reversed');
+  const refundId = await claimEvent({
+    storeId,
+    subscriptionId: charge.subscriptionId,
+    type: 'refund',
+    planCode: charge.planCode,
+    amountMinor: charge.amountMinor,
+    provider: 'instapay',
+    idempotencyKey: key,
+    relatedEventId: charge.id,
+  });
+  if (!refundId) {
+    const raced = await withStore(storeId, tx =>
+      tx.billingEvent.findFirst({ where: { storeId, idempotencyKey: key }, select: { id: true } })
+    );
+    return { refundEventId: raced?.id ?? '', duplicate: true };
+  }
+  const effects: BillingEffect[] = [];
+  await withStore(storeId, async tx => {
+    await tx.billingEvent.updateMany({
+      where: { id: refundId, storeId, status: 'pending' },
+      data: {
+        raw: {
+          outsideGateway: true,
+          reason: args.reason.slice(0, 500),
+          actorId: args.actorId,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await settleRefundInTx(tx, storeId, refundId, true, undefined, effects);
+  });
+  await runBillingEffects(effects);
+  await restoreRevokedGrants().catch(() => undefined);
+  return { refundEventId: refundId, duplicate: false };
 }
 
 // ───────────────────────────── read models (UI) ───────────────────────────

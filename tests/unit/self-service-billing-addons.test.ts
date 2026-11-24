@@ -14,7 +14,12 @@ const h = vi.hoisted(() => ({
   chargeFor: vi.fn(),
   createCheckout: vi.fn(),
   events: [] as Array<Record<string, any>>,
-  storeRow: { name: 'Shop', settings: {}, owner: { email: 'm@x.test', firstName: 'M' } } as any,
+  storeRow: {
+    name: 'Shop',
+    plan: 'starter',
+    settings: {},
+    owner: { email: 'm@x.test', firstName: 'M' },
+  } as any,
   sub: null as any,
   features: {} as Record<string, boolean>,
   countAiUsage: vi.fn(),
@@ -101,6 +106,7 @@ const fakeTx = () => ({
     updateMany: vi.fn(async () => ({ count: 1 })),
     create: vi.fn(async () => ({})),
   },
+  manualPaymentClaim: { count: async () => 0 },
   store: { findUnique: async () => h.storeRow },
   storeSubscription: { findUnique: async () => h.sub },
   storeFeature: {
@@ -147,7 +153,7 @@ beforeEach(() => {
 });
 
 describe('catalog', () => {
-  it('feature add-ons are real, visible add-on-tier registry keys with integer positive prices', async () => {
+  it('feature add-ons are real, visible Business-baseline registry keys with integer positive prices', async () => {
     const { ADDON_CATALOG } = await import('@api/services/billing/addon-catalog');
     const { FEATURE_REGISTRY, PLAN_BASELINE } = await import('@ebda/shared');
     for (const a of Object.values(ADDON_CATALOG)) {
@@ -353,6 +359,14 @@ describe('purchase: confirm token, idempotency, ledger row', () => {
     expect(typeof p.confirmToken).toBe('string');
     expect(h.claimEvent).not.toHaveBeenCalled();
     expect(h.createCheckout).not.toHaveBeenCalled();
+  });
+  it('an InstaPay payment already waiting for approval blocks a second purchase of the same add-on', async () => {
+    const { previewAddon } = await import('@api/services/billing/addons.service');
+    (tx as any).manualPaymentClaim.count = async () => 1;
+    await expect(previewAddon({ ...ctx, sku: 'feature:floating_widget' })).rejects.toMatchObject({
+      code: 'ADDON_AWAITING_CONFIRMATION',
+    });
+    expect(h.claimEvent).not.toHaveBeenCalled();
   });
   it('checkout without a token charges nothing', async () => {
     const { purchaseAddon } = await import('@api/services/billing/addons.service');
@@ -586,6 +600,37 @@ describe('A9 AI top-up raises the STORE cap only; platform caps still apply', ()
     h.aiStoreToday.mockResolvedValue(10); // another store, no pack
     await expect(assertAiQuota({ storeId: 's3' })).resolves.toBeUndefined();
     delete process.env.AI_DAILY_REQUEST_CAP;
+  });
+  it('P6 at the prod cap (1800/day, 54000/month): +300 is sold, +1000 is refused (listing is covered in addons-list-history)', async () => {
+    process.env.AI_DAILY_REQUEST_CAP = '1800';
+    process.env.AI_MONTHLY_REQUEST_CAP = '54000';
+    try {
+      const { previewAddon } = await import('@api/services/billing/addons.service');
+      const ctx = { storeId: 's1', userId: 'u1' };
+      // a store may use half the day: 900. 150 base + 300 = 450 fits; 150 + 1000 = 1150 does not.
+      await expect(previewAddon({ ...ctx, sku: 'ai:topup_300' })).resolves.toMatchObject({
+        sku: 'ai:topup_300',
+      });
+      await expect(previewAddon({ ...ctx, sku: 'ai:topup_1000' })).rejects.toMatchObject({
+        code: 'AI_CAPACITY_UNAVAILABLE',
+      });
+    } finally {
+      delete process.env.AI_DAILY_REQUEST_CAP;
+      delete process.env.AI_MONTHLY_REQUEST_CAP;
+    }
+  });
+  it('P6 at a 450 cap (the old default): no top-up is sold', async () => {
+    process.env.AI_DAILY_REQUEST_CAP = '450';
+    try {
+      const { previewAddon } = await import('@api/services/billing/addons.service');
+      const ctx = { storeId: 's1', userId: 'u1' };
+      for (const sku of ['ai:topup_300', 'ai:topup_1000'])
+        await expect(previewAddon({ ...ctx, sku })).rejects.toMatchObject({
+          code: 'AI_CAPACITY_UNAVAILABLE',
+        });
+    } finally {
+      delete process.env.AI_DAILY_REQUEST_CAP;
+    }
   });
   it('P6: a top-up the platform cannot back is not sold (nothing charged); with enough capacity it is', async () => {
     process.env.AI_DAILY_REQUEST_CAP = '450'; // these P6 cases model the old 450/day platform (the default is 1800 since PLANS-1)
