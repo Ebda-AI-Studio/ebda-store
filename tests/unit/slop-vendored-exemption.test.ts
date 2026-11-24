@@ -141,6 +141,109 @@ describe('SLOP-VENDORED-1', () => {
     expect(vendoredExemption(b.root, b.config).why).toMatch(/not in the lock/);
   });
 
+  describe('trust boundary: the lock is PR-controlled (security review of SLOP-VENDORED-1)', () => {
+    const cloneRoot = (from: string) => {
+      const to = mkdtempSync(join(tmpdir(), 'pq-vend-pr-'));
+      dirs.push(to);
+      for (const rel of [
+        `${DIR}/helpers.ts`,
+        `${DIR}/loose.ts`,
+        PARITY,
+        'foundation.lock.json',
+        'apps/api/src/own.ts',
+      ]) {
+        mkdirSync(dirname(join(to, rel)), { recursive: true });
+        writeFileSync(join(to, rel), readFileSync(join(from, rel)));
+      }
+      return to;
+    };
+    const editLock = (root: string, fn: (l: any) => void) => {
+      const f = join(root, 'foundation.lock.json');
+      const l = JSON.parse(readFileSync(f, 'utf8'));
+      fn(l);
+      writeFileSync(f, JSON.stringify(l));
+    };
+
+    it('with --base-root, an unchanged lock keeps the exemption', () => {
+      const { root: base, config } = checkout();
+      const pr = cloneRoot(base);
+      expect(vendoredExemption(pr, config, base).dir).toBe(DIR);
+    });
+
+    it('a PR that edits the lock AND a vendored file together gets NO exemption (it cannot waive its own code)', () => {
+      const { root: base, config } = checkout();
+      const pr = cloneRoot(base);
+      const evil = 'export const SNEAKED_IN = 1;\n';
+      writeFileSync(join(pr, `${DIR}/helpers.ts`), evil);
+      editLock(pr, l => {
+        l.files[`${DIR}/helpers.ts`] = sha(evil); // the lock now "proves" the edited file
+      });
+      // read from the PR alone the edit would pass; against the base it must not
+      expect(vendoredExemption(pr, config).dir).toBe(DIR);
+      const r = vendoredExemption(pr, config, base);
+      expect(r.dir).toBeNull();
+      expect(r.why).toContain('differs from the base');
+      expect(
+        ids(scan({ root: pr, config, baseRoot: base })).some(i =>
+          i.includes(`unused-export|${DIR}/helpers.ts|SNEAKED_IN`)
+        )
+      ).toBe(true);
+    });
+
+    it('a PR that only touches the tag or commit in the lock gets no waiver either', () => {
+      const { root: base, config } = checkout();
+      const pr = cloneRoot(base);
+      editLock(pr, l => {
+        l.tag = 'v9.9.9';
+      });
+      expect(vendoredExemption(pr, config, base).dir).toBeNull();
+    });
+
+    it('a base without a lock has nothing to trust: no exemption', () => {
+      const { root: base, config } = checkout();
+      const pr = cloneRoot(base);
+      rmSync(join(base, 'foundation.lock.json'));
+      expect(vendoredExemption(pr, config, base).dir).toBeNull();
+    });
+  });
+
+  describe('path safety: lock entries are data from the PR', () => {
+    const withEntry = (rel: string) => {
+      const { root, config } = checkout();
+      const f = join(root, 'foundation.lock.json');
+      const l = JSON.parse(readFileSync(f, 'utf8'));
+      l.files[rel] = 'f'.repeat(64);
+      writeFileSync(f, JSON.stringify(l));
+      return vendoredExemption(root, config);
+    };
+    it.each([
+      [`${DIR}/../../../../etc/passwd`, 'dot-dot under dir'],
+      ['../outside.ts', 'leading dot-dot'],
+      ['/etc/passwd', 'absolute'],
+      [`${DIR}/a\\..\\b.ts`, 'backslash'],
+      ['', 'empty'],
+    ])('rejects the lock entry %j (%s) before touching the file system', rel => {
+      const r = withEntry(rel);
+      expect(r.dir).toBeNull();
+      expect(r.why).toMatch(/not a safe relative path|escapes/);
+    });
+    it('rejects a lock whose dir is absolute or climbs out of the repo', () => {
+      for (const dir of ['/tmp', '../x', 'packages/../../x']) {
+        const { root, config } = checkout();
+        const f = join(root, 'foundation.lock.json');
+        const l = JSON.parse(readFileSync(f, 'utf8'));
+        l.dir = dir;
+        writeFileSync(f, JSON.stringify(l));
+        config.ruleExemptions[0].path = dir;
+        expect(vendoredExemption(root, config).dir).toBeNull();
+      }
+    });
+    it('a normal lock still passes', () => {
+      const { root, config } = checkout();
+      expect(vendoredExemption(root, config).dir).toBe(DIR);
+    });
+  });
+
   it('without a lock file there is no exemption', () => {
     const { root, config } = checkout();
     rmSync(join(root, 'foundation.lock.json'));
