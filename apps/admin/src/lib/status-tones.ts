@@ -52,7 +52,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-export type StatusTone =
+type StatusTone =
   | 'neutral'
   | 'inactive'
   | 'success'
@@ -77,7 +77,7 @@ export const TONE_CLASSES: Record<StatusTone, string> = {
   solid: 'bg-foreground text-background',
 };
 
-export interface StatusEntry {
+interface StatusEntry {
   tone: StatusTone;
   icon: LucideIcon;
 }
