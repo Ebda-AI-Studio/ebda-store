@@ -49,6 +49,7 @@ export interface ReturnRecord {
     email: string;
     firstName: string;
     lastName: string;
+    phone?: string | null;
     /** a guest order's return: the identity is the order's own name/email/phone, there is no account */
     isGuest?: boolean;
   } | null;
