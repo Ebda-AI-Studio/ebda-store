@@ -15,6 +15,10 @@
   "compatibility_flags": ["nodejs_compat"],
   // Ruling BUNDLE-BUDGET-7: pre-built modules under src/cf/modules/ are uploaded as separate ES modules, not bundled into worker.js
   "find_additional_modules": true,
+  // Build-time assets (docs/plans/2026-11-24-help-corpus-build-time.md): the assistant's help corpus module + capability registry are git-ignored outputs.
+  // wrangler runs this before bundling for deploy, --dry-run and dev, from the folder wrangler is started in: start it in apps/api (cf:dry-run and the deploy workflow do); from the repo
+  // root the script path does not resolve, the build step fails and wrangler aborts (never a deploy without the corpus).
+  "build": { "command": "node scripts/build-help-corpus.mjs" },
   "rules": [
     { "type": "ESModule", "globs": ["cf/modules/*.mjs"], "fallthrough": false },
     { "type": "CommonJS", "globs": ["cf/modules/*.cjs"], "fallthrough": false },

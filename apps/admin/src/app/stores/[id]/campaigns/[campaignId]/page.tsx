@@ -97,26 +97,6 @@ interface FormState {
   localeStrategy: CampaignLocaleStrategy;
 }
 
-// Plain `as const` objects (no Record<K,V> annotation) mirror
-// returns/_components/types.ts's RETURN_COLORS — passed straight into
-// OrderStatusBadge's `colorMap: Record<string, StatusStyle>` prop.
-const CAMPAIGN_STATUS_COLORS = {
-  draft: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
-  scheduled: { bg: 'bg-info/10', text: 'text-info-ink', dot: 'bg-info' },
-  sending: { bg: 'bg-warning/10', text: 'text-warning-ink', dot: 'bg-warning' },
-  sent: { bg: 'bg-success/10', text: 'text-success-ink', dot: 'bg-success' },
-  cancelled: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
-  failed: { bg: 'bg-destructive/5', text: 'text-destructive-ink', dot: 'bg-destructive' },
-} as const;
-
-const RECIPIENT_STATUS_COLORS = {
-  queued: { bg: 'bg-info/10', text: 'text-info-ink', dot: 'bg-info' },
-  sent: { bg: 'bg-success/10', text: 'text-success-ink', dot: 'bg-success' },
-  failed: { bg: 'bg-destructive/5', text: 'text-destructive-ink', dot: 'bg-destructive' },
-  bounced: { bg: 'bg-warning/10', text: 'text-warning-ink', dot: 'bg-warning' },
-  unsubscribed: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
-} as const;
-
 const ERROR_KEYS = CAMPAIGN_ERROR_KEYS;
 
 function formFromCampaign(c: CampaignDetail): FormState {
@@ -473,11 +453,7 @@ export default function CampaignDetailPage() {
       <div className="mx-auto max-w-3xl px-4 pb-16 pt-4">
         <div className="mb-4 flex items-center justify-between">
           {backLink}
-          <OrderStatusBadge
-            status={campaign.status}
-            namespace="campaigns.status"
-            colorMap={CAMPAIGN_STATUS_COLORS}
-          />
+          <OrderStatusBadge status={campaign.status} family="campaign" />
         </div>
 
         {error && (
@@ -878,11 +854,7 @@ export default function CampaignDetailPage() {
                           <td className="px-3 py-2 font-mono text-sm">{r.email}</td>
                           <td className="px-3 py-2 uppercase">{r.locale}</td>
                           <td className="px-3 py-2">
-                            <OrderStatusBadge
-                              status={r.status}
-                              namespace="campaigns.recipientStatus"
-                              colorMap={RECIPIENT_STATUS_COLORS}
-                            />
+                            <OrderStatusBadge status={r.status} family="campaignRecipient" />
                           </td>
                           <td className="px-3 py-2 text-muted-foreground">
                             {r.unsubscribedAt

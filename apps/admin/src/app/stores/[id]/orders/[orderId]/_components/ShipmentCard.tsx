@@ -9,7 +9,6 @@ import { apiGet, apiPost } from '../../../../../../lib/api';
 import { ConfirmActionModal } from '../../../../../../components/ConfirmActionModal';
 import { OrderStatusBadge } from '../../../../../../components/OrderStatusBadge';
 import { CourierHint } from './CourierHint';
-import { SHIPMENT_COLORS } from '../../../shipping-carriers/_components/types';
 import { formatMoney } from './format';
 import { ShipmentPickupPanel } from './ShipmentPickupPanel';
 import { FIELD_CLASSES } from '@/components/ui/tokens';
@@ -242,11 +241,7 @@ export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: Ship
                 )}
               </p>
             </div>
-            <OrderStatusBadge
-              status={shipment.status}
-              namespace="shipping.carriers.shipments.statuses"
-              colorMap={SHIPMENT_COLORS}
-            />
+            <OrderStatusBadge status={shipment.status} family="shipment" />
           </div>
 
           {shipment.codAmount > 0 && (

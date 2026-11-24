@@ -22,6 +22,9 @@ export function verdict(event, needs, opts = {}) {
   if (opts.heavy === 'false') for (const j of HEAVY_ONLY_JOBS) lightSkippable.add(j);
   if (opts.heavy === 'false' && opts.docsOnly === 'true')
     for (const j of DOCS_ONLY_SKIPPABLE_JOBS) lightSkippable.add(j);
+  // CI-CAPACITY-1: a merge group that touches nothing the marketing Worker is built from (marketing=false, decided by mq-scope with the
+  // strict rails) skips its dry-run on purpose; independent of heavy.
+  if (opts.marketing === 'false') lightSkippable.add('worker-dry-run');
   if (event === 'pull_request')
     return { ok: true, message: 'pull request: the full lane runs on the merge group' };
   if (event !== 'merge_group')
@@ -57,6 +60,7 @@ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).
   const v = verdict(process.env.EVENT ?? '', needs, {
     heavy: needs?.['tested-tree']?.outputs?.heavy,
     docsOnly: needs?.['tested-tree']?.outputs?.docs_only,
+    marketing: needs?.['tested-tree']?.outputs?.marketing,
   });
   console.log(`merge-queue-gate: ${v.message}`);
   process.exit(v.ok ? 0 : 1);

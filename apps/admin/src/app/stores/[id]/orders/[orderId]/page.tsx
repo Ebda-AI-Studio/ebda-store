@@ -277,11 +277,7 @@ export default function OrderDetailPage() {
                   // pattern the returns/shipments/notifications surfaces
                   // use) rather than inventing a new chip style —
                   // every-data-needs-a-UI surface for Order.source.
-                  <OrderStatusBadge
-                    status="agent"
-                    label={t('agent')}
-                    colorMap={{ agent: { className: 'bg-primary/10 text-primary-ink' } }}
-                  />
+                  <OrderStatusBadge status="agent" label={t('agent')} family="orderSource" />
                 )}
               </div>
               <span className="text-xs text-muted-foreground">
