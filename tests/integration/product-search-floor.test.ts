@@ -119,7 +119,7 @@ describe.skipIf(!hasDb)('public product search floor', () => {
     expect(searchTokens('a b c d e f g h i j')).toHaveLength(8);
   });
 
-  it('pg_trgm GIN indexes exist on all four searched columns, the two normalised docs and the SKU', async () => {
+  it('pg_trgm GIN indexes exist on all four searched columns, the two normalised docs (fold B and hamza fold A) and the SKU', async () => {
     const rows = await prisma.$queryRaw<Array<{ indexname: string }>>`
       SELECT indexname FROM pg_indexes
       WHERE tablename = 'products' AND indexdef ILIKE '%gin_trgm_ops%'
@@ -129,8 +129,10 @@ describe.skipIf(!hasDb)('public product search floor', () => {
       'products_description_ar_trgm_idx',
       'products_description_trgm_idx',
       'products_name_ar_trgm_idx',
+      'products_name_doc_h_trgm_idx', // fold A (hamza), migration 20261123200000_search_fold_hamza
       'products_name_doc_trgm_idx',
       'products_name_trgm_idx',
+      'products_search_doc_h_trgm_idx', // fold A (hamza), migration 20261123200000_search_fold_hamza
       'products_search_doc_trgm_idx',
       'products_sku_norm_trgm_idx',
     ]);

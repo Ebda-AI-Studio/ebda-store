@@ -132,7 +132,7 @@ function UnitField({
       {(error || help) && (
         <p
           id={noteId}
-          className={`mt-1.5 text-xs ${error ? 'text-destructive-ink' : 'text-muted-foreground'}`}
+          className={`mt-1.5 text-sm ${error ? 'text-destructive-ink' : 'text-muted-foreground'}`}
         >
           {error || help}
         </p>
@@ -316,7 +316,7 @@ function PlansInner() {
 
   if (loadError) {
     return (
-      <div className="rounded-xl border bg-card p-6 text-center">
+      <div className="rounded-md border bg-card p-6 text-center">
         <p className="text-sm text-destructive-ink">{t('loadError')}</p>
         <Button variant="link" size="sm" type="button" onClick={load} className="mt-3">
           {tCommon('retry')}
@@ -404,8 +404,8 @@ function PlansInner() {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-muted-foreground">{t('priceHint')}</p>
-      <div className="rounded-xl border bg-card shadow-sm">
+      <p className="text-sm text-muted-foreground">{t('priceHint')}</p>
+      <div className="rounded-md border bg-card shadow-sm">
         <DataTable<PlanRow>
           ariaLabel={t('title')}
           columns={columns}
@@ -510,10 +510,10 @@ function PlansInner() {
                           setLimits(l => (l ? { ...l, [k]: Number.isNaN(n) ? 0 : n } : l));
                         }}
                       />
-                      <label className="flex min-h-6 items-center gap-2 text-xs text-muted-foreground">
+                      <label className="flex min-h-6 items-center gap-2 text-sm text-muted-foreground">
                         <input
                           type="checkbox"
-                          className="h-4 w-4 accent-primary"
+                          className="h-5 w-5 accent-primary"
                           aria-label={`${t(`limits.${k}`)}: ${t('unlimited')}`}
                           checked={limits[k] === null}
                           onChange={e =>
@@ -545,7 +545,7 @@ function PlansInner() {
                     />
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground">{t('form.feesHelp')}</p>
+                <p className="text-sm text-muted-foreground">{t('form.feesHelp')}</p>
               </Section>
 
               <Section title={t('form.sectionFeatures')}>

@@ -31,6 +31,9 @@ const h = vi.hoisted(() => ({
     order: { findMany: vi.fn(), findUnique: vi.fn() },
     payment: { findMany: vi.fn() },
     paymentEvent: { findMany: vi.fn() },
+    // the sale posting looks for pre-sale refunds to replay (replayPreSaleRefunds): none here
+    journalEntry: { findFirst: vi.fn() },
+    orderEvent: { findMany: vi.fn() },
     storeWhatsAppLink: { findUnique: vi.fn() },
     storeWhatsAppConsent: { findMany: vi.fn() },
     warehouse: { findFirst: vi.fn() },
