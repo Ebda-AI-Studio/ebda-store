@@ -12,6 +12,7 @@ import { useT } from '@/i18n/useT';
 import { localDayRange, reportRangeParams, withNumerals } from '@ebda/shared';
 import { intlLocaleForUi } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface LoyaltyTransaction {
   id: string;
@@ -60,7 +61,7 @@ const TYPE_FILTERS = [
 function TypeBadge({ type, label }: { type: string; label: string }) {
   let className = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ';
   if (type === 'tier_changed') {
-    className += 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300';
+    className += 'bg-primary/10 text-primary-ink';
   } else if (type.startsWith('earn_')) {
     className += 'bg-success/10 text-success-ink';
   } else if (type.startsWith('redeem_')) {
@@ -74,8 +75,7 @@ function TypeBadge({ type, label }: { type: string; label: string }) {
 }
 
 function PointsCell({ points }: { points: number }) {
-  if (points > 0)
-    return <span className="font-semibold text-emerald-600 dark:text-emerald-400">+{points}</span>;
+  if (points > 0) return <span className="font-semibold text-success-ink">+{points}</span>;
   if (points < 0) return <span className="font-semibold text-destructive-ink">{points}</span>;
   return <span className="text-muted-foreground">0</span>;
 }
@@ -252,7 +252,7 @@ export default function LoyaltyTransactionsPage() {
             value={typeFilter}
             onChange={e => handleFilterChange(setTypeFilter, e.target.value)}
             aria-label={t('filterTypeAriaLabel')}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            className={FIELD_CLASSES}
           >
             {TYPE_FILTERS.map(type => (
               <option key={type} value={type}>
@@ -267,7 +267,7 @@ export default function LoyaltyTransactionsPage() {
             value={dateFrom}
             onChange={e => handleFilterChange(setDateFrom, e.target.value)}
             aria-label={t('dateFromAriaLabel')}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
 
           {/* Date to */}
@@ -276,7 +276,7 @@ export default function LoyaltyTransactionsPage() {
             value={dateTo}
             onChange={e => handleFilterChange(setDateTo, e.target.value)}
             aria-label={t('dateToAriaLabel')}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
 
           {/* Customer search */}
@@ -287,7 +287,7 @@ export default function LoyaltyTransactionsPage() {
               onChange={e => setCustomerFilter(e.target.value)}
               placeholder={t('customerIdPlaceholder')}
               aria-label={t('customerIdAriaLabel')}
-              className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              className={FIELD_CLASSES}
             />
             <Button variant="default" size="md" type="submit">
               {t('searchButton')}
@@ -299,7 +299,7 @@ export default function LoyaltyTransactionsPage() {
         {loadFailed && !loading && (
           <div
             role="alert"
-            className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink"
+            className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink"
           >
             {t('loadFailed')}
             <button
@@ -314,7 +314,7 @@ export default function LoyaltyTransactionsPage() {
 
         {/* Table */}
         {loading ? (
-          <div className="flex items-center justify-center py-16 rounded-2xl border border-border bg-card">
+          <div className="flex items-center justify-center py-16 rounded-lg border border-border bg-card">
             <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
           </div>
         ) : (
@@ -332,7 +332,7 @@ export default function LoyaltyTransactionsPage() {
         )}
 
         {meta && meta.totalPages > 1 && (
-          <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-muted px-4 py-3">
+          <div className="mt-4 flex items-center justify-between rounded-md border border-border bg-muted px-4 py-3">
             <p className="text-sm text-muted-foreground">
               {t('pageOf', {
                 page: meta.page,

@@ -19,6 +19,7 @@ import { pctToBps } from './pct';
 import { wholesalePlanName } from '@/lib/plan-labels';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface CustomerGroup {
   id: string;
@@ -184,7 +185,7 @@ export default function CustomerGroupsPage() {
             </span>
           )}
           {group.isDefault && (
-            <span className="ms-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary-ink">
+            <span className="ms-2 rounded-md bg-primary/10 px-1.5 py-0.5 text-xs text-primary-ink">
               {t('defaultBadge')}
             </span>
           )}
@@ -265,7 +266,7 @@ export default function CustomerGroupsPage() {
 
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-md rounded-lg bg-background p-5 shadow-lg">
+            <div className="w-full max-w-md rounded-lg bg-background p-5 shadow-md">
               <h2 className="mb-4 text-lg font-semibold">
                 {editing ? t('editTitle') : t('createTitle')}
               </h2>
@@ -275,7 +276,7 @@ export default function CustomerGroupsPage() {
                 <input
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className={FIELD_CLASSES}
                 />
               </label>
 
@@ -285,7 +286,7 @@ export default function CustomerGroupsPage() {
                   value={form.nameAr}
                   onChange={e => setForm({ ...form, nameAr: e.target.value })}
                   dir="rtl"
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className={FIELD_CLASSES}
                 />
               </label>
 
@@ -307,7 +308,7 @@ export default function CustomerGroupsPage() {
                     onChange={e =>
                       setForm({ ...form, pricingMode: e.target.value as FormState['pricingMode'] })
                     }
-                    className="min-h-11 w-full rounded-md border px-3 text-sm"
+                    className={FIELD_CLASSES}
                   >
                     <option value="none">{t('modeNone')}</option>
                     <option value="percent_off">{t('modePercent')}</option>
@@ -321,7 +322,7 @@ export default function CustomerGroupsPage() {
                       dir="ltr"
                       value={form.discountPct}
                       onChange={e => setForm({ ...form, discountPct: e.target.value })}
-                      className="min-h-11 w-full rounded-md border px-3 text-sm"
+                      className={FIELD_CLASSES}
                     />
                     <span className="mt-1 block text-xs text-muted-foreground">
                       {t('discountHint')}

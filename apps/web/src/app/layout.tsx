@@ -21,7 +21,6 @@ import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistrati
 import { SkipLink } from '../components/SkipLink';
 import { ScrollToTop } from '../components/ScrollToTop';
 import { PushNotificationPrompt } from '../components/PushNotificationPrompt';
-import { OneSignalStorefrontInit } from '../components/OneSignalStorefrontInit';
 import { TypographyProbe } from '../components/TypographyProbe';
 import { AffiliateTracker } from '../components/AffiliateTracker';
 import { StoreMaintenance } from '../components/StoreMaintenance';
@@ -672,7 +671,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                               {store.isDemo && <DemoLookBar activeLook={store.look} />}
                               <div id="main-content">{children}</div>
                               <PushNotificationPrompt />
-                              <OneSignalStorefrontInit />
                               {/* Activates ONLY when ?probe=typography is on
                           the URL and the page is in a trusted-admin
                           iframe. Measures real getComputedStyle()
