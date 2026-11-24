@@ -34,6 +34,7 @@ vi.mock('@ebda/database', () => ({
     fn({
       store: { findUnique: m.storeFind },
       storeFeature: { upsert: m.upsert, findMany: m.findMany },
+      billingEvent: { findMany: async () => [] }, // running add-ons (none here)
     })
   ),
 }));
