@@ -157,7 +157,7 @@ export function Canvas({
           data-testid="builder-canvas"
           data-viewport={viewport}
           style={{ width, height: `calc((100vh - 7rem) / ${scale})` }}
-          className="rounded-xl border border-border bg-white shadow-2xl"
+          className="rounded-md border border-border bg-white shadow-xl"
           sandbox="allow-scripts allow-same-origin allow-forms"
         />
       </div>

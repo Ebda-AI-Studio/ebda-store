@@ -105,7 +105,7 @@ export default function ShippingCarriersPage() {
         <ShippingCarriersEmptyState />
       ) : (
         <div className="space-y-6">
-          <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+          <div className="rounded-md border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
             {tPage('intro')}
           </div>
 

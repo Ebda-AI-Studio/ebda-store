@@ -213,11 +213,11 @@ export default function FinanceDashboardPage() {
         const isNeg = row.balance < 0;
         return (
           <span
-            className={isNeg ? 'font-mono text-red-600' : 'font-mono'}
+            className={isNeg ? 'font-mono text-destructive-ink' : 'font-mono'}
             title={isNeg ? t('negativeBalanceTooltip') : undefined}
           >
             {isNeg && (
-              <span className="inline-flex items-center me-1 px-1 py-0.5 text-xs bg-red-100 text-red-700 rounded">
+              <span className="inline-flex items-center me-1 px-1 py-0.5 text-xs bg-destructive/10 text-destructive-ink rounded-md">
                 !
               </span>
             )}
@@ -254,13 +254,13 @@ export default function FinanceDashboardPage() {
             <h2 className="text-base font-semibold mb-3">{t('thisMonth')}</h2>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Revenue */}
-              <div className="rounded-xl border border-border p-4 space-y-1">
+              <div className="rounded-md border border-border p-4 space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">
                   {t('revenue')}
                 </p>
                 <p
                   className={`text-2xl font-semibold font-mono ${
-                    dashboardErr ? 'text-muted-foreground' : 'text-green-700'
+                    dashboardErr ? 'text-muted-foreground' : 'text-success-ink'
                   }`}
                   title={dashboardErr ?? undefined}
                 >
@@ -274,13 +274,13 @@ export default function FinanceDashboardPage() {
               </div>
 
               {/* Expenses */}
-              <div className="rounded-xl border border-border p-4 space-y-1">
+              <div className="rounded-md border border-border p-4 space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">
                   {t('expenses')}
                 </p>
                 <p
                   className={`text-2xl font-semibold font-mono ${
-                    dashboardErr ? 'text-muted-foreground' : 'text-red-600'
+                    dashboardErr ? 'text-muted-foreground' : 'text-destructive-ink'
                   }`}
                   title={dashboardErr ?? undefined}
                 >
@@ -294,15 +294,15 @@ export default function FinanceDashboardPage() {
               </div>
 
               {/* Net Income */}
-              <div className="rounded-xl border border-border p-4 space-y-1">
+              <div className="rounded-md border border-border p-4 space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('net')}</p>
                 <p
                   className={`text-2xl font-semibold font-mono ${
                     dashboardErr
                       ? 'text-muted-foreground'
                       : netPositive
-                        ? 'text-green-700'
-                        : 'text-red-600'
+                        ? 'text-success-ink'
+                        : 'text-destructive-ink'
                   }`}
                   title={dashboardErr ?? undefined}
                 >
@@ -343,15 +343,15 @@ export default function FinanceDashboardPage() {
                 </span>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="rounded-xl border border-border p-4 space-y-1">
+                <div className="rounded-md border border-border p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
                     {t('salesOrdersRevenue')}
                   </p>
-                  <p className="text-2xl font-semibold font-mono text-green-700">
+                  <p className="text-2xl font-semibold font-mono text-success-ink">
                     {major(salesStats.totalRevenue)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-border p-4 space-y-1">
+                <div className="rounded-md border border-border p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
                     {t('salesOrdersCount')}
                   </p>
@@ -368,7 +368,7 @@ export default function FinanceDashboardPage() {
             {/* Stock Value */}
             <section>
               <h2 className="text-base font-semibold mb-3">{t('stockValue')}</h2>
-              <div className="rounded-xl border border-border p-6 flex items-center justify-center">
+              <div className="rounded-md border border-border p-6 flex items-center justify-center">
                 <div className="text-center space-y-1">
                   <p
                     className={`text-3xl font-semibold font-mono ${
@@ -401,13 +401,13 @@ export default function FinanceDashboardPage() {
               <h2 className="text-base font-semibold mb-3">{t('cash')}</h2>
               {dashboardErr ? (
                 <div
-                  className="rounded-xl border border-border overflow-hidden p-4 text-sm text-muted-foreground"
+                  className="rounded-md border border-border overflow-hidden p-4 text-sm text-muted-foreground"
                   title={dashboardErr}
                 >
                   — <span className="text-xs text-destructive-ink">{t('couldntLoad')}</span>
                 </div>
               ) : cash.length === 0 ? (
-                <div className="rounded-xl border border-border overflow-hidden p-4 text-sm text-muted-foreground">
+                <div className="rounded-md border border-border overflow-hidden p-4 text-sm text-muted-foreground">
                   —
                 </div>
               ) : (
@@ -431,7 +431,7 @@ export default function FinanceDashboardPage() {
                     { labelKey: 'equity', val: balanceSheet.totalEquity },
                   ] as { labelKey: 'assets' | 'liabilities' | 'equity'; val: number }[]
                 ).map(({ labelKey, val }) => (
-                  <div key={labelKey} className="rounded-xl border border-border p-4 space-y-1">
+                  <div key={labelKey} className="rounded-md border border-border p-4 space-y-1">
                     <p className="text-xs text-muted-foreground uppercase tracking-wide">
                       {t(labelKey)}
                     </p>
@@ -469,7 +469,7 @@ export default function FinanceDashboardPage() {
                   {t('viewAll')}
                 </Button>
               </div>
-              <div className="rounded-xl border border-border overflow-hidden">
+              <div className="rounded-md border border-border overflow-hidden">
                 {recentAnomalies.length === 0 ? (
                   <div className="p-4 text-sm text-muted-foreground">—</div>
                 ) : (
@@ -483,9 +483,9 @@ export default function FinanceDashboardPage() {
                         <div key={a.id} className="px-3 py-2 space-y-0.5">
                           <div className="flex items-center gap-2">
                             <span
-                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-medium ${
                                 a.severity === 'p0'
-                                  ? 'bg-red-100 text-red-700'
+                                  ? 'bg-destructive/10 text-destructive-ink'
                                   : 'bg-warning/10 text-warning-ink'
                               }`}
                             >
@@ -496,7 +496,7 @@ export default function FinanceDashboardPage() {
                             </span>
                             <span
                               className={`text-xs font-mono ms-auto ${
-                                a.deltaPercent < 0 ? 'text-red-600' : 'text-green-700'
+                                a.deltaPercent < 0 ? 'text-destructive-ink' : 'text-success-ink'
                               }`}
                             >
                               {sign}
@@ -529,7 +529,7 @@ export default function FinanceDashboardPage() {
                   {t('viewAll')}
                 </Button>
               </div>
-              <div className="rounded-xl border border-border p-6 flex items-center justify-center">
+              <div className="rounded-md border border-border p-6 flex items-center justify-center">
                 <div className="text-center space-y-1">
                   {pendingOcrCount === null ? (
                     <p className="text-sm text-muted-foreground">{tc('loading')}</p>

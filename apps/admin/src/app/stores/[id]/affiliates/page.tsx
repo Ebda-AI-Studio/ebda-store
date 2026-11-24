@@ -24,6 +24,7 @@ import { useLatestRequest } from '../../../../hooks/useLatestRequest';
 
 import { roundToMinor, REGION } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 type TabKey = 'affiliates' | 'config';
 
 // Narrow type for tolerant unwrapping of legacy `{ data: { ... } }` responses.
@@ -355,6 +356,7 @@ export default function AffiliatesPage() {
               onPageChange={setPage}
               onStatusAction={handleStatusAction}
               onOpenPayout={openPayoutModal}
+              onInvite={openInviteModal}
             />
           )}
 
@@ -386,7 +388,7 @@ export default function AffiliatesPage() {
 
       {showInviteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-background shadow-xl border border-border">
+          <div className="w-full max-w-lg rounded-md bg-background shadow-xl border border-border">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <div>
                 <h2 className="text-lg font-semibold">{tPage('inviteTitle')}</h2>
@@ -423,7 +425,7 @@ export default function AffiliatesPage() {
                     required
                     maxLength={100}
                     placeholder={tPage('inviteNamePlaceholder')}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={FIELD_CLASSES}
                   />
                 </div>
 
@@ -437,7 +439,7 @@ export default function AffiliatesPage() {
                     onChange={e => setInviteEmail(e.target.value)}
                     required
                     placeholder={tPage('inviteEmailPlaceholder')}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={FIELD_CLASSES}
                   />
                 </div>
 
@@ -451,7 +453,7 @@ export default function AffiliatesPage() {
                     onChange={e => setInvitePhone(e.target.value)}
                     maxLength={30}
                     placeholder={REGION.phone.placeholderIntl}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={FIELD_CLASSES}
                   />
                 </div>
 
@@ -465,7 +467,7 @@ export default function AffiliatesPage() {
                     onChange={e => setInviteInstagram(e.target.value)}
                     maxLength={100}
                     placeholder="@username"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={FIELD_CLASSES}
                   />
                 </div>
 
@@ -479,7 +481,7 @@ export default function AffiliatesPage() {
                     onChange={e => setInviteTiktok(e.target.value)}
                     maxLength={100}
                     placeholder="@username"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={FIELD_CLASSES}
                   />
                 </div>
 
@@ -493,7 +495,7 @@ export default function AffiliatesPage() {
                     maxLength={1000}
                     rows={3}
                     placeholder={tPage('inviteNotesPlaceholder')}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                    className={`${TEXTAREA_CLASSES} resize-none`}
                   />
                 </div>
               </div>

@@ -53,9 +53,9 @@ export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps
               className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-muted/30"
             >
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/10">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                   <svg
-                    className="h-4 w-4 text-violet-600"
+                    className="h-4 w-4 text-primary-ink"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -101,7 +101,7 @@ export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps
           ))
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
               <svg
                 className="h-8 w-8 text-muted-foreground"
                 fill="none"

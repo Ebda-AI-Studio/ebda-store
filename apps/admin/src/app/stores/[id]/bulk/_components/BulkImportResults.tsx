@@ -17,7 +17,7 @@ export function BulkImportResults({ result, onViewProducts }: BulkImportResultsP
   const hasChanges = result.created > 0 || result.updated > 0;
 
   return (
-    <div className="rounded-xl border bg-card p-6 shadow-sm">
+    <div className="rounded-md border bg-card p-6 shadow-sm">
       <h3 className="font-semibold text-foreground mb-4">{t('title')}</h3>
 
       <div className="grid gap-4 sm:grid-cols-4 mb-4">

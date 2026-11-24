@@ -44,7 +44,7 @@ export function NeedsAction({ storeId }: { storeId: string }) {
     return (
       <section
         aria-label={t('title')}
-        className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4"
+        className="mb-6 rounded-md border border-destructive/30 bg-destructive/5 p-4"
       >
         <div className="flex flex-wrap items-center justify-between gap-3" role="alert">
           <p className="text-sm text-destructive-ink">{t('loadFailed')}</p>
@@ -62,11 +62,11 @@ export function NeedsAction({ storeId }: { storeId: string }) {
       {loading && open.length === 0 ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-busy="true">
           {[0, 1, 2, 3].map(i => (
-            <div key={i} className="force-skeleton h-20 rounded-xl" />
+            <div key={i} className="force-skeleton h-20 rounded-md" />
           ))}
         </div>
       ) : open.length === 0 ? (
-        <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+        <p className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
           {t('allClear')}
         </p>
       ) : (
@@ -76,7 +76,7 @@ export function NeedsAction({ storeId }: { storeId: string }) {
               data-ui="tile"
               key={tile.key}
               href={tile.href}
-              className="flex min-h-20 flex-col justify-center rounded-xl border border-primary/30 bg-card p-4 shadow-sm transition hover:border-primary hover:shadow-md"
+              className="flex min-h-20 flex-col justify-center rounded-md border border-primary/30 bg-card p-4 shadow-sm transition hover:border-primary hover:shadow-md"
             >
               <span className="text-3xl font-bold tracking-tight text-foreground">
                 {tile.count as number}

@@ -575,6 +575,11 @@
       "errSession": "Your session ended. Sign in again to continue.",
       "errNetwork": "No connection right now. Check your internet and try again.",
       "securityLink": "Open account security"
+    },
+    "notFound": {
+      "title": "This store was not found",
+      "body": "This link is not for a store you can open. It may have been deleted, or the link has a typo. Go back to your stores and pick yours from there.",
+      "backToStores": "Back to my stores"
     }
   },
   "products": {
@@ -870,7 +875,10 @@
         "searchTermsDropped": "Words that will not be saved (over the limit): {count}",
         "searchTermsAtLimit": "Limit reached",
         "searchTermsNearLimit": "Almost at the limit",
-        "priceMinError": "The price must be more than zero."
+        "priceMinError": "The price must be more than zero.",
+        "slug": "Link (slug)",
+        "slugHint": "Part of the product's web address. Changing it keeps the old link working: visitors are redirected to the new one.",
+        "slugInvalid": "Use lowercase letters, numbers, Arabic letters and hyphens only."
       },
       "statusOptions": {
         "draft": "Draft",
@@ -984,7 +992,8 @@
       "createdBanner": "Product added. Next step: add sizes or colours if it has any.",
       "addVariants": "Add variants",
       "toast": {
-        "saved": "Product saved"
+        "saved": "Product saved",
+        "savedSlugChanged": "Product saved. That link was already taken, so it is now: {slug}"
       },
       "tabs": {
         "label": "Product page sections",
@@ -1564,6 +1573,7 @@
       "remain": "Remain {amount}",
       "refunded": "Refunded",
       "refundedAmount": "Refunded {amount}",
+      "partially_refunded": "Partially refunded",
       "disputed": "Disputed",
       "paymentMethod": "Payment method",
       "methodCod": "Cash on delivery",
@@ -2364,6 +2374,10 @@
       "newsletter": {
         "title": "Newsletter Subscribers",
         "description": "View and export the email list captured from your storefront"
+      },
+      "activity": {
+        "title": "Activity log",
+        "description": "See who changed what in your store"
       },
       "staff": {
         "title": "Team",
@@ -3782,7 +3796,8 @@
       },
       "empty": {
         "title": "No Affiliates Yet",
-        "description": "Affiliates will appear here when they sign up or are invited."
+        "description": "Affiliates will appear here when they sign up or are invited.",
+        "invite": "Invite an affiliate"
       },
       "pagination": {
         "summary": "Page {page} of {totalPages} ({total} total)",
@@ -4426,7 +4441,7 @@
     },
     "emailNudge": {
       "title": "Get abandoned carts back by email",
-      "body": "One reminder email per cart, sent as your store and only to shoppers who opted in. It is off until you turn it on.",
+      "body": "One email per cart, sent as your store and only to shoppers who opted in to your newsletter. The reminder steps below (up to 3 reminders by message and notification) are separate, and reach only shoppers who agreed to them. The email is off until you turn it on.",
       "review": "Review settings",
       "dismiss": "Not now"
     }
@@ -4523,6 +4538,7 @@
         "REFUND_ALREADY_ISSUED": "A refund for this return was already sent to the payment provider. Check the provider dashboard, then complete the return with \"Already refunded — record only\".",
         "RETURN_ALREADY_COMPLETING": "This return is already being completed. Refresh the page before trying again.",
         "PARTIAL_REFUND_EXCEEDS_PAYMENT": "Part of this payment was already refunded outside this return, so what is left is less than this return is worth. Complete it with store credit or bank transfer and settle the difference with the customer.",
+        "GUEST_STORE_CREDIT": "Store credit needs a customer account. This order was placed as a guest, so refund it in cash, by bank transfer or manually.",
         "PARTIAL_REFUND_NOTHING_TO_REFUND": "Every item in this return was already refunded by an earlier return.",
         "PAYMENT_FULLY_REFUNDED": "This payment has already been refunded in full.",
         "NO_COMPLETED_PAYMENT": "This order has no online payment to refund. Choose store credit or bank transfer.",
@@ -4617,7 +4633,8 @@
           "amount": "Enter an amount between 0 and {max}.",
           "reason": "Write a reason (at least 3 characters)."
         }
-      }
+      },
+      "storeCreditNeedsAccount": "Store credit needs a customer account. This order was placed as a guest, so refund it in cash, by bank transfer or manually."
     },
     "newReturn": {
       "title": "New return",
@@ -4648,7 +4665,10 @@
         "bundle_returns_are_atomic": "A bundle can only be returned as a complete box.",
         "FORBIDDEN": "Your role cannot open returns.",
         "UNKNOWN": "The return was not opened. Try again."
-      }
+      },
+      "pickLines": "Tick the lines you are returning.",
+      "estimating": "Working out the amount…",
+      "estimate": "This return refunds about {amount} {currency}, the items' share of any discount and tax."
     }
   },
   "marketingPixels": {
@@ -4991,9 +5011,12 @@
     },
     "push": {
       "title": "Push Notifications",
-      "subtitle": "Browser push notifications",
+      "subtitle": "Send order updates and offers to shoppers who allow notifications in their browser.",
+      "statusAvailable": "Push is available",
+      "statusUnavailable": "Push is not available yet",
+      "unavailableHint": "We are setting push up for all stores. You do not need to do anything, we will let you know when it is ready.",
       "subscribers": "{count, number, latn} subscribers",
-      "platformNote": "Push notifications use the platform configuration. No per-store setup needed — just toggle Enabled."
+      "platformNote": "Nothing to set up on your side. Switch it on and shoppers who allow notifications will start receiving them."
     },
     "broadcast": {
       "title": "Send a broadcast",
@@ -5016,17 +5039,19 @@
       "send": "Send broadcast",
       "sending": "Sending…",
       "sentTitle": "Broadcast sent",
-      "sentDescription": "Targeted {count, number, latn} subscriber(s).",
+      "sentDescription": "Sent to {count, number, latn} subscriber(s).",
+      "channelOffTitle": "Push is switched off",
+      "channelOffDescription": "Turn on push notifications for this store above, then send again.",
       "sendFailed": "Failed to send broadcast.",
-      "notConfiguredTitle": "Push notifications are not available yet",
-      "notConfiguredDescription": "Push notifications are not available for your store yet. Try again later.",
+      "notConfiguredTitle": "Push is not available yet",
+      "notConfiguredDescription": "We are setting push up for all stores. This form unlocks as soon as it is ready. There is nothing for you to do.",
       "recentTitle": "Recent broadcasts",
       "recentEmpty": "No broadcasts sent yet.",
       "refresh": "Refresh",
       "refreshing": "Refreshing…",
       "untitled": "(untitled)",
       "deliveredCount": "{count, number, latn} delivered",
-      "clickedCount": "{count, number, latn} clicked"
+      "failedCount": "{count, number, latn} did not arrive"
     },
     "events": {
       "title": "Event Configuration",
@@ -6071,7 +6096,8 @@
       "aiSaveResponseBody": "Your owner response has been saved to the review.",
       "aiSaveResponseFailed": "Failed to save response. Please try again.",
       "saving": "Saving...",
-      "searchPlaceholder": "Search reviews…"
+      "searchPlaceholder": "Search reviews…",
+      "emptyAction": "View your products"
     },
     "spam": "Spam"
   },
@@ -8542,6 +8568,22 @@
       "firstFactorEmailHint": "To add your first sign-in method we e-mail a code to this account (enter your password, then press the button).",
       "signInAgainAfterEnrol": "You will be signed out now. Sign in again with your new sign-in method: that is what carries platform-admin access.",
       "savedSignInAgainButton": "Saved, sign me out",
+      "recovery": {
+        "title": "Recovery codes",
+        "description": "One-time codes that let you sign in if you lose your authenticator app. Each code works once. Making a new set cancels every old code, so save the new ones before you close this page.",
+        "remaining": "Unused codes left: {count}",
+        "passwordLabel": "Your password",
+        "codeLabel": "Authenticator code (6 digits)",
+        "regenerate": "Make new recovery codes",
+        "working": "Working…",
+        "done": "New recovery codes created. The old ones no longer work.",
+        "saveNow": "Save these codes now. They are shown only once.",
+        "saved": "I saved them",
+        "errorPassword": "That password is not right.",
+        "errorCode": "That authenticator code is not right. A recovery code cannot be used here.",
+        "errorThrottle": "Too many attempts. Wait a few minutes and try again.",
+        "errorGeneric": "Could not make new codes. Try again."
+      },
       "phone": {
         "title": "Phone number",
         "description": "The number on your account. It is where a password-reset code goes over WhatsApp when that is switched on, so changing it needs your password (and your authenticator code if 2FA is on).",
@@ -8747,8 +8789,23 @@
       "dateFrom": "From",
       "dateTo": "To",
       "dateApply": "Apply",
-      "guest": "Guest"
+      "guest": "Guest",
+      "emptyAction": "Check payment settings"
     }
+  },
+  "activity": {
+    "title": "Store activity",
+    "subtitle": "Who changed what in your store, newest first. Read only. Contact details are hidden.",
+    "tableLabel": "Store activity",
+    "colWhen": "When",
+    "colWho": "Who",
+    "colWhat": "What",
+    "colNetwork": "Network",
+    "system": "System",
+    "empty": "No activity yet.",
+    "error": "Could not load the activity. Try again in a moment.",
+    "loading": "Loading…",
+    "loadMore": "Load more"
   },
   "staff": {
     "page": {
@@ -10124,7 +10181,8 @@
       "ledger": "Ledger",
       "subscriptions": "Subscriptions",
       "claims": "Payment claims",
-      "grants": "Free months"
+      "grants": "Free months",
+      "held": "Held payments"
     },
     "manual": {
       "title": "Record manual payment for {store}",
@@ -10319,7 +10377,52 @@
       }
     },
     "refundObject": "Refund {amount}",
-    "refundAction": "Refund the payment"
+    "refundAction": "Refund the payment",
+    "held": {
+      "title": "Held payments",
+      "intro": "Subscription payments the provider reported as successful but that don't match what we billed. The merchant may have paid without being upgraded, so settle each one here.",
+      "loading": "Loading held payments...",
+      "failedToLoad": "Could not load the held payments.",
+      "empty": "No held payments.",
+      "statusFilter": "Show",
+      "statuses": {
+        "open": "Needs action",
+        "resolved": "Resolved"
+      },
+      "unknownAmount": "Not reported",
+      "columns": {
+        "date": "Received",
+        "reason": "Why it was held",
+        "expected": "We billed",
+        "got": "Provider reported",
+        "reference": "Reference",
+        "status": "Status",
+        "action": "Action"
+      },
+      "reasons": {
+        "unknown_order": "No matching bill",
+        "amount_mismatch": "Different amount",
+        "currency_mismatch": "Different currency",
+        "amount_missing": "No amount sent",
+        "currency_missing": "No currency sent",
+        "kind_mismatch": "Charge on a card-saving checkout",
+        "row_resolved": "Late payment on a row a person already resolved"
+      },
+      "resolve": "Resolve",
+      "resolveTitle": "Resolve this held payment",
+      "actionLabel": "What did you do?",
+      "creditedHelp": "Resolving as \"activated by hand\" only closes this hold. The original charge row stays failed, so the money reaches the books only when you also record the payment on the manual payment form (it creates its own ledger row).",
+      "actions": {
+        "credited": "Activated the plan by hand",
+        "refunded": "Refunded it at the provider",
+        "not_ours": "Not our payment"
+      },
+      "note": "Note (at least 3 characters)",
+      "noteRequired": "Write a short note about what you did.",
+      "resolveSubmit": "Mark resolved",
+      "resolveFailed": "Could not resolve it. It may have been resolved already; refresh the list.",
+      "resolved": "The held payment was marked resolved."
+    }
   },
   "codReconciliation": {
     "title": "COD reconciliation",
@@ -12474,6 +12577,39 @@
     "restock": "Put back on the shelf",
     "notTracked": "Stock is not tracked for this product",
     "wholeOrderRestockNote": "These lines cover the whole order, so every line is put back on the shelf. To skip restocking, leave one unit out."
+  },
+  "planLimits": {
+    "upgradeCta": "Upgrade plan",
+    "maxProducts": {
+      "warnTitle": "You are close to your product limit",
+      "warnBody": "{used} of {limit} products used. Upgrade before you hit the limit so you can keep adding products.",
+      "fullTitle": "You have reached your product limit",
+      "fullBody": "Your plan allows {limit} products and you are using all of them. Upgrade to add more."
+    },
+    "maxOrdersPerMonth": {
+      "warnTitle": "You are close to this month's order limit",
+      "warnBody": "{used} of {limit} orders this month. Upgrade to keep your store inside its plan.",
+      "fullTitle": "You have reached this month's order limit",
+      "fullBody": "{used} orders against a limit of {limit}. Orders still come through, but upgrade so your store stays within its plan."
+    },
+    "maxStaff": {
+      "warnTitle": "You are close to your team seat limit",
+      "warnBody": "{used} of {limit} team seats used. Upgrade to invite more people.",
+      "fullTitle": "All your team seats are used",
+      "fullBody": "Your plan includes {limit} team seats. Upgrade to invite more people."
+    },
+    "maxStorageMb": {
+      "warnTitle": "You are close to your storage limit",
+      "warnBody": "{used} of {limit} MB used. Upgrade before image uploads stop.",
+      "fullTitle": "Your storage is full",
+      "fullBody": "{used} of {limit} MB used. Upgrade to keep uploading images and files."
+    },
+    "ai": {
+      "warnTitle": "You are close to your AI allowance",
+      "warnBody": "{used} of {limit} AI requests used ({window, select, daily {today} other {this month}}). Upgrade for a bigger allowance.",
+      "fullTitle": "You have used your AI allowance",
+      "fullBody": "{used} of {limit} AI requests used ({window, select, daily {today} other {this month}}). Upgrade for a bigger allowance."
+    }
   },
   "launchChip": {
     "stepsLabel": "{done} of {total} steps",

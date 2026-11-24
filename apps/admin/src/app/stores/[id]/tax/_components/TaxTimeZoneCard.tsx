@@ -5,6 +5,7 @@ import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { apiPut } from '@/lib/api';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * IANA zones offered in the picker. Ebda is an Egypt product (A3): Africa/Cairo is the
@@ -55,7 +56,7 @@ export function TaxTimeZoneCard({ storeId }: { storeId: string }) {
   }
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6 mb-6">
+    <div className="bg-card rounded-md border border-border p-6 mb-6">
       <h2 data-setting-id="tax.time-zone" className="text-lg font-semibold text-foreground mb-1">
         {t('title')}
       </h2>
@@ -67,7 +68,7 @@ export function TaxTimeZoneCard({ storeId }: { storeId: string }) {
           disabled={saving}
           onChange={e => void save(e.target.value)}
           dir="ltr"
-          className="rounded-lg border border-input bg-background px-3 py-1.5 text-sm"
+          className={FIELD_CLASSES}
         >
           {options.map(z => (
             <option key={z} value={z}>
