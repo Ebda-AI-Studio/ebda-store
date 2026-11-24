@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { Button, buttonVariants } from '@/components/ui/Button';
 import { cn } from '@ebda/ui/cn';
 
-export interface EmptyStateAction {
+interface EmptyStateAction {
   label: string;
   /** Navigates (renders a link). Provide `href` OR `onClick`. */
   href?: string;
