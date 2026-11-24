@@ -158,6 +158,7 @@ jobs:
       heavy: ${{ steps.scope.outputs.heavy }}
       docs_only: ${{ steps.scope.outputs.docs_only }}
       marketing: ${{ steps.scope.outputs.marketing }}
+      builder: ${{ steps.scope.outputs.builder }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -474,7 +475,7 @@ jobs:
     # unit shards instead of after an 11 min Build; 2 shards of the 192 tests (Playwright --shard) halve its 18.5 min. The job id stays for the
     # `Merge queue gate`; the check names are not branch-ruleset requirements (only Repo guards, API Worker boots on workerd and the gate are).
     needs: [tested-tree]
-    if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.heavy != 'false'
+    if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.heavy != 'false' && (github.event_name != 'merge_group' || needs.tested-tree.outputs.builder != 'false')
     strategy:
       fail-fast: false
       matrix:
