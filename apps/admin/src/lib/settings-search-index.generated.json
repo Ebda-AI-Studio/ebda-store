@@ -1314,6 +1314,18 @@
     "pageAr": "الضريبة"
   },
   {
+    "id": "tax.change-request",
+    "kind": "setting",
+    "route": "/tax",
+    "access": "owner",
+    "en": "Change your VAT registration details",
+    "ar": "غيّر بيانات التسجيل الضريبي",
+    "synEn": "change tax number legal name vat registration verified update trn",
+    "synAr": "تغيير الرقم الضريبي الاسم القانوني التسجيل الضريبي تحديث",
+    "pageEn": "Tax & VAT",
+    "pageAr": "الضريبة"
+  },
+  {
     "id": "tax.time-zone",
     "kind": "setting",
     "route": "/tax",

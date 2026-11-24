@@ -23,6 +23,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge, Select, useToast } from '@ebda/ui';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
+import { limitLevel, limitPct } from '@/lib/plan-limits';
 import { billingDisplayStatus, showPeriodEnd, trialDaysLeft } from '@/lib/billing-state';
 import { Button } from '@/components/ui/Button';
 import { formatMoney, type PlanLimits, withNumerals } from '@ebda/shared';
@@ -131,10 +132,9 @@ function UsageBar({
   unlimitedLabel: string;
   usedOfLabel: string;
 }) {
-  const pct =
-    limit === null ? 0 : limit === 0 ? 100 : Math.min(100, Math.round((used / limit) * 100));
-  const tone =
-    limit !== null && used > limit ? 'bg-destructive' : pct >= 80 ? 'bg-warning' : 'bg-primary';
+  const pct = limitPct(used, limit);
+  const level = limit === null ? 'ok' : limitLevel(used, limit);
+  const tone = level === 'full' ? 'bg-destructive' : level === 'warn' ? 'bg-warning' : 'bg-primary';
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between gap-2 text-sm">
