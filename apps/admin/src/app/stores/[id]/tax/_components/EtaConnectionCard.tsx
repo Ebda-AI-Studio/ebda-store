@@ -90,7 +90,7 @@ export function EtaConnectionCard({ storeId }: { storeId: string }) {
 
   if (loadError)
     return (
-      <div id="eta-ereceipts" className="rounded-xl border border-border bg-card p-4 mb-4">
+      <div id="eta-ereceipts" className="rounded-md border border-border bg-card p-4 mb-4">
         <p role="alert" className="text-sm text-destructive-ink">
           {t('loadFailed')}
         </p>
@@ -98,7 +98,7 @@ export function EtaConnectionCard({ storeId }: { storeId: string }) {
     );
   if (!conn)
     return (
-      <div id="eta-ereceipts" className="rounded-xl border border-border bg-card p-4 mb-4">
+      <div id="eta-ereceipts" className="rounded-md border border-border bg-card p-4 mb-4">
         <p className="text-sm text-muted-foreground">{t('loading')}</p>
       </div>
     );
@@ -189,7 +189,7 @@ export function EtaConnectionCard({ storeId }: { storeId: string }) {
   return (
     <section
       id="eta-ereceipts"
-      className="rounded-xl border border-border bg-card p-4 mb-4"
+      className="rounded-md border border-border bg-card p-4 mb-4"
       aria-labelledby="eta-title"
     >
       <h2

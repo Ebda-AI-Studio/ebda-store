@@ -1,6 +1,7 @@
 'use client';
 
 import { useLocale } from 'next-intl';
+import { orderPaymentSummary } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { PaymentEventsTimeline } from '../../../../../../components/payment-events/PaymentEventsTimeline';
 import { formatMoney } from './format';
@@ -18,10 +19,10 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
   const t = useT('orders.detail');
   const tInstapay = useT('orders.detail.instapay');
   const locale = useLocale();
-  const isPaid = order.paymentStatus === 'paid';
-  // What is still to be collected: the order value less any part paid from
-  // the customer wallet at checkout (D1). === order.total without a wallet.
-  const remain = isPaid ? 0 : Math.max(0, order.total - (order.walletAmount ?? 0));
+  // paid / refunded / unpaid. A refunded order is NOT unpaid: nothing is owed on it.
+  // `remain` is the order value less any part paid from the customer wallet at checkout (D1), only when unpaid.
+  const { state, refunded, remain } = orderPaymentSummary(order);
+  const isUnpaid = state === 'unpaid';
   const link = order.payments?.find(p => p.paymentLink)?.paymentLink ?? null;
   const expiresAt = order.paymentConfirmationExpiresAt
     ? new Date(order.paymentConfirmationExpiresAt)
@@ -52,7 +53,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
   })();
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section className="rounded-lg border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
           {t('payment')}
@@ -81,7 +82,9 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
       <div className="flex items-start gap-3">
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-            isPaid ? 'bg-success/10 text-success-ink' : 'bg-destructive/10 text-destructive-ink'
+            isUnpaid || state === 'disputed'
+              ? 'bg-destructive/10 text-destructive-ink'
+              : 'bg-success/10 text-success-ink'
           }`}
         >
           <svg
@@ -101,14 +104,21 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
-            <div className="font-semibold text-foreground">{isPaid ? t('paid') : t('unpaid')}</div>
+            <div className="font-semibold text-foreground">
+              {t(state === 'unpaid' ? 'unpaid' : state)}
+            </div>
             <div className="font-semibold text-foreground">
               {formatMoney(order.total, order.currency)}
             </div>
           </div>
-          {!isPaid && (
+          {isUnpaid && (
             <div className="mt-1 text-sm text-muted-foreground text-end">
               {t('remain', { amount: formatMoney(remain, order.currency) })}
+            </div>
+          )}
+          {!isUnpaid && refunded > 0 && (
+            <div className="mt-1 text-sm text-muted-foreground text-end">
+              {t('refundedAmount', { amount: formatMoney(refunded, order.currency) })}
             </div>
           )}
 
@@ -118,7 +128,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
               empty section. */}
           {order.status === 'awaiting_payment_confirmation' && (
             <div
-              className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900"
+              className="mt-4 rounded-md border border-primary/30 bg-primary/10 p-4 text-sm text-primary-ink"
               data-testid="instapay-panel"
             >
               <p className="font-semibold">{tInstapay('title')}</p>
@@ -143,20 +153,20 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
               <dl className="mt-3 space-y-1.5">
                 {order.instapay?.handle && (
                   <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                    <dt className="text-violet-700">{tInstapay('payTo')}</dt>
+                    <dt className="text-primary-ink">{tInstapay('payTo')}</dt>
                     <dd className="font-medium" dir="ltr">
                       {order.instapay.handle}
                     </dd>
                   </div>
                 )}
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                  <dt className="text-violet-700">{tInstapay('orderRef')}</dt>
-                  <dd className="font-mono text-xs" dir="ltr">
+                  <dt className="text-primary-ink">{tInstapay('orderRef')}</dt>
+                  <dd className="font-mono text-sm" dir="ltr">
                     {order.orderNumber}
                   </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                  <dt className="text-violet-700">{tInstapay('customerReference')}</dt>
+                  <dt className="text-primary-ink">{tInstapay('customerReference')}</dt>
                   <dd className="font-medium" dir="ltr">
                     {order.instapay?.customerReference ?? (
                       <span className="text-xs font-normal">{tInstapay('noReference')}</span>
@@ -176,7 +186,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
               {detailPayment?.transactionId && (
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
                   <dt className="text-muted-foreground">{t('paymentTransactionId')}</dt>
-                  <dd className="font-mono text-xs text-foreground break-all text-end">
+                  <dd className="font-mono text-sm text-foreground break-all text-end">
                     {detailPayment.transactionId}
                   </dd>
                 </div>

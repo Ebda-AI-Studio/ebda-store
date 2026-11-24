@@ -86,7 +86,7 @@ export function ConnectChatCard({ storeId }: { storeId: string }) {
   return (
     <section
       data-testid="connect-chat-card"
-      className="rounded-xl border bg-card p-5 shadow-sm"
+      className="rounded-lg border bg-card p-5 shadow-sm"
       aria-labelledby="connect-chat-title"
     >
       <h2 id="connect-chat-title" className="font-semibold text-foreground">

@@ -83,6 +83,27 @@ describe('SuccessClient hero vs receipt', () => {
     expect(screen.getByText('طلبك اتسجل. جهّز المبلغ لما الطلب يوصلك.')).toBeTruthy();
   });
 
+  it('STORE-QA-41: a guest with a signed status token is sent to /o/<token>, not the login wall', async () => {
+    getOrder.mockResolvedValue({ success: true, data: { order, statusToken: 'sid.oid.123.sig' } });
+    render(<SuccessClient />);
+    await waitFor(() =>
+      expect(screen.getByTestId('receipt').getAttribute('data-has-order')).toBe('true')
+    );
+    const link = screen.getByText(/View order status|عرض حالة الطلب/).closest('a');
+    expect(link?.getAttribute('href')).toContain('/o/sid.oid.123.sig');
+    expect(link?.getAttribute('href')).not.toContain('/account/orders');
+  });
+
+  it('a signed-in customer (no token) keeps /account/orders', async () => {
+    getOrder.mockResolvedValue({ success: true, data: { order } });
+    render(<SuccessClient />);
+    await waitFor(() =>
+      expect(screen.getByTestId('receipt').getAttribute('data-has-order')).toBe('true')
+    );
+    const link = screen.getByText(/View order status|عرض حالة الطلب/).closest('a');
+    expect(link?.getAttribute('href')).toContain('/account/orders');
+  });
+
   it('while the order loads the printer is up and the hero stays hidden', () => {
     getOrder.mockReturnValue(new Promise(() => {}));
     render(<SuccessClient />);

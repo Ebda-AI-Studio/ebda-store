@@ -253,7 +253,7 @@ export default function StoreDomainPage() {
     return (
       <AdminLayout title={t('title')} subtitle={t('subtitle')} mode="store_admin" storeId={storeId}>
         <div className="mx-auto max-w-4xl p-6">
-          <div className="h-64 animate-pulse rounded-xl bg-muted" />
+          <div className="h-64 animate-pulse rounded-md bg-muted" />
         </div>
       </AdminLayout>
     );
@@ -303,7 +303,7 @@ export default function StoreDomainPage() {
           </div>
         )}
 
-        <div className="rounded-xl border bg-card shadow-sm">
+        <div className="rounded-md border bg-card shadow-sm">
           <div className="flex items-center justify-between border-b p-4">
             <h2 className="font-semibold text-foreground">
               {t('storeDomainTitle', { name: store.name })}
