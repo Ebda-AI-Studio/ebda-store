@@ -2,11 +2,12 @@
 
 import { ReactNode, useEffect } from 'react';
 import { useParams, usePathname } from 'next/navigation';
-import { AdminFeatureProvider } from '../../../hooks/useFeatures';
+import { AdminFeatureProvider, useFeatures } from '../../../hooks/useFeatures';
 import { useNotifications } from '../../../contexts/NotificationContext';
 import { BillingStatusBanner } from '../../../components/billing/BillingStatusBanner';
 import { LegalNoticeBanner } from '../../../components/legal/LegalNoticeBanner';
 import { PlanGate } from '../../../components/PlanGate';
+import { StoreNotFound } from '../../../components/StoreNotFound';
 import { featureForStorePath } from '../../../lib/route-feature-gates';
 
 /**
@@ -41,11 +42,32 @@ export default function StoreLayout({ children }: { children: ReactNode }) {
 
   return (
     <AdminFeatureProvider storeId={storeId}>
+      <StoreGuard storeId={storeId} gatedFeature={gatedFeature}>
+        {children}
+      </StoreGuard>
+    </AdminFeatureProvider>
+  );
+}
+
+/** QA-91: an id that is not a store the user can open is a not-found page, not the admin shell. */
+function StoreGuard({
+  storeId,
+  gatedFeature,
+  children,
+}: {
+  storeId: string;
+  gatedFeature: string | null;
+  children: ReactNode;
+}) {
+  const { storeMissing } = useFeatures();
+  if (storeMissing) return <StoreNotFound />;
+  return (
+    <>
       {storeId && <BillingStatusBanner storeId={storeId} />}
       {storeId && <LegalNoticeBanner storeId={storeId} />}
       <PlanGate storeId={storeId} featureKey={gatedFeature}>
         {children}
       </PlanGate>
-    </AdminFeatureProvider>
+    </>
   );
 }

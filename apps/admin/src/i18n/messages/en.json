@@ -575,6 +575,11 @@
       "errSession": "Your session ended. Sign in again to continue.",
       "errNetwork": "No connection right now. Check your internet and try again.",
       "securityLink": "Open account security"
+    },
+    "notFound": {
+      "title": "This store was not found",
+      "body": "This link is not for a store you can open. It may have been deleted, or the link has a typo. Go back to your stores and pick yours from there.",
+      "backToStores": "Back to my stores"
     }
   },
   "products": {
