@@ -2,7 +2,7 @@
  * Security review of #723 (batched feature lookups), two MEDIUM findings.
  *  1. The row-based `automationFlagsFromRows` (FeatureService's batched prefetch) treated only `canceled` as lapsed, while
  *     `getEntitlements` also downgrades a lapsed InstaPay row (`past_due`, instapay, no retry date, #836): a lapsed manual-pay
- *     store kept paid automation flags in batched sweeps. Both now go through ONE function, `effectivePlanCode`.
+ *     store kept paid automation flags in batched sweeps. Both now go through ONE function, `effectivePlanCode` (internal to plan-entitlements).
  *  2. payment-abandonment-sweep used the batched, possibly stale `selectEnabled` as its ONLY gate. It still narrows with it, but
  *     re-checks `isFeatureEnabled` live per store right before it stamps.
  */
@@ -32,10 +32,7 @@ vi.mock('../../apps/api/src/services/onesignal.service', () => ({
   OneSignalService: { notifyAdminsOfAbandonedCheckout: vi.fn() },
 }));
 
-import {
-  automationFlagsFromRows,
-  effectivePlanCode,
-} from '../../apps/api/src/services/plan-entitlements';
+import { automationFlagsFromRows } from '../../apps/api/src/services/plan-entitlements';
 import { paymentAbandonmentSweep } from '../../apps/api/src/lib/inngest/functions/payment-abandonment-sweep';
 
 const planRows = new Map(
@@ -77,11 +74,10 @@ describe('batched row path agrees with getEntitlements on a lapsed manual subscr
   });
 
   it('canceled still falls back to free, and no row derives the plan from stores.plan', () => {
-    expect(effectivePlanCode('free', sub({ status: 'canceled' })).effectiveCode).toBe('free');
-    expect(effectivePlanCode('free', null)).toEqual({
-      subscribedPlanCode: 'free',
-      effectiveCode: 'free',
-    });
+    expect(
+      automationFlagsFromRows('free', sub({ status: 'canceled' }), planRows).effectiveCode
+    ).toBe('free');
+    expect(automationFlagsFromRows('free', null, planRows).effectiveCode).toBe('free');
   });
 });
 

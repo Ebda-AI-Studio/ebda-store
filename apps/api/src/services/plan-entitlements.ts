@@ -99,7 +99,7 @@ function isLapsedManualSubscription(
  * (`automationFlagsFromRows`), so a lapsed InstaPay store cannot keep paid flags in a batched sweep while the per-store read
  * already downgrades it (security review of #723).
  */
-export function effectivePlanCode(
+function effectivePlanCode(
   legacyPlan: keyof typeof STORE_PLAN_TO_PLAN_CODE,
   sub:
     | {
