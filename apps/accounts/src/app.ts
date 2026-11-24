@@ -1,4 +1,4 @@
-import { logAuditEvent } from './audit-log';
+import { logAuditEvent, logEvent } from './audit-log';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod/v3';
 import bcrypt from 'bcryptjs';
@@ -9,6 +9,7 @@ import {
   isSessionRevoked,
   resolveRefresh,
   revokeAllForUser,
+  revokeOtherSessions,
   revokeSession,
   SESSION_TTL_MS,
   type Resolved,
@@ -39,7 +40,7 @@ import {
   revokeClient,
   rotateClient,
 } from './clients';
-import { jwks } from './keys';
+import { jwks, retiredKeysWithoutExp } from './keys';
 import { isDisposableEmail } from '../../../packages/shared/src/abuse/disposable-email-domains';
 import { renderSignupPage, signupReturn, SIGNUP_JS, SIGNUP_PAGE_HEADERS } from './signup-page';
 import { DUMMY_HASH, hashPassword, passwordPolicy, verifyPassword } from './password';
@@ -548,6 +549,30 @@ export async function issueAndMail(
   await Promise.all([mail, whatsapp]);
 }
 
+/**
+ * ID-06: after MFA is turned off, a passkey is removed or the recovery phone changes, every OTHER session is signed out (a thief
+ * holding a stolen session loses it; the owner keeps the one they just used) and the mailbox owner is told. The mail is best
+ * effort and runs after the response; the revocation is not and happens before it.
+ */
+async function securityChanged(
+  c: C,
+  user: UserRow,
+  sid: string,
+  change: 'mfa_disabled' | 'passkey_removed' | 'phone_changed'
+): Promise<void> {
+  await revokeOtherSessions(c.env.DB, user.id, sid, change);
+  queueMail(
+    c,
+    c.env.MAILER?.sendNotice({
+      to: user.email,
+      kind: 'credential_changed',
+      change,
+      language: user.language === 'ar' ? 'ar' : 'en',
+      firstName: user.first_name,
+    }) ?? Promise.resolve()
+  );
+}
+
 /** Mail work runs after the response, so every branch of the caller answers in the same time (no registered-address oracle). */
 function queueMail(c: C, job: Promise<unknown>): void {
   c.executionCtx.waitUntil(
@@ -973,14 +998,25 @@ export function createApp() {
   );
 
   // ---- discovery ----
-  app.get('/health', c =>
-    c.json({
+  app.get('/health', c => {
+    const noExp = retiredKeysWithoutExp(c.env);
+    if (noExp.length)
+      logEvent('jwt_previous_public_jwks_entry_without_exp', { kids: noExp }, 'error');
+    return c.json({
       status: 'ok',
+      ...(noExp.length
+        ? {
+            warning: 'retired_jwk_without_exp',
+            warningDetail:
+              'a retired JWKS key has no exp, or an exp more than 30 days ahead: it is not published',
+            retiredKeysWithoutExp: noExp,
+          }
+        : {}),
       service: 'accounts',
       commit: c.env.BUILD_COMMIT_SHA || null,
       deploymentId: c.env.CF_VERSION_METADATA?.id ?? null,
-    })
-  );
+    });
+  });
   app.get('/.well-known/jwks.json', async c => {
     c.header('Cache-Control', 'public, max-age=300');
     return c.json(await jwks(c.env));
@@ -1429,7 +1465,7 @@ export function createApp() {
   });
 
   app.post('/mfa/disable', async c => {
-    const { user } = await bearerAuth(c);
+    const { user, sid } = await bearerAuth(c);
     const body = await json(c, z.object({ password: z.string(), code: z.string() }));
     await requirePassword(c, user, body.password);
     if (!user.mfa_secret || !c.env.MFA_KEY) throw err(409, 'MFA_NOT_ENABLED');
@@ -1447,6 +1483,7 @@ export function createApp() {
     )
       .bind(user.id)
       .run();
+    await securityChanged(c, user, sid, 'mfa_disabled');
     return c.json({ success: true, data: { enabled: false } });
   });
 
@@ -1456,7 +1493,7 @@ export function createApp() {
   // account has a second factor, and a per-user throttle. Interim: the new number is NOT proven by a code sent to it (the
   // WhatsApp channel is flag-off); the re-authentication is the proof. Send the code to the new number here when it is on.
   app.post('/phone', async c => {
-    const { user } = await bearerAuth(c);
+    const { user, sid } = await bearerAuth(c);
     const body = await json(
       c,
       z.object({
@@ -1476,6 +1513,7 @@ export function createApp() {
     await c.env.DB.prepare(`UPDATE users SET phone = ?2, updated_at = ?3 WHERE id = ?1`)
       .bind(user.id, body.phone, iso())
       .run();
+    await securityChanged(c, user, sid, 'phone_changed');
     return c.json({ success: true, data: { phone: body.phone } });
   });
 
@@ -1579,6 +1617,7 @@ export function createApp() {
     }
     if (!(await passkeys.removePasskey(c.env.DB, user.id, c.req.param('id'))))
       throw err(404, 'NOT_FOUND');
+    await securityChanged(c, user, sid, 'passkey_removed');
     return c.json({ success: true, data: { deleted: true } });
   });
 

@@ -5,6 +5,9 @@
     "storeNotOperational": "This store is suspended, so Ebda AI Studio has paused messages to customers and payouts. Contact support to get it reactivated.",
     "storeNotOperationalTitle": "Store suspended",
     "storeNotOperationalAppeal": "Contact support to appeal",
+    "storeNotOperationalAppealForm": "Appeal this suspension",
+    "storeNotOperationalBilling": "This store is suspended for an unpaid invoice, so Ebda AI Studio has paused messages to customers and payouts. Pay the invoice and the store switches back on.",
+    "storeNotOperationalPay": "Pay the invoice",
     "delete": "Delete",
     "edit": "Edit",
     "close": "Close",
@@ -6137,6 +6140,7 @@
   },
   "auth": {
     "login": {
+      "stepUpRequired": "To confirm this change, sign in again. We will bring you back to the page afterwards.",
       "sessionEnded": "Your session ended because the password was changed or you signed out on another device. Please sign in again.",
       "title": "Sign in",
       "subtitle": "Sign in and get back to your store.",
@@ -10188,7 +10192,8 @@
       "ledger": "Ledger",
       "subscriptions": "Subscriptions",
       "claims": "Payment claims",
-      "grants": "Free months"
+      "grants": "Free months",
+      "held": "Held payments"
     },
     "manual": {
       "title": "Record manual payment for {store}",
@@ -10383,7 +10388,52 @@
       }
     },
     "refundObject": "Refund {amount}",
-    "refundAction": "Refund the payment"
+    "refundAction": "Refund the payment",
+    "held": {
+      "title": "Held payments",
+      "intro": "Subscription payments the provider reported as successful but that don't match what we billed. The merchant may have paid without being upgraded, so settle each one here.",
+      "loading": "Loading held payments...",
+      "failedToLoad": "Could not load the held payments.",
+      "empty": "No held payments.",
+      "statusFilter": "Show",
+      "statuses": {
+        "open": "Needs action",
+        "resolved": "Resolved"
+      },
+      "unknownAmount": "Not reported",
+      "columns": {
+        "date": "Received",
+        "reason": "Why it was held",
+        "expected": "We billed",
+        "got": "Provider reported",
+        "reference": "Reference",
+        "status": "Status",
+        "action": "Action"
+      },
+      "reasons": {
+        "unknown_order": "No matching bill",
+        "amount_mismatch": "Different amount",
+        "currency_mismatch": "Different currency",
+        "amount_missing": "No amount sent",
+        "currency_missing": "No currency sent",
+        "kind_mismatch": "Charge on a card-saving checkout",
+        "row_resolved": "Late payment on a row a person already resolved"
+      },
+      "resolve": "Resolve",
+      "resolveTitle": "Resolve this held payment",
+      "actionLabel": "What did you do?",
+      "creditedHelp": "Resolving as \"activated by hand\" only closes this hold. The original charge row stays failed, so the money reaches the books only when you also record the payment on the manual payment form (it creates its own ledger row).",
+      "actions": {
+        "credited": "Activated the plan by hand",
+        "refunded": "Refunded it at the provider",
+        "not_ours": "Not our payment"
+      },
+      "note": "Note (at least 3 characters)",
+      "noteRequired": "Write a short note about what you did.",
+      "resolveSubmit": "Mark resolved",
+      "resolveFailed": "Could not resolve it. It may have been resolved already; refresh the list.",
+      "resolved": "The held payment was marked resolved."
+    }
   },
   "codReconciliation": {
     "title": "COD reconciliation",
