@@ -1575,7 +1575,7 @@ class ApiClient {
   }
 
   async getOrder(orderId: string) {
-    return this.request<{ order: Order }>(`/public/orders/${orderId}`);
+    return this.request<{ order: Order; statusToken?: string }>(`/public/orders/${orderId}`);
   }
 
   /**

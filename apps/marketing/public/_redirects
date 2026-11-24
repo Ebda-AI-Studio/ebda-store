@@ -57,6 +57,40 @@
 
 # Search Console coverage (2026-11-09): guessable and legacy URLs that answered 404 now land on the right page in ONE hop.
 # The store apps use an /ar locale prefix and the /for hub never existed; the policy slugs below are the common English guesses.
+# QA-71: /ar/<page> is the same page as /<page>/ (Arabic is the default). The splat below keeps its slash-less target, which the
+# edge then slashes with a SECOND hop (301 -> /terms -> 307 -> /terms/). Each page is listed with its slash so it is ONE 308 hop.
+/ar/about /about/ 308
+/ar/about/ /about/ 308
+/ar/acceptable-use /acceptable-use/ 308
+/ar/acceptable-use/ /acceptable-use/ 308
+/ar/contact /contact/ 308
+/ar/contact/ /contact/ 308
+/ar/credits /credits/ 308
+/ar/credits/ /credits/ 308
+/ar/features /features/ 308
+/ar/features/ /features/ 308
+/ar/legal /legal/ 308
+/ar/legal/ /legal/ 308
+/ar/merchant-agreement /merchant-agreement/ 308
+/ar/merchant-agreement/ /merchant-agreement/ 308
+/ar/privacy /privacy/ 308
+/ar/privacy/ /privacy/ 308
+/ar/refund /refund/ 308
+/ar/refund/ /refund/ 308
+/ar/services /services/ 308
+/ar/services/ /services/ 308
+/ar/store /store/ 308
+/ar/store/ /store/ 308
+/ar/support /support/ 308
+/ar/support/ /support/ 308
+/ar/terms /terms/ 308
+/ar/terms/ /terms/ 308
+/ar/whatsapp /whatsapp/ 308
+/ar/whatsapp/ /whatsapp/ 308
+/ar/compare /store/#pricing 301
+/ar/compare/ /store/#pricing 301
+/ar/for /store/#looks 301
+/ar/for/ /store/#looks 301
 /ar / 301
 /ar/ / 301
 /ar/* /:splat 301

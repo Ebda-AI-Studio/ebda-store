@@ -198,13 +198,17 @@ async function fixtures(
 }
 
 /** Both backends run the scenario; each yields {result or error, resulting money tables}; they must be equal. */
-async function parity(fx: Fx, scenario: () => Promise<unknown>) {
+async function bothBackends(fx: Fx, scenario: () => Promise<unknown>) {
   const run = async (on: typeof onPg) => {
     const out = await settle(() => on(scenario));
     return scrub({ out, state: await on(() => state(fx.names)) }, fx.names);
   };
   const pg = await run(onPg);
   const dobj = await run(onDo);
+  return { pg: pg as any, dobj: dobj as any };
+}
+async function parity(fx: Fx, scenario: () => Promise<unknown>) {
+  const { pg, dobj } = await bothBackends(fx, scenario);
   expect(dobj).toEqual(pg);
   return pg as any;
 }
@@ -306,9 +310,9 @@ describe('loyalty (LoyaltyService)', () => {
     expect(t.out.ok.unknown).toBeNull();
   });
 
-  it('reverseEarnedPointsFromOrder floors at the balance a customer still holds (spent points are not clawed negative)', async () => {
+  it('reverseEarnedPointsFromOrder: Postgres floors at the held balance; the DO takes back the full earn and leaves debt (Ruling MONEY-LOYALTY-LOTS-1, deliberate divergence)', async () => {
     const fx = await fixtures();
-    const t = await parity(fx, async () => {
+    const t = await bothBackends(fx, async () => {
       await LoyaltyService.earnPointsFromPurchase(STORE, fx.cust, fx.o1, 25_000);
       // the customer spends 200 of the 250 points (a redeem elsewhere; set directly on whichever backend is current)
       if ((await storeRepo(STORE)).backend === 'do')
@@ -320,8 +324,12 @@ describe('loyalty (LoyaltyService)', () => {
         });
       return LoyaltyService.reverseEarnedPointsFromOrder(STORE, fx.o1);
     });
-    expect(t.out.ok.pointsReversed).toBe(50);
-    expect(t.state.points[0].points).toBe(0);
+    // Postgres LoyaltyService keeps the old floor (it cannot run in the Worker, NZ-D23).
+    expect(t.pg.out.ok.pointsReversed).toBe(50);
+    expect(t.pg.state.points[0].points).toBe(0);
+    // The DO store takes back the FULL earn; points already spent leave a debt the next earn pays.
+    expect(t.dobj.out.ok.pointsReversed).toBe(250);
+    expect(t.dobj.state.points[0].points).toBe(-200);
   });
 
   it('reverseRedeemedPointsFromOrder: re-credits the spent points once, null when nothing was spent', async () => {

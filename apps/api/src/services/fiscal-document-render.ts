@@ -1,5 +1,6 @@
 import { intlLocale } from '@ebda/shared';
-import { emailMoney } from './email-templates/_util';
+import { moneyHtml } from './email-templates/_util';
+import { orderBarcodeBlock, ORDER_BARCODE_CSS } from './order-barcode';
 import type { RefundDocumentPayload, SaleDocumentPayload } from './fiscal-document.service';
 
 /**
@@ -220,12 +221,15 @@ export function renderFiscalDocumentHtml(
   doc: RenderableDocument,
   locale: 'ar' | 'en',
   timeZone = 'Africa/Cairo',
-  eta: RenderableEta | null = null
+  eta: RenderableEta | null = null,
+  /** The store's `settings.receiptBarcodeShape` (unset = plain, `off` = none). */
+  barcodeShape?: unknown
 ): string {
   const ar = locale === 'ar';
   const l = ar ? L.ar : L.en;
-  const money = (n: number) =>
-    `<span dir="ltr">${esc(emailMoney(n, doc.currency || 'EGP', 'en'))}</span>`;
+  // The document's language, not English: Arabic prints «ج.م» (never "EGP") and a sign stays with its number in RTL.
+  const money = (n: number) => moneyHtml(n, doc.currency || 'EGP', locale);
+  const minus = (n: number) => moneyHtml(n, doc.currency || 'EGP', locale, '\u2212');
   const date = (d: Date | string | null | undefined) =>
     d
       ? new Date(d).toLocaleDateString(intlLocale(locale), {
@@ -270,10 +274,14 @@ export function renderFiscalDocumentHtml(
       ].filter(Boolean)
     : [];
 
-  const hasLines = Array.isArray(p.lines) && p.lines.length > 0;
+  // Shipping, COD fee and extra charge are totals lines, not purchased items (QA-70): no qty, no unit price.
+  const isCharge = (k: string | undefined) => k === 'shipping' || k === 'cod_fee' || k === 'extra';
+  const allLines = Array.isArray(p.lines) ? p.lines : [];
+  const hasLines = allLines.some(ln => !isCharge(ln.kind));
   const lines = hasLines
-    ? p
-        .lines!.map(ln => {
+    ? allLines
+        .filter(ln => !isCharge(ln.kind))
+        .map(ln => {
           const v2 = version >= 2;
           const code = [
             ln.internalCode ?? ln.sku,
@@ -297,11 +305,23 @@ export function renderFiscalDocumentHtml(
         })
         .join('')
     : '';
+  // QA-70: a charge is a totals-style row (description across the item / qty / unit columns, never a qty and unit price), but it
+  // still carries its own VAT rate and amount like every other fiscal line, so the tax archive keeps the shipping VAT.
+  const charges = allLines
+    .filter(ln => isCharge(ln.kind))
+    .map(ln => {
+      const v2 = version >= 2;
+      return `<tr><td colspan="3">${esc(ar && ln.descriptionAr ? ln.descriptionAr : ln.description)}</td>
+            <td class="n">${v2 && ln.vatAmount != null ? esc(pct(ln.vatRateBps)) : na}</td>
+            <td class="n">${v2 && ln.vatAmount != null ? money(ln.vatAmount) : na}</td>
+            <td class="n">${money(ln.amount)}</td></tr>`;
+    })
+    .join('');
   const discounts = Array.isArray(p.discounts)
     ? p.discounts
         .map(
           d =>
-            `<tr><td colspan="5">${esc(l.discount)}${d.label ? ` (${esc(d.label)})` : ''}</td><td class="n">−${money(d.amount)}</td></tr>`
+            `<tr><td colspan="5">${esc(l.discount)}${d.label ? ` (${esc(d.label)})` : ''}</td><td class="n">${minus(d.amount)}</td></tr>`
         )
         .join('')
     : '';
@@ -335,6 +355,9 @@ ${row(l.etaEnv, esc(eta.environment))}
 ${eta.qr && /^https:\/\//.test(eta.qr) ? `<div class="qr">${eta.qrSvg ?? ''}<a href="${esc(eta.qr)}" target="_blank" rel="noopener noreferrer">${esc(l.etaVerify)}</a></div>` : ''}</div>`
       : `<div class="box muted" data-eta-none="1">${esc(l.etaNone)}</div>`;
 
+  // QA-69: the order barcode the store configured in /codes (Code 128 of the order number), as the invoice page prints it.
+  const barcode = p.orderNumber ? orderBarcodeBlock(p.orderNumber, barcodeShape) : '';
+
   return `<!DOCTYPE html>
 <html lang="${locale}" dir="${ar ? 'rtl' : 'ltr'}">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -350,6 +373,7 @@ ${eta.qr && /^https:\/\//.test(eta.qr) ? `<div class="qr">${eta.qrSvg ?? ''}<a h
   .box{margin-top:16px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px} .qr{margin-top:8px;display:flex;align-items:center;gap:12px} .qr svg{width:96px;height:96px}
   .stamp{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);font-size:72px;font-weight:900;color:#dc2626;opacity:.08}
+  ${ORDER_BARCODE_CSS}
   @media print{body{background:#fff}.page{margin:0;border-radius:0}}
 </style></head>
 <body><div class="page">
@@ -381,14 +405,15 @@ ${p.reason ? `<p class="muted">${esc(l.reason)}: ${esc(p.reason)}</p>` : ''}
 <table>
   ${lines ? `<thead><tr><th>${esc(l.item)}</th><th class="n">${esc(l.qty)}</th><th class="n">${esc(l.unit)}</th><th class="n">${esc(l.vatRate)}</th><th class="n">${esc(l.vatAmt)}</th><th class="n">${esc(l.lineTotal)}</th></tr></thead>` : ''}
   <tbody>
-    ${lines}${discounts}
+    ${lines}${discounts}${charges}
     ${breakdown}
     <tr><td colspan="5">${esc(l.net)}</td><td class="n">${money(doc.netAmount)}</td></tr>
     <tr><td colspan="5">${esc(l.vat)}${esc(rate)}</td><td class="n">${money(doc.vatAmount)}</td></tr>
     ${t?.taxIncludedInPrice ? `<tr><td colspan="6" class="muted">${esc(l.priceIncludesVat)}</td></tr>` : ''}
-    <tr class="tot"><td colspan="5">${esc(l.total)}</td><td class="n">${refundSign}${money(doc.totalAmount)}</td></tr>
+    <tr class="tot"><td colspan="5">${esc(l.total)}</td><td class="n">${refundSign ? minus(doc.totalAmount) : money(doc.totalAmount)}</td></tr>
   </tbody>
 </table>
 ${etaBlock}
+${barcode}
 </div></body></html>`;
 }

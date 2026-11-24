@@ -162,7 +162,8 @@ describe('scanner tests are always in the pre-push run (PREPUSH-3)', () => {
   });
 
   it('the gate runs them whatever the diff', () => {
-    const gate = readSrc('scripts/ci/pre-push-gate.sh', 'utf8');
+    // F10: the Store's own steps live in scripts/ci/pre-push-extra.sh, which the vendored gate runs last
+    const gate = readSrc('scripts/ci/pre-push-extra.sh', 'utf8');
     expect(gate).toContain('SCANNERS=$(field scanners)');
     expect(gate).toMatch(/npx vitest run [^\n]*\$SCANNERS/);
     // not nested inside the `affected` branch
@@ -197,7 +198,7 @@ describe('PREPUSH-6 change class', () => {
   });
 
   it('PREPUSH-8: EVERY related run uses a prepush slot with 2 workers and never the heavy host lock (CI jobs hold it back to back)', () => {
-    const gate = readSrc('scripts/ci/pre-push-gate.sh', 'utf8');
+    const gate = readSrc('scripts/ci/pre-push-extra.sh', 'utf8');
     expect(gate).toContain(
       'prepush-slot.sh npx vitest related --run --passWithNoTests --maxWorkers=2'
     );
