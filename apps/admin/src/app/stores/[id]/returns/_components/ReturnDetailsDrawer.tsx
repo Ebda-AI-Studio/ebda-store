@@ -8,7 +8,6 @@ import { useT } from '@/i18n/useT';
 import { useFeatures } from '@/hooks/useFeatures';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { ReturnLifecycleTimeline } from '../../../../../components/return-timeline/ReturnLifecycleTimeline';
-import { RETURN_COLORS } from './types';
 import type { ReturnItem, ReturnRecord } from './types';
 
 import { formatPrice } from '@/lib/format';
@@ -136,11 +135,7 @@ export function ReturnDetailsDrawer({
         <div className="p-6 space-y-6">
           {/* Status & Type */}
           <div className="flex items-center gap-3">
-            <OrderStatusBadge
-              status={record.status}
-              namespace="returns.status"
-              colorMap={RETURN_COLORS}
-            />
+            <OrderStatusBadge status={record.status} family="return" />
             <Badge variant="outline">{tType(record.type)}</Badge>
           </div>
 

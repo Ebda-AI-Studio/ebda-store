@@ -6,6 +6,7 @@ import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice, minorToMajor, formatDate } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
@@ -43,14 +44,6 @@ interface PurchaseOrder {
 }
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
-
-const STATUS_CLASSES: Record<string, string> = {
-  draft: 'bg-muted text-foreground',
-  sent: 'bg-info/10 text-info-ink',
-  partial: 'bg-warning/10 text-warning-ink',
-  received: 'bg-success/10 text-success-ink',
-  cancelled: 'bg-destructive/10 text-destructive-ink',
-};
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -291,13 +284,7 @@ export default function PurchaseOrderDetailPage() {
           <div className="max-w-4xl space-y-6">
             {/* Header summary */}
             <div className="flex flex-wrap gap-4 items-start">
-              <span
-                className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium ${
-                  STATUS_CLASSES[po.status] ?? 'bg-muted text-muted-ink'
-                }`}
-              >
-                {t(`statuses.${po.status}`)}
-              </span>
+              <OrderStatusBadge family="purchaseOrder" status={po.status} />
 
               <div className="text-sm text-muted-foreground space-x-4">
                 {po.expectedDate && (
