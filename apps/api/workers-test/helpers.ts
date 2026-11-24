@@ -88,6 +88,7 @@ export const ENV_DB = (): boolean => testEnv.E2E_DB === '1';
  * so credential-class routes behind `requireRecentLogin` (TEN-4: agent / merchant keys, provider credentials, staff changes)
  * accept it. A legacy HS256 `accessToken` has no `auth_time` and is refused there on purpose (fail closed).
  */
+// pq-allow(unused-export): test seam, imported by workers-test/merchant-mcp-do.test.ts (the guard reads no test imports)
 export async function identityAccessToken(claims: {
   sub: string;
   email?: string;
