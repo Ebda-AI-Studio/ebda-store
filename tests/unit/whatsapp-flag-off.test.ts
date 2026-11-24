@@ -11,6 +11,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('@api/services/billing/addon-grant', () => ({ activeAddons: async () => [] }));
 vi.mock('@api/services/redis.service', () => ({
   redis: { get: vi.fn().mockResolvedValue(null), set: vi.fn(), delete: vi.fn() },
 }));

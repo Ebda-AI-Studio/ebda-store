@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/Button';
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -181,7 +182,13 @@ export default function FloatingWidgetPage() {
           <h2 className="mb-2 text-lg font-semibold text-foreground">
             {t('featureNotEnabledTitle')}
           </h2>
-          <p className="text-sm text-muted-foreground">{t('featureNotEnabledBody')}</p>
+          <p className="mb-4 text-sm text-muted-foreground">{t('featureNotEnabledBody')}</p>
+          <Link
+            href={`/stores/${storeId}/billing/addons`}
+            className="text-sm font-medium text-primary underline"
+          >
+            {t('featureNotEnabledCta')}
+          </Link>
         </div>
       </AdminLayout>
     );
