@@ -169,7 +169,7 @@ export function Canvas({
           className="pointer-events-none absolute inset-x-0 top-12 mx-auto flex w-[min(100%,48rem)] flex-col gap-4 px-4"
         >
           <div className="force-skeleton h-10 rounded-lg" />
-          <div className="force-skeleton h-56 rounded-xl" />
+          <div className="force-skeleton h-56 rounded-lg" />
           <div className="grid grid-cols-3 gap-3">
             <div className="force-skeleton h-32 rounded-lg" />
             <div className="force-skeleton h-32 rounded-lg" />
