@@ -16,6 +16,7 @@ import { apiDelete, apiGet, apiPatch, apiPost, type ApiError } from '../../../..
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 import { planNamesJoined } from '@/lib/plan-labels';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Merchant outgoing webhooks: endpoints, the once-only signing secret, the delivery log with
@@ -256,7 +257,7 @@ export default function WebhooksPage() {
 
   const fmt = (v: string | null) =>
     v ? new Date(v).toLocaleString(undefined, withNumerals()) : t('table.never');
-  const badge = 'rounded px-1.5 py-0.5 text-xs font-medium';
+  const badge = 'rounded-md px-1.5 py-0.5 text-xs font-medium';
 
   return (
     <AdminLayout
@@ -316,7 +317,7 @@ export default function WebhooksPage() {
                   <span
                     className={`${badge} ${
                       ep.active
-                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                        ? 'bg-success/10 text-success-ink'
                         : 'bg-muted text-muted-foreground'
                     }`}
                     dir="auto"
@@ -426,10 +427,10 @@ export default function WebhooksPage() {
         title={editing ? t('form.editTitle') : t('form.addTitle')}
       >
         <div className="space-y-3">
-          <label className="block text-xs font-medium text-foreground" dir="auto">
+          <label className="block text-sm font-medium text-foreground" dir="auto">
             {t('form.urlLabel')}
             <input
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className={`${FIELD_CLASSES} mt-1`}
               value={form.url}
               onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
               placeholder={t('form.urlPlaceholder')}
@@ -441,10 +442,10 @@ export default function WebhooksPage() {
               {t('form.urlHelp')}
             </span>
           </label>
-          <label className="block text-xs font-medium text-foreground" dir="auto">
+          <label className="block text-sm font-medium text-foreground" dir="auto">
             {t('form.descriptionLabel')}
             <input
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className={`${FIELD_CLASSES} mt-1`}
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               maxLength={120}
@@ -452,13 +453,13 @@ export default function WebhooksPage() {
             />
           </label>
           <fieldset className="space-y-1">
-            <legend className="text-xs font-medium text-foreground" dir="auto">
+            <legend className="text-sm font-medium text-foreground" dir="auto">
               {t('form.eventsLabel')}
             </legend>
             {WEBHOOK_EVENT_TYPES.map(ev => (
               <label
                 key={ev}
-                className="flex items-center gap-2 text-xs max-md:min-h-11"
+                className="flex items-center gap-2 text-sm max-md:min-h-11"
                 dir="auto"
               >
                 <input
@@ -470,7 +471,7 @@ export default function WebhooksPage() {
               </label>
             ))}
           </fieldset>
-          <label className="flex items-start gap-2 text-xs" dir="auto">
+          <label className="flex items-start gap-2 text-sm" dir="auto">
             <input
               type="checkbox"
               className="mt-0.5"
@@ -629,7 +630,7 @@ export default function WebhooksPage() {
           ) : null}
           <ul className="space-y-2">
             {log?.map(d => (
-              <li key={d.id} className="rounded-lg border p-2 text-xs">
+              <li key={d.id} className="rounded-lg border p-2 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-foreground" dir="auto">
                     {eventLabel(d.eventType)}
@@ -638,7 +639,7 @@ export default function WebhooksPage() {
                   <span
                     className={`${badge} ${
                       d.status === 'success'
-                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                        ? 'bg-success/10 text-success-ink'
                         : d.status === 'failed'
                           ? 'border border-destructive/40 bg-destructive/5 text-foreground'
                           : 'bg-muted text-muted-foreground'
