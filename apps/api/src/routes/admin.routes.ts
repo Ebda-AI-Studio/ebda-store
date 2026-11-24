@@ -658,7 +658,10 @@ router.get(
           limit: z.coerce.number().int().min(1).max(200).optional(),
         })
         .parse(req.query);
-      res.json({ success: true, data: { held: await listHeldBillingWebhooks(q) } });
+      res.json({
+        success: true,
+        data: { held: await listHeldBillingWebhooks({ ...q, flagAddons: true }) },
+      });
     } catch (error) {
       next(error);
     }

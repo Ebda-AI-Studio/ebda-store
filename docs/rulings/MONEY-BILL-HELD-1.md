@@ -55,3 +55,19 @@ manual payment form (`POST /admin/stores/:id/manual-payment`, which writes its o
 Order for a paid-but-unmatched charge the team accepts: record the manual payment first, then resolve the hold as `credited` with the
 manual payment's reference in the note. The held payments panel says this next to the action (`billingEvents.held.creditedHelp`, ar + en).
 `refunded` and `not_ours` need no second step.
+
+Ruling ADDON-HELD-CREDIT-A (money review of #1146): an ADD-ON payment cannot be resolved as `credited`. Nothing can write a hand credit
+for an add-on (the manual payment form records plan payments only), so `credited` could only ever match a later card purchase of the
+same add-on: a double charge, and a claim confirmed against the wrong term. Therefore:
+
+- `resolveHeldBillingWebhook` refuses `credited` with 409 `HELD_ADDON_CREDIT_UNSUPPORTED` when the held ledger row's plan code starts with
+  `addon:`, BEFORE the audit row and before any write (ledger, queue and claim stay as they were).
+- The held payments panel offers only `refunded` and `not_ours` for an add-on row (the open list carries `isAddon`, set with
+  `flagAddons`; the sweep digest skips that read), preselects `refunded`, and says why (refund it: the merchant can buy the add-on again;
+  `billingEvents.held.addonNoCreditHelp`, ar + en).
+- `closeAddonClaimForResolvedHold` handles rejects only: `refunded` rejects the claim and keeps its transfer reference USED (the
+  money went back; the receipt keeps its reference key too), `not_ours` rejects it and frees the reference for re-filing. The confirm
+  branch and the newer-term search are gone.
+- A plan payment (not an add-on) keeps all three actions and the "record it on the manual payment form too" note above.
+  Cost if wrong: a super admin who really granted an add-on by hand cannot close that hold as credited: refund it and let the merchant buy it
+  again, or fix it in the database; the alternative was confirming a claim against a card purchase it did not pay for.

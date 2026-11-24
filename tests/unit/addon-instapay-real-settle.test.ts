@@ -292,39 +292,40 @@ describe('resolving a held add-on payment closes the merchant claim behind it (f
     });
   });
 
-  it('credited with NO granted add-on: rejected with a note that says so, never confirmed', async () => {
+  it('credited on an ADD-ON row is refused 409 HELD_ADDON_CREDIT_UNSUPPORTED before any write: ledger, queue, claim and audit all unchanged (Ruling ADDON-HELD-CREDIT-A)', async () => {
     const { db, h } = await heldClaim();
-    await resolve(h.id, 'credited');
-    const c = claimRow(db);
-    expect(c.s).toBe('rejected');
-    expect(c.n).toMatch(/^Credited by hand, but no active add-on of this kind was found/);
+    const before = {
+      ledger: db
+        .prepare('SELECT status s, failure_reason f FROM billing_events WHERE id = ?')
+        .get(EV),
+      claim: claimRow(db),
+      queue: (await listHeldBillingWebhooks({ status: 'open' })).length,
+    };
+    const audit = vi.fn(async () => undefined);
+    await expect(
+      resolveHeldBillingWebhook({
+        id: h.id,
+        actorId: 'admin-1',
+        action: 'credited',
+        note: 'tried',
+        audit,
+      })
+    ).rejects.toMatchObject({ statusCode: 409, code: 'HELD_ADDON_CREDIT_UNSUPPORTED' });
+    expect(audit).not.toHaveBeenCalled();
+    expect(
+      db.prepare('SELECT status s, failure_reason f FROM billing_events WHERE id = ?').get(EV)
+    ).toEqual(before.ledger);
+    expect(claimRow(db)).toEqual(before.claim);
+    expect((await listHeldBillingWebhooks({ status: 'open' })).length).toBe(before.queue);
+    expect(await addons()).toHaveLength(0);
   });
 
-  it('credited with the add-on actually granted: confirmed against that term', async () => {
-    const { db, h } = await heldClaim();
-    db.prepare(
-      `INSERT INTO billing_events (id, store_id, type, plan_code, billing_interval, amount_minor, currency, provider, idempotency_key, status, for_period_end, created_at)
-       VALUES ('99999999-9999-4999-8999-999999999999', ?, 'upgrade', ?, 'monthly', 5000, 'EGP', 'manual', 'manual:granted', 'succeeded', ?, ?)`
-    ).run(STORE, planCodeOfSku(SKU), Date.now() + 20 * 86_400_000, Date.now() + 5000);
-    await resolve(h.id, 'credited');
-    expect(claimRow(db)).toMatchObject({
-      s: 'confirmed',
-      b: '99999999-9999-4999-8999-999999999999',
-    });
-  });
-
-  it('credited while the merchant ALREADY had a running term of that add-on: rejected, never confirmed against the old term', async () => {
-    const { db, h } = await heldClaim();
-    db.prepare(
-      `INSERT INTO billing_events (id, store_id, type, plan_code, billing_interval, amount_minor, currency, provider, idempotency_key, status, for_period_end, created_at)
-       VALUES ('88888888-8888-4888-8888-888888888888', ?, 'upgrade', ?, 'monthly', 5000, 'EGP', 'kashier', 'card:earlier', 'succeeded', ?, ?)`
-    ).run(STORE, planCodeOfSku(SKU), Date.now() + 20 * 86_400_000, Date.now() - 10 * 86_400_000);
-    expect(await addons()).toHaveLength(1); // the merchant does have a running term from before
-    await resolve(h.id, 'credited');
-    const c = claimRow(db);
-    expect(c.s).toBe('rejected');
-    expect(c.b).toBeNull();
-    expect(c.n).toMatch(/^Credited by hand, but no active add-on of this kind was found/);
+  it('the open list flags add-on holds (the panel hides credited for them) and leaves a plan hold unflagged', async () => {
+    const { h } = await heldClaim();
+    const [flagged] = await listHeldBillingWebhooks({ status: 'open', flagAddons: true });
+    expect(flagged).toMatchObject({ id: h.id, isAddon: true });
+    const [plain] = await listHeldBillingWebhooks({ status: 'open' });
+    expect(plain.isAddon).toBe(false); // not asked for (the sweep digest skips the extra reads)
   });
 
   it('a failing queue close leaves the claim already closed, and the retry completes without touching it twice', async () => {

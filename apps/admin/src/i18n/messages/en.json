@@ -10418,6 +10418,7 @@
       "resolveTitle": "Resolve this held payment",
       "actionLabel": "What did you do?",
       "creditedHelp": "Resolving as \"activated by hand\" only closes this hold. The original charge row stays failed, so the money reaches the books only when you also record the payment on the manual payment form (it creates its own ledger row).",
+      "addonNoCreditHelp": "This is an add-on payment, which cannot be credited by hand. Refund it at the provider, and the merchant can buy the add-on again, or mark it as not ours.",
       "actions": {
         "credited": "Activated the plan by hand",
         "refunded": "Refunded it at the provider",

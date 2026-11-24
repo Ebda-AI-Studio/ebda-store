@@ -2208,6 +2208,8 @@ async function heldQueueDb(): Promise<WebhookEvents> {
 export async function listHeldBillingWebhooks(args: {
   status: 'open' | 'resolved';
   limit?: number;
+  /** also say which open holds are add-on payments (the admin panel); the sweep's digest only counts and skips the extra reads */
+  flagAddons?: boolean;
 }) {
   const rows = await (
     await heldQueueDb()
@@ -2216,22 +2218,44 @@ export async function listHeldBillingWebhooks(args: {
     orderBy: { receivedAt: 'desc' },
     take: Math.min(Math.max(args.limit ?? 100, 1), 200),
   });
-  return rows.map(r => {
+  const parsed = rows.map(r => {
     let detail: Record<string, unknown> = {};
     try {
       detail = r.detail ? (JSON.parse(r.detail) as Record<string, unknown>) : {};
     } catch {
       detail = { unparsed: r.detail };
     }
-    return {
-      id: r.id,
-      provider: r.provider,
-      eventId: r.eventId,
-      receivedAt: r.receivedAt,
-      status: args.status,
-      ...detail,
-    };
+    return { r, detail };
   });
+  // Which held rows are ADD-ON payments (the panel offers them only refund / not ours, Ruling ADDON-HELD-CREDIT-A): one ledger read per
+  // store, open holds only (a handful).
+  const addonRows = new Set<string>();
+  if (args.status === 'open' && args.flagAddons) {
+    const byStore = new Map<string, string[]>();
+    for (const { detail } of parsed) {
+      const sid = typeof detail.storeId === 'string' ? detail.storeId : null;
+      const oid = typeof detail.merchantOrderId === 'string' ? detail.merchantOrderId : null;
+      if (sid && oid && UUID_RE.test(oid)) byStore.set(sid, [...(byStore.get(sid) ?? []), oid]);
+    }
+    for (const [sid, ids] of byStore) {
+      const found = await withStore(sid, tx =>
+        tx.billingEvent.findMany({
+          where: { storeId: sid, id: { in: ids }, planCode: { startsWith: ADDON_PLAN_PREFIX } },
+          select: { id: true },
+        })
+      ).catch(() => []);
+      for (const f of found) addonRows.add(f.id);
+    }
+  }
+  return parsed.map(({ r, detail }) => ({
+    id: r.id,
+    provider: r.provider,
+    eventId: r.eventId,
+    receivedAt: r.receivedAt,
+    status: args.status,
+    ...detail,
+    isAddon: typeof detail.merchantOrderId === 'string' && addonRows.has(detail.merchantOrderId),
+  }));
 }
 
 /**
@@ -2267,6 +2291,27 @@ export async function resolveHeldBillingWebhook(args: {
     detail = { unparsed: row.detail };
   }
   const priorAction = (detail.resolution as { action?: unknown } | undefined)?.action;
+  // Ruling ADDON-HELD-CREDIT-A: nothing can write a hand credit for an add-on, so `credited` could only ever match a later card purchase
+  // (a double charge). Refused BEFORE the audit row and before any write: the person refunds it (the merchant can buy again) or marks it
+  // not ours.
+  if (args.action === 'credited') {
+    const preRowId = typeof detail.merchantOrderId === 'string' ? detail.merchantOrderId : null;
+    const preStoreId = typeof detail.storeId === 'string' ? detail.storeId : null;
+    if (preRowId && preStoreId && UUID_RE.test(preRowId)) {
+      const pre = await withStore(preStoreId, tx =>
+        tx.billingEvent.findFirst({
+          where: { id: preRowId, storeId: preStoreId },
+          select: { planCode: true },
+        })
+      );
+      if (pre?.planCode?.startsWith(ADDON_PLAN_PREFIX))
+        throw new AppError(
+          409,
+          'HELD_ADDON_CREDIT_UNSUPPORTED',
+          'An add-on payment cannot be credited by hand: refund it (the merchant can buy the add-on again) or mark it not ours'
+        );
+    }
+  }
   await args.audit();
   // 1) the LEDGER row first (the money truth, in its OWN store's scope): a person's decision. Idempotent: a row already
   //    `held_resolved:<same action>` (an earlier attempt whose queue close failed) completes; a failure here leaves the
@@ -2284,6 +2329,7 @@ export async function resolveHeldBillingWebhook(args: {
       if (!r || r.status === 'succeeded') return;
       // an add-on's InstaPay CLAIM closes with its held ledger row (idempotent: a retry after a failed queue close repeats it)
       const closeClaim = async () => {
+        if (args.action === 'credited') return; // refused up front for an add-on row; a plan row has no claim to close here
         const { closeAddonClaimForResolvedHold } = await import('./addon-claim-close.js');
         await closeAddonClaimForResolvedHold(tx, {
           storeId,
