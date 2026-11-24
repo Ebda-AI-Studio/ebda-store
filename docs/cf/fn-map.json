@@ -414,6 +414,11 @@
     "replacement": "platform.setVatSetting validates the caller is a super admin (role check; there is no DB role in D1)",
     "test": "packages/repo/test/contract/platform-authz.contract.ts"
   },
+  "provider_activation_ledger_append_only": {
+    "target": "d1",
+    "replacement": "D1 triggers provider_activation_ledger_no_{update,delete} in migrations/platform/0013_provider_activation_ledger_append_only.sql; activation.* rows are append-only",
+    "test": "packages/cf-schema/test/provider-activation-ledger.test.ts"
+  },
   "set_count_sessions_updated_at": {
     "target": "store-do",
     "replacement": "repo layer sets updated_at on every write (one helper); no trigger",

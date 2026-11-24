@@ -11,6 +11,7 @@ import { auditLog } from '../middleware/security';
 import { PaymentService } from '../services/payment.service';
 import { getAuthUser } from '../utils/store-helpers';
 import { paymentSettingsRouteContext } from '../middleware/tenant-context';
+import { refuseUnconfirmedEnable } from '../lib/provider-confirm-gate';
 
 import { REGION, PAYMENT_PROVIDER_CODES, getProviderEntry } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
@@ -499,6 +500,10 @@ router.put(
       }
 
       refuseLegacyGatewayCredentials(provider, req.body ?? {});
+      // The confirm rule on this route's off -> on transition (the enable test gate runs inside the shared writer).
+      if (data.isEnabled === true && !existing.isEnabled) {
+        refuseUnconfirmedEnable(getAuthUser(req).role, provider);
+      }
       const config = await applyStorePaymentConfigUpdate(
         storeId,
         provider,
@@ -682,6 +687,8 @@ router.post(
       // successful Test connection of the credentials stored now (PROVIDERS-2 + plan 4.2/5).
       if (enabled === true) {
         assertEnableAllowed(existing);
+        // Checkout-visible: a merchant turns a provider ON through /provider-activation/.../activate (confirm step).
+        refuseUnconfirmedEnable(user.role, provider);
       } else if (enabled !== false) {
         throw new AppError(400, 'VALIDATION_ERROR', '`enabled` must be true or false');
       }

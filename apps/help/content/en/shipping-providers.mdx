@@ -8,6 +8,7 @@ keywords: shipping carrier bosta shipblu mylerz aramex connect api key cod cash 
 capabilities:
   - shipping.book-shipment@1
   - shipping.carriers@1
+  - self.provider-self-activation@1
 ---
 
 <Callout title="New connections: we watch the first parcel">
@@ -44,6 +45,16 @@ delivery are between you and the carrier, not Ebda Store. Connecting is only a c
 When an order is ready, **Ship** books the parcel with your default carrier. The cash to collect is the
 order's unpaid cash-on-delivery amount, sent in EGP. Printing the label, tracking, cancelling and
 requesting the courier pickup are on the order.
+
+## Turning a carrier on yourself
+
+You never wait for Ebda Store to activate a carrier. Press the **Ship orders with this carrier** switch on the card:
+
+1. Ebda Store tests your saved keys right then, on the server. Nothing you type on the page can make the test pass.
+2. If the test passes, you are asked to confirm, because from that moment orders can be booked with this carrier. Press **Test and turn on**.
+3. If the test fails, you get one plain sentence about what to check next (for example, the keys belong to the other mode). Nothing is turned on. Fix the keys and press the switch again.
+
+Every activation is recorded, and the Ebda Store team is told when a carrier nobody has verified yet is turned on for the first time, so we watch its first real parcel. If something is wrong, we can turn the carrier off for your store and tell you why.
 
 ## Courier pickup
 

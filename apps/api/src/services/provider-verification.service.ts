@@ -141,7 +141,12 @@ export async function recordProviderOperation(input: ProviderOperation): Promise
     const counted = input.ok && mode === 'live' && SETTLED_OPS.has(input.op);
 
     const prior = await prisma.providerVerificationEvent.findFirst({
-      where: { provider: input.provider, sourceStoreId: input.storeId },
+      // The activation ledger (op `activation.*`) is not a REAL use: it must not hide the first-real-use alert.
+      where: {
+        provider: input.provider,
+        sourceStoreId: input.storeId,
+        NOT: { op: { startsWith: 'activation.' } },
+      },
       select: { id: true },
     });
     const firstUse = prior === null;
