@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
-import { NOTIFICATION_COLORS } from './types';
 import type { NotificationLog } from './types';
 import { withNumerals } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface NotificationsLogProps {
   logs: NotificationLog[];
@@ -83,11 +83,7 @@ export function NotificationsLog({
       mobileBadge: true,
       cell: log => (
         <>
-          <OrderStatusBadge
-            status={log.status}
-            namespace="notifications.log.status"
-            colorMap={NOTIFICATION_COLORS}
-          />
+          <OrderStatusBadge status={log.status} family="notification" />
           {log.error && (
             <p
               className="text-xs text-destructive-ink mt-1 truncate max-w-[200px]"
@@ -124,7 +120,7 @@ export function NotificationsLog({
 
   return (
     <div className="space-y-4">
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-md border border-border overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
@@ -135,7 +131,7 @@ export function NotificationsLog({
               value={channelFilter}
               onChange={e => onChannelFilterChange(e.target.value)}
               aria-label={t('filters.channelLabel')}
-              className="px-3 py-1.5 text-sm border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
             >
               <option value="all">{t('filters.allChannels')}</option>
               {smsEnabled && <option value="sms">{tShared('channelNames.sms')}</option>}
@@ -147,7 +143,7 @@ export function NotificationsLog({
               value={statusFilter}
               onChange={e => onStatusFilterChange(e.target.value)}
               aria-label={t('filters.statusLabel')}
-              className="px-3 py-1.5 text-sm border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
             >
               <option value="all">{t('filters.allStatuses')}</option>
               <option value="sent">{t('status.sent')}</option>
@@ -168,7 +164,7 @@ export function NotificationsLog({
       />
 
       {logs.length > 0 && pages > 1 && (
-        <div className="flex items-center justify-between px-6 py-4 rounded-xl border border-border bg-card">
+        <div className="flex items-center justify-between px-6 py-4 rounded-md border border-border bg-card">
           <p className="text-sm text-muted-foreground">
             {t('pagination.summary', { page, pages, total })}
           </p>

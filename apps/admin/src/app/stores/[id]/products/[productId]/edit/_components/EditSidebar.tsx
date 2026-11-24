@@ -66,7 +66,7 @@ export function EditSidebar({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
+      <div className="rounded-md border bg-card p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('status')}</h2>
         <Select
           label={tFields('productStatus')}
@@ -76,7 +76,7 @@ export function EditSidebar({
         />
       </div>
 
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
+      <div className="rounded-md border bg-card p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('organization')}</h2>
         <Select
           label={tFields('category')}
@@ -93,7 +93,7 @@ export function EditSidebar({
         />
       </div>
 
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
+      <div className="rounded-md border bg-card p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('flags')}</h2>
         <div className="space-y-3">
           <label className="flex items-center gap-3 cursor-pointer">
@@ -101,7 +101,7 @@ export function EditSidebar({
               type="checkbox"
               checked={isFeatured}
               onChange={e => onFeaturedChange(e.target.checked)}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
             />
             <span className="text-sm text-foreground">{tFields('featured')}</span>
           </label>
@@ -110,7 +110,7 @@ export function EditSidebar({
               type="checkbox"
               checked={isNew}
               onChange={e => onIsNewChange(e.target.checked)}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
             />
             <span className="text-sm text-foreground">{tFields('newArrival')}</span>
           </label>
@@ -119,7 +119,7 @@ export function EditSidebar({
               type="checkbox"
               checked={isBestSeller}
               onChange={e => onIsBestSellerChange(e.target.checked)}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
             />
             <span className="text-sm text-foreground">{tFields('bestSeller')}</span>
           </label>

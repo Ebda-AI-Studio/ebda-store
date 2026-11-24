@@ -20,7 +20,7 @@ export function CashflowChart({ data, periodLabel }: CashflowChartProps) {
 
   if (data.length === 0) {
     return (
-      <div className="bg-card rounded-xl border p-6 shadow-sm">
+      <div className="bg-card rounded-md border p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-foreground mb-1">{t('title')}</h2>
         <p className="text-sm text-muted-foreground mb-4">{periodLabel}</p>
         <p className="text-sm text-muted-foreground text-center py-8">—</p>
@@ -42,7 +42,7 @@ export function CashflowChart({ data, periodLabel }: CashflowChartProps) {
   const midY = H / 2;
 
   return (
-    <div className="bg-card rounded-xl border p-6 shadow-sm">
+    <div className="bg-card rounded-md border p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground mb-1">{t('title')}</h2>
       <p className="text-sm text-muted-foreground mb-4">{periodLabel}</p>
 
@@ -73,7 +73,7 @@ export function CashflowChart({ data, periodLabel }: CashflowChartProps) {
               width={barW}
               height={barH}
               rx={1}
-              className={positive ? 'fill-emerald-500 dark:fill-emerald-400' : 'fill-destructive'}
+              className={positive ? 'fill-success' : 'fill-destructive'}
               opacity={0.85}
             >
               <title>{`${formatDate(point.day.toString().slice(0, 10))}: ${formatCurrency(point.net)}`}</title>
