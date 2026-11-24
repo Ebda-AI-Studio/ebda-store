@@ -23,6 +23,7 @@ const BUYER_PLANS: readonly StorePlan[] = ['starter', 'professional'];
  * would charge for something the merchant can turn on free (money review of #859). Ahmad's approved price (EGP 149) is
  * parked until he decides whether the owner toggle becomes plan/purchase-gated.
  */
+// pq-allow(unused-export): test seam, imported by tests/unit/addon-sellable.test.ts
 export const NEVER_SOLD_FEATURES: ReadonlySet<string> = new Set([
   'whatsapp',
   'sms',
