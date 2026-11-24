@@ -11,6 +11,7 @@
  * Route guard: super_admin only (RequireSuperAdmin + the API's authorize('super_admin')).
  */
 
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 import { buttonVariants } from '@/components/ui/Button';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -92,7 +93,7 @@ function TaxArchiveInner() {
           <div className="text-muted-foreground">
             <span>{s.lastIssuedAt ? formatFiscalDate(s.lastIssuedAt, locale) : '—'}</span>
             {s.summary?.lastNumber && (
-              <p dir="ltr" className="font-mono text-xs">
+              <p dir="ltr" className="font-mono text-sm">
                 {s.summary.lastNumber}
               </p>
             )}
@@ -114,7 +115,7 @@ function TaxArchiveInner() {
               <p className="font-semibold text-foreground">
                 {t('totals.gross')} {formatFiscalMoney(s.summary.period.gross, 'EGP')}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 {t('totals.count', { count: s.summary.period.count })}
               </p>
             </div>
@@ -167,7 +168,7 @@ function TaxArchiveInner() {
         <select
           value={period}
           onChange={e => setPeriod(e.target.value as ArchivePeriod)}
-          className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+          className={`${FIELD_CLASSES} sm:w-auto`}
         >
           {PERIODS.map(p => (
             <option key={p} value={p}>
@@ -176,7 +177,7 @@ function TaxArchiveInner() {
           ))}
         </select>
       </label>
-      <p className="text-xs text-muted-foreground">{t('totalsNote')}</p>
+      <p className="text-sm text-muted-foreground">{t('totalsNote')}</p>
       {loading ? (
         <div className="rounded-lg border border-border px-3 py-6 text-center text-muted-foreground">
           {t('loading')}

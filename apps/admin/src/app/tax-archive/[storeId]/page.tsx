@@ -1,5 +1,6 @@
 'use client';
 
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -167,7 +168,7 @@ function StoreArchiveInner({ storeId }: { storeId: string }) {
           <select
             value={docType}
             onChange={e => setDocType(e.target.value)}
-            className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+            className={`${FIELD_CLASSES} sm:w-auto`}
           >
             <option value="">{ti('allTypes')}</option>
             {FISCAL_DOC_TYPES.map(k => (
@@ -184,7 +185,7 @@ function StoreArchiveInner({ storeId }: { storeId: string }) {
             value={fromDay}
             max={toDay || undefined}
             onChange={e => setFromDay(e.target.value)}
-            className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+            className={`${FIELD_CLASSES} sm:w-auto`}
           />
         </label>
         <label className="flex items-center gap-2 text-sm">
@@ -194,7 +195,7 @@ function StoreArchiveInner({ storeId }: { storeId: string }) {
             value={toDay}
             min={fromDay || undefined}
             onChange={e => setToDay(e.target.value)}
-            className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+            className={`${FIELD_CLASSES} sm:w-auto`}
           />
         </label>
       </div>

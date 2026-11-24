@@ -155,7 +155,7 @@ function extendedColumns(t: Translate): DataTableColumn<FiscalDocument>[] {
         <div>
           <span>{d.customerName ?? '—'}</span>
           {d.contactMasked && (
-            <p dir="ltr" className="text-xs text-muted-foreground">
+            <p dir="ltr" className="text-sm text-muted-foreground">
               {d.contactMasked}
             </p>
           )}
@@ -169,7 +169,7 @@ function extendedColumns(t: Translate): DataTableColumn<FiscalDocument>[] {
         <div>
           <span>{d.paymentMethod ? label(t, 'paymentMethods', d.paymentMethod) : '—'}</span>
           {d.paymentStatus && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {label(t, 'paymentStatuses', d.paymentStatus)}
             </p>
           )}
@@ -186,7 +186,7 @@ function extendedColumns(t: Translate): DataTableColumn<FiscalDocument>[] {
               {label(t, 'etaStatuses', d.etaStatus)}
             </Badge>
             {d.etaUuid && (
-              <p dir="ltr" className="font-mono text-xs text-muted-foreground" title={d.etaUuid}>
+              <p dir="ltr" className="font-mono text-sm text-muted-foreground" title={d.etaUuid}>
                 {d.etaUuid.slice(0, 8)}…
               </p>
             )}
