@@ -23,8 +23,8 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": [],
-    "en": []
+    "ar": ["ازاي اغير سعر الباقة؟", "فين تعديل مميزات الباقات؟", "ينفع اضيف باقة جديدة؟"],
+    "en": ["How do I change a plan price?"]
   },
   "steps": ["Super-admin console only."],
   "edgeCases": [

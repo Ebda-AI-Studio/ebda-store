@@ -12,6 +12,7 @@ import { ImageUpload } from '../../../../components/ImageUpload';
 import { StickySaveBar } from '../../../../components/StickySaveBar';
 import { getStorePublicHost } from '@/lib/store-url';
 import { applyAiSeoSuggestion, arabicInEnglishFields } from './language-guard';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface SeoSettings {
   metaTitle: string;
@@ -308,8 +309,8 @@ export default function StoreSeoPage() {
     return (
       <AdminLayout title={t('title')} subtitle={t('subtitle')}>
         <div className="animate-pulse space-y-4" aria-busy="true">
-          <div className="h-64 rounded-xl bg-muted" />
-          <div className="h-64 rounded-xl bg-muted" />
+          <div className="h-64 rounded-md bg-muted" />
+          <div className="h-64 rounded-md bg-muted" />
         </div>
       </AdminLayout>
     );
@@ -327,9 +328,9 @@ export default function StoreSeoPage() {
   const englishBlock = (
     <div key="en">
       {/* English SEO */}
-      <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+      <div className="rounded-md border bg-card p-6 shadow-sm space-y-4">
         <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded bg-info/10">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-info/10">
             <span className="text-xs font-bold text-info-ink">{t('enBadge')}</span>
           </div>
           <h2 className="font-semibold text-foreground">{t('englishSeo')}</h2>
@@ -382,9 +383,9 @@ export default function StoreSeoPage() {
   const arabicBlock = (
     <div key="ar">
       {/* Arabic SEO */}
-      <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+      <div className="rounded-md border bg-card p-6 shadow-sm space-y-4">
         <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded bg-success/10">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-success/10">
             <span className="text-xs font-bold text-success-ink">{t('arBadge')}</span>
           </div>
           <h2 className="font-semibold text-foreground">{t('arabicSeo')}</h2>
@@ -455,7 +456,7 @@ export default function StoreSeoPage() {
 
         {/* How the store looks on Google, in the store's own default language */}
         {previewTitle && (
-          <div className="rounded-xl border bg-card p-6 shadow-sm">
+          <div className="rounded-md border bg-card p-6 shadow-sm">
             <h2 className="mb-4 text-sm font-medium text-foreground">{t('searchPreview')}</h2>
             <div
               className="max-w-xl rounded-lg border border-border p-4"
@@ -477,7 +478,7 @@ export default function StoreSeoPage() {
         )}
 
         {/* The AI helper sits with the fields it fills (UX:SEO-1) */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary/30 bg-card p-4">
           <p className="min-w-0 flex-1 text-sm text-muted-foreground">{t('aiGenerateTooltip')}</p>
           <Button
             type="button"
@@ -503,15 +504,15 @@ export default function StoreSeoPage() {
         )}
 
         {/* "متقدم": the AI-answer copy, social card image, verification and sender (UX:SEO-3) */}
-        <details className="rounded-xl border bg-card p-4 shadow-sm">
+        <details className="rounded-md border bg-card p-4 shadow-sm">
           <summary className="cursor-pointer text-sm font-semibold text-foreground">
             {t('advancedGroup')}
           </summary>
           <div className="mt-4 space-y-6">
             {/* AEO — Conversational Answer Engine copy */}
-            <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+            <div className="rounded-md border bg-card p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded bg-primary/10">
+                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10">
                   {/* i18n-gate-allow: acronym badge */}
                   <span className="text-xs font-bold text-primary">AEO</span>
                 </div>
@@ -570,7 +571,7 @@ export default function StoreSeoPage() {
             </div>
 
             {/* Advanced */}
-            <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+            <div className="rounded-md border bg-card p-6 shadow-sm space-y-4">
               <h2 className="font-semibold text-foreground">{t('advanced')}</h2>
 
               <div>
@@ -605,7 +606,7 @@ export default function StoreSeoPage() {
                         }))
                       }
                       placeholder={t('twitterPlaceholder')}
-                      className="flex-1 rounded-e-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      className={`${FIELD_CLASSES} flex-1`}
                     />
                   </div>
                 </div>
@@ -621,7 +622,7 @@ export default function StoreSeoPage() {
                       onChange={e =>
                         setSettings(prev => ({ ...prev, hideFromSearchEngines: e.target.checked }))
                       }
-                      className="mt-0.5 h-4 w-4 rounded border-input accent-primary"
+                      className="mt-0.5 h-5 w-5 rounded-md border-input accent-primary"
                       data-testid="hide-from-search-toggle"
                     />
                     <span>
@@ -650,7 +651,7 @@ export default function StoreSeoPage() {
                       }))
                     }
                     placeholder={t('googleSiteVerificationPlaceholder')}
-                    className="w-full rounded-lg border border-input px-4 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={`${FIELD_CLASSES} font-mono`}
                   />
                   <p className="mt-1 text-xs text-muted-foreground whitespace-pre-line">
                     {t('googleSiteVerificationHint')}
@@ -673,7 +674,7 @@ export default function StoreSeoPage() {
                       onChange={e =>
                         setSettings(prev => ({ ...prev, emailSenderLocalPart: e.target.value }))
                       }
-                      className="flex-1 bg-transparent px-3 py-2 text-sm focus:outline-none"
+                      className={`${FIELD_CLASSES} flex-1`}
                     >
                       {SENDER_PREFIXES.map(p => (
                         <option key={p} value={p}>
@@ -695,7 +696,7 @@ export default function StoreSeoPage() {
             in Branding → Social to avoid duplication. Only knowledge-graph
             fields — wikidata + wikipedia — remain here because they are
             genuinely SEO-specific structured-data signals, not social links. */}
-            <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+            <div className="rounded-md border bg-card p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="font-semibold text-foreground">{t('socialTitle')}</h2>

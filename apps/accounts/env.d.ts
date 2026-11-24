@@ -20,7 +20,7 @@ export interface MailerRpc {
     ttlMinutes: number;
     storeName?: string;
   }): Promise<void>;
-  /** A security notice with no code (a sign-in method was added). */
+  /** A security notice with no code (a sign-in method was added; the recovery codes were regenerated; a member was added to a Chat workspace). */
   sendNotice(
     input: {
       to: string;
@@ -29,6 +29,7 @@ export interface MailerRpc {
     } & (
       | { kind: 'factor_added'; factor: 'totp' | 'passkey' }
       | { kind: 'chat_member_added'; workspaceName: string }
+      | { kind: 'recovery_codes_changed' }
     )
   ): Promise<void>;
 }
