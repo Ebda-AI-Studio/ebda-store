@@ -55,10 +55,30 @@ export function isDocsOnly(files) {
 }
 
 /**
+ * `builder` (CI-SCOPE-2): do the two Builder E2E shards need to run? They drive the admin builder and the storefront in a browser, so
+ * the answer is an ALLOW-LIST of what cannot move them, never a list of what can: false only when EVERY changed file is under
+ * apps/api, apps/marketing, apps/docs, apps/help or apps/status (or is a docs file), is not a rail (workflow, script, test, lockfile,
+ * any packages/, root config, migration, SQL), and is not an API file named for the builder / look / layout / theme / template /
+ * storefront / i18n path. The `ci:full` label and an empty diff are true. Independent of `heavy` and `marketing`.
+ */
+const BUILDER_FREE = /^(apps\/(api|marketing|docs|help|status)\/|docs\/|.*\.md$)/;
+const BUILDER_NAMED_API =
+  /^apps\/api\/.*(builder|look|layout|theme|template|storefront|i18n|locale)/i;
+const BUILDER_RAILS = /^(packages\/|.*\bmigrations?\/|.*\.sql$|.*prisma\/)/;
+export function builderNeeded({ files, labels = [] }) {
+  const changed = (files ?? []).filter(Boolean);
+  if (labels.includes('ci:full') || changed.length === 0) return true;
+  return changed.some(
+    f =>
+      !BUILDER_FREE.test(f) || RAILS.test(f) || BUILDER_RAILS.test(f) || BUILDER_NAMED_API.test(f)
+  );
+}
+
+/**
  * @param {{ files: string[], labels?: string[], workspaces?: any[] }} a
  * @returns {{ heavy: boolean, reason: string, docsOnly: boolean, marketing: boolean }}
  */
-export function decideScope({ files, labels = [], workspaces = loadWorkspaces() }) {
+function decideScopeBase({ files, labels = [], workspaces = loadWorkspaces() }) {
   const changed = (files ?? []).filter(Boolean);
   if (labels.includes('ci:full'))
     return { heavy: true, reason: 'ci:full label', docsOnly: false, marketing: true };
@@ -100,6 +120,11 @@ export function decideScope({ files, labels = [], workspaces = loadWorkspaces() 
   };
 }
 
+/** @returns {{ heavy: boolean, reason: string, docsOnly: boolean, marketing: boolean, builder: boolean }} */
+export function decideScope(a) {
+  return { ...decideScopeBase(a), builder: builderNeeded(a) };
+}
+
 async function labelsOf(ref, repo, token) {
   const m = /^(?:refs\/heads\/)?gh-readonly-queue\/[^/]+\/pr-(\d+)-/.exec(ref ?? '');
   if (!m) throw new Error(`cannot read the PR number from ${ref}`);
@@ -135,6 +160,7 @@ async function main() {
         reason: `event ${EVENT}: full lane rules apply`,
         docsOnly: false,
         marketing: true,
+        builder: true,
       };
     else {
       if (!BASE_SHA || !HEAD_SHA) throw new Error('missing merge group shas');
@@ -143,15 +169,21 @@ async function main() {
       out = decideScope({ files, labels });
     }
   } catch (e) {
-    out = { heavy: true, reason: `fail closed: ${e.message}`, docsOnly: false, marketing: true };
+    out = {
+      heavy: true,
+      reason: `fail closed: ${e.message}`,
+      docsOnly: false,
+      marketing: true,
+      builder: true,
+    };
   }
   console.log(
-    `mq-scope: heavy=${out.heavy} docs_only=${out.docsOnly} marketing=${out.marketing} (${out.reason})`
+    `mq-scope: heavy=${out.heavy} docs_only=${out.docsOnly} marketing=${out.marketing} builder=${out.builder} (${out.reason})`
   );
   if (process.env.GITHUB_OUTPUT)
     appendFileSync(
       process.env.GITHUB_OUTPUT,
-      `heavy=${out.heavy}\ndocs_only=${out.docsOnly}\nmarketing=${out.marketing}\n`
+      `heavy=${out.heavy}\ndocs_only=${out.docsOnly}\nmarketing=${out.marketing}\nbuilder=${out.builder}\n`
     );
 }
 

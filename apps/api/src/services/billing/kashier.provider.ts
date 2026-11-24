@@ -344,7 +344,18 @@ export class KashierBillingProvider implements BillingProvider {
       throw new BillingProviderError(`Kashier reports a ${txn.kind}, not a charge`, false);
     }
     const raw = stripTokens(json);
-    if (txn.status === 'SUCCESS') return { status: 'succeeded', chargeId: req.chargeId, raw };
+    // #627: the amount / currency the gateway states for THIS transaction (absent -> the success is held, not settled)
+    const body = (json as { body?: Record<string, unknown> } | null)?.body ?? {};
+    const entry = (Array.isArray(body.transactions) ? body.transactions : []).find(
+      (t): t is Record<string, unknown> =>
+        !!t &&
+        typeof t === 'object' &&
+        String((t as Record<string, unknown>).transactionId) === req.chargeId
+    );
+    const amountMinor = parseGatewayAmount(entry?.amount ?? body.amount);
+    const currency = scalar(entry?.currency ?? body.currency) || null;
+    if (txn.status === 'SUCCESS')
+      return { status: 'succeeded', chargeId: req.chargeId, raw, amountMinor, currency };
     if (txn.status === 'PENDING') return { status: 'pending', chargeId: req.chargeId, raw };
     return {
       status: 'failed',

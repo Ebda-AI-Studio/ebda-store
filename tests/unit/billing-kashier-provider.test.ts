@@ -416,6 +416,36 @@ describe('Kashier getChargeStatus (M-023 stuck-charge lookup)', () => {
     });
   });
 
+  it('review of #687: the gateway amount is read as DECIMAL EGP and returned as integer PIASTRES (the ledger unit), with its currency', async () => {
+    // 199.99 EGP = 19999 piastres, the same unit the ledger and the webhook compare in: no false amount_mismatch hold
+    expect(
+      await ask(mkGet(200, details({ amount: '199.99', currency: 'EGP' })).p, 'TX-1')
+    ).toMatchObject({
+      status: 'succeeded',
+      amountMinor: 19999,
+      currency: 'EGP',
+    });
+    expect(
+      await ask(mkGet(200, details({ amount: 1000, currency: 'EGP' })).p, 'TX-1')
+    ).toMatchObject({
+      amountMinor: 100000,
+    });
+    // an amount on the matching transaction entry wins over the body's, and a body with none states none (the sweep then HOLDS it)
+    const entry = mkGet(
+      200,
+      details({
+        amount: '5.00',
+        transactions: [{ transactionId: 'TX-1', amount: '12.50', currency: 'EGP' }],
+      })
+    );
+    expect(await ask(entry.p, 'TX-1')).toMatchObject({ amountMinor: 1250 });
+    expect(await ask(mkGet(200, details()).p, 'TX-1')).toMatchObject({
+      status: 'succeeded',
+      amountMinor: null,
+      currency: null,
+    });
+  });
+
   it('with NO transaction id it throws (cannot tell) and never claims "not found"; so does anything unclear', async () => {
     const f = mkGet(200, details());
     await expect(ask(f.p, null)).rejects.toThrow(/without a transaction id/);
