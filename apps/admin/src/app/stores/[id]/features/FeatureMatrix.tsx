@@ -59,15 +59,13 @@ function TriStateBadge({ state, planLabel }: { state: TriState; planLabel: strin
   const t = useT('features.matrix');
   const configs: Record<TriState, { color: string; dot: string; label: string }> = {
     baseline_on: {
-      color:
-        'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
-      dot: 'bg-emerald-500',
+      color: 'bg-success/10 text-success-ink border-success/30',
+      dot: 'bg-success',
       label: t('badges.includedIn', { plan: planLabel }),
     },
     override_on: {
-      color:
-        'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800',
-      dot: 'bg-blue-500',
+      color: 'bg-info/10 text-info-ink border-info/30',
+      dot: 'bg-info',
       label: t('badges.grantedByOverride'),
     },
     override_off: {
@@ -147,6 +145,7 @@ function FeatureRowItem({
           enabled={isEffectivelyOn}
           onChange={() => onAction(def.key, state)}
           disabled={inFlight}
+          label={def.nameAr || def.name}
         />
       </div>
     </div>
@@ -179,7 +178,7 @@ function CategorySection({
   const t = useT('features.matrix');
   const tFeatures = useT('features');
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden">
+    <div className="bg-card rounded-md border border-border overflow-hidden">
       <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/40">
         <div>
           <h2 className="font-semibold text-foreground">{tFeatures(`categories.${category}`)}</h2>
@@ -423,7 +422,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       {/* ── Danger Zone ──────────────────────────────────────────────────────── */}
       <div className="mt-8">
         <h2 className="mb-4 font-semibold text-destructive-ink">{t('dangerZone.heading')}</h2>
-        <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-6 space-y-4">
+        <div className="rounded-md border-2 border-destructive/40 bg-destructive/5 p-6 space-y-4">
           {/* Suspend / Reactivate */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>

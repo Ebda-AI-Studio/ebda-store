@@ -5,7 +5,7 @@
  * picker, and (SP5 task 3) subscribe/checkout, dunning banner and charges list.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 const { apiGet, apiPost, role } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -552,11 +552,48 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     await waitFor(() =>
       expect(apiPost).toHaveBeenCalledWith('/api/v1/stores/store-1/billing/instapay-plan', {
         planCode: 'growth',
-        interval: 'monthly',
+        // the cards open on the store's own interval (this fixture is on yearly), no longer always monthly
+        interval: 'yearly',
       })
     );
     expect(await screen.findByTestId('instapay-quote')).toBeTruthy();
     expect(document.getElementById('plans')).toBeTruthy();
+  });
+
+  it('QA: a yearly store opens on Yearly and "Current plan" shows only under Yearly, never under both toggles', async () => {
+    mockApi(
+      billing({
+        subscription: { ...trialing, status: 'active' },
+        availablePlans: [
+          {
+            ...plans[0],
+            code: 'growth',
+            nameEn: 'Growth',
+            priceMonthlyMinor: 99_900,
+            priceYearlyMinor: 899_100,
+          },
+        ],
+        plan: { code: 'growth', nameEn: 'Growth', nameAr: 'نمو', subscribedPlanCode: 'growth' },
+        billing: { ...instapayChosen, pendingPlanCode: null, billingInterval: 'yearly' },
+      })
+    );
+    render(<StoreBillingPage />);
+    const yearly = await screen.findByRole('button', { name: 'intervalYearly' });
+    await waitFor(() => expect(yearly.getAttribute('aria-pressed')).toBe('true'));
+    const card = () =>
+      within(document.getElementById('plans')!)
+        .getByText('Growth')
+        .closest<HTMLElement>('.rounded-lg')!;
+    expect(card().textContent).toContain('currentBadge');
+    expect(within(card()).queryByRole('button', { name: 'chooseThisPlan' })).toBeNull();
+    // Monthly toggle: the same plan on the OTHER interval is an interval change, not "current"
+    fireEvent.click(screen.getByRole('button', { name: 'intervalMonthly' }));
+    expect(card().textContent).not.toContain('currentBadge');
+    expect(within(card()).getByRole('button', { name: 'chooseThisPlan' })).toBeTruthy();
+    // a later reload never undoes the merchant's own toggle (the sync runs once)
+    expect(
+      screen.getByRole('button', { name: 'intervalMonthly' }).getAttribute('aria-pressed')
+    ).toBe('true');
   });
 
   it('canceled store: "subscription ended" copy, never "Free plan limits apply", plan picker shown', async () => {
