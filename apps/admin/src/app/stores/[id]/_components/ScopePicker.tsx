@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { apiGet } from '../../../../lib/api';
 import { SearchPicker } from '@/components/SearchPicker';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface ScopeEntity {
   id: string;
@@ -135,7 +136,7 @@ export function ScopePicker({
           {value.map(id => (
             <li
               key={id}
-              className="flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-1 text-xs"
+              className="flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-1 text-sm"
             >
               {selectedDetails[id] ? labelFor(selectedDetails[id]) : id}
               <button
@@ -166,7 +167,7 @@ export function ScopePicker({
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder={searchPlaceholder}
-            className="w-full rounded-md border border-border px-3 py-2 text-sm"
+            className={FIELD_CLASSES}
           />
 
           {showDropdown && (
