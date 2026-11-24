@@ -13,7 +13,9 @@ vi.mock('@ebda/database', () => ({
 }));
 vi.mock('@api/lib/repo-factory', () => ({
   storeMoney: vi.fn().mockResolvedValue({
-    analyticsRefundQuote: vi.fn().mockResolvedValue({ refundable: 5000, coversWholeOrder: false }),
+    analyticsRefundQuote: vi
+      .fn()
+      .mockResolvedValue({ refundable: 5000, coversWholeOrder: false, lines: [] }),
   }),
   storeDb: vi
     .fn()
