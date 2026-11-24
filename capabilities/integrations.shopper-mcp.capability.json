@@ -18,7 +18,11 @@
   },
   "helpArticle": "shopping-agents-mcp-endpoint",
   "questions": {
-    "ar": ["هل AI agent يقدر يشتري من متجري؟"],
+    "ar": [
+      "هل AI agent يقدر يشتري من متجري؟",
+      "ازاي افعل ربط المتجر مع وكلاء الذكاء الاصطناعي؟",
+      "ليه الشراء بالـ agent مش شغال؟"
+    ],
     "en": ["Can AI agents buy from my store?"]
   },
   "steps": ["Enabled by feature; X-Agent-Key required for writes."],

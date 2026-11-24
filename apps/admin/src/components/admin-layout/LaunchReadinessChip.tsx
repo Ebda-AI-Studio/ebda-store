@@ -103,12 +103,12 @@ export function LaunchReadinessChip() {
         <div
           role="dialog"
           aria-label={p.phase === 'steps' ? t('stepsTitle') : t('ordersTitle', { goal: p.total })}
-          className="fixed inset-x-4 top-16 z-50 max-h-[70vh] overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-xl sm:absolute sm:inset-x-auto sm:end-0 sm:top-full sm:mt-2 sm:w-96"
+          className="fixed inset-x-4 top-16 z-50 max-h-[70vh] overflow-y-auto rounded-lg border border-border bg-card p-4 shadow-xl sm:absolute sm:inset-x-auto sm:end-0 sm:top-full sm:mt-2 sm:w-96"
         >
           <p className="text-sm font-semibold text-foreground">
             {p.phase === 'steps' ? t('stepsTitle') : t('ordersTitle', { goal: p.total })}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             {p.phase === 'steps' ? t('stepsHint') : t('ordersHint', { goal: p.total })}
           </p>
           {p.phase === 'steps' ? (

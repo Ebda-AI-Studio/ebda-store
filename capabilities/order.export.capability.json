@@ -18,7 +18,7 @@
   },
   "helpArticle": "export-orders-and-customers-to-excel",
   "questions": {
-    "ar": ["نزلي الطلبات في اكسيل"],
+    "ar": ["نزلي الطلبات في اكسيل", "ازاي اطلع تقرير بالطلبات؟", "عايز بيانات العملاء في ملف"],
     "en": ["Export my orders"]
   },
   "steps": ["Orders > Export."],
