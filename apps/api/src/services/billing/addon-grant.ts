@@ -40,6 +40,8 @@ interface ActiveAddon {
   sku: string;
   endsAt: Date;
   cancelAtPeriodEnd: boolean;
+  /** Who took the money: an `instapay` term never renews by itself. */
+  provider: string | null;
 }
 
 /**
@@ -106,7 +108,7 @@ export async function activeAddons(tx: Tx, storeId: string, now: Date): Promise<
       planCode: { startsWith: ADDON_PLAN_PREFIX },
       forPeriodEnd: { gt: now },
     },
-    select: { id: true, planCode: true, forPeriodEnd: true },
+    select: { id: true, planCode: true, forPeriodEnd: true, provider: true },
   });
   const stopped = await cancelledTerms(
     tx,
@@ -118,7 +120,13 @@ export async function activeAddons(tx: Tx, storeId: string, now: Date): Promise<
     const sku = skuOfPlanCode(r.planCode);
     if (!sku || !r.forPeriodEnd) continue;
     if (addDays(r.forPeriodEnd, -ADDON_TERM_DAYS) > now) continue; // chained term, not started yet
-    out.push({ eventId: r.id, sku, endsAt: r.forPeriodEnd, cancelAtPeriodEnd: stopped.has(r.id) });
+    out.push({
+      eventId: r.id,
+      sku,
+      endsAt: r.forPeriodEnd,
+      cancelAtPeriodEnd: stopped.has(r.id),
+      provider: r.provider ?? null,
+    });
   }
   return out;
 }

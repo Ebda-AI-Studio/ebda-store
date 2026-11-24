@@ -12,7 +12,12 @@ import { AppError } from '../../middleware/error-handler';
 import { config } from '../../config';
 import logger from '../../lib/logger';
 import { withIdempotencyKey } from '../../lib/money-idempotency';
-import { maxStoreDailyRequests, storeAiAllowance, storeAiExtraRequests } from '../../lib/ai-quota';
+import {
+  maxStoreDailyRequests,
+  storeAiAllowance,
+  storeAiExtraRequests,
+  storeAiUsageByFeature,
+} from '../../lib/ai-quota';
 import {
   consumeConfirmToken,
   hashConfirmArgs,
@@ -27,13 +32,19 @@ import { chargeFor } from './charge-amount';
 import { claimEvent, markFailedUnlessSettled } from './subscription-billing.service';
 import {
   ADDON_CATALOG,
+  ADDON_PLAN_PREFIX,
   ADDON_TERM_DAYS,
   planCodeOfSku,
   renewsEachTerm,
+  skuOfPlanCode,
   type AddonItem,
 } from './addon-catalog';
 import { activeAddons, appendRenewalMarker } from './addon-grant';
+import { deriveAddonState, type AttemptRow } from './addon-state';
+import { instapayHandle } from './manual-config';
 import { canBuyFeatureOnPlan } from '@ebda/shared';
+
+const RECENT_ATTEMPTS = 100;
 
 const TOOL = 'billing.addon-purchase';
 
@@ -78,6 +89,18 @@ export async function quoteAddon(
   if (opts.card && resolveTrialCardMode() !== 'card_on_file') {
     throw new AppError(409, 'CARD_PAYMENTS_DISABLED', 'Card payments are not available yet');
   }
+  // An InstaPay payment for this add-on is already waiting for a super admin: never sell it a second way meanwhile.
+  const waiting = await withStore(storeId, tx =>
+    tx.manualPaymentClaim.count({
+      where: { storeId, status: 'pending', planCode: planCodeOfSku(sku) },
+    })
+  );
+  if (waiting > 0)
+    throw new AppError(
+      409,
+      'ADDON_AWAITING_CONFIRMATION',
+      'This add-on is already waiting for confirmation'
+    );
   const [store, sub, running] = await Promise.all([
     withStore(storeId, tx =>
       tx.store.findUnique({
@@ -94,33 +117,10 @@ export async function quoteAddon(
     withStore(storeId, tx => activeAddons(tx, storeId, new Date())),
   ]);
   if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
-  // An InstaPay payment for this add-on is already waiting for a super admin: never sell it a second way meanwhile.
-  const waiting = await withStore(storeId, tx =>
-    tx.manualPaymentClaim.count({
-      where: { storeId, status: 'pending', planCode: planCodeOfSku(sku) },
-    })
-  );
-  if (waiting > 0)
-    throw new AppError(
-      409,
-      'ADDON_AWAITING_CONFIRMATION',
-      'This add-on is already waiting for confirmation'
-    );
   if (!store.owner?.email)
     throw new AppError(409, 'NO_BILLING_EMAIL', 'The store owner has no email address');
   if (sub?.status === 'comped')
     throw new AppError(409, 'STORE_COMPED', 'Comped stores are not billed');
-  if (item.kind === 'ai_topup') {
-    // Never sell capacity the platform cannot back (money-abuse audit P6): base + packs <= one store's share of the day.
-    const extra = await storeAiExtraRequests(storeId);
-    const base = (await storeAiAllowance(storeId)).baseCap;
-    if (base + extra + (item.aiExtraRequests ?? 0) > maxStoreDailyRequests())
-      throw new AppError(
-        409,
-        'AI_CAPACITY_UNAVAILABLE',
-        'The shared AI capacity cannot back this top-up right now. Nothing was charged.'
-      );
-  }
   if (item.kind === 'feature' && !canBuyFeatureOnPlan(String(store.plan), item.featureKey!)) {
     // Business holds every feature; Free picks a plan first; Basic/Growth only buy what their own plan lacks.
     const topPlan = store.plan === 'enterprise';
@@ -131,6 +131,17 @@ export async function quoteAddon(
         ? 'Your plan already includes this feature'
         : 'This feature cannot be added to your current plan. Choose a plan first.'
     );
+  }
+  if (item.kind === 'ai_topup') {
+    // Never sell capacity the platform cannot back (money-abuse audit P6): base + packs <= one store's share of the day.
+    const extra = await storeAiExtraRequests(storeId);
+    const base = (await storeAiAllowance(storeId)).baseCap;
+    if (base + extra + (item.aiExtraRequests ?? 0) > maxStoreDailyRequests())
+      throw new AppError(
+        409,
+        'AI_CAPACITY_UNAVAILABLE',
+        'The shared AI capacity cannot back this top-up right now. Nothing was charged.'
+      );
   }
   if (item.kind === 'feature') {
     // A super-admin "off" (abuse, dispute) is never sold around: the owner contacts support instead.
@@ -298,13 +309,78 @@ export const cancelAddon = (a: { storeId: string; sku: string }) =>
 export const resumeAddon = (a: { storeId: string; sku: string }) =>
   setCancelFlag(a.storeId, a.sku, false);
 
+/** Add-on ledger rows (purchases, renewals, failures, refunds), newest first. Cancel/resume markers use `addon-`, not `addon:`. */
+async function addonRows(storeId: string, take: number) {
+  return withStore(storeId, tx =>
+    tx.billingEvent.findMany({
+      where: { storeId, type: 'upgrade', planCode: { startsWith: ADDON_PLAN_PREFIX } },
+      orderBy: { createdAt: 'desc' },
+      take,
+      select: {
+        id: true,
+        planCode: true,
+        status: true,
+        amountMinor: true,
+        vatMinor: true,
+        vat: true,
+        currency: true,
+        failureReason: true,
+        forPeriodEnd: true,
+        createdAt: true,
+      },
+    })
+  );
+}
+
+/** InstaPay claims for add-ons that are still open or were refused (a confirmed one has a ledger row), newest first. */
+async function addonClaims(storeId: string, take: number) {
+  return withStore(storeId, tx =>
+    tx.manualPaymentClaim.findMany({
+      where: {
+        storeId,
+        planCode: { startsWith: ADDON_PLAN_PREFIX },
+        status: { in: ['pending', 'rejected'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
+      select: {
+        id: true,
+        planCode: true,
+        status: true,
+        amountMinor: true,
+        reviewNote: true,
+        createdAt: true,
+      },
+    })
+  );
+}
+
 export async function listAddons(storeId: string) {
   const now = new Date();
-  const [running, features, ai] = await Promise.all([
-    withStore(storeId, tx => activeAddons(tx, storeId, now)),
-    featureService.getStoreFeatures(storeId),
-    storeAiAllowance(storeId),
-  ]);
+  const [running, features, withoutAddons, overrides, rows, claims, ai, aiByFeature, planRow] =
+    await Promise.all([
+      withStore(storeId, tx => activeAddons(tx, storeId, now)),
+      featureService.getStoreFeatures(storeId),
+      featureService.resolveWithoutAddons(storeId),
+      withStore(storeId, tx =>
+        tx.storeFeature.findMany({
+          where: { storeId, enabled: true },
+          select: { featureKey: true },
+        })
+      ),
+      addonRows(storeId, RECENT_ATTEMPTS),
+      addonClaims(storeId, RECENT_ATTEMPTS),
+      storeAiAllowance(storeId),
+      storeAiUsageByFeature(storeId),
+      withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+      ),
+    ]);
+  const overrideOn = new Set(overrides.map(o => o.featureKey));
+  const runningExtra = running.reduce(
+    (n, r) => n + (ADDON_CATALOG[r.sku]?.aiExtraRequests ?? 0),
+    0
+  );
   let cardAvailable = true;
   try {
     cardAvailable = resolveTrialCardMode() === 'card_on_file';
@@ -313,25 +389,142 @@ export async function listAddons(storeId: string) {
   }
   return {
     cardAvailable,
+    instapayAvailable: instapayHandle() !== null,
     termDays: ADDON_TERM_DAYS,
-    addons: Object.values(ADDON_CATALOG).map(i => {
+    addons: Object.values(ADDON_CATALOG).flatMap(i => {
       const mine = running
         .filter(r => r.sku === i.sku)
         .sort((x, y) => y.endsAt.getTime() - x.endsAt.getTime());
-      return {
-        sku: i.sku,
-        kind: i.kind,
-        nameEn: i.nameEn,
-        nameAr: i.nameAr,
-        priceMinor: i.priceMinor,
-        aiExtraRequests: i.aiExtraRequests ?? null,
-        includedInPlan:
-          i.kind === 'feature' && features[i.featureKey!] === true && mine.length === 0,
-        active: mine[0]
-          ? { endsAt: mine[0].endsAt, cancelAtPeriodEnd: mine[0].cancelAtPeriodEnd }
-          : null,
-      };
+      const newestRow = rows.find(r => skuOfPlanCode(r.planCode) === i.sku);
+      const newest: AttemptRow | null = newestRow
+        ? {
+            status: newestRow.status,
+            createdAt: newestRow.createdAt,
+            forPeriodEnd: newestRow.forPeriodEnd,
+          }
+        : null;
+      const isFeature = i.kind === 'feature';
+      // A top-up the EFFECTIVE platform cap cannot back is not offered (same rule as the quote): base + packs running +
+      // this pack must fit one store's share of the day, unless this pack is already running.
+      if (
+        i.kind === 'ai_topup' &&
+        !mine[0] &&
+        ai.baseCap + runningExtra + (i.aiExtraRequests ?? 0) > maxStoreDailyRequests()
+      )
+        return [];
+      const on = isFeature && withoutAddons[i.featureKey!] === true;
+      const state = deriveAddonState({
+        // An InstaPay term cannot renew by itself (ADDON-SS-6): it shows as active until its end date.
+        renews: renewsEachTerm(i) && mine[0]?.provider !== 'instapay',
+        isFeature,
+        running: mine[0] ?? null,
+        onWithoutAddon: on,
+        overrideOn: isFeature && overrideOn.has(i.featureKey!),
+        newest,
+        claim: claims.find(c => skuOfPlanCode(c.planCode) === i.sku) ?? null,
+        now,
+      });
+      // Sellable set = Business baseline minus the store's own plan (computed): a feature this store cannot buy is not
+      // offered at all, unless it is already running or waiting (so a downgrade never hides a paid term).
+      const waiting = state === 'waiting_confirmation' || state === 'pending_payment';
+      if (
+        isFeature &&
+        !canBuyFeatureOnPlan(String(planRow?.plan), i.featureKey!) &&
+        !mine[0] &&
+        !waiting
+      )
+        return [];
+      return [
+        {
+          sku: i.sku,
+          kind: i.kind,
+          featureKey: i.featureKey ?? null,
+          nameEn: i.nameEn,
+          nameAr: i.nameAr,
+          descEn: i.descEn,
+          descAr: i.descAr,
+          previewImage: i.previewImage ?? null,
+          priceMinor: i.priceMinor,
+          aiExtraRequests: i.aiExtraRequests ?? null,
+          state,
+          includedInPlan: state === 'included' || state === 'granted',
+          // `features` already contains the paid term; kept so a reader can see the live gate answer too.
+          enabled: isFeature ? features[i.featureKey!] === true : null,
+          active: mine[0]
+            ? { endsAt: mine[0].endsAt, cancelAtPeriodEnd: mine[0].cancelAtPeriodEnd }
+            : null,
+        },
+      ];
     }),
-    ai,
+    ai: {
+      ...ai,
+      /** What spent today's requests (same ledger the cap counts), biggest first. */
+      byFeature: aiByFeature,
+      /** The packs that raise today's cap and when each ends. */
+      packs: running
+        .filter(r => ADDON_CATALOG[r.sku]?.kind === 'ai_topup')
+        .map(r => ({
+          sku: r.sku,
+          extraRequests: ADDON_CATALOG[r.sku].aiExtraRequests ?? 0,
+          nameEn: ADDON_CATALOG[r.sku].nameEn,
+          nameAr: ADDON_CATALOG[r.sku].nameAr,
+          endsAt: r.endsAt,
+        })),
+    },
   };
+}
+
+/** The merchant's add-on purchase history: every attempt with what it cost, newest first. Receipt data only. */
+export async function listAddonHistory(storeId: string, limit = 50) {
+  const take = Math.min(Math.max(limit, 1), 200);
+  const [rows, claims] = await Promise.all([addonRows(storeId, take), addonClaims(storeId, take)]);
+  const claimItems = claims.flatMap(c => {
+    const sku = skuOfPlanCode(c.planCode);
+    const item = sku ? ADDON_CATALOG[sku] : null;
+    if (!item) return [];
+    return [
+      {
+        id: c.id,
+        sku: item.sku,
+        nameEn: item.nameEn,
+        nameAr: item.nameAr,
+        // InstaPay: nothing is on until a super admin approves, so this is a wait, never a payment.
+        status: c.status === 'pending' ? 'waiting_confirmation' : 'rejected',
+        amountMinor: c.amountMinor,
+        vatMinor: 0,
+        vat: null,
+        currency: 'EGP',
+        termEnd: null,
+        createdAt: c.createdAt,
+        failureReason: null,
+        planCode: c.planCode,
+      },
+    ];
+  });
+  const ledgerItems = rows.flatMap(r => {
+    const sku = skuOfPlanCode(r.planCode);
+    const item = sku ? ADDON_CATALOG[sku] : null;
+    if (!item) return [];
+    return [
+      {
+        id: r.id,
+        sku: item.sku,
+        nameEn: item.nameEn,
+        nameAr: item.nameAr,
+        status: r.status,
+        amountMinor: r.amountMinor,
+        vatMinor: r.vatMinor ?? 0,
+        vat: r.vat,
+        currency: r.currency,
+        termEnd: r.forPeriodEnd,
+        createdAt: r.createdAt,
+        // Provider / config errors are for operators only (same rule as /billing/invoices).
+        failureReason: r.failureReason ? 'payment_not_completed' : null,
+        planCode: r.planCode,
+      },
+    ];
+  });
+  return [...ledgerItems, ...claimItems]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, take);
 }

@@ -388,3 +388,47 @@ describe('finding 5: cancel and resume APPEND a ledger row, they never edit a pa
     expect(await activeAddons(tx as any, 's1', NOW)).toEqual([]);
   });
 });
+
+describe('ADDON-SS-3: a term that ended is an entitlement change (cache layers cleared by the daily run)', () => {
+  it('emits ONE addon_granted (cache bust) effect per lapsed store, and none for a running term', async () => {
+    const { renewDueAddons } = await import('@api/services/billing/addon-renewal');
+    h.events = [
+      term({ id: 'gone1', forPeriodEnd: new Date(NOW.getTime() - 0.5 * DAY) }),
+      term({
+        id: 'gone2',
+        planCode: 'addon:feature:loyalty',
+        forPeriodEnd: new Date(NOW.getTime() - 1 * DAY),
+      }),
+    ];
+    await renewDueAddons(NOW);
+    expect(h.effects.filter(e => e.kind === 'addon_granted')).toEqual([
+      { kind: 'addon_granted', storeId: 's1' },
+    ]);
+    h.effects = [];
+    h.events = [term({ forPeriodEnd: new Date(NOW.getTime() + 0.5 * DAY) })];
+    await renewDueAddons(NOW);
+    expect(h.effects.filter(e => e.kind === 'addon_granted')).toEqual([]);
+  });
+});
+
+describe('ADDON-SS-6: an InstaPay term is non-renewing (nothing can be charged, nothing is settled)', () => {
+  it('an approved InstaPay term reaching its due date is NOT renewed, no event is written, and the owner is told to pay again', async () => {
+    const { renewDueAddons } = await import('@api/services/billing/addon-renewal');
+    h.events = [term({ provider: 'instapay' })];
+    // run twice: the first run would only announce, the second would charge for a card term
+    expect(await renewDueAddons(NOW)).toBe(0);
+    expect(await renewDueAddons(new Date(NOW.getTime() + 3600_000))).toBe(0);
+    expect(h.claimEvent).not.toHaveBeenCalled();
+    expect(h.chargeAndSettle).not.toHaveBeenCalled();
+    expect(h.effects).toContainEqual(
+      expect.objectContaining({ kind: 'addon_notice', reason: 'renew_via_instapay' })
+    );
+    expect(h.effects.filter(e => e.reason === 'renewal_upcoming')).toEqual([]);
+  });
+  it('the same term paid by card still renews (the rule is about the provider, not the add-on)', async () => {
+    const { renewDueAddons } = await import('@api/services/billing/addon-renewal');
+    h.events = [term({ provider: 'kashier' })];
+    await renewDueAddons(NOW);
+    expect(await renewDueAddons(new Date(NOW.getTime() + 3600_000))).toBe(1);
+  });
+});

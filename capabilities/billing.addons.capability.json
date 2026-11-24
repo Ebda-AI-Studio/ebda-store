@@ -10,6 +10,7 @@
   "api": [
     "GET /stores/:storeId/my-features",
     "GET /stores/:storeId/billing/addons",
+    "GET /stores/:storeId/billing/addons/history",
     "POST /stores/:storeId/billing/addons/preview",
     "POST /stores/:storeId/billing/addons/checkout",
     "POST /stores/:storeId/billing/addons/:sku/cancel",

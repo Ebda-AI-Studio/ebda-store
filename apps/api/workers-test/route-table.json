@@ -253,6 +253,7 @@
   "GET /stores/:storeId/billing/",
   "GET /stores/:storeId/billing/addons/",
   "GET /stores/:storeId/billing/addons/:sku/instapay",
+  "GET /stores/:storeId/billing/addons/history",
   "GET /stores/:storeId/billing/checkout/return",
   "GET /stores/:storeId/billing/invoices",
   "GET /stores/:storeId/billing/payment-claims",

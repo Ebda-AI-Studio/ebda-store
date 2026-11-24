@@ -16,6 +16,7 @@ import { instapayReceiptFieldsSchema } from '@ebda/shared';
 import { addonInstapayInstructions, submitAddonReceipt } from '../services/billing/addon-instapay';
 import {
   cancelAddon,
+  listAddonHistory,
   listAddons,
   previewAddon,
   purchaseAddon,
@@ -65,6 +66,15 @@ router.get('/', ...read, async (req: Request, res: Response, next: NextFunction)
   }
 });
 
+/** The merchant's own add-on purchases, renewals, failures and refunds (receipt data; no provider fields). */
+router.get('/history', ...read, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({ success: true, data: { items: await listAddonHistory(req.params.storeId) } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** Step 1 of 2: the exact charge + a single-use token bound to it. Nothing is charged or written. */
 router.post('/preview', ...write, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -101,16 +111,6 @@ router.post('/checkout', ...write, async (req: Request, res: Response, next: Nex
   }
 });
 
-router.post('/:sku/cancel', ...write, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sku = skuSchema.parse(req.params.sku);
-    const out = await cancelAddon({ storeId: req.params.storeId, sku });
-    await audit(req, 'billing.addon_cancelled', { sku, effectiveAt: out.effectiveAt });
-    res.json({ success: true, data: out });
-  } catch (err) {
-    next(err);
-  }
-});
 /** InstaPay for one add-on: handle, QR, the exact total and the reference. Read-only; nothing is created. */
 router.get('/:sku/instapay', ...read, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -149,6 +149,17 @@ router.post(
     }
   }
 );
+
+router.post('/:sku/cancel', ...write, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sku = skuSchema.parse(req.params.sku);
+    const out = await cancelAddon({ storeId: req.params.storeId, sku });
+    await audit(req, 'billing.addon_cancelled', { sku, effectiveAt: out.effectiveAt });
+    res.json({ success: true, data: out });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.post('/:sku/resume', ...write, async (req: Request, res: Response, next: NextFunction) => {
   try {
