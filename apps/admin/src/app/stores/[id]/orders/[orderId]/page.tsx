@@ -248,13 +248,13 @@ export default function OrderDetailPage() {
         </div>
 
         {isLoading && (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
             {t('loading')}
           </div>
         )}
 
         {error && !isLoading && (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center">
             <p className="text-sm text-destructive-ink">{error}</p>
             <Button
               type="button"
@@ -278,11 +278,7 @@ export default function OrderDetailPage() {
                   // pattern the returns/shipments/notifications surfaces
                   // use) rather than inventing a new chip style —
                   // every-data-needs-a-UI surface for Order.source.
-                  <OrderStatusBadge
-                    status="agent"
-                    label={t('agent')}
-                    colorMap={{ agent: { className: 'bg-violet-50 text-violet-700' } }}
-                  />
+                  <OrderStatusBadge status="agent" label={t('agent')} family="orderSource" />
                 )}
               </div>
               <span className="text-xs text-muted-foreground">

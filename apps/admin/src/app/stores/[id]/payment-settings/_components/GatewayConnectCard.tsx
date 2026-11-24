@@ -15,6 +15,7 @@ import { useT } from '@/i18n/useT';
 import { Alert } from '../../../../../components/Alert';
 import { apiPost, apiPut } from '../../../../../lib/api';
 import { UnverifiedProviderNotice } from '../../../../../components/UnverifiedProviderNotice';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /** One saved-credential hint: secrets only say they are set (+ last 4), non-secrets echo the value. */
 type CredentialHint = { set: true; last4?: string; value?: string };
@@ -56,8 +57,7 @@ interface Props {
   onChanged: () => Promise<void> | void;
 }
 
-const inputClass =
-  'w-full rounded-lg border border-input bg-background px-3 py-1.5 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60';
+const inputClass = FIELD_CLASSES;
 const btnPrimary = buttonVariants({ size: 'sm' });
 const btnOutline = buttonVariants({ variant: 'outline', size: 'sm' });
 
@@ -235,7 +235,7 @@ export function GatewayConnectCard({ entry, config, storeId, onChanged }: Props)
 
   return (
     <div
-      className={`overflow-hidden rounded-xl border bg-card shadow-sm ${
+      className={`overflow-hidden rounded-md border bg-card shadow-sm ${
         config?.isEnabled ? 'border-s-4' : ''
       }`}
       style={config?.isEnabled ? { borderInlineStartColor: entry.logo.color } : undefined}
@@ -262,7 +262,7 @@ export function GatewayConnectCard({ entry, config, storeId, onChanged }: Props)
             {entry.capabilities.methods.map(m => (
               <span
                 key={m}
-                className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+                className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
               >
                 {t(`methods.${m}`)}
               </span>
@@ -534,7 +534,7 @@ export function GatewayConnectCard({ entry, config, storeId, onChanged }: Props)
                 onChange={e => toggle(e.target.checked)}
                 className="peer sr-only"
               />
-              <div className="peer h-6 w-11 rounded-full bg-border after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-400/40 peer-disabled:opacity-50" />
+              <div className="peer h-6 w-11 rounded-full bg-border after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-success peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-focus-visible:ring-2 peer-focus-visible:ring-success/40 peer-disabled:opacity-50" />
             </label>
           </div>
         </div>
@@ -592,7 +592,7 @@ function GatewayOptions({
     <div className="space-y-3 rounded-lg border border-border bg-background p-3">
       <p className="text-sm font-medium text-foreground">{t('options.title')}</p>
       <fieldset>
-        <legend className="mb-1 text-xs text-muted-foreground">{t('options.methods')}</legend>
+        <legend className="mb-1 text-sm text-muted-foreground">{t('options.methods')}</legend>
         <div className="flex flex-wrap gap-4">
           {allMethods.map(m => (
             <label key={m} className="flex items-center gap-2 text-sm text-foreground">
@@ -616,7 +616,7 @@ function GatewayOptions({
       )}
       {isKashier ? (
         <div>
-          <label htmlFor="kashier-display" className="mb-1 block text-xs text-muted-foreground">
+          <label htmlFor="kashier-display" className="mb-1 block text-sm text-muted-foreground">
             {t('options.display')}
           </label>
           <select
@@ -631,7 +631,7 @@ function GatewayOptions({
         </div>
       ) : (
         <div>
-          <label htmlFor="fawry-expiry" className="mb-1 block text-xs text-muted-foreground">
+          <label htmlFor="fawry-expiry" className="mb-1 block text-sm text-muted-foreground">
             {t('options.expiryHours')}
           </label>
           <input

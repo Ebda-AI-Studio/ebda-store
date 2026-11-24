@@ -178,7 +178,7 @@ export function OrderLifecycleTimeline({ storeId, orderId }: OrderLifecycleTimel
   }, [expanded, fetchTimeline]);
 
   return (
-    <section className="rounded-2xl border border-border bg-card">
+    <section className="rounded-lg border border-border bg-card">
       {/* Collapsible header */}
       <button
         data-ui="row"

@@ -53,7 +53,7 @@ function StatCard({
               <span
                 className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${
                   isPositive
-                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                    ? 'bg-success/10 text-success-ink'
                     : 'bg-destructive/5 text-destructive-ink dark:bg-destructive/20 dark:text-destructive-ink'
                 }`}
               >
@@ -73,7 +73,7 @@ function StatCard({
           {note && <div className="mt-2 text-xs text-muted-foreground">{note}</div>}
         </div>
         <div
-          className={`flex h-12 w-12 items-center justify-center rounded-2xl ${iconBg} text-white shadow-lg transition-transform duration-200 group-hover:scale-110`}
+          className={`flex h-12 w-12 items-center justify-center rounded-lg ${iconBg} text-white shadow-md transition-transform duration-200 group-hover:scale-110`}
         >
           {icon}
         </div>
@@ -144,7 +144,7 @@ export function AnalyticsStatsGrid({ stats }: AnalyticsStatsGridProps) {
         value={stats ? stats.totalProfit : null}
         change={stats?.profitChange}
         format="currency"
-        iconBg="bg-emerald-600"
+        iconBg="bg-success"
         vsLastPeriodLabel={vsLabel}
         // A missing cost price is a KNOWN reason; failed stats are just unknown.
         unknownLabel={stats ? t('profitUnknown') : undefined}
@@ -164,7 +164,7 @@ export function AnalyticsStatsGrid({ stats }: AnalyticsStatsGridProps) {
         title={t('totalOrders')}
         value={stats ? stats.totalOrders : null}
         change={stats?.ordersChange}
-        iconBg="bg-violet-500"
+        iconBg="bg-primary"
         vsLastPeriodLabel={vsLabel}
         icon={<CartIcon className="w-5 h-5" />}
       />
@@ -172,7 +172,7 @@ export function AnalyticsStatsGrid({ stats }: AnalyticsStatsGridProps) {
         title={t('totalCustomers')}
         value={stats ? stats.totalCustomers : null}
         change={stats?.customersChange}
-        iconBg="bg-emerald-500"
+        iconBg="bg-success"
         vsLastPeriodLabel={vsLabel}
         icon={
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

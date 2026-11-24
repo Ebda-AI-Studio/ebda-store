@@ -42,7 +42,7 @@ export function GoldPaymentPolicyCard({ storeId, canEdit }: { storeId: string; c
   };
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+    <section className="rounded-md border bg-card p-4 shadow-sm sm:p-6">
       <h2 className="text-lg font-semibold">{t('title')}</h2>
       <p className="mt-2 text-sm text-muted-foreground">{t('intro')}</p>
       <label className="mt-4 flex min-h-11 items-start gap-3 text-sm">

@@ -21,6 +21,7 @@ import { useAuth } from '../../../../../lib/auth';
 import { formatPrice } from '@/lib/format';
 import { useT } from '@/i18n/useT';
 import { effectiveVariantPrice } from '@/lib/variant-price';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface ProductVariant {
   id: string;
@@ -459,7 +460,7 @@ export default function NewOrderPage() {
     >
       <div className="mx-auto max-w-4xl space-y-6 pb-24">
         {/* Customer card */}
-        <section className="rounded-xl border bg-card p-6 shadow-sm">
+        <section className="rounded-md border bg-card p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {t('customerSection.heading')}
           </h2>
@@ -557,7 +558,7 @@ export default function NewOrderPage() {
         </section>
 
         {/* Shipping address */}
-        <section className="rounded-xl border bg-card p-6 shadow-sm">
+        <section className="rounded-md border bg-card p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {t('shippingSection.heading')}
           </h2>
@@ -575,7 +576,7 @@ export default function NewOrderPage() {
               <select
                 value={governorate}
                 onChange={e => handleGovernorateChange(e.target.value)}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               >
                 <option value="">{t('shippingSection.selectGovernoratePlaceholder')}</option>
                 {/* Governorate names are shown in both languages together on purpose —
@@ -596,7 +597,7 @@ export default function NewOrderPage() {
                 value={area}
                 onChange={e => setArea(e.target.value)}
                 disabled={!governorate}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`${FIELD_CLASSES} disabled:cursor-not-allowed`}
               >
                 <option value="">
                   {governorate
@@ -665,7 +666,7 @@ export default function NewOrderPage() {
                 value={shippingOverrideMajor}
                 onChange={e => setShippingOverrideMajor(e.target.value)}
                 dir="ltr"
-                className="w-48 rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={`${FIELD_CLASSES} w-48`}
               />
               {typeof shippingOverrideFils === 'number' && (
                 <p className="text-xs text-primary">
@@ -679,7 +680,7 @@ export default function NewOrderPage() {
         </section>
 
         {/* Products */}
-        <section className="rounded-xl border bg-card p-6 shadow-sm">
+        <section className="rounded-md border bg-card p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {t('productsSection.heading')}
           </h2>
@@ -765,7 +766,7 @@ export default function NewOrderPage() {
                     onChange={e =>
                       updateQuantity(it.productId, Number(e.target.value), it.variantId)
                     }
-                    className="w-16 rounded border border-border bg-background px-2 py-1 text-center text-sm"
+                    className={`${FIELD_CLASSES} w-16 text-center`}
                   />
                   <span className="w-24 text-end font-semibold text-foreground">
                     {formatPrice(it.unitPrice * it.quantity)}
@@ -809,7 +810,7 @@ export default function NewOrderPage() {
         </section>
 
         {/* Notes + coupon */}
-        <section className="rounded-xl border bg-card p-6 shadow-sm">
+        <section className="rounded-md border bg-card p-6 shadow-sm">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Input
               label={t('notesSection.couponLabel')}
@@ -825,7 +826,7 @@ export default function NewOrderPage() {
                   type="checkbox"
                   checked={overrideCouponRules}
                   onChange={e => setOverrideCouponRules(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-border"
+                  className="mt-0.5 h-5 w-5 rounded-md border-border"
                 />
                 <span>
                   <span className="font-medium text-foreground">
@@ -889,7 +890,7 @@ export default function NewOrderPage() {
             56px) + safe-area on mobile so it isn't hidden behind it; rule 6
             "fixed-bottom UI" recipe. md:bottom-0 because the nav is
             md:hidden (desktop = sidebar). */}
-        <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:bg-card sm:p-4">
+        <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-lg sm:border sm:bg-card sm:p-4">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
               {t('footer.itemCount', { count: items.length })} ·{' '}
@@ -940,7 +941,7 @@ function Input({ label, value, onChange, type = 'text', required, className, dir
         onChange={e => onChange(e.target.value)}
         required={required}
         dir={dir}
-        className="rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        className={FIELD_CLASSES}
       />
     </label>
   );

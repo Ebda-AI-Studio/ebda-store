@@ -226,7 +226,7 @@ export default function StockDashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl">
         {kpis.map(kpi => {
           const card = (
-            <div key={kpi.label} className="rounded-xl border border-border bg-card p-5 space-y-1">
+            <div key={kpi.label} className="rounded-md border border-border bg-card p-5 space-y-1">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 {kpi.label}
               </p>
@@ -248,7 +248,7 @@ export default function StockDashboardPage() {
                 </p>
               )}
               {'hint' in kpi && kpi.hint && (
-                <p className="text-xs text-muted-foreground" data-testid="stock-value-hint">
+                <p className="text-sm text-muted-foreground" data-testid="stock-value-hint">
                   {kpi.hint}
                 </p>
               )}

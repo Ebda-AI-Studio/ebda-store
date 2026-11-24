@@ -1219,8 +1219,10 @@ export interface MoneyClient {
   returnCreate(
     a: {
       orderId: string;
-      /** required for a shopper-opened return; a merchant-opened one (`byMerchant`) uses the order's own customer */
+      /** required for a shopper-opened account return; a merchant-opened one (`byMerchant`) uses the order's own customer, a `guest` one the order's marker */
       customerId?: string;
+      /** a shopper-opened return on a GUEST order (Ruling GUEST-RETURN-MARKER-1): never a null customerId */
+      guest?: boolean;
       type: string;
       reason: string;
       reasonDetail?: string;

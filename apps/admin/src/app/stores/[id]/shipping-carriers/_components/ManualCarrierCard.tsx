@@ -11,7 +11,7 @@ import { useT } from '@/i18n/useT';
 export function ManualCarrierCard({ storeId }: { storeId: string }) {
   const t = useT('shipping.carriers.manual');
   return (
-    <div className="bg-card rounded-xl border border-border p-6">
+    <div className="bg-card rounded-md border border-border p-6">
       <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
       <p className="text-sm text-muted-foreground mt-1">{t('description')}</p>
       <Link
