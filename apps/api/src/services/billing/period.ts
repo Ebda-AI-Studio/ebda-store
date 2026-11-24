@@ -81,3 +81,17 @@ export function renewalKey(subId: string, periodEnd: Date, attempt: number): str
 export function upgradeKey(subId: string, planCode: string, periodEnd: Date | null, n: number) {
   return `sub:${subId}:upgrade:${planCode}:${periodEnd ? periodEnd.toISOString() : 'none'}:${n}`;
 }
+
+/**
+ * The interval of the period the store is IN, read from its own dates (a year-long period is yearly). `billingInterval`
+ * is overwritten by a scheduled plan change (the picker stores the NEW plan's interval there), so only the dates still
+ * say what was bought; null when they cannot say.
+ */
+export function intervalOfPeriod(
+  sub: { currentPeriodStart: Date | null; currentPeriodEnd: Date | null } | null
+): BillingInterval | null {
+  if (!sub?.currentPeriodStart || !sub.currentPeriodEnd) return null;
+  const days = (sub.currentPeriodEnd.getTime() - sub.currentPeriodStart.getTime()) / 86_400_000;
+  if (days <= 0) return null;
+  return days >= 300 ? 'yearly' : 'monthly';
+}

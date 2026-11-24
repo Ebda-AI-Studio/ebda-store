@@ -38,6 +38,8 @@ export const INSTAPAY_RECEIPT_FLAGS = [
   'SAME_IMAGE_USED_BEFORE',
   'AI_UNAVAILABLE',
   'SUSPICIOUS_TEXT',
+  /** A plan-change (downgrade) payment that is not due yet: the transfer is recorded and held for the operator. */
+  'PAYMENT_NOT_DUE',
 ] as const;
 export type InstapayReceiptFlag = (typeof INSTAPAY_RECEIPT_FLAGS)[number];
 

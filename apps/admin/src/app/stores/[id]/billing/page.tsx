@@ -90,6 +90,8 @@ interface BillingData {
 
 /** `POST /billing/instapay-plan`: what to transfer for the plan just picked. */
 interface InstapayQuote {
+  notDue?: boolean;
+  mobile?: string | null;
   handle: string | null;
   qrUrl?: string | null;
   reference: string | null;
@@ -1151,7 +1153,10 @@ export default function StoreBillingPage() {
                     {isCurrent && data.subscription.status !== 'canceled' && (
                       <Badge variant="info">{t('currentBadge')}</Badge>
                     )}
-                    {(!isCurrent || data.subscription.status === 'canceled') &&
+                    {(!isCurrent ||
+                      data.subscription.status === 'canceled' ||
+                      // QA-123: the current plan card can switch the billing interval (Business yearly -> monthly and back)
+                      (data.billing?.billingInterval ?? interval) !== interval) &&
                       paid &&
                       data.subscription.status !== 'comped' &&
                       !payOnOtherStore &&

@@ -31,9 +31,18 @@ export function InstapayPanel({
   const showQr = !!instapay.qrUrl && !qrFailed;
   const rows = [
     [t('handle'), instapay.handle],
+    [t('mobile'), instapay.mobile ?? null],
     [t('amount'), amount],
     [t('reference'), instapay.reference],
   ] as const;
+
+  if (instapay.notDue) {
+    return (
+      <p className="text-sm text-muted-foreground" data-testid="instapay-not-due">
+        {t('notDue')}
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-3 text-sm">

@@ -79,6 +79,7 @@ import {
   upgradeKey,
   type BillingInterval,
   addIntervalAnchored,
+  intervalOfPeriod,
 } from './period';
 import { runBillingEffects, type BillingEffect } from './billing-notify';
 import {
@@ -88,9 +89,14 @@ import {
   shiftedByGrants,
   sweepFreeMonthGrants,
 } from './grants.service';
-import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
+import {
+  assertPayableStore,
+  isBillableStoreId,
+  paymentNotDueYet,
+  suspendForBilling,
+} from './account.service';
 import { auditLog } from '../../middleware/security';
-import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
+import { instapayHandle, instapayMobile, instapayQrUrl, supportContact } from './manual-config';
 import { findReminderCandidates, sendDueReminder } from './reminders.service';
 import {
   chargeFor,
@@ -1603,10 +1609,17 @@ export async function resumeSubscription(args: { storeId: string }): Promise<voi
   if (!sub || !['active', 'trialing'].includes(sub.status)) {
     throw new AppError(409, 'NOTHING_TO_RESUME', 'Nothing to resume');
   }
+  // QA-123 (a): a scheduled plan change also overwrote `billingInterval` with the new plan's interval, so "keep my plan"
+  // must put the interval back too - read from the period the store actually paid (its own dates), else left as is.
+  const restored = sub.status === 'active' ? intervalOfPeriod(sub) : null;
   await withStore(args.storeId, tx =>
     tx.storeSubscription.update({
       where: { storeId: args.storeId },
-      data: { cancelAtPeriodEnd: false, pendingPlanCode: null },
+      data: {
+        cancelAtPeriodEnd: false,
+        pendingPlanCode: null,
+        ...(sub.pendingPlanCode && restored ? { billingInterval: restored } : {}),
+      },
     })
   );
 }
@@ -2432,6 +2445,12 @@ export async function getSubscriptionBillingState(storeId: string) {
   const now = Date.now();
   const daysLeft = next ? Math.ceil((next.at.getTime() - now) / 86_400_000) : null;
   const handle = instapayHandle();
+  // QA-123 (b): a pending downgrade is paid from 7 days before the period ends; until then no amount / payee is shown.
+  const notDue = await paymentNotDueYet(
+    sub,
+    { planCode: next?.planCode ?? sub?.planCode ?? '', amountMinor: next?.amountMinor ?? null },
+    new Date(now)
+  );
   const support = supportContact();
   return {
     billingInterval: sub?.billingInterval ?? 'monthly',
@@ -2446,13 +2465,17 @@ export async function getSubscriptionBillingState(storeId: string) {
     /** InstaPay instructions; `handle` null = InstaPay not offered (not configured). */
     instapay: {
       available: !!handle,
-      handle,
+      /** A pending downgrade not due yet: payee, amount and QR are withheld (QA-123). */
+      notDue,
+      handle: notDue ? null : handle,
+      /** The same account's mobile (EBDA_INSTAPAY_MOBILE); null = none configured. */
+      mobile: notDue ? null : instapayMobile(),
       reference: sub?.paymentReference ?? null,
-      amountMinor: payQuote?.amountMinor ?? null,
+      amountMinor: notDue ? null : (payQuote?.amountMinor ?? null),
       /** Ebda VAT inside the amount + Ebda's TRN/legal name; null = no VAT line. */
-      vat: payQuote?.vat ?? null,
+      vat: notDue ? null : (payQuote?.vat ?? null),
       /** Ebda's InstaPay QR image (EBDA_INSTAPAY_QR_URL); null = no QR shown. */
-      qrUrl: handle ? instapayQrUrl() : null,
+      qrUrl: handle && !notDue ? instapayQrUrl() : null,
       pendingClaims,
     },
     /** Banner input: the next due date when it is within 7 days (or already past). */

@@ -553,6 +553,69 @@ describe.skipIf(!hasDb)('InstaPay receipts (money batch A)', () => {
       expect(emailsOf()).toContain('payment_confirmed');
     });
 
+    it('QA-123: an early downgrade receipt is ACCEPTED as a held claim (flagged), refused for approval until due, then the period starts at the current end', async () => {
+      const t = await trialStore('subdown');
+      const now = Date.now();
+      const periodStart = new Date(now - 30 * 86_400_000);
+      const periodEnd = new Date(now + 335 * 86_400_000);
+      await owner.storeSubscription.update({
+        where: { storeId: t.storeId },
+        data: {
+          status: 'active',
+          planCode: 'growth',
+          billingInterval: 'yearly',
+          billingMethod: 'instapay',
+          trialEndsAt: null,
+          currentPeriodStart: periodStart,
+          currentPeriodEnd: periodEnd,
+        },
+      });
+      const details = await asApp(() =>
+        chooseInstapayPlan({ storeId: t.storeId, planCode: 'basic', interval: 'monthly' })
+      );
+      // the merchant is shown nothing to pay yet
+      expect(details).toMatchObject({
+        notDue: true,
+        handle: null,
+        mobile: null,
+        amountMinor: null,
+        qrUrl: null,
+      });
+      // the money may already be sent: the receipt is accepted, never refused
+      const basicPrice = (await owner.plan.findUniqueOrThrow({ where: { code: 'basic' } }))
+        .priceMonthlyMinor!;
+      const { claim, receipt } = await asApp(() =>
+        submitTestSubscriptionReceipt(t.storeId, {
+          amountMinor: basicPrice,
+        })
+      );
+      expect(receipt.flags).toContain('PAYMENT_NOT_DUE');
+      expect(claim.status).toBe('pending');
+      const rec = (over: Date | null) =>
+        asApp(() =>
+          recordManualPayment({
+            storeId: t.storeId,
+            planCode: claim.planCode,
+            interval: 'monthly',
+            amountMinor: claim.amountMinor,
+            method: 'instapay',
+            reference: receipt.fields.reference!,
+            paidAt: new Date(),
+            actorId: superAdmin.id,
+            claimId: claim.id,
+            ...(over ? { now: over } : {}),
+          })
+        );
+      // approval a year early is refused; the claim stays pending
+      await expect(rec(null)).rejects.toMatchObject({ code: 'PAYMENT_NOT_DUE_YET' });
+      expect(
+        await owner.manualPaymentClaim.findUniqueOrThrow({ where: { id: claim.id } })
+      ).toMatchObject({ status: 'pending' });
+      // inside the 7-day window it is approved and the paid period starts at the CURRENT END (EBDA-MONEYA-6 unchanged)
+      const res = await rec(new Date(periodEnd.getTime() - 3 * 86_400_000));
+      expect(res.periodStart!.getTime()).toBe(periodEnd.getTime());
+    });
+
     it('Ebda rejects with a reason: the merchant is told, the reference can be filed again', async () => {
       const t = await trialStore('subrej');
       await asApp(() => chooseInstapay(t.storeId));
