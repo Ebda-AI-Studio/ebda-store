@@ -142,6 +142,16 @@ describe('pre-push slop guard (same check as CI "Slop baselines")', () => {
     expect(r.stderr).toContain('apps/x/src/testOnly.ts');
   });
 
+  it('the BASE export carries the vendored-folder proof (foundation.lock.json + its parity test), or the foundation exemption is OFF on every push', () => {
+    // Without them in the base tree the guard reports "the base branch has no foundation.lock.json to trust" and every vendored export reads as a NEW violation.
+    const src = readFileSync(SCRIPT, 'utf8');
+    const baseExport = src.split('\n').find(l => l.startsWith('export_ref "$BASE_REF"')) ?? '';
+    expect(baseExport).toContain('foundation.lock.json');
+    expect(baseExport).toContain('tests/unit/foundation-parity.test.ts');
+    const headExport = src.split('\n').find(l => l.startsWith('export_ref "$HEAD_REF"')) ?? '';
+    expect(headExport).toContain('foundation.lock.json');
+  });
+
   it('does not move HEAD or write refs/pr/head in the repo named by an inherited GIT_DIR (a pre-push hook exports it)', () => {
     const before = git('for-each-ref').trim() + git('symbolic-ref', 'HEAD').trim();
     spawnSync('bash', [SCRIPT, 'origin/main', 'HEAD'], {
