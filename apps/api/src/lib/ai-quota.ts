@@ -49,6 +49,9 @@ const AI_QUOTA_STOP_CODES = new Set([
   AI_QUOTA_STORE_DAILY_CODE,
   // the merchant turned AI off: a sweep must stop, not fail every remaining product
   AI_DISABLED_BY_MERCHANT_CODE,
+  // the store is suspended for billing (store-ai-switch AI_BILLING_SUSPENDED_CODE; a literal so the many test mocks
+  // of that module need no new export): a sweep must stop, not fail every remaining product
+  'AI_STORE_BILLING_SUSPENDED',
   'AI_QUOTA_EXCEEDED',
   'AI_BUDGET_EXCEEDED',
 ]);

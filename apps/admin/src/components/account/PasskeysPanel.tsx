@@ -238,7 +238,7 @@ export function PasskeysPanel({
   if (!supported && items !== null && items.length === 0) {
     return (
       <section
-        className="rounded-2xl border border-border bg-card p-6"
+        className="rounded-lg border border-border bg-card p-6"
         aria-labelledby="passkeys-title"
       >
         <h3 id="passkeys-title" className="font-semibold text-foreground">
@@ -250,7 +250,7 @@ export function PasskeysPanel({
   }
 
   return (
-    <section className="rounded-2xl border border-border bg-card" aria-labelledby="passkeys-title">
+    <section className="rounded-lg border border-border bg-card" aria-labelledby="passkeys-title">
       <div className="border-b border-border p-5">
         <h3 id="passkeys-title" className="font-semibold text-foreground">
           {t('title')}
@@ -466,7 +466,7 @@ export function PasskeysPanel({
               </div>
             )}
             {removeId === p.id && (
-              <div className="rounded-xl border border-destructive/30 p-4">
+              <div className="rounded-md border border-destructive/30 p-4">
                 <p className="text-sm text-foreground">{t('removeConfirm')}</p>
                 <div className="mt-3 flex gap-3">
                   <Button

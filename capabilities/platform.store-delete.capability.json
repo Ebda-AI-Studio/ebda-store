@@ -23,7 +23,7 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": ["عايز امسح متجري"],
+    "ar": ["عايز امسح متجري", "ازاي امسح متجر من لوحة الادارة؟", "ينفع ارجع متجر اتمسح؟"],
     "en": ["Delete my store"]
   },
   "steps": ["Super-admin console only."],
