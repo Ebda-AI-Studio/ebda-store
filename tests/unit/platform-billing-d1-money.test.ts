@@ -15,6 +15,8 @@ vi.mock('../../apps/api/src/services/billing/billing-notify', () => ({
 const storeUpdateMock = vi.hoisted(() => vi.fn(async () => ({})));
 const captured = vi.hoisted(() => ({
   guard: undefined as undefined | ((m: string, o: string) => void),
+  // the D1 `Store` record is not in the platform schema this rig loads: when set, `store.findUnique` answers an ownerless store
+  stubStore: false,
 }));
 vi.mock('../../apps/api/src/lib/repo-factory', async importOriginal => ({
   ...(await importOriginal<object>()),
@@ -28,7 +30,17 @@ vi.mock('@ebda/database', async importOriginal => {
       captured.guard = fn;
       real.setRoutedModelGuard(fn);
     },
-    withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(real.prisma),
+    withStore: (_id: string, fn: (tx: unknown) => unknown) =>
+      fn(
+        captured.stubStore
+          ? new Proxy(real.prisma, {
+              get: (t, prop) =>
+                prop === 'store'
+                  ? { findUnique: async () => ({ ownerId: null, billingSuspendedReason: null }) }
+                  : (t as never)[prop],
+            })
+          : real.prisma
+      ),
     currentStoreId: () => '11111111-1111-4111-8111-111111111111',
   };
 });
@@ -45,6 +57,7 @@ import {
 import { sendAlert } from '../../apps/api/src/services/alerts.service';
 import { reconcilePlanTiers } from '../../apps/api/src/services/billing/subscription-billing.service';
 import { registerPlatformRouter } from '../../apps/api/src/services/platform/router';
+import { chooseInstapayPlan } from '../../apps/api/src/services/billing/account.service';
 import {
   applyGrantsBatchD1,
   commitManualPaymentD1,
@@ -108,7 +121,7 @@ function rig() {
     ['basic', 'starter'],
   ] as const)
     db.prepare(
-      `INSERT INTO plans (id, code, name_en, name_ar, feature_tier, limits, price_monthly_minor) VALUES (?, ?, ?, ?, ?, '{}', 1000)`
+      `INSERT INTO plans (id, code, name_en, name_ar, feature_tier, limits, price_monthly_minor, price_yearly_minor) VALUES (?, ?, ?, ?, ?, '{}', 1000, 10000)`
     ).run(`p-${code}`, code, code, code, tier);
   db.prepare(`INSERT INTO system_settings (id, key, value) VALUES ('c', ?, '{}')`).run(
     cutoverKey('billing')
@@ -243,6 +256,103 @@ describe('BILLING-INTERVAL-PENDING-1: a settled card payment drops the InstaPay 
       []
     );
     expect(pendingOf(db)).toEqual({ i: 'yearly', p: null });
+  });
+});
+
+describe('BILLING-INTERVAL-PENDING-1: an InstaPay interval pick on an active store (D1 subscription)', () => {
+  const YEAR = 365 * 86_400_000;
+  beforeEach(() => {
+    captured.stubStore = true;
+    vi.stubEnv('EBDA_INSTAPAY_HANDLE', 'ebda@instapay');
+    return () => {
+      captured.stubStore = false;
+      vi.unstubAllEnvs();
+    };
+  });
+  const subRow = (db: DatabaseSync) =>
+    db
+      .prepare(
+        `SELECT status s, plan_code p, billing_interval i, pending_billing_interval pi, pending_plan_code pp, current_period_end e FROM store_subscriptions`
+      )
+      .get() as {
+      s: string;
+      p: string;
+      i: string;
+      pi: string | null;
+      pp: string | null;
+      e: number;
+    };
+  const seedSub = (
+    db: DatabaseSync,
+    status: 'active' | 'trialing',
+    interval: string,
+    end: number
+  ) =>
+    db
+      .prepare(
+        `INSERT INTO store_subscriptions (id, store_id, plan_code, status, billing_interval, current_period_start, current_period_end, billing_method) VALUES ('s1', ?, 'growth', ?, ?, ?, ?, 'instapay')`
+      )
+      .run(STORE, status, interval, Date.now(), end);
+
+  it('active yearly store picks monthly: stays yearly with monthly pending, period untouched, payment quote is monthly', async () => {
+    const db = rig();
+    const end = Date.now() + YEAR;
+    seedSub(db, 'active', 'yearly', end);
+    const details = await chooseInstapayPlan({
+      storeId: STORE,
+      planCode: 'growth',
+      interval: 'monthly',
+    });
+    expect(subRow(db)).toMatchObject({ s: 'active', i: 'yearly', pi: 'monthly', e: end });
+    expect(details!.interval).toBe('monthly');
+  });
+
+  it('pay: recording the monthly payment makes monthly current and clears the pending pick', async () => {
+    const db = rig();
+    seedSub(db, 'active', 'yearly', Date.now() + YEAR);
+    await chooseInstapayPlan({ storeId: STORE, planCode: 'growth', interval: 'monthly' });
+    expect(subRow(db).pi).toBe('monthly');
+    const sub = db.prepare('SELECT id, updated_at u FROM store_subscriptions').get() as {
+      id: string;
+      u: number;
+    };
+    const end = new Date(Date.now() + YEAR + 30 * 86_400_000);
+    const out = await commitManualPaymentD1({
+      eventId: EV,
+      idempotencyKey: 'manual:pend-1',
+      storeId: STORE,
+      subscriptionId: sub.id,
+      planCode: 'growth',
+      interval: 'monthly',
+      periodStart: new Date(Date.now() + YEAR),
+      periodEnd: end,
+      amountMinor: 1000,
+      providerRef: 'pend-1',
+      vatMinor: 0,
+      vat: null,
+      raw: {},
+      anchorDay: 5,
+      billingMethod: 'instapay',
+      expectedSubUpdatedAt: new Date(sub.u),
+      now: new Date(),
+    });
+    expect(out).toBe('applied');
+    expect(subRow(db)).toMatchObject({ s: 'active', i: 'monthly', pi: null, pp: null });
+  });
+
+  it('abandon: picking the current interval again leaves the interval untouched', async () => {
+    const db = rig();
+    seedSub(db, 'active', 'yearly', Date.now() + YEAR);
+    await chooseInstapayPlan({ storeId: STORE, planCode: 'growth', interval: 'monthly' });
+    await chooseInstapayPlan({ storeId: STORE, planCode: 'growth', interval: 'yearly' });
+    expect(subRow(db)).toMatchObject({ i: 'yearly', pi: null });
+  });
+
+  it('a trialing store still writes the interval directly (no active period to protect)', async () => {
+    const db = rig();
+    seedSub(db, 'trialing', 'monthly', Date.now() + 7 * 86_400_000);
+    await chooseInstapayPlan({ storeId: STORE, planCode: 'growth', interval: 'yearly' });
+    expect(subRow(db)).toMatchObject({ s: 'trialing', i: 'yearly', pi: null });
   });
 });
 
