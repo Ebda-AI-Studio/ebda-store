@@ -3,7 +3,9 @@ import { createDoPort, storefrontUrlFor } from './do-port';
 import { suiteBuyerKeySecret } from '../config';
 import logger from '../../logger';
 import { buyerProofRequired } from './proof-policy';
-import { createOwnerTools } from './owner-tools';
+import { createOwnerTools, type OrderRowLite } from './owner-tools';
+import { refundedMinorByOrder } from '../../order-refunds';
+import { latestPaymentIsOnline } from '../../revenue-sql';
 import { memberRole } from '../../store-members';
 import { isWhatsAppLinked } from '../link';
 import { featureService } from '../../../services/feature.service';
@@ -36,6 +38,48 @@ export const ownerTools = () =>
         quantity: p.quantity,
         revenue: p.revenue,
       })),
+    ordersInWindow: async (storeId, range, cap) => {
+      const db = await storeDb(storeId);
+      const out: OrderRowLite[] = [];
+      let cursor: string | undefined;
+      for (;;) {
+        const page = await db.order.findMany({
+          where: {
+            storeId,
+            deletedAt: null,
+            createdAt: { gte: range.startDate, lte: range.endDate },
+          },
+          select: {
+            id: true,
+            total: true,
+            status: true,
+            paymentStatus: true,
+            payments: { select: { id: true, provider: true, createdAt: true } },
+          },
+          orderBy: { id: 'asc' },
+          take: 1000,
+          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        });
+        if (page.length === 0) break;
+        const refunded = await refundedMinorByOrder(
+          db,
+          storeId,
+          page.map(o => o.id)
+        );
+        for (const o of page)
+          out.push({
+            total: o.total,
+            status: o.status,
+            paymentStatus: o.paymentStatus,
+            online: latestPaymentIsOnline(o.payments ?? []),
+            cod: (o.payments ?? []).some(p => p.provider === 'cod'),
+            refundedMinor: refunded.get(o.id) ?? 0,
+          });
+        if (out.length > cap || page.length < 1000) break;
+        cursor = page[page.length - 1]!.id;
+      }
+      return out;
+    },
     findCoupon: async (storeId, code) =>
       (await (
         await storeDb(storeId)

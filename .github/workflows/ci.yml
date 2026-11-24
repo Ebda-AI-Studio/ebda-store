@@ -1651,7 +1651,7 @@ jobs:
       - name: Check for secrets
         # The action runs trufflehog in a docker container; the Mac runner has no docker, so it runs on Linux only.
         if: runner.os == 'Linux'
-        uses: trufflesecurity/trufflehog@ea68ca03c865c5f324e86e849ced20ed3cf9dbbb # v3.99.8
+        uses: trufflesecurity/trufflehog@d232362a64a09a9e7d58267b8f5acef00ae90e23 # v3.100.0
         with:
           path: ./
           extra_args: --only-verified
