@@ -19,7 +19,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge, Select, useToast } from '@ebda/ui';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
@@ -502,6 +502,16 @@ export default function StoreBillingPage() {
   const [nowMs, setNowMs] = useState(0);
   useEffect(() => setNowMs(Date.now()), []);
   const info = data?.billing;
+  // The plan cards open on the interval the store is on (a yearly store opens on Yearly), once: a later reload never undoes the
+  // merchant's own toggle. The "Current plan" badge follows the same pair (plan AND interval), see `isCurrent` below.
+  const currentInterval: 'monthly' | 'yearly' =
+    info?.billingInterval === 'yearly' ? 'yearly' : 'monthly';
+  const intervalSynced = useRef(false);
+  useEffect(() => {
+    if (intervalSynced.current || !info?.billingInterval) return;
+    intervalSynced.current = true;
+    setInterval(info.billingInterval === 'yearly' ? 'yearly' : 'monthly');
+  }, [info?.billingInterval]);
   const notice = billingNotice(info);
   const noticeCopy = info && notice ? noticeText(notice, info, tNotice, locale) : null;
   const noticeUrgent = notice === 'unpaid' || notice === 'overdue' || notice === 'overStoreLimit';
@@ -1111,8 +1121,11 @@ export default function StoreBillingPage() {
             <div className="mb-4 grid gap-3 sm:grid-cols-3">
               {data.availablePlans.map(p => {
                 const price = planPrice(p);
-                const isCurrent = p.code === data.plan.subscribedPlanCode;
                 const paid = p.code !== 'free' && p.code !== 'comped' && p.code !== 'founding_free';
+                // Current = this plan on the interval the store is on: Business Yearly is not "current" under the Monthly toggle
+                // (picking it there is an interval change). A plan with no interval (free, comped) is current on either toggle.
+                const samePlan = p.code === data.plan.subscribedPlanCode;
+                const isCurrent = samePlan && (!paid || interval === currentInterval);
                 const hasCard =
                   !!data.billing?.hasPaymentMethod &&
                   data.subscription.status === 'active' &&
@@ -1148,7 +1161,8 @@ export default function StoreBillingPage() {
                           {price === null ? t('priceUnset') : t('chooseThisPlan')}
                         </Button>
                       )}
-                    {!isCurrent &&
+                    {/* a card switch carries no interval (change-plan takes the plan only): never offered for the plan the store is on */}
+                    {!samePlan &&
                       paid &&
                       data.subscription.status !== 'comped' &&
                       !payOnOtherStore &&
