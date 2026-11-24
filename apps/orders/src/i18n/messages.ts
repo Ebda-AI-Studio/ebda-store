@@ -131,6 +131,7 @@ export interface Messages {
     refunded: string;
     disputed: string;
     refundedAmount: string;
+    partially_refunded: string;
     delivery: string;
     deliverTo: string;
     deliverBy: string;
@@ -397,6 +398,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       refunded: 'Refunded',
       disputed: 'Disputed',
       refundedAmount: 'Refunded {amount}',
+      partially_refunded: 'Partially refunded',
       delivery: 'Delivery',
       deliverTo: 'Deliver to',
       deliverBy: 'Delivered by',
@@ -678,6 +680,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       refunded: 'مسترد',
       disputed: 'متنازع عليه',
       refundedAmount: 'المسترد {amount}',
+      partially_refunded: 'مسترد جزئيًا',
       delivery: 'التوصيل',
       deliverTo: 'التوصيل إلى',
       deliverBy: 'يتم التوصيل بواسطة',

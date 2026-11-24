@@ -11,10 +11,10 @@ export function SettingsLink({ storeId }: SettingsLinkProps) {
     <div className="mt-8">
       <Link
         href={`/stores/${storeId}/settings`}
-        className="flex items-center justify-between rounded-xl border bg-card p-5 shadow-sm transition hover:border-primary hover:shadow-md group"
+        className="flex items-center justify-between rounded-md border bg-card p-5 shadow-sm transition hover:border-primary hover:shadow-md group"
       >
         <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted transition-transform group-hover:scale-110">
+          <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted transition-transform group-hover:scale-110">
             <svg
               className="h-6 w-6 text-muted-foreground"
               fill="none"

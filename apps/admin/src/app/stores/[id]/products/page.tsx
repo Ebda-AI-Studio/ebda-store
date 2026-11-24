@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { PlanLimitNotice } from '@/components/billing/PlanLimitNotice';
 import { useAuth } from '../../../../lib/auth';
 import { apiGet, apiDelete } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
@@ -276,6 +277,8 @@ export default function StoreProductsPage() {
       subtitle={t('subtitle', { storeName: store?.name ?? t('fallbackThisStore') })}
       actions={<ProductsToolbar storeId={storeId} listUrl={listUrl} />}
     >
+      <PlanLimitNotice storeId={storeId} keys={['maxProducts']} />
+
       <ProductFilters
         search={search}
         onSearchChange={handleSearchChange}
@@ -334,7 +337,7 @@ export default function StoreProductsPage() {
 
       {/* Sticky selection action bar — shown whenever ≥1 product selected */}
       {selectedMap.size > 0 && (
-        <div className="fixed bottom-6 start-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-xl">
+        <div className="fixed bottom-6 start-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-md border border-border bg-card px-4 py-3 shadow-xl">
           <span className="text-sm font-medium text-foreground whitespace-nowrap">
             {t('selectionBar.selected', { count: String(selectedMap.size) })}
           </span>

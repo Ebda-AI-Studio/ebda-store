@@ -5,6 +5,7 @@ import { useT } from '@/i18n/useT';
 import { StatusFilterPills } from '../../../../../components/StatusFilterPills';
 import { SearchInput } from '../../../../../components/SearchInput';
 import type { StatusFilter } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface ProductFiltersProps {
   search: string;
@@ -52,7 +53,7 @@ export function ProductFilters({
             value={categoryFilter}
             onChange={e => onCategoryFilterChange(e.target.value)}
             aria-label={t('categoryAriaLabel')}
-            className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
+            className={FIELD_CLASSES}
           >
             <option value="">{t('allCategories')}</option>
             {categoryOptions.map(c => (
