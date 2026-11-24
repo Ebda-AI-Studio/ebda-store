@@ -73,7 +73,7 @@ export interface OrdersSummaryValue {
   collectedOrders: number;
   /** Net of refunds, minor units, over the collected orders. */
   salesMinor: number;
-  /** Refunded minor units on the window's orders (completed non-exchange returns / payment refunds, capped at each order's total). */
+  /** Refunded minor units on the window's orders (the order page's `refundedTotal`: payment refunds + merchant partial refunds not on a payment row + completed non-gateway non-exchange returns, each once; capped at each order's total). */
   refundsMinor: number;
   /** salesMinor / collectedOrders, rounded; 0 when none. */
   avgOrderMinor: number;
