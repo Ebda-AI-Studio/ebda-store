@@ -1,5 +1,8 @@
 import type { JobDef } from '../../jobs/types';
-import { storeWriter } from '../../../lib/repo-factory';
+import {
+  writeBulkProductFields,
+  writeBulkStoreFields,
+} from '../../../services/ai-autofill.service';
 import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { GeminiFailoverClient } from '../../ai/gemini-keys';
@@ -19,7 +22,6 @@ import { bustStoreCachesById } from '../../../services/store.service';
 import { storeOrigin } from '@ebda/shared';
 import { isPlaceholderText } from '../../ai/placeholder-guard';
 import { EGYPTIAN_ARABIC_REGISTER } from '../../ai/arabic-register';
-import { storeUpdate } from '../../repo-factory';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
@@ -255,10 +257,12 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
             const text = genResult.response.text().trim();
 
             if (text.length > 50 && !isPlaceholderText(text)) {
-              await storeUpdate(prisma, {
-                where: { id: storeId },
-                data: { llmsTxt: text.slice(0, 4000) },
-              });
+              await writeBulkStoreFields(
+                storeId,
+                store,
+                { llmsTxt: text.slice(0, 4000) },
+                { overwrite: force, job: 'bulk-ai-llms-txt' }
+              );
               filled++;
             } else {
               skipped++;
@@ -544,15 +548,16 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
                 parsed.en.trim() &&
                 !isPlaceholderText(parsed.en)
               ) {
-                await (
-                  await storeWriter(storeId)
-                ).product.update({
-                  where: { id: p.id, storeId },
-                  data: {
+                await writeBulkProductFields(
+                  storeId,
+                  p.id,
+                  p,
+                  {
                     citationCopy: parsed.en.trim().slice(0, 500),
-                    citationCopyAr: parsed.ar?.trim().slice(0, 500) || p.citationCopyAr || null,
+                    citationCopyAr: parsed.ar?.trim().slice(0, 500),
                   },
-                });
+                  { overwrite: force }
+                );
                 bFilled++;
               } else {
                 bSkipped++;
@@ -802,7 +807,12 @@ Populate using only the information provided above. For keyCategories, use the c
             const facts = normalizeBrandFacts(JSON.parse(raw));
 
             if (facts) {
-              await storeUpdate(prisma, { where: { id: storeId }, data: { aboutJson: facts } });
+              await writeBulkStoreFields(
+                storeId,
+                store,
+                { aboutJson: facts },
+                { overwrite: force, job: 'bulk-ai-brand-facts' }
+              );
               filled++;
             } else {
               skipped++;

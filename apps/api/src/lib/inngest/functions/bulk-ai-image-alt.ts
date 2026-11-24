@@ -1,5 +1,5 @@
 import type { JobDef } from '../../jobs/types';
-import { storeWriter } from '../../../lib/repo-factory';
+import { writeBulkRowFields } from '../../../services/ai-autofill.service';
 import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { config } from '../../../config';
@@ -215,12 +215,7 @@ const bulkAiImageAltFn = inngest.createFunction(
                   `image-alt:${image.id}`
                 );
 
-                await (
-                  await storeWriter(storeId)
-                ).productImage.update({
-                  where: { id: image.id },
-                  data: { alt },
-                });
+                await writeBulkRowFields(storeId, 'productImage', image.id, image, { alt });
                 productFilled++;
               } catch (err) {
                 if (isAiQuotaCapError(err)) {

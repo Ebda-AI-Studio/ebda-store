@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { storeWriter } from '../../../lib/repo-factory';
+import { writeBulkProductFields, writeBulkRowFields } from '../../../services/ai-autofill.service';
+import { writeBulkStoreFields } from '../../../services/ai-autofill.service';
 import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { AIService } from '../../../services/ai.service';
@@ -10,7 +11,6 @@ import { inngest } from '../client';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import { bustStoreCachesById } from '../../../services/store.service';
-import { storeUpdate } from '../../repo-factory';
 
 /**
  * Catalogue-wide SEO sweep. Fills missing SEO meta on the store row,
@@ -239,15 +239,17 @@ const bulkAiSeoFn = inngest.createFunction(
                       }),
                     `seo:store:${storeId}`
                   );
-                  await storeUpdate(prisma, {
-                    where: { id: storeId },
-                    data: {
-                      metaTitle: s.metaTitle?.trim() || r.suggestion.title,
-                      metaTitleAr: s.metaTitleAr?.trim() || r.suggestion.titleAr,
-                      metaDescription: s.metaDescription?.trim() || r.suggestion.description,
-                      metaDescriptionAr: s.metaDescriptionAr?.trim() || r.suggestion.descriptionAr,
+                  await writeBulkStoreFields(
+                    storeId,
+                    s,
+                    {
+                      metaTitle: r.suggestion.title,
+                      metaTitleAr: r.suggestion.titleAr,
+                      metaDescription: r.suggestion.description,
+                      metaDescriptionAr: r.suggestion.descriptionAr,
                     },
-                  });
+                    { job: 'bulk-ai-seo' }
+                  );
                   bFilled++;
                   await sleep(THROTTLE_MS);
                 } catch (err) {
@@ -306,16 +308,11 @@ const bulkAiSeoFn = inngest.createFunction(
                       }),
                     `seo:category:${c.id}`
                   );
-                  await (
-                    await storeWriter(storeId)
-                  ).category.update({
-                    where: { id: c.id, storeId },
-                    data: {
-                      metaTitle: c.metaTitle?.trim() || r.suggestion.title,
-                      metaTitleAr: c.metaTitleAr?.trim() || r.suggestion.titleAr,
-                      metaDescription: c.metaDescription?.trim() || r.suggestion.description,
-                      metaDescriptionAr: c.metaDescriptionAr?.trim() || r.suggestion.descriptionAr,
-                    },
+                  await writeBulkRowFields(storeId, 'category', c.id, c, {
+                    metaTitle: r.suggestion.title,
+                    metaTitleAr: r.suggestion.titleAr,
+                    metaDescription: r.suggestion.description,
+                    metaDescriptionAr: r.suggestion.descriptionAr,
                   });
                   bFilled++;
                   await sleep(THROTTLE_MS);
@@ -377,16 +374,11 @@ const bulkAiSeoFn = inngest.createFunction(
                     }),
                   `seo:product:${p.id}`
                 );
-                await (
-                  await storeWriter(storeId)
-                ).product.update({
-                  where: { id: p.id, storeId },
-                  data: {
-                    metaTitle: p.metaTitle?.trim() || r.suggestion.title,
-                    metaTitleAr: p.metaTitleAr?.trim() || r.suggestion.titleAr,
-                    metaDescription: p.metaDescription?.trim() || r.suggestion.description,
-                    metaDescriptionAr: p.metaDescriptionAr?.trim() || r.suggestion.descriptionAr,
-                  },
+                await writeBulkProductFields(storeId, p.id, p, {
+                  metaTitle: r.suggestion.title,
+                  metaTitleAr: r.suggestion.titleAr,
+                  metaDescription: r.suggestion.description,
+                  metaDescriptionAr: r.suggestion.descriptionAr,
                 });
                 bFilled++;
                 // Throttle to stay under the free-tier 15 RPM. Only sleep

@@ -164,6 +164,25 @@ function writesOfColumn(root: ts.Node, key: string): ts.CallExpression[] {
   return out;
 }
 
+/** `writeBulk{Product,Row,Store}Fields(..., { <key>: ... })`: the guarded write of that column (#620). */
+function bulkWritesOfColumn(root: ts.Node, key: string): ts.CallExpression[] {
+  const out: ts.CallExpression[] = [];
+  walk(root, n => {
+    if (
+      !ts.isCallExpression(n) ||
+      !/^writeBulk(Product|Row|Store)Fields$/.test(n.expression.getText())
+    )
+      return;
+    if (
+      n.arguments.some(
+        a => ts.isObjectLiteralExpression(a) && a.properties.some(pr => pr.name?.getText() === key)
+      )
+    )
+      out.push(n);
+  });
+  return out;
+}
+
 const unparen = (e: ts.Expression): ts.Expression =>
   ts.isParenthesizedExpression(e) ? unparen(e.expression) : e;
 function operands(e: ts.Expression, op: ts.SyntaxKind): ts.Expression[] {
@@ -264,7 +283,14 @@ describe('bulk-ai-aeo.ts: every live write site rejects placeholder output befor
   it('bulk-ai-meta-aeo guards the store/product/category metaDescriptionAeo writes', () => {
     const fn = functionNode(sf, 'bulk-ai-meta-aeo');
     // Three write sites (store, product, category), each behind its own guard.
-    expectGuardedWrites(writesOfColumn(fn, 'metaDescriptionAeo'), 3, 'metaDescriptionAeo');
+    expectGuardedWrites(
+      [
+        ...writesOfColumn(fn, 'metaDescriptionAeo'),
+        ...bulkWritesOfColumn(fn, 'metaDescriptionAeo'),
+      ],
+      3,
+      'metaDescriptionAeo'
+    );
   });
 });
 
@@ -279,12 +305,12 @@ describe('bulk-ai-geo.ts: every live write site rejects placeholder output befor
 
   it('bulk-ai-llms-txt guards Store.llmsTxt', () => {
     const fn = functionNode(sf, 'bulk-ai-llms-txt');
-    expectGuardedWrites(writesOfColumn(fn, 'llmsTxt'), 1, 'Store.llmsTxt');
+    expectGuardedWrites(bulkWritesOfColumn(fn, 'llmsTxt'), 1, 'Store.llmsTxt');
   });
 
   it('bulk-ai-citation-copy guards Product.citationCopy', () => {
     const fn = functionNode(sf, 'bulk-ai-citation-copy');
-    expectGuardedWrites(writesOfColumn(fn, 'citationCopy'), 1, 'Product.citationCopy');
+    expectGuardedWrites(bulkWritesOfColumn(fn, 'citationCopy'), 1, 'Product.citationCopy');
   });
 });
 

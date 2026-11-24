@@ -42,6 +42,7 @@ import {
   type MoneyAnswer,
   applyStoreSettings,
   patchStoreSettings,
+  casStoreFields,
   bootstrapStoreRows,
   readStoreRecord,
   encodeRpc,
@@ -664,6 +665,32 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
       const err = e as { code?: string };
       return { ok: false, code: err.code ?? 'SETTINGS_REFUSED', status: 409 };
+    }
+  }
+
+  /**
+   * Compare-and-set of Store fields (issue #620): writes each field only while it still holds the expected value, in one synchronous
+   * transaction. Input is an RPC JSON string `{ expect, set }`.
+   */
+  async casStoreFields(
+    storeId: string,
+    inputJson: string
+  ): Promise<Result<{ written: string[]; stale: string[]; directoryOnly: string[] }>> {
+    try {
+      this.bind(storeId);
+      if (isStoreClosed(this.sync)) return { ok: false, code: 'STORE_CLOSED', status: 410 };
+      const meta = (await import('@ebda-src/prisma-meta')).default as unknown as Meta;
+      const input = decodeRpc<{ expect: Record<string, unknown>; set: Record<string, unknown> }>(
+        inputJson
+      );
+      return {
+        ok: true,
+        data: casStoreFields(doSqlRunner(this.ctx.storage), meta, storeId, input),
+      };
+    } catch (e) {
+      if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
+      const err = e as { code?: string };
+      return { ok: false, code: err.code ?? 'CAS_REFUSED', status: 409 };
     }
   }
 

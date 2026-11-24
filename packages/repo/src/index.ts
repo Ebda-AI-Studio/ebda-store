@@ -46,6 +46,7 @@ export {
   applyStoreSettings,
   bootstrapStoreRows,
   patchStoreSettings,
+  casStoreFields,
   readStoreRecord,
   PATCHABLE_JSON_FIELDS,
   type JsonKeyPatch,
