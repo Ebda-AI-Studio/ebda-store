@@ -65,7 +65,7 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
     { name: 'billing-deferred-webhooks', run: () => processDeferredBillingWebhooks() },
     // InstaPay receipts / manual-payment claims left half-done by a dead Worker (N-10d): complete or roll back, P1 if undecidable.
     { name: 'payments-reconcile', run: () => reconcilePayments() },
-    // NZ-PG-9: all markers set + no Hyperdrive + STORE_CREATE_ON_DO unset = every store creation fails: P1.
+    // NZ-PG-9: all markers set + no Postgres binding + STORE_CREATE_ON_DO unset = every store creation fails: P1.
     {
       name: 'store-create-config',
       run: async () => void (await alertIfStoreCreateMisconfigured()),

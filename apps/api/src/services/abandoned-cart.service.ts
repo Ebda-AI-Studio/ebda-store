@@ -23,7 +23,7 @@ import {
   storeDirectory,
   withStore,
 } from '@ebda/database';
-import { storefrontOrigin } from '@ebda/shared';
+import { formatMoney, storefrontOrigin } from '@ebda/shared';
 import {
   latestPaymentIsOnline,
   netOrderRevenueMinor,
@@ -543,11 +543,14 @@ class AbandonedCartService {
     const customerName = abandonedCart.customer
       ? `${abandonedCart.customer.firstName} ${abandonedCart.customer.lastName}`.trim()
       : 'Customer';
-    const cartTotalFormatted = (abandonedCart.cartTotal / 1000).toFixed(3); // piastres → EGP
+    // Minor units (EGP: 100 per pound) through the shared formatter; the SMS / push template adds the currency word.
+    // This divided by 1000 and printed 3 decimals, so a 4,850 cart read "485.000" (ten times too small).
+    const cartTotalFormatted = formatMoney(abandonedCart.cartTotal, 'en', { hideSymbol: true });
 
     const notificationData: NotificationData = {
       customerName,
       customerPhone: abandonedCart.customerPhone ?? undefined,
+      customerId: abandonedCart.customerId ?? undefined,
       orderNumber: abandonedCart.id, // no order number at abandonment stage; use record ID
       storeId,
       storeName: abandonedCart.store?.name ?? '',

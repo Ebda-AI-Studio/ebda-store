@@ -11,9 +11,19 @@ import path from 'path';
 import { describe, it, expect } from 'vitest';
 import { prisma, Prisma } from '@ebda/database';
 import { AR_FOLD_FROM, AR_FOLD_TO, NORMALIZE_VECTORS, normalizeArabicSearch } from '@ebda/shared';
+import {
+  AR_FOLD_H_FROM,
+  AR_FOLD_H_TO,
+  normalizeArabicHamza,
+} from '../../packages/shared/src/search';
+import hamzaVectors from '../../packages/shared/src/foundation/vectors/arabic-hamza.json';
 import { hasDb } from '../helpers/bundle-fixtures';
 import { productSearchSql } from '../../apps/api/src/services/product-search.service';
 
+const MIGRATION_H = path.resolve(
+  __dirname,
+  '../../packages/database/prisma/migrations/20261123200000_search_fold_hamza/migration.sql'
+);
 const MIGRATION = path.resolve(
   __dirname,
   '../../packages/database/prisma/migrations/20261019000100_search_normalisation/migration.sql'
@@ -203,4 +213,90 @@ describe.skipIf(!hasDb)('ebda_ar_norm parity with normalizeArabicSearch', () => 
       expect(plan).not.toContain('Seq Scan on products');
     }
   }, 90_000);
+});
+
+// ---- fold A (hamza fold, Ruling F7-HAMZA-2): ebda_ar_norm_h, migration 20261123200000_search_fold_hamza ----
+// ebda_ar_norm (fold B) above is untouched; these cases pin the second fold and its two indexes.
+const ALPHABET_H: string[] = [
+  ...AR_FOLD_H_FROM,
+  ...AR_FOLD_H_TO,
+  'ء',
+  'ئ',
+  'ؤ',
+  'و',
+  'و',
+  'و',
+  'ﻻ',
+  'ﻣ',
+  'ﺣ',
+  '１',
+  'Ａ',
+  'ﷲ',
+  ' ',
+  '　',
+  ' ',
+  ' ',
+  '\t',
+  '\n',
+  'ـ',
+  'َ',
+  'ٰ',
+  'é',
+  'Ⅻ',
+  '¹',
+];
+
+describe('ebda_ar_norm_h migration mirrors the TS fold-A table', () => {
+  it('the translate() strings are AR_FOLD_H_FROM / AR_FOLD_H_TO byte for byte, NFKC first', () => {
+    const sql = fs.readFileSync(MIGRATION_H, 'utf8');
+    expect(sql).toContain(`'${AR_FOLD_H_FROM}',\n        '${AR_FOLD_H_TO}'`);
+    expect(sql).toContain('normalize(t, NFKC)');
+  });
+});
+
+describe.skipIf(!hasDb)('ebda_ar_norm_h parity with normalizeArabicHamza', () => {
+  it.each(hamzaVectors.cases as Array<[string, string]>)(
+    'SQL and TS agree on %j',
+    async (input, expected) => {
+      const [row] = await prisma.$queryRaw<
+        Array<{ n: string | null }>
+      >`SELECT public.ebda_ar_norm_h(${input}) AS n`;
+      expect(row.n).toBe(normalizeArabicHamza(input));
+      expect(row.n).toBe(expected);
+    }
+  );
+
+  it('SQL and TS agree on a 3000-string generated sample', async () => {
+    const next = rng(20261123);
+    const sample: string[] = [];
+    for (let i = 0; i < 3000; i++) {
+      let s = '';
+      const len = Math.floor(next() * 24);
+      for (let j = 0; j < len; j++) s += ALPHABET_H[Math.floor(next() * ALPHABET.length)];
+      sample.push(s);
+    }
+    const rows = await prisma.$queryRaw<Array<{ i: number; n: string }>>`
+      SELECT u.ord::int AS i, public.ebda_ar_norm_h(u.x) AS n
+      FROM unnest(${sample}::text[]) WITH ORDINALITY AS u(x, ord) ORDER BY u.ord`;
+    const mismatches = rows
+      .filter(r => r.n !== normalizeArabicHamza(sample[r.i - 1]))
+      .map(r => ({ input: sample[r.i - 1], sql: r.n, ts: normalizeArabicHamza(sample[r.i - 1]) }));
+    expect(mismatches).toEqual([]);
+  });
+
+  it('the fold-A functions are IMMUTABLE and the two fold-A indexes exist and are valid', async () => {
+    const fns = await prisma.$queryRaw<Array<{ proname: string; provolatile: string }>>`
+      SELECT proname, provolatile FROM pg_proc WHERE pronamespace = 'public'::regnamespace
+        AND proname IN ('ebda_ar_norm_h','ebda_product_search_doc_h','ebda_product_name_doc_h')`;
+    expect(fns).toHaveLength(3);
+    for (const r of fns) expect(r.provolatile).toBe('i');
+    const idx = await prisma.$queryRaw<Array<{ relname: string; valid: boolean }>>`
+      SELECT c.relname, i.indisvalid AS valid FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+      WHERE c.relname IN ('products_search_doc_h_trgm_idx','products_name_doc_h_trgm_idx')`;
+    expect(idx.map(r => r.relname).sort()).toEqual([
+      'products_name_doc_h_trgm_idx',
+      'products_search_doc_h_trgm_idx',
+    ]);
+    expect(idx.every(r => r.valid)).toBe(true);
+  });
 });

@@ -1,5 +1,5 @@
 import { invalidateStoreProductCaches } from '../lib/public-cache';
-import { prisma, Prisma, withMoneyTx, withStore } from '@ebda/database';
+import { Prisma, withStore } from '@ebda/database';
 import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@ebda/shared';
 import { redis } from './redis.service';
 import { bustStoreCaches } from './store.service';
@@ -491,8 +491,14 @@ class FeatureService {
     // SELECT goes to the primary that just absorbed the writes —
     // avoids the Neon read-replica staleness window where the cache
     // would otherwise be repopulated with the pre-write row state.
-    const freshFeatures = await withStore(storeId, () =>
-      withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+    // ONE store-scope section (a real transaction on Postgres; on the Worker the lazy scope routes `storeFeature` to the platform
+    // D1). NOT `withMoneyTx(prisma, ...)`: that opens a Postgres interactive transaction, which no longer exists on the Worker
+    // (POSTGRES_REMOVED: every toggle of a feature, incl. the customer-intelligence hints switch, answered 500).
+    // On the platform D1 a multi-key update is NOT one transaction: if it throws after some keys were written the cached map no
+    // longer matches the rows, so the cache key is dropped on failure (the next read rebuilds it from the rows).
+    let freshFeatures: Record<FeatureKey, boolean>;
+    try {
+      freshFeatures = await withStore(storeId, async (tx: Prisma.TransactionClient) => {
         for (const [featureKey, enabled] of Object.entries(updates)) {
           await tx.storeFeature.upsert({
             where: { storeId_featureKey: { storeId, featureKey } },
@@ -510,20 +516,22 @@ class FeatureService {
             },
           });
         }
-        // Read plan + override rows via the SAME tx so the resolved map
-        // reflects the writes we just made.
-        const store = await tx.store.findUnique({
-          where: { id: storeId },
-          select: { plan: true },
-        });
+        // Read plan + override rows through the SAME tx so the resolved map reflects the writes just made. The plan comes from
+        // the store's own backend (a Durable Object store's record is its DO), as in `readFromDb`.
+        const store = await readStorePlan(tx, storeId);
         const rows = await tx.storeFeature.findMany({
           where: { storeId },
           select: { featureKey: true, enabled: true },
         });
         const flags = await getAutomationFlags(storeId, tx, { legacyPlan: store?.plan ?? 'free' });
         return this.rowsToMap((store?.plan ?? 'free') as StorePlan, rows, flags);
-      })
-    );
+      });
+    } catch (err) {
+      await this.invalidateCache(storeId);
+      // the public storefront payload embeds `enabledFeatures`: drop it too, or it shows the old flags until its TTL
+      await this.bustPublicStoreCache(storeId);
+      throw err;
+    }
 
     await this.writeToCache(storeId, freshFeatures);
     await this.bustPublicStoreCache(storeId);

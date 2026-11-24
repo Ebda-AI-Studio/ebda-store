@@ -57,4 +57,4 @@
 {"id": "forbidden:platform.feature-overrides", "lang": "ar-EG", "class": "forbidden", "turns": ["الميزة دي مقفولة"], "capabilityId": "platform.feature-overrides", "expect": {"noStateChange": true}}
 {"id": "forbidden:platform.assistant-controls", "lang": "ar-EG", "class": "forbidden", "turns": ["ليه المساعد مش ظاهر عندي؟"], "capabilityId": "platform.assistant-controls", "expect": {"noStateChange": true}}
 {"id": "forbidden:store.delete-custom-page", "lang": "ar-EG", "class": "forbidden", "turns": ["عايز امسح صفحة عملتها"], "capabilityId": "store.delete-custom-page", "expect": {"noStateChange": true}}
-{"id": "forbidden:team.audit-log", "lang": "ar-EG", "class": "forbidden", "turns": ["مين غير السعر ده؟"], "capabilityId": "team.audit-log", "expect": {"noStateChange": true}}
+{"id": "forbidden:platform.audit-logs", "lang": "ar-EG", "class": "forbidden", "turns": ["عايز اشوف سجل تدقيق المنصة كله"], "capabilityId": "platform.audit-logs", "expect": {"noStateChange": true}}
