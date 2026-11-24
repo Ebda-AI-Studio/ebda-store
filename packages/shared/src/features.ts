@@ -285,12 +285,12 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
   },
   whatsapp: {
     key: 'whatsapp',
-    name: 'WhatsApp Notifications',
-    nameAr: 'إشعارات واتساب',
+    name: 'WhatsApp Order Updates',
+    nameAr: 'تحديثات الطلب على واتساب',
     description:
-      'Send order confirmation, shipping, and delivery updates via the WhatsApp Business Platform bridge in Ebda Chat. The merchant connects their WABA on the WhatsApp Notifications page and picks an approved Meta template per event.',
+      'Order updates reach customers on WhatsApp through Ebda Chat once the store is linked to it: order confirmation, shipping updates and a paid notice. Ebda Chat uses its own message templates, so the merchant does not connect a WhatsApp Business account here or pick templates per event.',
     descriptionAr:
-      'إرسال تأكيدات الطلب وتحديثات الشحن والتسليم عبر منصة ابدأ WhatsApp للواتساب التجاري. يربط التاجر حساب الواتساب التجاري الخاص به في صفحة إشعارات الواتساب ويختار قالب Meta معتمد لكل حدث.',
+      'تحديثات الطلب بتوصل لعملائك على واتساب من خلال ابدأ شات أول ما تربط المتجر بيه: تأكيد الطلب وتحديثات الشحن وإشعار الدفع. ابدأ شات بيستخدم قوالب رسائله الخاصة، فمش محتاج تربط حساب واتساب للأعمال من هنا ولا تختار قالب لكل حدث.',
     category: 'marketing',
     tier: 'addon',
     // hidden (case 1: not launched). The key gates the separate Ebda Chat product

@@ -114,6 +114,28 @@ export const DEFAULT_EVENTS: EventConfig[] = [
 ];
 
 /**
+ * What the Notifications matrix knows about WhatsApp (Ruling NT1-A-DEFAULT). Read-only: Ebda Chat sends these
+ * messages itself once the store is linked, so the Store has nothing to toggle. `error` means the link state could
+ * not be read; it is NOT "not connected" (unknown is not empty).
+ */
+export type WhatsAppStatus =
+  | { kind: 'loading' }
+  | { kind: 'error' }
+  | { kind: 'ready'; active: boolean };
+
+/**
+ * The matrix events Ebda Chat sends a WhatsApp message for (ebda-whatsapp docs/store-link.md events table):
+ * order confirmation on `order.created`, shipping updates on shipped/delivered, and a paid notice for
+ * InstaPay/link orders. Payment failure, cancellation and refund are NOT sent by Chat.
+ */
+export const CHAT_SENT_EVENTS: ReadonlySet<string> = new Set([
+  'order_confirmed',
+  'payment_success',
+  'order_shipped',
+  'order_delivered',
+]);
+
+/**
  * STORE-QA-62: `GET /notifications/events` answers `{ events: { [event]: { whatsapp, sms, push } } }` (a record), but the page read
  * it as an array, so a saved toggle never came back after a reload. Fold the stored record (or a legacy array) over the defaults.
  */

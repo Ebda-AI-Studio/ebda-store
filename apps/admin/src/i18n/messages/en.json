@@ -4995,9 +4995,9 @@
     },
     "push": {
       "title": "Push Notifications",
-      "subtitle": "Standards-based Web Push (W3C Push API)",
+      "subtitle": "Notifications that appear on the customer's phone or browser",
       "subscribers": "{count, number, latn} subscribers",
-      "platformNote": "Push notifications use the platform VAPID configuration. No per-store setup needed — just toggle Enabled."
+      "platformNote": "No setup needed from you. Just turn it on and we handle the rest."
     },
     "broadcast": {
       "title": "Send a broadcast",
@@ -5034,7 +5034,7 @@
     },
     "events": {
       "title": "Event Configuration",
-      "subtitle": "Choose which events trigger notifications on each channel",
+      "subtitle": "Choose what the customer is told, and on which channel",
       "tableLabel": "Notification event configuration",
       "save": "Save Event Config",
       "columns": {
@@ -5048,6 +5048,17 @@
         "order_delivered": "Order Delivered",
         "order_cancelled": "Order Cancelled",
         "order_refunded": "Order Refunded"
+      },
+      "whatsapp": {
+        "header": "WhatsApp",
+        "explainer": "WhatsApp messages are sent by Ebda Chat, not from here, so this column has no on/off switch. Order confirmations are controlled in the bot settings in Ebda Chat; shipping updates are always on. The delivery log lives in Ebda Chat for now.",
+        "sent": "Sent by Ebda Chat",
+        "none": "Not sent by WhatsApp",
+        "notConnected": "Ebda Chat not connected",
+        "connect": "Connect Ebda Chat",
+        "open": "Open conversations in Ebda Chat",
+        "unknown": "Could not check WhatsApp status",
+        "loading": "Loading…"
       }
     },
     "log": {

@@ -93,7 +93,7 @@ describe('FeatureMatrix → hidden-from-merchants features (WHATSAPP-OFF-1)', ()
         <FeatureMatrix storeId="s1" />
       </ToastProvider>
     );
-    expect(await screen.findByText('WhatsApp Notifications')).toBeTruthy();
+    expect(await screen.findByText('WhatsApp Order Updates')).toBeTruthy();
     // whatsapp (WHATSAPP-OFF-1), b2b.wholesale (hidden from merchants until its UI ships, B2B Task 8 removes the flag)
     // and eta_ereceipt (Ruling ETA-1: a super-admin switches the ETA e-receipt connector on per store).
     expect(screen.getAllByText('row.hiddenFromMerchants').length).toBe(3);
@@ -101,7 +101,7 @@ describe('FeatureMatrix → hidden-from-merchants features (WHATSAPP-OFF-1)', ()
     expect(screen.getByText('Wholesale pricing')).toBeTruthy();
     expect(screen.queryByText('SEO Tools')).toBeNull();
 
-    const row = screen.getByText('WhatsApp Notifications').closest('div.flex.items-start');
+    const row = screen.getByText('WhatsApp Order Updates').closest('div.flex.items-start');
     fireEvent.click(row!.querySelector('[role="switch"]')!);
     await waitFor(() => expect(api.apiPut).toHaveBeenCalledTimes(1));
     expect(String(api.apiPut.mock.calls[0][0])).toContain('/features/whatsapp');
