@@ -1136,6 +1136,103 @@ describe('#627 review: ONE may-settle predicate on every settle path (a held cha
     );
     expect(plan(db)).toBe('free');
   });
+
+  // Review of #687 (critical): the resolve must never strand a paid merchant. Ledger row first, queue row second, retriable.
+  const heldLedger = (db: DatabaseSync) =>
+    db.prepare('SELECT status s, failure_reason f FROM billing_events WHERE id = ?').get(EV) as {
+      s: string;
+      f: string | null;
+    };
+  const resolveAs = (id: string, action: 'credited' | 'refunded' | 'not_ours') =>
+    resolveHeldBillingWebhook({
+      id,
+      actorId: 'a',
+      action,
+      note: 'checked at Kashier',
+      audit: async () => {},
+    });
+
+  it('a throw BETWEEN the two steps (ledger closed, queue close fails): the hold stays open, the retry completes, nothing is applied twice', async () => {
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const [h] = await listHeldBillingWebhooks({ status: 'open' });
+    // inject the failure exactly at the queue close
+    db.exec(
+      `CREATE TRIGGER fail_queue_close BEFORE UPDATE ON billing_webhook_events WHEN NEW.outcome = 'held_resolved'
+       BEGIN SELECT RAISE(ABORT, 'injected: queue close failed'); END`
+    );
+    await expect(resolveAs(h.id, 'credited')).rejects.toThrow();
+    // the ledger row is already closed (settled for the person), the queue entry is still OPEN and listed: no stranded row
+    expect(heldLedger(db)).toEqual({ s: 'failed', f: 'held_resolved:credited' });
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(1);
+    db.exec('DROP TRIGGER fail_queue_close');
+    await resolveAs(h.id, 'credited'); // the retry
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(0);
+    expect(await listHeldBillingWebhooks({ status: 'resolved' })).toHaveLength(1);
+    expect(heldLedger(db)).toEqual({ s: 'failed', f: 'held_resolved:credited' });
+    // exactly once: resolving applies no plan change (a hand credit is a person's act), and a sweep afterwards still cannot upgrade it
+    expect(plan(db)).toBe('free');
+    expect(db.prepare('SELECT COUNT(*) n FROM billing_events').get()).toEqual({ n: 1 });
+    await sweepStuckCharges(
+      NOW,
+      gateway({
+        status: 'succeeded',
+        chargeId: 'ref-1',
+        raw: {},
+        amountMinor: 1000,
+        currency: 'EGP',
+      })
+    );
+    expect(plan(db)).toBe('free');
+    // and a third click is the usual 409
+    await expect(resolveAs(h.id, 'credited')).rejects.toMatchObject({
+      code: 'HELD_PAYMENT_NOT_OPEN',
+    });
+  });
+
+  it('a queue row an EARLIER build already closed while its ledger row stayed held is resolvable again (not a 409), once, with the same action', async () => {
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const [h] = await listHeldBillingWebhooks({ status: 'open' });
+    // the old order: queue closed first, ledger close never happened
+    db.prepare(
+      `UPDATE billing_webhook_events SET outcome = 'held_resolved', detail = json_set(detail, '$.resolution', json('{"action":"credited","note":"x","by":"a"}')) WHERE id = ?`
+    ).run(h.id);
+    expect(heldLedger(db).f).toBe('held:amount_mismatch'); // stranded shape
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(0);
+    // a DIFFERENT action than the recorded decision is refused and changes nothing
+    await expect(resolveAs(h.id, 'refunded')).rejects.toMatchObject({
+      code: 'HELD_PAYMENT_ACTION_CONFLICT',
+    });
+    expect(heldLedger(db).f).toBe('held:amount_mismatch');
+    await resolveAs(h.id, 'credited');
+    expect(heldLedger(db)).toEqual({ s: 'failed', f: 'held_resolved:credited' });
+    expect(plan(db)).toBe('free');
+    await expect(resolveAs(h.id, 'credited')).rejects.toMatchObject({
+      code: 'HELD_PAYMENT_NOT_OPEN',
+    });
+  });
+
+  it('the held queue goes through ONE platform-aware client, not a bare prisma cast at each call site (review of #687)', async () => {
+    const src = (await import('node:fs')).readFileSync(
+      new URL(
+        '../../apps/api/src/services/billing/subscription-billing.service.ts',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    expect(src).not.toMatch(/prisma as unknown as Tx\)\.billingWebhookEvent/);
+    expect(src).toMatch(/async function heldQueueDb\(\)/);
+    // and it still works end to end on the D1 rig
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const [h] = await listHeldBillingWebhooks({ status: 'open' });
+    await resolveAs(h.id, 'not_ours');
+    expect(await listHeldBillingWebhooks({ status: 'resolved' })).toHaveLength(1);
+  });
 });
 
 function paid900(over: Record<string, unknown> = {}) {

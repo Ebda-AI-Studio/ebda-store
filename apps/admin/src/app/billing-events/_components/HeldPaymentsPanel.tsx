@@ -96,7 +96,10 @@ export function HeldPaymentsPanel({
     });
     setBusy(false);
     if (error) {
-      setNoteError(t('resolveFailed'));
+      // a different decision is already recorded on this payment: say so (the server's own sentence), never the generic failure
+      setNoteError(
+        error.code === 'HELD_PAYMENT_ACTION_CONFLICT' ? error.message : t('resolveFailed')
+      );
       void fetchRows(); // e.g. 409 already resolved: never leave a stale open row on screen
       return;
     }

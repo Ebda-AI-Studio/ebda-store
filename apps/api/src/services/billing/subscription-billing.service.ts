@@ -36,6 +36,7 @@ import { getBillingRefundStoreId, getEntityStoreId } from '../../lib/definer';
 import { pageAcrossStores } from '../../lib/cross-store';
 import { AppError } from '../../middleware/error-handler';
 import { config } from '../../config';
+import { platformDb } from '../../lib/platform-db';
 import logger from '../../lib/logger';
 import { isStoreGoneError } from '../../lib/jobs/store-gone';
 import { sendAlert } from '../alerts.service';
@@ -1749,7 +1750,7 @@ export interface WebhookResult {
  */
 const WEBHOOK_HELD = 'held';
 const WEBHOOK_HELD_RESOLVED = 'held_resolved';
-interface HeldBillingWebhook {
+export interface HeldBillingWebhook {
   reason:
     | 'unknown_order'
     | 'amount_mismatch'
@@ -2089,12 +2090,29 @@ async function alertHeldBillingWebhook(
   }).catch(err => logger.error({ err, eventId }, '[billing] held-webhook alert failed'));
 }
 
+/**
+ * The `billing_webhook_events` client for the held queue. The table is PLATFORM-owned (model-split: d1; GLOBAL_MODELS in the tenant
+ * guard: no tenant scope applies), so the queue is read and written where the webhook handler writes it: the platform D1 client once
+ * `billing` is on D1 (a bare `prisma` call there is POSTGRES_REMOVED on a Worker), the Postgres client before that. One place, one
+ * narrow cast (the D1 client is prisma-shaped), instead of a cast at every call site.
+ */
+type WebhookEvents = Pick<Tx['billingWebhookEvent'], 'findMany' | 'findFirst' | 'updateMany'>;
+async function heldQueueDb(): Promise<WebhookEvents> {
+  if (await onD1()) {
+    const platform = await platformDb();
+    if (platform) return platform.billingWebhookEvent as unknown as WebhookEvents;
+  }
+  return prisma.billingWebhookEvent;
+}
+
 /** Super-admin queue: every held subscription payment (newest first), with its facts. */
 export async function listHeldBillingWebhooks(args: {
   status: 'open' | 'resolved';
   limit?: number;
 }) {
-  const rows = await (prisma as unknown as Tx).billingWebhookEvent.findMany({
+  const rows = await (
+    await heldQueueDb()
+  ).findMany({
     where: { outcome: args.status === 'open' ? WEBHOOK_HELD : WEBHOOK_HELD_RESOLVED },
     orderBy: { receivedAt: 'desc' },
     take: Math.min(Math.max(args.limit ?? 100, 1), 200),
@@ -2129,9 +2147,12 @@ export async function resolveHeldBillingWebhook(args: {
   /** the audit row, written BEFORE anything changes: a resolve that cannot be audited changes nothing */
   audit: () => Promise<void>;
 }): Promise<void> {
-  const db = prisma as unknown as Tx;
-  const row = await db.billingWebhookEvent.findFirst({
-    where: { id: args.id, outcome: WEBHOOK_HELD },
+  const queue = await heldQueueDb();
+  // An OPEN hold, or a hold an earlier build / attempt already moved to `held_resolved` whose LEDGER row is still `held:` (the
+  // queue closed first in the old order and the ledger close then failed): that one must stay resolvable, never a 409 that
+  // strands a paid merchant. Whether the ledger half is still owed is decided below, against the ledger row itself.
+  const row = await queue.findFirst({
+    where: { id: args.id, outcome: { in: [WEBHOOK_HELD, WEBHOOK_HELD_RESOLVED] } },
   });
   if (!row)
     throw new AppError(
@@ -2139,18 +2160,22 @@ export async function resolveHeldBillingWebhook(args: {
       'HELD_PAYMENT_NOT_OPEN',
       'This held payment is already resolved or does not exist'
     );
+  const queueAlreadyClosed = row.outcome === WEBHOOK_HELD_RESOLVED;
   let detail: Record<string, unknown> = {};
   try {
     detail = row.detail ? (JSON.parse(row.detail) as Record<string, unknown>) : {};
   } catch {
     detail = { unparsed: row.detail };
   }
+  const priorAction = (detail.resolution as { action?: unknown } | undefined)?.action;
   await args.audit();
   // 1) the LEDGER row first (the money truth, in its OWN store's scope): a person's decision. Idempotent: a row already
   //    `held_resolved:<same action>` (an earlier attempt whose queue close failed) completes; a failure here leaves the
-  //    queue entry OPEN so the resolve can simply be retried.
+  //    queue entry OPEN so the resolve can simply be retried. `ledgerStillOwed` = this call found the ledger row still
+  //    `held:` and closed it (the only thing a queue entry that is ALREADY closed can still need).
   const rowId = typeof detail.merchantOrderId === 'string' ? detail.merchantOrderId : null;
   const storeId = typeof detail.storeId === 'string' ? detail.storeId : null;
+  let ledgerClosedNow = false;
   if (rowId && storeId && UUID_RE.test(rowId))
     await withStore(storeId, async tx => {
       const r = await tx.billingEvent.findFirst({
@@ -2159,6 +2184,7 @@ export async function resolveHeldBillingWebhook(args: {
       });
       if (!r || r.status === 'succeeded') return;
       if (r.failureReason?.startsWith(RESOLVED_ROW_PREFIX)) {
+        if (queueAlreadyClosed) return; // both halves done already: the usual "not open" below
         if (r.failureReason !== `${RESOLVED_ROW_PREFIX}${args.action}`)
           throw new AppError(
             409,
@@ -2167,14 +2193,32 @@ export async function resolveHeldBillingWebhook(args: {
           );
         return;
       }
-      if (r.failureReason?.startsWith(HELD_ROW_PREFIX))
-        await tx.billingEvent.updateMany({
+      if (r.failureReason?.startsWith(HELD_ROW_PREFIX)) {
+        // the ledger half is still owed for a queue entry an earlier build closed: it completes the decision ALREADY recorded
+        if (queueAlreadyClosed && typeof priorAction === 'string' && priorAction !== args.action)
+          throw new AppError(
+            409,
+            'HELD_PAYMENT_ACTION_CONFLICT',
+            `This payment was already resolved as ${priorAction}`
+          );
+        const closed = await tx.billingEvent.updateMany({
           where: { id: rowId, storeId, failureReason: r.failureReason },
           data: { status: 'failed', failureReason: `${RESOLVED_ROW_PREFIX}${args.action}` },
         });
+        ledgerClosedNow = closed.count > 0;
+      }
     });
-  // 2) then the queue entry
-  const done = await db.billingWebhookEvent.updateMany({
+  // 2) then the queue entry (already closed by an earlier attempt / build: nothing left to do here unless the ledger half was owed)
+  if (queueAlreadyClosed) {
+    if (!ledgerClosedNow)
+      throw new AppError(
+        409,
+        'HELD_PAYMENT_NOT_OPEN',
+        'This held payment is already resolved or does not exist'
+      );
+    return;
+  }
+  const done = await queue.updateMany({
     where: { id: args.id, outcome: WEBHOOK_HELD },
     data: {
       outcome: WEBHOOK_HELD_RESOLVED,
