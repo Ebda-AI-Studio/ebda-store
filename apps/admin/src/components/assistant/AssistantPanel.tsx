@@ -24,6 +24,8 @@ import {
   type PreviewCardData,
 } from '@/lib/assistant';
 import { Button } from '@/components/ui/Button';
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
+import { cn } from '@ebda/ui/cn';
 import { Segments } from './Citation';
 import { ConfirmCard } from './ConfirmCard';
 import { PreviewCard } from './PreviewCard';
@@ -172,7 +174,7 @@ export function AssistantPanel({
       aria-modal="false"
       aria-labelledby="assistant-title"
       data-testid="assistant-panel"
-      className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-border bg-background shadow-2xl sm:w-[26rem]"
+      className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-border bg-background shadow-xl sm:w-[26rem]"
     >
       <header className="flex items-center gap-2 border-b border-border bg-card px-4 py-3">
         <h2 id="assistant-title" className="me-auto text-base font-semibold">
@@ -238,7 +240,7 @@ export function AssistantPanel({
           m.role === 'merchant' ? (
             <div
               key={m.id}
-              className="max-w-[92%] self-end rounded-2xl bg-muted px-3.5 py-2 text-sm"
+              className="max-w-[92%] self-end rounded-lg bg-muted px-3.5 py-2 text-sm"
             >
               <span className="sr-only">{t('you')}: </span>
               <p dir="auto" className="whitespace-pre-wrap break-words">
@@ -249,7 +251,7 @@ export function AssistantPanel({
             <div
               key={m.id}
               data-status={m.status}
-              className="max-w-[92%] self-start rounded-2xl border border-border bg-card px-3.5 py-2.5 text-sm"
+              className="max-w-[92%] self-start rounded-lg border border-border bg-card px-3.5 py-2.5 text-sm"
             >
               <span className="sr-only">{t('title')}: </span>
               <p className="whitespace-pre-wrap break-words leading-relaxed">
@@ -331,7 +333,7 @@ export function AssistantPanel({
         {failed !== null && (
           <div
             role="alert"
-            className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-3 text-center text-sm text-muted-foreground"
+            className="flex flex-col items-center gap-2 rounded-md border border-border bg-card p-3 text-center text-sm text-muted-foreground"
           >
             <CircleAlert className="h-5 w-5" aria-hidden="true" />
             <p>{t('error')}</p>
@@ -377,7 +379,7 @@ export function AssistantPanel({
               void ask(text);
             }
           }}
-          className="min-h-11 max-h-36 resize-none rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm leading-normal focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className={cn(TEXTAREA_CLASSES, 'max-h-36 resize-none')}
         />
         <Button
           type="submit"
