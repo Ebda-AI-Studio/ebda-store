@@ -420,7 +420,8 @@ describe('signup funnel on the platform D1: card on file (nothing charged) -> 14
       amountMinor: 0,
       token: 'tok_y',
     });
-    expect(r2).toMatchObject({ outcome: 'ignored', detail: 'kind_mismatch' });
+    // #627 (#687 on main): a SUCCESSFUL charge on a card-setup row is money we cannot place: held for a person, still not booked
+    expect(r2).toMatchObject({ outcome: 'held', detail: 'kind_mismatch' });
     expect((await sub(s2)).providerPaymentMethodRef).toBeNull();
   });
 

@@ -95,6 +95,12 @@ export interface GscDashboard {
   setup?: 'verifying' | 'awaiting_data';
 }
 
-export function formatPosition(position: number): string {
+/**
+ * Average position, or an em dash when there is NO data. A position is 1 or more, so 0 (what the API reports for zero impressions) is
+ * "unknown", never "position 0.0" (live: the Search Console card showed 0.0 with 0 impressions). `impressions` is optional: pass it
+ * wherever it is known, a zero count also means no data.
+ */
+export function formatPosition(position: number, impressions?: number): string {
+  if (impressions === 0 || !Number.isFinite(position) || position <= 0) return '\u2014';
   return position.toFixed(1);
 }

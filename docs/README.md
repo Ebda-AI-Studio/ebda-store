@@ -463,3 +463,4 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/done/2026-11-12-storage-limit-enforce.md](plans/done/2026-11-12-storage-limit-enforce.md) - S3-X8: enforce maxStorageMb on the four upload routes, usage from the R2 listing (60 s bounded-stale)
 - [plans/2026-11-11-batch-limiter-and-resolve-calls.md](plans/2026-11-11-batch-limiter-and-resolve-calls.md) - PERF-BATCH-1: batch the limiter calls, parallelise the cold store resolve
 - [plans/2026-11-12-auto-recommendations.md](plans/2026-11-12-auto-recommendations.md) - Automatic product recommendations: merchant picks, then bought-together, then similar items (Vectorize), cap 8, merchant switch
+- [plans/2026-11-24-help-corpus-build-time.md](plans/2026-11-24-help-corpus-build-time.md) - HELP-CORPUS-BUILD-1: the help corpus module and capability registry are build-time outputs, never committed; every consumer generates them first

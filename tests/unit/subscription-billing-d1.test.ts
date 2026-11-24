@@ -531,20 +531,20 @@ describe('webhooks: replay and out-of-order', () => {
     expect((await getSub(storeId)).status).toBe('active');
   });
 
-  it('ignores an event whose amount does not match the ledger row', async () => {
+  it('HOLDS (never ignores) a paid event whose amount does not match the ledger row (#627)', async () => {
     const storeId = await makeStore();
     const { billingEventId } = await startCheckout({ storeId, planCode: PRO, provider: stub });
     const res = await deliver({ id: billingEventId, amountMinor: 49900 }, 'charge.succeeded', {
       amountMinor: 100,
       token: 'tok_x',
     });
-    expect(res).toMatchObject({ outcome: 'ignored', detail: 'amount_mismatch' });
+    expect(res).toMatchObject({ outcome: 'held', detail: 'amount_mismatch' });
     expect((await ledger(storeId))[0].status).toBe('pending');
   });
 
-  it('acknowledges but ignores an event for an unknown order', async () => {
+  it('acknowledges and HOLDS a paid event for an unknown order (#627)', async () => {
     const res = await deliver({ id: crypto.randomUUID(), amountMinor: 100 }, 'charge.succeeded');
-    expect(res).toMatchObject({ outcome: 'ignored', detail: 'unknown_order' });
+    expect(res).toMatchObject({ outcome: 'held', detail: 'unknown_order' });
   });
 });
 

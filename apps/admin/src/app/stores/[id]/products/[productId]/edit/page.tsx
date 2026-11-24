@@ -740,7 +740,7 @@ export default function EditProductPage() {
   if (error && !product) {
     return (
       <AdminLayout title={t('notFoundTitle')} subtitle="">
-        <div className="rounded-xl border bg-card p-8 text-center">
+        <div className="rounded-md border bg-card p-8 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
             <svg
               className="h-6 w-6 text-muted-foreground"
@@ -881,7 +881,7 @@ export default function EditProductPage() {
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-6">
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
+            <div className="rounded-md border bg-card p-6 shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
                 <h2 className="text-lg font-semibold text-foreground">
                   {tSections('basicInformation')}
@@ -1050,7 +1050,7 @@ export default function EditProductPage() {
 
             <PersonalisationCard value={personalisation} onChange={setPersonalisation} />
 
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
+            <div className="rounded-md border bg-card p-6 shadow-sm">
               <div className="mb-4 flex items-baseline justify-between gap-3 flex-wrap">
                 <h2 className="text-lg font-semibold text-foreground">{tSections('media')}</h2>
                 <p className="text-xs text-muted-foreground">{tFields('mediaSizeHint')}</p>
@@ -1069,7 +1069,7 @@ export default function EditProductPage() {
               />
             </div>
 
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
+            <div className="rounded-md border bg-card p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('pricing')}</h2>
               {/* Row 1: Price (regular) + Cost */}
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1201,7 +1201,7 @@ export default function EditProductPage() {
               })()}
             </div>
 
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
+            <div className="rounded-md border bg-card p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-foreground mb-4">
                 {tSections('inventory')}
               </h2>
@@ -1266,7 +1266,7 @@ export default function EditProductPage() {
                 FAQ section's own draft endpoint — the same endpoints the
                 bulk sweeps use, so per-product regeneration stays
                 consistent with the catalogue-wide flow). */}
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
+            <div className="rounded-md border bg-card p-6 shadow-sm">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-semibold text-foreground">{tSections('seo')}</h2>

@@ -7,6 +7,9 @@
 # shellcheck disable=SC2086  # word splitting of the file lists is intended (they are newline/space separated paths without spaces)
 set -euo pipefail
 
+# SLOP-PREPUSH-1: the same slop guard CI runs ("Slop baselines": new unused exports, any, console, ...), only when a .ts/.tsx file changed. See scripts/ci/pre-push-slop.sh.
+bash scripts/ci/pre-push-slop.sh origin/main HEAD
+
 # Cheap related tests: only tests that import/mock a changed module (the planner picks the files and the unit-tier
 # exclude list, PREPUSH-2). Skipped when the planner cannot narrow ("full"), docs-only, or the shared packages are not
 # built (no builds here; a missing dist would only produce environment failures).
