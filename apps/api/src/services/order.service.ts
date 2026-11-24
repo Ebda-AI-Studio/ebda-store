@@ -734,7 +734,7 @@ export class OrderService {
       order.status === 'refunded'
     ) {
       try {
-        const [partialA, partialB, payMeta] = await Promise.all([
+        const [partialA, partialB, payMeta, doneReturns] = await Promise.all([
           repo.db.orderEvent.findMany({
             where: { storeId, orderId, toStatus: 'partial_refund_recorded' },
             select: { metadata: true },
@@ -747,8 +747,14 @@ export class OrderService {
             where: { orderId },
             select: { refundedAmount: true, metadata: true },
           }),
+          // refunds made through the RETURNS path (cash / bank / manual / store credit; gateway ones are on the payment row)
+          repo.db.return.findMany({
+            // an EXCHANGE moves no money (its refundAmount is only the create-time estimate): never a refund
+            where: { storeId, orderId, status: 'completed', type: { not: 'exchange' } },
+            select: { refundMethod: true, refundAmount: true, type: true },
+          }),
         ]);
-        refundedTotalMinor = refundedTotal(payMeta, [...partialA, ...partialB]);
+        refundedTotalMinor = refundedTotal(payMeta, [...partialA, ...partialB], doneReturns);
       } catch (err) {
         // Display-only figure: the order must still load. The card falls back to summing its payment rows.
         logger.warn({ err, storeId, orderId }, '[order.getById] refunded total unavailable');

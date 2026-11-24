@@ -1,3 +1,4 @@
+import { logAuditEvent } from './audit-log';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod/v3';
 import bcrypt from 'bcryptjs';
@@ -442,6 +443,26 @@ async function bearerAuth(
   const user = await findUserById(c.env.DB, verified.sub);
   if (!user || user.status !== 'active') throw err(401, 'UNAUTHORIZED');
   return { user, sid: verified.sid, aud: verifiedAud };
+}
+
+/** Unused recovery codes; a null or malformed column (legacy row, operator reset) reads as none instead of a 500. */
+function remainingRecoveryCodes(raw: string | null): number {
+  try {
+    const list: unknown = JSON.parse(raw ?? '[]');
+    return Array.isArray(list) ? list.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** 10 single-use recovery codes: the plain list is shown once, only bcrypt hashes are stored. */
+async function newRecoveryCodes(): Promise<{ plain: string[]; hashed: string[] }> {
+  const plain = Array.from({ length: 10 }, () =>
+    [...crypto.getRandomValues(new Uint8Array(5))]
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+  );
+  return { plain, hashed: await Promise.all(plain.map(x => bcrypt.hash(x, 10))) };
 }
 
 /** Step-up for sensitive changes: the account password again, throttled like a login (a bearer token alone must not allow free guessing). */
@@ -1353,12 +1374,7 @@ export function createApp() {
     if (!user.mfa_secret || !c.env.MFA_KEY || user.mfa_enabled) throw err(409, 'MFA_NOT_PENDING');
     if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
     const mode = await authorizeEnrolment(c, user, sid, body);
-    const plain = Array.from({ length: 10 }, () =>
-      [...crypto.getRandomValues(new Uint8Array(5))]
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('')
-    );
-    const hashed = await Promise.all(plain.map(x => bcrypt.hash(x, 10)));
+    const { plain, hashed } = await newRecoveryCodes();
     await c.env.DB.prepare(
       `UPDATE users SET mfa_enabled = 1, mfa_enrolled_at = ?2, mfa_backup_codes = ?3 WHERE id = ?1`
     )
@@ -1366,6 +1382,50 @@ export function createApp() {
       .run();
     const requiresSignIn = await finishEnrolment(c, user, mode, 'totp');
     return c.json({ success: true, data: { enabled: true, backupCodes: plain, requiresSignIn } });
+  });
+
+  // Recovery codes (A23): how many are left (never the codes), and a regenerate that retires the whole old set.
+  app.get('/mfa/recovery-codes', async c => {
+    const { user } = await bearerAuth(c);
+    if (!user.mfa_enabled) throw err(409, 'MFA_NOT_ENABLED');
+    return c.json({
+      success: true,
+      data: { remaining: remainingRecoveryCodes(user.mfa_backup_codes) },
+    });
+  });
+
+  // Step-up = the account password AND a live authenticator code (a recovery code is refused: it must not mint more of
+  // itself). Both go through the throttled paths. The new list REPLACES the old one in one statement, so every old code dies.
+  // Super-admin override: staff may still reset MFA via scripts/mfa-reset.ts (last resort, docs/runbooks/mfa-recovery.md).
+  app.post('/mfa/recovery-codes/regenerate', async c => {
+    const { user } = await bearerAuth(c);
+    const body = await json(c, z.object({ password: z.string(), code: z.string().max(20) }));
+    if (!user.mfa_enabled || !user.mfa_secret || !c.env.MFA_KEY) throw err(409, 'MFA_NOT_ENABLED');
+    await requirePassword(c, user, body.password);
+    if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
+    const { plain, hashed } = await newRecoveryCodes();
+    // The new set and its audit row land together (no code, no hash in the row; actor 'self').
+    await c.env.DB.batch([
+      c.env.DB.prepare(`UPDATE users SET mfa_backup_codes = ?2 WHERE id = ?1`).bind(
+        user.id,
+        JSON.stringify(hashed)
+      ),
+      c.env.DB.prepare(
+        `INSERT INTO admin_audit (event, user_id, email, actor, at, detail) VALUES ('mfa_recovery_codes_regenerated', ?1, ?2, 'self', ?3, '{}')`
+      ).bind(user.id, user.email.toLowerCase(), nowMs()),
+    ]);
+    // Tell the mailbox owner (best effort; the change already happened): a stolen session regenerating codes must not be silent.
+    queueMail(
+      c,
+      c.env.MAILER?.sendNotice({
+        to: user.email,
+        kind: 'recovery_codes_changed',
+        language: user.language === 'ar' ? 'ar' : 'en',
+        firstName: user.first_name,
+      }) ?? Promise.resolve()
+    );
+    logAuditEvent('mfa_recovery_codes_regenerated', user.id);
+    return c.json({ success: true, data: { backupCodes: plain } });
   });
 
   app.post('/mfa/disable', async c => {

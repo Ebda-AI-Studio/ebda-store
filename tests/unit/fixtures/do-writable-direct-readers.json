@@ -217,6 +217,14 @@
         "productCategory": 1
       }
     },
+    "apps/api/src/services/push.service.ts": {
+      "kind": "pg-branch",
+      "guardFile": "apps/api/src/lib/analytics-backend.ts",
+      "reason": "NZ-AN-1: recent broadcasts list. The Postgres read is the `() => withStore(...)` fallback of analyticsRead, taken only until the controller's analytics copy writes the D1 marker (lib/analytics-backend.ts routes a Durable Object store to its DO after it).",
+      "models": {
+        "notificationLog": 1
+      }
+    },
     "apps/api/src/services/shipping-carrier.service.ts": {
       "kind": "platform",
       "reason": "the Postgres legs of upsertCarrierConfig / rotateWebhookSecret (row lock + read inside prisma.$transaction) stay on the store-scope prisma; a DO store takes the compare-and-swap branch through storeWriter (Ruling NZ-CARRIER-1).",

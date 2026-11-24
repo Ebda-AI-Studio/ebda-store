@@ -122,7 +122,7 @@ export default function JournalDetailPage() {
     >
       <div className="max-w-3xl space-y-5">
         {/* Entry header card */}
-        <div className="rounded-xl border border-border bg-card p-5 space-y-2">
+        <div className="rounded-md border border-border bg-card p-5 space-y-2">
           {entry.memo && <p className="text-sm text-foreground">{entry.memo}</p>}
           {entry.memoAr && (
             <p className="text-sm text-muted-foreground" dir="rtl">
@@ -194,7 +194,7 @@ export default function JournalDetailPage() {
         {/* Lines table — genuine accounting ledger (debit/credit columns are
             the point); kept as an isolated horizontal-scroll container per
             the B1 mobile-table exception rather than card-stacked. */}
-        <div className="rounded-xl border border-border overflow-x-auto">
+        <div className="rounded-md border border-border overflow-x-auto">
           <table className="w-full min-w-[520px] text-sm">
             <thead className="bg-muted/30">
               <tr>
@@ -215,7 +215,7 @@ export default function JournalDetailPage() {
             <tbody>
               {entry.lines.map(line => (
                 <tr key={line.id} className="border-t border-border/40">
-                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
+                  <td className="px-3 py-2 font-mono text-sm text-muted-foreground">
                     {line.account.code}
                   </td>
                   <td className="px-3 py-2">
@@ -226,10 +226,10 @@ export default function JournalDetailPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-end font-mono text-xs">
+                  <td className="px-3 py-2 text-end font-mono text-sm">
                     {line.debit > 0 ? minorToMajor(line.debit) : ''}
                   </td>
-                  <td className="px-3 py-2 text-end font-mono text-xs">
+                  <td className="px-3 py-2 text-end font-mono text-sm">
                     {line.credit > 0 ? minorToMajor(line.credit) : ''}
                   </td>
                 </tr>
@@ -238,13 +238,13 @@ export default function JournalDetailPage() {
             {/* Totals footer */}
             <tfoot className="bg-muted/20 border-t border-border">
               <tr>
-                <td className="px-3 py-2 text-xs font-medium text-muted-foreground" colSpan={2}>
+                <td className="px-3 py-2 text-sm font-medium text-muted-foreground" colSpan={2}>
                   {t('totalLabel')}
                 </td>
-                <td className="px-3 py-2 text-end font-mono text-xs font-semibold">
+                <td className="px-3 py-2 text-end font-mono text-sm font-semibold">
                   {minorToMajor(totalDr)}
                 </td>
-                <td className="px-3 py-2 text-end font-mono text-xs font-semibold">
+                <td className="px-3 py-2 text-end font-mono text-sm font-semibold">
                   {minorToMajor(totalCr)}
                 </td>
               </tr>
