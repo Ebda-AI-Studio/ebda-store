@@ -84,6 +84,7 @@ import { WalletService } from './wallet.service';
 import { affiliateService } from './affiliate.service';
 import { auditLog } from '../middleware/security';
 import { hasCapturedPayment, shouldApplyRefundEffects } from './order-refund-gating';
+import { refundedTotal } from './order-refunded-total';
 import logger from '../lib/logger';
 import { lineAllowsBackorder } from '../lib/effective-inventory';
 import { frozenTaxInvoiceFields, resolveActiveTaxRate } from '../lib/order-tax';
@@ -760,7 +761,36 @@ export class OrderService {
     // InstaPay app: the reference the customer entered and the hold deadline. A
     // derived summary, never the raw payment metadata. Only present on an InstaPay
     // order, so every other order keeps exactly the shape it always had.
+    // "Refunded X" on the payment card: payments + merchant-booked partial refunds (refundedTotal's header says why).
+    // Only an order whose money was captured can have been refunded, so the extra reads are skipped otherwise.
+    let refundedTotalMinor: number | null = null;
+    if (
+      ['paid', 'refunded', 'disputed'].includes(order.paymentStatus) ||
+      order.status === 'refunded'
+    ) {
+      try {
+        const [partialA, partialB, payMeta] = await Promise.all([
+          repo.db.orderEvent.findMany({
+            where: { storeId, orderId, toStatus: 'partial_refund_recorded' },
+            select: { metadata: true },
+          }),
+          repo.db.orderEvent.findMany({
+            where: { storeId, orderId, toStatus: 'partial_return_restored' },
+            select: { metadata: true },
+          }),
+          repo.db.payment.findMany({
+            where: { orderId },
+            select: { refundedAmount: true, metadata: true },
+          }),
+        ]);
+        refundedTotalMinor = refundedTotal(payMeta, [...partialA, ...partialB]);
+      } catch (err) {
+        // Display-only figure: the order must still load. The card falls back to summing its payment rows.
+        logger.warn({ err, storeId, orderId }, '[order.getById] refunded total unavailable');
+      }
+    }
     const result: typeof order & {
+      refundedTotal?: number | null;
       instapay?: {
         customerReference: string | null;
         customerReferenceAt: string | null;
@@ -784,6 +814,7 @@ export class OrderService {
       };
     }
 
+    result.refundedTotal = refundedTotalMinor;
     return result;
   }
 
