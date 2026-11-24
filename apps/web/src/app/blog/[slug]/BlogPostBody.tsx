@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { permanentRedirect, notFound } from 'next/navigation';
 import type { ResolvedStore } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
-import { fetchSlugRedirect, storeRedirectUrl } from '../../../lib/slug-redirect';
+import { fetchSlugRedirect, localizedRedirectUrl } from '../../../lib/slug-redirect';
 import { getSiteUrl, storeAbsoluteUrl } from '../../../lib/structured-data';
 import { jsonLdScriptContent } from '../../../lib/json-ld-script';
 import { BlogPostClient, type BlogDetail } from './BlogPostClient';
@@ -103,7 +103,7 @@ export async function BlogPostBody({ store, slug }: { store: ResolvedStore; slug
       if (toSlug && toSlug !== slug) {
         // encodeURIComponent — see ProductDetailBody: a raw Arabic handle in the
         // `Location` header throws `Invalid character in header content`.
-        permanentRedirect(storeRedirectUrl(store, `/blog/${encodeURIComponent(toSlug)}`));
+        permanentRedirect(await localizedRedirectUrl(store, `/blog/${encodeURIComponent(toSlug)}`));
       }
       notFound();
     }

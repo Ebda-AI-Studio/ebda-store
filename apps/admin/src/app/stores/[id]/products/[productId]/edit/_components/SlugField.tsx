@@ -18,7 +18,7 @@ export function SlugField({ value, onChange }: { value: string; onChange: (v: st
         aria-describedby="product-slug-hint"
         error={invalid ? t('slugInvalid') : undefined}
       />
-      <p id="product-slug-hint" className="mt-1 text-xs text-muted-foreground">
+      <p id="product-slug-hint" className="mt-1 text-sm text-muted-foreground">
         {t('slugHint')}
       </p>
     </div>
