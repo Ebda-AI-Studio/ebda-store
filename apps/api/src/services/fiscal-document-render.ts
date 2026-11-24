@@ -311,10 +311,8 @@ export function renderFiscalDocumentHtml(
     .filter(ln => isCharge(ln.kind))
     .map(ln => {
       const v2 = version >= 2;
-      return `<tr><td colspan="3">${esc(ar && ln.descriptionAr ? ln.descriptionAr : ln.description)}</td>
-            <td class="n">${v2 && ln.vatAmount != null ? esc(pct(ln.vatRateBps)) : na}</td>
-            <td class="n">${v2 && ln.vatAmount != null ? money(ln.vatAmount) : na}</td>
-            <td class="n">${money(ln.amount)}</td></tr>`;
+      const vat = v2 && ln.vatAmount != null;
+      return `<tr><td colspan="3">${esc(ar && ln.descriptionAr ? ln.descriptionAr : ln.description)}</td><td class="n">${vat ? esc(pct(ln.vatRateBps)) : na}</td><td class="n">${vat ? money(ln.vatAmount!) : na}</td><td class="n">${money(ln.amount)}</td></tr>`;
     })
     .join('');
   const discounts = Array.isArray(p.discounts)
