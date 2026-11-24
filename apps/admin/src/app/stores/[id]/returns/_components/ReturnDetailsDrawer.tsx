@@ -148,6 +148,11 @@ export function ReturnDetailsDrawer({
                 : '-'}
             </p>
             <p className="text-sm text-muted-foreground">{record.customer?.email}</p>
+            {record.customer?.phone ? (
+              <p dir="ltr" className="text-sm text-muted-foreground">
+                {record.customer.phone}
+              </p>
+            ) : null}
           </div>
 
           {/* Reason */}

@@ -70,6 +70,11 @@ export function ReturnsTable({
                     {ret.customer
                       ? `${ret.customer.firstName} ${ret.customer.lastName}`.trim()
                       : '-'}
+                    {ret.customer?.phone ? (
+                      <span dir="ltr" className="ms-2">
+                        {ret.customer.phone}
+                      </span>
+                    ) : null}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     <span className="font-medium">{t('reasonLabel')}:</span> {ret.reason}
