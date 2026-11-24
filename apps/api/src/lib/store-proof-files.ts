@@ -10,6 +10,7 @@
  * deleted, not marked), logged and raised as a P1 by the caller. A failure throws (the purge aborts with a P1, and the
  * tombstone, which nulls proof_url, has NOT run yet).
  */
+// pq-allow(unused-export): test seam, imported by tests/unit/store-proof-files.test.ts
 export interface ProofFileDeps {
   d1All<T>(sql: string, ...params: unknown[]): Promise<T[]>;
   d1Run(sql: string, ...params: unknown[]): Promise<number>;

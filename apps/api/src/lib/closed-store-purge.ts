@@ -19,7 +19,8 @@
 import { RETENTION_YEARS } from '../config/retention';
 
 const DAY_MS = 86_400_000;
-export const PURGE_NO_FISCAL_DAYS = 90;
+const PURGE_NO_FISCAL_DAYS = 90;
+// pq-allow(unused-export): test seam, imported by tests/unit/closed-store-purge.test.ts
 export const PURGE_NOTICE_DAYS = 30;
 /** First 30 days after Ruling NZ-D15B (2026-11-24): dry run only, whatever the flag says. */
 export const PURGE_DRY_RUN_UNTIL = Date.UTC(2026, 11, 24);
@@ -29,7 +30,7 @@ export interface ClosedStore {
   /** epoch ms the store was deleted/closed */
   closedAt: number;
 }
-export interface FiscalSummary {
+interface FiscalSummary {
   count: number;
   lastIssuedAt: number | null;
 }
@@ -80,14 +81,14 @@ export function ledgerForClosure(
   return stored && stored.closedAt === s.closedAt ? stored : {};
 }
 
-export type PurgeOutcome =
+type PurgeOutcome =
   | 'not_due'
   | 'notice_sent'
   | 'waiting_notice'
   | 'dry_run_verified'
   | 'purged'
   | 'aborted';
-export interface PurgeResult {
+interface PurgeResult {
   storeId: string;
   outcome: PurgeOutcome;
   reason?: string;
@@ -100,6 +101,7 @@ const addYears = (t: number, years: number) => {
 };
 
 /** When a closed store becomes purgeable (epoch ms): 7 years after the later of its last fiscal document and its last platform billing record. */
+// pq-allow(unused-export): test seam, imported by tests/unit/closed-store-purge.test.ts
 export function purgeDueAt(
   s: ClosedStore,
   fiscal: FiscalSummary,
@@ -116,6 +118,7 @@ export function purgeIsLive(env: { CLOSED_STORE_PURGE_LIVE?: string }, now: numb
   return env.CLOSED_STORE_PURGE_LIVE === 'true' && now >= PURGE_DRY_RUN_UNTIL;
 }
 
+// pq-allow(unused-export): test seam, imported by tests/unit/closed-store-purge.test.ts
 export async function purgeOneClosedStore(
   p: PurgePorts,
   s: ClosedStore,

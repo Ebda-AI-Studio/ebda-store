@@ -16,8 +16,10 @@
  */
 import { redactedMetaSql } from './audit-meta-redact';
 
+// pq-allow(unused-export): test seam, imported by tests/unit/store-tombstone.test.ts
 export const PURGED_SLUG_PREFIX = '~purged~';
 
+// pq-allow(unused-export): test seam, imported by tests/unit/store-tombstone.test.ts
 export const isPurgedSlug = (slug: string | null | undefined): boolean =>
   typeof slug === 'string' && slug.startsWith(PURGED_SLUG_PREFIX);
 

@@ -6,6 +6,7 @@
  * they sit under one of these keys; a personal value under any OTHER key is not found here (known limit: new audit writers must not put
  * personal data in meta; the classification names the column personal so a reviewer is prompted).
  */
+// pq-allow(unused-export): test seam, imported by tests/unit/audit-meta-redaction.test.ts
 export const AUDIT_META_PII_KEYS = [
   'email',
   'phone',
