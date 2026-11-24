@@ -30,6 +30,13 @@ export const HEAVY_ONLY_JOBS = [
 /** The workerd dry-run is skipped, and accepted as `skipped` by the gate, ONLY for a strictly docs-only merge group (CRITICAL-PATH-1). */
 export const DOCS_ONLY_SKIPPABLE_JOBS = ['worker-dry-run'];
 
+/**
+ * `marketing` (CI-CAPACITY-1): does the marketing Worker dry-run (the only per-app job a merge group runs) need to run? STRICT:
+ * true on a label, an empty or unreadable diff, any rail (workflow, script, test, lockfile, shared / repo / database package,
+ * migration), classify's `all` (root config, packages/shared, packages/database), or when apps/marketing (or a workspace it
+ * depends on) is affected; false only when every changed file is positively outside all of those. Independent of `heavy`.
+ */
+
 /** Rails: always the full tier. Beyond classify()'s own `all` (root files, packages/shared, packages/database). */
 const RAILS =
   /^(package(-lock)?\.json$|packages\/(shared|repo|database)\/|\.github\/|scripts\/|tests\/|.*\bmigrations?\/|.*\.sql$|.*prisma\/)/;
@@ -49,27 +56,46 @@ export function isDocsOnly(files) {
 
 /**
  * @param {{ files: string[], labels?: string[], workspaces?: any[] }} a
- * @returns {{ heavy: boolean, reason: string, docsOnly: boolean }}
+ * @returns {{ heavy: boolean, reason: string, docsOnly: boolean, marketing: boolean }}
  */
 export function decideScope({ files, labels = [], workspaces = loadWorkspaces() }) {
   const changed = (files ?? []).filter(Boolean);
-  if (labels.includes('ci:full')) return { heavy: true, reason: 'ci:full label', docsOnly: false };
+  if (labels.includes('ci:full'))
+    return { heavy: true, reason: 'ci:full label', docsOnly: false, marketing: true };
   if (changed.length === 0)
-    return { heavy: true, reason: 'empty diff: refusing to guess, full tier', docsOnly: false };
+    return {
+      heavy: true,
+      reason: 'empty diff: refusing to guess, full tier',
+      docsOnly: false,
+      marketing: true,
+    };
   const docsOnly = isDocsOnly(changed);
   const code = changed.filter(f => !DOCS_ONLY.test(f) || RAILS.test(f));
   const rail = code.find(f => RAILS.test(f) && !DOCS_ONLY.test(f));
-  if (rail) return { heavy: true, reason: `rail file ${rail}`, docsOnly: false };
+  if (rail) return { heavy: true, reason: `rail file ${rail}`, docsOnly: false, marketing: true };
   const r = classify(changed, workspaces);
-  if (r.all) return { heavy: true, reason: 'classify: every workspace affected', docsOnly: false };
+  if (r.all)
+    return {
+      heavy: true,
+      reason: 'classify: every workspace affected',
+      docsOnly: false,
+      marketing: true,
+    };
+  const marketing = r.workspaces.includes('apps/marketing');
   if (integrationPlan(changed).integration)
-    return { heavy: true, reason: 'integration tests affected', docsOnly: false };
+    return { heavy: true, reason: 'integration tests affected', docsOnly: false, marketing };
   const heavyWs = r.workspaces.filter(w => !LIGHT_WORKSPACES.includes(w));
   if (heavyWs.length)
-    return { heavy: true, reason: `non-light workspace affected: ${heavyWs.join(' ')}`, docsOnly: false };
+    return {
+      heavy: true,
+      reason: `non-light workspace affected: ${heavyWs.join(' ')}`,
+      docsOnly: false,
+      marketing,
+    };
   return {
     heavy: false,
     docsOnly,
+    marketing,
     reason: `only light workspaces / docs changed (${r.workspaces.join(' ') || 'docs'}): heavy-only jobs skipped`,
   };
 }
@@ -104,7 +130,12 @@ async function main() {
   let out;
   try {
     if (EVENT !== 'merge_group')
-      out = { heavy: true, reason: `event ${EVENT}: full lane rules apply`, docsOnly: false };
+      out = {
+        heavy: true,
+        reason: `event ${EVENT}: full lane rules apply`,
+        docsOnly: false,
+        marketing: true,
+      };
     else {
       if (!BASE_SHA || !HEAD_SHA) throw new Error('missing merge group shas');
       const files = await changedFiles(BASE_SHA, HEAD_SHA, GITHUB_REPOSITORY, GITHUB_TOKEN);
@@ -112,11 +143,16 @@ async function main() {
       out = decideScope({ files, labels });
     }
   } catch (e) {
-    out = { heavy: true, reason: `fail closed: ${e.message}`, docsOnly: false };
+    out = { heavy: true, reason: `fail closed: ${e.message}`, docsOnly: false, marketing: true };
   }
-  console.log(`mq-scope: heavy=${out.heavy} docs_only=${out.docsOnly} (${out.reason})`);
+  console.log(
+    `mq-scope: heavy=${out.heavy} docs_only=${out.docsOnly} marketing=${out.marketing} (${out.reason})`
+  );
   if (process.env.GITHUB_OUTPUT)
-    appendFileSync(process.env.GITHUB_OUTPUT, `heavy=${out.heavy}\ndocs_only=${out.docsOnly}\n`);
+    appendFileSync(
+      process.env.GITHUB_OUTPUT,
+      `heavy=${out.heavy}\ndocs_only=${out.docsOnly}\nmarketing=${out.marketing}\n`
+    );
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) await main();

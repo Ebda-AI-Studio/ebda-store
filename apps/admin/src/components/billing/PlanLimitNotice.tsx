@@ -47,7 +47,7 @@ function NoticeCard({ storeId, meter }: { storeId: string; meter: PlanMeter }) {
       role="status"
       data-testid={`plan-limit-${meter.key}`}
       data-level={meter.level}
-      className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${
+      className={`flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between ${
         full ? 'border-destructive/40 bg-destructive/5' : 'border-warning/40 bg-warning/10'
       }`}
     >

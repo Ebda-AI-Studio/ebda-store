@@ -23,7 +23,7 @@ export function BrandPreview({ theme }: BrandPreviewProps) {
     <div className="mt-8 pt-6 border-t">
       <h3 className="text-sm font-medium text-foreground mb-4">{t('title')}</h3>
       <div
-        className="p-6 bg-muted rounded-xl"
+        className="p-6 bg-muted rounded-md"
         style={{ '--primary': theme.primaryColor } as CSSProperties}
       >
         <div className="flex items-center gap-4 mb-4">

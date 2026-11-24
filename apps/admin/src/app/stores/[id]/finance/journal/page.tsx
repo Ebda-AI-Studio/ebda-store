@@ -212,7 +212,7 @@ export default function JournalListPage() {
       />
 
       {error && (
-        <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
+        <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
           {error}
         </div>
       )}
