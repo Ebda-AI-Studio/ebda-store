@@ -76,6 +76,12 @@ export interface ChargeResult {
   failureReason?: string;
   /** Provider payload with card tokens removed. */
   raw: unknown;
+  /**
+   * #627: the amount / currency the gateway STATES it charged. Absent on a status answer that does not say: such a
+   * success is HELD for a person, never settled (`maySettle`).
+   */
+  amountMinor?: number | null;
+  currency?: string | null;
 }
 
 export interface RefundRequest {
