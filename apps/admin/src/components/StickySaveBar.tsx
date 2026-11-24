@@ -49,7 +49,7 @@ export function StickySaveBar({
     <div
       role="region"
       aria-label={t('regionLabel')}
-      className="fixed inset-x-0 bottom-[calc(var(--bottom-chrome))] z-30 border-t border-border bg-card/95 px-4 py-3 shadow-lg backdrop-blur-md lg:start-72"
+      className="fixed inset-x-0 bottom-[calc(var(--bottom-chrome))] z-30 border-t border-border bg-card/95 px-4 py-3 shadow-xl backdrop-blur-md lg:start-72"
     >
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
         {error ? (

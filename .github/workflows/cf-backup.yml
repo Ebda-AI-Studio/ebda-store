@@ -38,11 +38,12 @@ jobs:
           # remote Actions cache on hosted runners only (a self-hosted runner already has ~/.npm; the remote cache pulled GBs there)
       - uses: ./.github/actions/npm-ci
       - name: Require the inputs
+        timeout-minutes: 5
         run: |
           for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID EBDA_BACKUP_AGE_PUBLIC_KEY BACKUP_EXPORT_SECRET; do
             test -n "${!v}" || { echo "::error::$v is not set in the production environment"; exit 1; }
           done
-          command -v age >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq age >/dev/null; }
+          command -v age >/dev/null || { sudo apt-get -o DPkg::Lock::Timeout=120 -o Acquire::Retries=3 update -qq && sudo apt-get -o DPkg::Lock::Timeout=120 -o Acquire::Retries=3 install -y -qq age >/dev/null; }
       - name: Warn when the failure alert cannot fire
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

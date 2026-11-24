@@ -76,6 +76,8 @@ import { subscriptionBillingTemplate } from '@api/services/email-templates/subsc
 import { staffInviteTemplate } from '@api/services/email-templates/staff-invite';
 import { factorEnrolCodeTemplate } from '@api/services/email-templates/factor-enrol-code';
 import { factorAddedNoticeTemplate } from '@api/services/email-templates/factor-added-notice';
+import { recoveryCodesChangedNoticeTemplate } from '@api/services/email-templates/recovery-codes-changed-notice';
+import { chatMemberAddedTemplate } from '@api/services/email-templates/chat-member-added';
 import { legalNoticeTemplate } from '@api/services/email-templates/legal-notice';
 import { passkeyNoticeTemplate } from '@api/services/email-templates/passkey-notice';
 import { wholesaleNotice } from '@api/services/email-templates/wholesale';
@@ -248,6 +250,8 @@ const TEMPLATES: Record<string, Tpl> = {
   staffInvite: staffInviteTemplate,
   factorEnrolCode: factorEnrolCodeTemplate,
   factorAddedNotice: factorAddedNoticeTemplate,
+  recoveryCodesChangedNotice: recoveryCodesChangedNoticeTemplate,
+  chatMemberAdded: chatMemberAddedTemplate,
   passkeyNotice: passkeyNoticeTemplate,
   // Recovery email takes a data object, not the (data, storeName, url) triple.
   cartRecovery: {

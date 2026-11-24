@@ -24,7 +24,7 @@
   },
   "helpArticle": "store-content-faqs-pages-blog",
   "questions": {
-    "ar": ["ازاي اضيف اسئلة شائعة؟", "اكتب FAQ للمنتجات بالذكاء"],
+    "ar": ["ازاي اضيف اسئلة شائعة؟", "اكتب FAQ للمنتجات بالذكاء", "فين صفحة الاسئلة الشائعة؟"],
     "en": ["Add FAQs to my store"]
   },
   "steps": ["FAQ page; AI drafts product FAQs."],
