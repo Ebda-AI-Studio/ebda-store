@@ -14,8 +14,10 @@ import { useT } from '@/i18n/useT';
 interface AuditLog {
   id: string;
   action: string;
-  entityType: 'store' | 'user' | 'product' | 'order' | 'setting';
-  entityId: string;
+  /** The API names these `resourceType` / `resourceId` (the page used to read non-existent `entityType`). */
+  resourceType: string;
+  resourceId: string | null;
+  storeId?: string | null;
   details: Record<string, unknown>;
   ipAddress: string;
   userAgent: string;
@@ -40,6 +42,7 @@ interface Pagination {
 }
 
 import { formatDateTime } from '@/lib/format';
+import { auditActionLabel, auditActorName, auditEntityLabel } from '@/lib/audit-labels';
 
 const actionColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
   create: 'default',
@@ -93,7 +96,7 @@ export default function AuditLogsPage() {
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
       });
-      if (entityFilter !== 'all') params.append('entityType', entityFilter);
+      if (entityFilter !== 'all') params.append('resourceType', entityFilter);
       if (actionFilter !== 'all') params.append('action', actionFilter);
       if (selectedStoreId !== 'all') params.append('storeId', selectedStoreId);
 
@@ -203,7 +206,7 @@ export default function AuditLogsPage() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={1.5}
-                        d={entityIcons[log.entityType] || entityIcons.setting}
+                        d={entityIcons[log.resourceType] || entityIcons.setting}
                       />
                     </svg>
                   </div>
@@ -211,9 +214,11 @@ export default function AuditLogsPage() {
                   {/* Log Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant={getActionColor(log.action)}>{log.action}</Badge>
-                      <span className="text-sm text-muted-foreground capitalize">
-                        {log.entityType}
+                      <Badge variant={getActionColor(log.action)}>
+                        {auditActionLabel(log.action, t)}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {auditEntityLabel(log.resourceType, t)}
                       </span>
                       {log.store && (
                         <Link
@@ -230,25 +235,27 @@ export default function AuditLogsPage() {
                           href={`/users/${log.user.id}`}
                           className="font-medium hover:text-primary"
                         >
-                          {log.user.firstName} {log.user.lastName}
+                          {auditActorName(log.user)}
                         </Link>
                       ) : (
                         <span className="font-medium text-muted-foreground">{t('system')}</span>
                       )}{' '}
-                      {log.action.toLowerCase()} {log.entityType}
-                      {log.entityId && (
+                      {auditActionLabel(log.action, t)}
+                      {log.resourceId && (
                         <span className="text-muted-foreground">
                           {' '}
-                          ({t('idPrefix')} {log.entityId.slice(0, 8)}...)
+                          ({t('idPrefix')} {log.resourceId.slice(0, 8)})
                         </span>
                       )}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {log.ipAddress} | {log.userAgent?.slice(0, 50)}...
+                    <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
+                      {[log.ipAddress, log.userAgent ? log.userAgent.slice(0, 50) : null]
+                        .filter(Boolean)
+                        .join(' | ')}
                     </p>
 
                     {/* Expandable Details */}
-                    {Object.keys(log.details || {}).length > 0 && (
+                    {(Object.keys(log.details || {}).length > 0 || log.action) && (
                       <Button
                         variant="link"
                         size="sm"
@@ -261,7 +268,7 @@ export default function AuditLogsPage() {
                     )}
                     {expandedLog === log.id && (
                       <pre className="mt-2 p-3 bg-muted rounded-lg text-xs text-foreground overflow-x-auto">
-                        {JSON.stringify(log.details, null, 2)}
+                        {JSON.stringify({ action: log.action, ...(log.details || {}) }, null, 2)}
                       </pre>
                     )}
                   </div>

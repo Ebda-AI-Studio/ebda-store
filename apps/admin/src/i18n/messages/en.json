@@ -6104,7 +6104,55 @@
     "idPrefix": "ID:",
     "paginationShowing": "Showing {from} to {to} of {total} logs",
     "previous": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "actionOther": "Other action",
+    "entityOther": "Item",
+    "actionLabels": {
+      "platform_viewed": "Opened the platform dashboard",
+      "audit_platform_viewed": "Opened the platform dashboard",
+      "store_access": "Opened a store",
+      "store_access_denied": "Was blocked from a store",
+      "create": "Created",
+      "update": "Updated",
+      "delete": "Deleted",
+      "login": "Signed in",
+      "logout": "Signed out",
+      "product_created": "Added a product",
+      "product_updated": "Updated a product",
+      "product_deleted": "Deleted a product",
+      "product_bulk_update": "Bulk-updated products",
+      "order_status_updated": "Changed an order status",
+      "order_cancelled": "Cancelled an order",
+      "order_admin_created": "Created an order from admin",
+      "order_cod_marked_paid": "Marked a COD order paid",
+      "store_feature_toggled": "Toggled a store feature",
+      "store_went_live": "Store went live",
+      "store_suspension_appeal": "Appealed a store suspension",
+      "user_updated": "Updated a user",
+      "user_deleted": "Deleted a user",
+      "staff_removed": "Removed a team member",
+      "coupon_created": "Created a coupon",
+      "coupon_updated": "Updated a coupon",
+      "coupon_deleted": "Deleted a coupon",
+      "return_approved": "Approved a return",
+      "return_rejected": "Rejected a return",
+      "return_completed": "Completed a return",
+      "inventory_adjusted": "Adjusted inventory",
+      "admin_export_orders": "Exported orders",
+      "webhook_event_replay": "Replayed a webhook event"
+    },
+    "entityLabels": {
+      "store": "Store",
+      "user": "User",
+      "product": "Product",
+      "order": "Order",
+      "setting": "Setting",
+      "platform": "Platform",
+      "store_access": "Store",
+      "customer": "Customer",
+      "coupon": "Coupon",
+      "return": "Return"
+    }
   },
   "auth": {
     "login": {
@@ -8068,9 +8116,9 @@
         "activeStores": "Active Stores (filtered)"
       },
       "noRatesConfiguredTitle": "No model rates configured.",
-      "noRatesConfiguredBody": "Spend shows 0 because <code>AI_MODEL_RATES</code> is unset — not because AI is free. Set it on the API service to price usage.",
+      "noRatesConfiguredBody": "Spend shows 0 because AI model rates have not been set yet, not because AI is free. Ask the operations team to set the rate table in the API settings so spend is priced.",
       "unpricedCallsTitle": "{count} calls this month are unpriced.",
-      "unpricedCallsBody": "Their model has no entry in <code>AI_MODEL_RATES</code>, so they contribute nothing to the totals above — treat the spend figure as a floor.",
+      "unpricedCallsBody": "Their model has no entry in the rate table, so they contribute nothing to the totals above. Treat the spend figure as a floor.",
       "unpricedTooltip": "These calls had no configured rate for their model, so they are NOT included in the amount above. The figure is a floor, not the true spend.",
       "unpricedRowSuffix": "unpriced",
       "filters": {
@@ -8094,7 +8142,24 @@
         "empty": "No stores match the current filters."
       },
       "perStoreBreakdown": "Per-store breakdown",
-      "storesCount": "{count} stores"
+      "storesCount": "{count} stores",
+      "featureNames": {
+        "translate": "Translation",
+        "seo": "SEO",
+        "categorize": "Product categorising",
+        "deadstock-scan": "Dead-stock scan",
+        "expense-ocr": "Expense receipt reading",
+        "insights-narration-cohort": "Cohort insight narration",
+        "insights-narration-funnel": "Funnel insight narration",
+        "insights-narration-segment": "Segment insight narration",
+        "product-excerpt": "Product excerpt",
+        "product-faq": "Product FAQ",
+        "product-meta-aeo": "Product answer-engine description",
+        "product-tags": "Product tags",
+        "profit-anomaly": "Profit anomaly",
+        "reorder-scan": "Reorder scan",
+        "other": "Other feature"
+      }
     }
   },
   "featureUpgrade": {
@@ -9408,7 +9473,7 @@
     "loading": "Loading plans…",
     "loadError": "Failed to load plans.",
     "edit": "Edit",
-    "editTitle": "Edit plan {code}",
+    "editTitle": "Edit plan {name}",
     "public": "Public",
     "hidden": "Hidden",
     "unlimited": "Unlimited",

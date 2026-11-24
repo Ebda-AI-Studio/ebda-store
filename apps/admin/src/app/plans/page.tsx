@@ -332,10 +332,8 @@ function PlansInner() {
       primaryOnMobile: true,
       cell: p => (
         <div>
+          {/* STORE-QA-15: the plan's name only. Internal keys (code, feature tier) are never table copy. */}
           <div className="font-medium text-foreground">{locale === 'ar' ? p.nameAr : p.nameEn}</div>
-          <div className="text-xs text-muted-foreground">
-            {p.code} · {p.featureTier}
-          </div>
         </div>
       ),
     },
@@ -417,7 +415,9 @@ function PlansInner() {
       <Modal
         isOpen={editing !== null}
         onClose={() => setEditing(null)}
-        title={editing ? t('editTitle', { code: editing.code }) : ''}
+        title={
+          editing ? t('editTitle', { name: locale === 'ar' ? editing.nameAr : editing.nameEn }) : ''
+        }
         closeLabel={t('form.close')}
         size="lg"
       >
