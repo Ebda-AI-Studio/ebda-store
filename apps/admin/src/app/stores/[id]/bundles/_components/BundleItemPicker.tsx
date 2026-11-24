@@ -35,6 +35,7 @@ import { extractVariantOptions } from '../bundlePricing';
 import { SearchPicker } from '@/components/SearchPicker';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // Mirrors bundle.routes.ts's MAX_BUNDLE_ITEMS — not importable from the
 // admin app (apps/api is a separate deployable); the server is the real
 // enforcement, this only stops the merchant from typing past a limit that
@@ -275,7 +276,7 @@ export function BundleItemPicker({ storeId, value, onChange }: BundleItemPickerP
                 value={row.quantity}
                 onChange={e => setQuantity(row, Number(e.target.value))}
                 aria-label={t('quantityLabel')}
-                className="w-16 rounded border border-border bg-background px-2 py-1 text-center text-sm"
+                className={`${FIELD_CLASSES} w-16 text-center`}
               />
               <span className="w-24 text-end font-semibold text-foreground">
                 {formatPrice(row.unitPrice * row.quantity)}
