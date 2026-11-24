@@ -10,6 +10,9 @@ import logger from '../../lib/logger';
 import { EmailService } from '../email.service';
 import { socketService } from '../socket.service';
 import { featureService } from '../feature.service';
+import { sendAlert } from '../alerts.service';
+import { emailMoney } from '../email-templates/_util';
+import { ADDON_CATALOG } from './addon-catalog';
 import { bustStoreCaches } from '../store.service';
 import { reconcileStoreAccess } from './account.service';
 import { instapayDetails } from './account.service';
@@ -21,6 +24,26 @@ import type { EmailBarcode } from '../email-templates/_barcode';
 
 export type BillingEffect =
   | { kind: 'plan_changed'; storeId: string }
+  /** An add-on / AI pack term was granted: drop the store's cached feature map. */
+  | { kind: 'addon_granted'; storeId: string }
+  /** Money was taken for an add-on we cannot deliver: alert and refund it (compensating action). */
+  | { kind: 'addon_unapplied'; storeId: string; billingEventId: string }
+  /** Tell the owner about an add-on renewal: heads-up before the charge, or why it was NOT charged (ADDON-RENEW-1). */
+  | {
+      kind: 'addon_notice';
+      storeId: string;
+      sku: string;
+      reason:
+        | 'renewal_upcoming'
+        | 'price_changed'
+        | 'now_included'
+        | 'disabled'
+        | 'renewal_declined'
+        | 'no_card'
+        | 'renew_via_instapay';
+      endsAt: Date;
+      amountMinor: number;
+    }
   /** Money was recorded: lift an `unpaid` suspension, re-apply the store allowance. */
   | { kind: 'payment_recorded'; storeId: string }
   /**
@@ -91,10 +114,129 @@ export async function runBillingEffects(effects: BillingEffect[]): Promise<void>
   }
 }
 
+function addonNoticeCopy(
+  reason: Extract<BillingEffect, { kind: 'addon_notice' }>['reason'],
+  lang: 'en' | 'ar',
+  v: { name: string; date: string; amount: string }
+): { title: string; body: string } {
+  const en = {
+    renewal_upcoming: [
+      `${v.name} renews on ${v.date}`,
+      `${v.amount} will be charged to your saved card on ${v.date} for another 30 days of ${v.name}. To stop it, open Add-ons and press Stop renewing before then.`,
+    ],
+    renewal_declined: [
+      `${v.name} was not renewed`,
+      `The renewal payment did not go through, so ${v.name} ends on ${v.date}. You can buy it again from Add-ons.`,
+    ],
+    price_changed: [
+      `${v.name} was not renewed: the price changed`,
+      `The price of ${v.name} is no longer the one you agreed to, so we did not charge you. It ends on ${v.date}. Buy it again from Add-ons to accept the new price.`,
+    ],
+    now_included: [
+      `${v.name} is now included in your plan`,
+      `Your plan already includes ${v.name}, so we did not charge a renewal. You keep the feature.`,
+    ],
+    disabled: [
+      `${v.name} was not renewed`,
+      `${v.name} was switched off for your store by Ebda Store support, so we did not charge a renewal. Contact support if this is a mistake.`,
+    ],
+    no_card: [
+      `${v.name} was not renewed: no saved card`,
+      `There is no saved card on your store, so ${v.name} ends on ${v.date}. Save a card in Billing and buy it again from Add-ons.`,
+    ],
+    renew_via_instapay: [
+      `${v.name} ends on ${v.date}`,
+      `You paid for ${v.name} by InstaPay, which cannot renew by itself. To keep it, open Add-ons before ${v.date} and pay by InstaPay again. Ebda Store confirms the new transfer and the days are added after your current term.`,
+    ],
+  } as const;
+  const ar = {
+    renewal_upcoming: [
+      `${v.name} بتتجدد يوم ${v.date}`,
+      `هيتخصم ${v.amount} من الكارت المحفوظ يوم ${v.date} مقابل 30 يوم تانيين من ${v.name}. لو مش عايز تتجدد، افتح الإضافات واضغط وقّف التجديد قبل الميعاد ده.`,
+    ],
+    renewal_declined: [
+      `${v.name} ماتجددتش`,
+      `دفعة التجديد معداتش، فـ ${v.name} هتخلص يوم ${v.date}. تقدر تشتريها تاني من الإضافات.`,
+    ],
+    price_changed: [
+      `${v.name} ماتجددتش: السعر اتغير`,
+      `سعر ${v.name} بقى مختلف عن اللي وافقت عليه، فمخصمناش منك حاجة. هتخلص يوم ${v.date}. اشتريها تاني من الإضافات لو موافق على السعر الجديد.`,
+    ],
+    now_included: [
+      `${v.name} بقت موجودة في باقتك`,
+      `باقتك بقت فيها ${v.name}، فمخصمناش تجديد. والميزة فضلت معاك.`,
+    ],
+    disabled: [
+      `${v.name} ماتجددتش`,
+      `دعم ابدأ ستور قفل ${v.name} لمتجرك، فمخصمناش تجديد. كلّم الدعم لو ده حصل بالغلط.`,
+    ],
+    no_card: [
+      `${v.name} ماتجددتش: مفيش كارت محفوظ`,
+      `مفيش كارت محفوظ على متجرك، فـ ${v.name} هتخلص يوم ${v.date}. احفظ كارت من الفوترة واشتريها تاني من الإضافات.`,
+    ],
+    renew_via_instapay: [
+      `${v.name} هتخلص يوم ${v.date}`,
+      `دفعت ثمن ${v.name} بإنستاباي، وإنستاباي مبيتجددش لوحده. عشان تكمّل، افتح الإضافات قبل ${v.date} وادفع بإنستاباي تاني. ابدأ ستور بيأكد التحويل الجديد والأيام بتتضاف بعد المدة الحالية.`,
+    ],
+  } as const;
+  const [title, body] = (lang === 'ar' ? ar : en)[reason];
+  return { title, body };
+}
+
 async function runOne(effect: BillingEffect): Promise<void> {
+  if (effect.kind === 'addon_granted') {
+    // A grant AND a refund: the entitlement changed, so every layer drops at once (feature map, then the public
+    // store payload that lists the store's features; the latter has its own TTL).
+    await featureService.invalidateCache(effect.storeId);
+    const ctx = await storeContext(effect.storeId);
+    if (ctx) await bustStoreCaches(effect.storeId, ctx.store.slug, ctx.store.domain);
+    return;
+  }
+  if (effect.kind === 'addon_unapplied') {
+    void sendAlert({
+      level: 'p1',
+      title: 'Add-on paid but not deliverable: refunding',
+      body: `billing_events ${effect.billingEventId} (store ${effect.storeId}) could not be delivered (unknown add-on, or a support override is on). A refund was attempted.`,
+    }).catch(() => undefined);
+    // Lazy import: subscription-billing imports this module.
+    const { refundCharge } = await import('./subscription-billing.service.js');
+    try {
+      await refundCharge({ eventId: effect.billingEventId });
+    } catch (err) {
+      // An InstaPay payment cannot be refunded through the card gateway: staff hand the money back outside it.
+      void sendAlert({
+        level: 'p1',
+        title: 'Add-on paid but not deliverable: refund by hand',
+        body: `billing_events ${effect.billingEventId} (store ${effect.storeId}) could not be refunded automatically (${(err as Error).message}). If it was paid by InstaPay, send the money back outside the gateway.`,
+      }).catch(() => undefined);
+    }
+    return;
+  }
   const ctx = await storeContext(effect.storeId);
   if (!ctx) return;
   const { store } = ctx;
+  if (effect.kind === 'addon_notice') {
+    const lang: 'en' | 'ar' =
+      (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'en'
+        ? 'en'
+        : 'ar';
+    const item = ADDON_CATALOG[effect.sku];
+    const name = item ? (lang === 'ar' ? item.nameAr : item.nameEn) : effect.sku;
+    const date = effect.endsAt.toISOString().slice(0, 10);
+    const amount = emailMoney(effect.amountMinor, 'EGP', lang);
+    const url = `${config.adminUrl ?? ''}/stores/${effect.storeId}/billing/addons`;
+    const copy = addonNoticeCopy(effect.reason, lang, { name, date, amount });
+    socketService.notifyStore(effect.storeId, {
+      type: 'billing_addon_notice',
+      title: copy.title,
+      message: copy.body,
+      data: { storeId: effect.storeId, url },
+      createdAt: new Date(),
+    });
+    if (store.owner?.email)
+      await EmailService.sendAddonNotice(effect.storeId, store.owner.email, copy, url, lang);
+    return;
+  }
   if (effect.kind === 'subscription_paid') {
     // FOUNDING-1: founding-20 + referral free months (idempotent, never throws)
     await awardGrantsAfterPayment(effect.storeId);

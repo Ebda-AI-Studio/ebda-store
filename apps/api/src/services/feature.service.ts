@@ -9,6 +9,8 @@ import { syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { getAutomationFlags } from './plan-entitlements';
 import { readStorePlan } from '../lib/store-plan';
 import { storeUpdate } from '../lib/repo-factory';
+import { activeAddons } from './billing/addon-grant';
+import { ADDON_CATALOG } from './billing/addon-catalog';
 
 // Versioned namespace (2026-09-25, customer wallet D1). The release that wired
 // behaviour to the previously hidden `customer_wallet` key also resets a stale
@@ -58,6 +60,20 @@ function isConnectionFailure(err: unknown): boolean {
   );
 }
 
+/** Seconds a cached feature map may live: the TTL, cut short at the soonest running paid term end (min 1 s). */
+export function ttlFor(soonestAddonEnd: Date | null, nowMs: number): number {
+  if (!soonestAddonEnd) return CACHE_TTL;
+  const left = Math.ceil((soonestAddonEnd.getTime() - nowMs) / 1000);
+  return Math.max(1, Math.min(CACHE_TTL, left));
+}
+
+function addonFeatureKeys(running: Array<{ sku: string }>): string[] {
+  return running.flatMap(r => {
+    const k = ADDON_CATALOG[r.sku]?.featureKey;
+    return k ? [k] : [];
+  });
+}
+
 class FeatureService {
   /**
    * In-process single-flight registry, keyed by storeId. When a store's
@@ -103,10 +119,11 @@ class FeatureService {
 
   private async writeToCache(
     storeId: string,
-    features: Record<FeatureKey, boolean>
+    features: Record<FeatureKey, boolean>,
+    ttlSeconds: number = CACHE_TTL
   ): Promise<void> {
     try {
-      await redis.set(this.cacheKey(storeId), features, CACHE_TTL);
+      await redis.set(this.cacheKey(storeId), features, ttlSeconds);
     } catch (err) {
       logger.warn({ err, storeId }, '[FeatureService] Cache write failed');
     }
@@ -140,7 +157,8 @@ class FeatureService {
       wholesalePricing: boolean;
       mcpAccess: boolean;
       featureTier: StorePlan;
-    } | null
+    } | null,
+    addonKeys: readonly string[] = []
   ): Record<FeatureKey, boolean> {
     // Start with all false.
     const map = Object.fromEntries(FEATURE_KEYS_ARRAY.map(key => [key, false])) as Record<
@@ -179,7 +197,11 @@ class FeatureService {
       // (mcp/merchant-write.ts); a StoreFeature override still wins both ways.
       map.merchant_mcp_write = flags.mcpAccess;
     }
-    // Layer 2: per-store overrides on top.
+    // Layer 1.7: running paid add-ons (SELF-SERVICE A8): a purchase turns the feature ON. Staleness class BOUNDED:
+    // a grant busts this cache (`addon_granted`) and the cache entry is written with a TTL cut at the soonest
+    // running term end (`ttlFor`), so an expiry never rides on the 5-minute TTL (NEVER-stale, Ruling ADDON-SS-3).
+    for (const key of addonKeys) map[key as FeatureKey] = true;
+    // Layer 2: per-store overrides on top (a super-admin "off" still beats a purchase: goodwill/abuse override).
     for (const row of rows) {
       if (FEATURE_KEYS_ARRAY.includes(row.featureKey as FeatureKey)) {
         map[row.featureKey as FeatureKey] = row.enabled;
@@ -188,37 +210,72 @@ class FeatureService {
     return map;
   }
 
-  private async readFromDb(storeId: string): Promise<Record<FeatureKey, boolean>> {
+  private async readFromDb(
+    storeId: string,
+    withAddons = true
+  ): Promise<Record<FeatureKey, boolean>> {
+    return (await this.readResolved(storeId, withAddons)).map;
+  }
+
+  /**
+   * The feature map plus the end of the soonest running paid add-on term (null when none feeds the map). The cache
+   * entry must die no later than that instant: an entitlement is NEVER-stale (Ruling ADDON-SS-3), so a lapsed term
+   * cannot ride on the TTL.
+   */
+  private async readResolved(
+    storeId: string,
+    withAddons = true
+  ): Promise<{ map: Record<FeatureKey, boolean>; soonestAddonEnd: Date | null }> {
     // store_features is under FORCE ROW LEVEL SECURITY. This map is read from
     // BOTH request handlers (with tenant context) AND background fan-out
     // (order-created / abandoned-cart Inngest jobs) which have no tenant GUC —
     // and without it the per-store override rows return empty, so a feature
     // enabled/disabled by override would be mis-resolved (and the wrong value
     // Redis-cached). Everything is read inside one store-scope tx.
-    const [store, rows, flags] = await withStore(storeId, async tx => {
-      const [storeRow, featureRows] = await Promise.all([
+    const [store, rows, flags, addonKeys, soonestAddonEnd] = await withStore(storeId, async tx => {
+      const [storeRow, featureRows, running] = await Promise.all([
         readStorePlan(tx, storeId),
         tx.storeFeature.findMany({
           where: { storeId },
           select: { featureKey: true, enabled: true },
         }),
+        activeAddons(tx, storeId, new Date()),
       ]);
+      const feeding = withAddons ? running.filter(r => ADDON_CATALOG[r.sku]?.featureKey) : [];
+      const addonKeys = addonFeatureKeys(feeding);
+      const soonest = feeding.length
+        ? new Date(Math.min(...feeding.map(r => r.endsAt.getTime())))
+        : null;
       // The plans engine's automation flags, read in the SAME store-scope tx (one
       // connection; a transient failure retries and fails closed together).
       const planFlags = storeRow
         ? await getAutomationFlags(storeId, tx, { legacyPlan: storeRow.plan })
         : null;
-      return [storeRow, featureRows, planFlags] as const;
+      return [storeRow, featureRows, planFlags, addonKeys, soonest] as const;
     });
     // If the store doesn't exist, return all-false (safe default; callers
     // already handle missing stores at the route level via requireStoreAccess).
     if (!store) {
-      return Object.fromEntries(FEATURE_KEYS_ARRAY.map(key => [key, false])) as Record<
-        FeatureKey,
-        boolean
-      >;
+      return {
+        map: Object.fromEntries(FEATURE_KEYS_ARRAY.map(key => [key, false])) as Record<
+          FeatureKey,
+          boolean
+        >,
+        soonestAddonEnd: null,
+      };
     }
-    return this.rowsToMap(store.plan as StorePlan, rows, flags);
+    return {
+      map: this.rowsToMap(store.plan as StorePlan, rows, flags, addonKeys),
+      soonestAddonEnd,
+    };
+  }
+
+  /**
+   * What the store would have WITHOUT any paid add-on (plan baseline + super-admin overrides). Uncached, read by the
+   * add-on renewal to see that the plan now includes the feature (the merchant must not keep paying for it).
+   */
+  async resolveWithoutAddons(storeId: string): Promise<Record<FeatureKey, boolean>> {
+    return this.readFromDb(storeId, false);
   }
 
   /**
@@ -294,12 +351,15 @@ class FeatureService {
       logger.debug({ storeId }, '[FeatureService] Cache miss, reading from DB');
       const inOutage = Date.now() - this.connectionOutageAt < RETRY_SUSPEND_AFTER_OUTAGE_MS;
       let features: Record<FeatureKey, boolean>;
+      let soonestAddonEnd: Date | null = null;
       try {
-        features = await retryOnWriteConflict(() => this.readFromDb(storeId), {
+        const resolved = await retryOnWriteConflict(() => this.readResolved(storeId), {
           ...DB_READ_RETRY,
           retries: inOutage ? 0 : DB_READ_RETRY.retries,
           label: 'feature.readFromDb',
         });
+        features = resolved.map;
+        soonestAddonEnd = resolved.soonestAddonEnd;
       } catch (err) {
         // Still fails CLOSED (RULINGS SN-4) — this only stops the next reads
         // from paying for a retry while the outage lasts.
@@ -309,7 +369,8 @@ class FeatureService {
       this.connectionOutageAt = 0;
 
       // 3. Populate cache (best-effort)
-      await this.writeToCache(storeId, features);
+      // (the entry dies at the soonest paid term end, never later: addon expiry is NEVER-stale)
+      await this.writeToCache(storeId, features, ttlFor(soonestAddonEnd, Date.now()));
 
       return features;
     })();
@@ -364,9 +425,9 @@ class FeatureService {
     // (POSTGRES_REMOVED: every toggle of a feature, incl. the customer-intelligence hints switch, answered 500).
     // On the platform D1 a multi-key update is NOT one transaction: if it throws after some keys were written the cached map no
     // longer matches the rows, so the cache key is dropped on failure (the next read rebuilds it from the rows).
-    let freshFeatures: Record<FeatureKey, boolean>;
+    let fresh: { map: Record<FeatureKey, boolean>; soonest: Date | null };
     try {
-      freshFeatures = await withStore(storeId, async (tx: Prisma.TransactionClient) => {
+      fresh = await withStore(storeId, async (tx: Prisma.TransactionClient) => {
         for (const [featureKey, enabled] of Object.entries(updates)) {
           await tx.storeFeature.upsert({
             where: { storeId_featureKey: { storeId, featureKey } },
@@ -392,7 +453,18 @@ class FeatureService {
           select: { featureKey: true, enabled: true },
         });
         const flags = await getAutomationFlags(storeId, tx, { legacyPlan: store?.plan ?? 'free' });
-        return this.rowsToMap((store?.plan ?? 'free') as StorePlan, rows, flags);
+        // the store's running add-ons count as entitlements; the soonest term end bounds the cache TTL (never-stale class)
+        const running = (await activeAddons(tx, storeId, new Date())).filter(
+          r => ADDON_CATALOG[r.sku]?.featureKey
+        );
+        const addonKeys = addonFeatureKeys(running);
+        const soonest = running.length
+          ? new Date(Math.min(...running.map(r => r.endsAt.getTime())))
+          : null;
+        return {
+          map: this.rowsToMap((store?.plan ?? 'free') as StorePlan, rows, flags, addonKeys),
+          soonest,
+        };
       });
     } catch (err) {
       await this.invalidateCache(storeId);
@@ -401,7 +473,8 @@ class FeatureService {
       throw err;
     }
 
-    await this.writeToCache(storeId, freshFeatures);
+    await this.writeToCache(storeId, fresh.map, ttlFor(fresh.soonest, Date.now()));
+    const freshFeatures = fresh.map;
     await this.bustPublicStoreCache(storeId);
 
     logger.info(

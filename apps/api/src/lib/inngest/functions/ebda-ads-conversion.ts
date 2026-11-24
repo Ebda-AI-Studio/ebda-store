@@ -83,6 +83,8 @@ export async function processEbdaConversion(data: Data): Promise<ConversionOutco
           status: 'succeeded',
           amountMinor: { gt: 0 },
           type: { in: ['checkout', 'upgrade', 'renewal', 'manual_payment'] },
+          // an add-on / AI pack payment is not a subscription payment (SELF-SERVICE A8/A9)
+          OR: [{ planCode: null }, { NOT: { planCode: { startsWith: 'addon:' } } }],
           createdAt: { lt: row.createdAt },
         },
       });
