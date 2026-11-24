@@ -33,7 +33,7 @@ export function StoreNotOperationalNotice() {
       aria-modal="true"
       aria-labelledby="store-not-operational-title"
       aria-describedby="store-not-operational-body"
-      className="fixed inset-x-4 bottom-4 z-[100] mx-auto max-w-md rounded-xl border bg-card p-4 shadow-lg sm:bottom-6"
+      className="fixed inset-x-4 bottom-4 z-[100] mx-auto max-w-md rounded-md border bg-card p-4 shadow-md sm:bottom-6"
     >
       <h2 id="store-not-operational-title" className="text-base font-semibold text-foreground">
         {t('storeNotOperationalTitle')}

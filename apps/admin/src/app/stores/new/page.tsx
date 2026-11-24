@@ -156,7 +156,7 @@ export default function CreateStorePage() {
         <StepIndicator currentStep={currentStep} onJumpTo={setCurrentStep} />
 
         {/* Step Content */}
-        <div className="rounded-xl border bg-card shadow-sm">
+        <div className="rounded-md border bg-card shadow-sm">
           {currentStep === 'store' && (
             <StoreDetailsStep
               formData={formData}
