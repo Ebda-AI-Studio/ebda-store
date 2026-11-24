@@ -11,7 +11,7 @@
  * store: inactive, Professional, on the Growth trial, in D1 + the DO") and the go-live card gate by signup-funnel-card-d1.test.ts.
  * The same-reference-on-another-store refusal of the RLS case is platform-manual-payment-d1.test.ts ("a reference store B already holds").
  *
- * Mutations (each turns the named test red, run by hand): account.service restoreFromBilling drop `billingSuspendedReason: reason` ->
+ * Mutations (each turns the named test red, run by hand): subscription-billing.service lapseManualSubscription skip `downgradeToFree` -> "runs the whole InstaPay path" (#836 free-plan expectation); account.service drop the canceled-parent child downgrade -> "a parent that lapses to canceled takes its children off the paid plan"; account.service drop the child re-sync after payment -> the same test's restore step; account.service restoreFromBilling drop `billingSuspendedReason: reason` ->
  * "a super-admin suspension is never lifted"; suspendForBilling drop `status: 'active'` -> "an inactive (never live) store is not suspended";
  * suspendForBilling skip suspendCoveredChildren -> "the parent going unpaid suspends its children"; admin.routes manual-payment drop
  * `requireRole('super_admin')` -> "only a super_admin may record a manual payment (HTTP)".
@@ -343,6 +343,9 @@ describe('signup funnel: store writes (platform D1 + one StoreDO per store)', ()
         status: 'suspended',
         billingSuspendedReason: 'unpaid',
       });
+      // #836: the lapse also ends the paid plan (it used to stay past_due on Growth forever), on both layers.
+      expect(await sub(storeId)).toMatchObject({ status: 'canceled', planCode: 'free' });
+      expect(storeRow(storeId).plan).toBe('free');
       expect(emailSpy).toHaveBeenCalledWith(
         storeId,
         expect.objectContaining({ kind: 'store_suspended' }),
@@ -676,6 +679,33 @@ describe('parent / child store billing (R-EBDA-PRICING-6, EBDA-FUNNEL-18)', () =
       status: 'active',
       billingSuspendedReason: null,
     });
+  });
+
+  it('a parent that lapses to canceled takes its children off the paid plan; its payment puts them back (#836)', async () => {
+    const { parent, childId } = await businessFamily('pclapsefree');
+    // a child inside the parent's allowance mirrors the parent plan once access is reconciled
+    await reconcileStoreAccess(parent.storeId);
+    expect((await sub(childId)).planCode).toBe('business');
+    // the end state of a lapse (InstaPay grace over / card dunning): parent canceled on free
+    await prisma.storeSubscription.update({
+      where: { storeId: parent.storeId },
+      data: { planCode: 'free', status: 'canceled' },
+    });
+    await reconcileStoreAccess(parent.storeId);
+    expect(await sub(childId)).toMatchObject({ planCode: 'free', status: 'canceled' });
+    await recordManualPayment({
+      storeId: parent.storeId,
+      planCode: 'business',
+      interval: 'monthly',
+      amountMinor: 999000,
+      method: 'instapay',
+      reference: `PC-lapsefree2-${run}`,
+      paidAt: new Date(),
+      periodStart: new Date(),
+      periodEnd: addDays(new Date(), 30),
+      actorId: parent.ownerId,
+    });
+    expect(await sub(childId)).toMatchObject({ planCode: 'business', status: 'active' });
   });
 
   it('the billing parent cannot be hard-deleted while the owner has other stores', async () => {
