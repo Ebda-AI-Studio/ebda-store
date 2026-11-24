@@ -18,6 +18,8 @@ if ! git diff --name-only "$MB" "$HEAD_REF" | grep -qE '\.(ts|tsx)$'; then echo 
 # physical path: the guard only runs main() when import.meta.url equals its argv[1], and macOS temp dirs (/var -> /private/var) differ by symlink
 T="$(cd "$(mktemp -d)" && pwd -P)"; trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/pr" "$T/base"
+# the BASE's foundation.lock.json is part of that set: the guard trusts the vendored-folder exemption only while the PR's lock equals the base's (SLOP-VENDORED-1);
+# without it every push judged the vendored exports as findings that CI (which has the base checkout) does not report.
 # the files the guard reads: code under the configured roots, its config + baseline, the vendored-folder proof, per-root eslint suppressions (inside the roots).
 # Only paths that exist at that ref are archived (git archive aborts on a missing pathspec).
 export_ref() { # <ref> <dest> <path>...
@@ -28,7 +30,7 @@ export_ref() { # <ref> <dest> <path>...
   git archive "$ref" "${present[@]}" | tar -x -C "$dest"
 }
 export_ref "$HEAD_REF" "$T/pr" apps packages .pr-quality.json .pr-quality-baseline.json foundation.lock.json tests/unit/foundation-parity.test.ts
-export_ref "$BASE_REF" "$T/base" apps packages .github/pr-quality .pr-quality.json .pr-quality-baseline.json
+export_ref "$BASE_REF" "$T/base" apps packages .github/pr-quality .pr-quality.json .pr-quality-baseline.json foundation.lock.json
 [ -f "$T/base/.github/pr-quality/slop-guard.mjs" ] || { echo "! slop guard skipped: $BASE_REF has no .github/pr-quality/slop-guard.mjs; CI runs it"; exit 0; }
 # CI form (.github/workflows/pr-quality.yml): the ratchet files as of the MERGE BASE are built by the base branch's merge-base-tree.sh, which needs a git
 # checkout whose HEAD is the base tip and whose refs/pr/head is the PR head. A throwaway --shared --no-checkout clone provides exactly that without copying
