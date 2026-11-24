@@ -20,6 +20,21 @@ vi.mock('@api/services/redis.service', () => ({
   redis: { get: vi.fn(async () => null), set: vi.fn(async () => undefined) },
 }));
 vi.mock('@api/services/accounting/reports.service', () => ({ profitAndLoss: vi.fn() }));
+// The dashboard payload rides the generation-guarded public cache (STORE-QA-74: revenue is invalidated on every refund). Its
+// generation protocol is proven in the public-cache tests; here only the KEY is under test, so the cache is a keyed Map.
+vi.mock('@api/lib/public-cache', () => {
+  const m = new Map<string, unknown>();
+  return {
+    getCached: async (key: string, _ttl: number, fn: () => Promise<unknown>) => {
+      if (m.has(key)) return m.get(key);
+      const v = await fn();
+      m.set(key, v);
+      return v;
+    },
+    invalidateCachedPrefix: vi.fn(),
+    invalidateCustomersCache: vi.fn(),
+  };
+});
 
 import { AnalyticsService, endOfMinute } from '@api/services/analytics.service';
 

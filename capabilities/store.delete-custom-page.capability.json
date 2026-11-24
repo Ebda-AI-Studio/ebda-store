@@ -18,7 +18,7 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": ["عايز امسح صفحة عملتها"],
+    "ar": ["عايز امسح صفحة عملتها", "ينفع امسح صفحة عملتها بنفسي؟", "ازاي اشيل صفحة من المتجر؟"],
     "en": ["Delete a page I created"]
   },
   "steps": ["Super-admin only today."],

@@ -95,7 +95,8 @@ const ALLOW: Record<string, AllowEntry> = {
   'routes/promotion.routes.ts': {
     category: 'resolver-input',
     reason: 'preview lines priced via priceCart',
-    reads: { 'POST /public/:storeId/promotions/preview': 2 },
+    // One shared handler serves the checkout route (/preview) and the browse route (/preview-browse).
+    reads: { makePreviewHandler: 2 },
   },
   'services/cart-recovery-email.service.ts': {
     category: 'resolver-output',
@@ -633,10 +634,8 @@ describe('B2B (M-4): every known bypass is PLANTED and goes red', () => {
     // promotion preview: all reads live in one handler. A read added to a second handler is reported under ITS route, not hidden.
     const v = planted(
       'routes/promotion.routes.ts',
-      "router.post('/public/:storeId/promotions/preview', async () => { " +
-        'a.price;'.repeat(
-          ALLOW['routes/promotion.routes.ts']!.reads['POST /public/:storeId/promotions/preview']!
-        ) +
+      'const makePreviewHandler = (browse) => async () => { ' +
+        'a.price;'.repeat(ALLOW['routes/promotion.routes.ts']!.reads['makePreviewHandler']!) +
         " });\nrouter.get('/preview', async () => { b.price; });"
     );
     expect(v.join()).toMatch(/new symbol "GET \/preview" reads a price/);

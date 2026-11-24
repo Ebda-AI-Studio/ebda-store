@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
 import { useT } from '@/i18n/useT';
+import { TONE_CLASSES, getStatusEntry } from '@/lib/status-tones';
 
 const iconMap: Record<string, string> = {
   new_order: '🛒',
@@ -15,16 +16,6 @@ const iconMap: Record<string, string> = {
   low_stock: '📦',
   order_status: '📋',
   return_status: '🔄',
-};
-
-const colorMap: Record<string, string> = {
-  new_order: 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success-ink',
-  new_review: 'bg-warning/10 text-warning-ink dark:bg-warning/30 dark:text-warning-ink',
-  new_return: 'bg-primary/10 text-primary-ink dark:bg-primary/30 dark:text-primary-ink',
-  low_stock:
-    'bg-destructive/10 text-destructive-ink dark:bg-destructive/30 dark:text-destructive-ink',
-  order_status: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink',
-  return_status: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink',
 };
 
 export function NotificationBell() {
@@ -161,7 +152,7 @@ export function NotificationBell() {
           <div
             ref={panelRef}
             style={{ position: 'fixed', top: coords.top, left: coords.left, width: coords.width }}
-            className="bg-card rounded-xl shadow-2xl border border-border z-[100] overflow-hidden"
+            className="bg-card rounded-md shadow-xl border border-border z-[100] overflow-hidden"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 bg-muted border-b border-border">
@@ -221,7 +212,7 @@ export function NotificationBell() {
                         {/* Icon */}
                         <div
                           className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg ${
-                            colorMap[notification.type] || 'bg-muted text-muted-foreground'
+                            TONE_CLASSES[getStatusEntry('notificationType', notification.type).tone]
                           }`}
                         >
                           {iconMap[notification.type] || '🔔'}

@@ -209,7 +209,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 ## legal - Legal
 
-- [legal/VAT-0-clause.md](legal/VAT-0-clause.md) - VAT-0: the final clause (Ruling VAT-0, Ahmad 2026-10-26)
+- [VAT-0-clause.md](../packages/shared/src/foundation/legal/clauses/VAT-0-clause.md) - VAT-0: the final clause (Ruling VAT-0, Ahmad 2026-10-26); lives in the foundation (`legal/clauses/`, Ruling FDN-LEGAL-1), vendored here byte for byte
 
 ## merchant - Merchant-facing guides
 
@@ -302,6 +302,8 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/done/2026-10-21-phase-b2-souq.md](plans/done/2026-10-21-phase-b2-souq.md) - Phase B2 — Souq (general retail & electronics) Implementation Plan
 - [plans/done/2026-10-21-phase-b3-jasmine.md](plans/done/2026-10-21-phase-b3-jasmine.md) - Phase B3 — Jasmine (beauty & skincare) Implementation Plan
 - [plans/done/2026-10-21-phase-b4-lamma.md](plans/done/2026-10-21-phase-b4-lamma.md) - Phase B4 — Lamma (home food & home kitchens) Implementation Plan
+- [plans/2026-11-24-ci-merge-queue-critical-path.md](plans/2026-11-24-ci-merge-queue-critical-path.md) - CI: shorten the merge-queue critical path (parallel + sharded heavy jobs), strict docs-only skip (2026-11-24)
+- [plans/2026-11-20-admin-partial-refund-and-returns.md](plans/2026-11-20-admin-partial-refund-and-returns.md) - STORE-QA-76: merchant partial refund by line (per-line restock) and merchant-opened returns from the admin (2026-11-20)
 - [plans/2026-11-15-gsc-custom-domain-verification.md](plans/2026-11-15-gsc-custom-domain-verification.md) - GSC data for custom merchant domains: automatic META verification via the Site Verification API, then sites.add (2026-11-15)
 - [plans/2026-11-05-nz-17-postgres-removal.md](plans/2026-11-05-nz-17-postgres-removal.md) - N-17: inventory of Postgres residue, what replaces the Postgres integration suite, CI footprint (2026-11-05)
 - [plans/done/2026-11-03-sharia-gold-bnpl-aup.md](plans/done/2026-11-03-sharia-gold-bnpl-aup.md) - Sharia decisions: gold prepaid, BNPL off by default, acceptable use (2026-11-03)
@@ -461,3 +463,4 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/done/2026-11-12-storage-limit-enforce.md](plans/done/2026-11-12-storage-limit-enforce.md) - S3-X8: enforce maxStorageMb on the four upload routes, usage from the R2 listing (60 s bounded-stale)
 - [plans/2026-11-11-batch-limiter-and-resolve-calls.md](plans/2026-11-11-batch-limiter-and-resolve-calls.md) - PERF-BATCH-1: batch the limiter calls, parallelise the cold store resolve
 - [plans/2026-11-12-auto-recommendations.md](plans/2026-11-12-auto-recommendations.md) - Automatic product recommendations: merchant picks, then bought-together, then similar items (Vectorize), cap 8, merchant switch
+- [plans/2026-11-24-help-corpus-build-time.md](plans/2026-11-24-help-corpus-build-time.md) - HELP-CORPUS-BUILD-1: the help corpus module and capability registry are build-time outputs, never committed; every consumer generates them first
