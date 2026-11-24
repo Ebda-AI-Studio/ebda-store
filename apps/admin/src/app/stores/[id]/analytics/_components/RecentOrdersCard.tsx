@@ -30,7 +30,7 @@ export function RecentOrdersCard({ orders }: RecentOrdersCardProps) {
   const tStatus = useT('analytics.orderStatus');
 
   return (
-    <div className="bg-card rounded-xl border p-6 shadow-sm">
+    <div className="bg-card rounded-md border p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h2>
       {orders.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t('empty')}</p>

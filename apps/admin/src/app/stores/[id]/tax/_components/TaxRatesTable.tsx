@@ -127,7 +127,7 @@ export function TaxRatesTable({
 
   return (
     <div className="space-y-4">
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-md border border-border overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 p-6 border-b border-border">
           <div>
             <h2 data-setting-id="tax.rates" className="text-lg font-semibold text-foreground">

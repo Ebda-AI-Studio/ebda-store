@@ -94,7 +94,7 @@ export function ReceiptBarcodePicker({
   };
 
   return (
-    <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+    <section className="space-y-3 rounded-md border bg-card p-4 shadow-sm">
       <div>
         <h2 className="text-sm font-semibold text-foreground">{t('title')}</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">{t('hint')}</p>

@@ -1573,6 +1573,7 @@
       "remain": "المتبقي {amount}",
       "refunded": "مسترد",
       "refundedAmount": "المسترد {amount}",
+      "partially_refunded": "مسترد جزئيًا",
       "disputed": "متنازع عليه",
       "paymentMethod": "طريقة الدفع",
       "methodCod": "الدفع عند الاستلام",
