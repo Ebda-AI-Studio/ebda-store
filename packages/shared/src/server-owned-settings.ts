@@ -16,6 +16,10 @@
  * `mcpWriteEnabled` (BE:S-8, Ruling FP-1) is the merchant's MCP write switch: it is written only by
  * `PUT /stores/:id/integrations/merchant-mcp/write-switch` (audit row; one atomic `jsonb_set` statement on a Postgres store, a write-time read-merge on a Durable Object store, Ruling FP-5), never the generic route.
  *
+ * `deletionRequest` (Ruling STORE-LIFECYCLE-1) is the owner's scheduled store deletion (id, 14-day `executeAfter`, state): written only by the
+ * owner-only `/stores/:storeId/deletion` routes behind a confirm token + typed slug, so a stale whole-settings copy can neither plant nor
+ * revert a cancel.
+ *
  * `autoRecommendationsEnabled` is the merchant's switch for automatic product recommendations (absent = on): written only by
  * `PUT /stores/:id/recommendations/auto-setting`, never the generic route, so a stale whole-settings copy cannot flip it back.
  *
@@ -29,6 +33,7 @@ export const SERVER_OWNED_SETTINGS_KEYS = [
   'mcpWriteEnabled',
   'assistantMode',
   'autoRecommendationsEnabled',
+  'deletionRequest',
 ] as const;
 
 /**
@@ -41,6 +46,7 @@ export const ECHOED_SERVER_OWNED_KEYS: readonly string[] = [
   'mcpWriteEnabled',
   'assistantMode',
   'autoRecommendationsEnabled',
+  'deletionRequest',
 ];
 
 export function reservedSettingsKeys(settings: unknown): string[] {

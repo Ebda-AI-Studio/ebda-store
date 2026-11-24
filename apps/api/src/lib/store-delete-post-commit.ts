@@ -50,6 +50,7 @@ export async function finishStoreDeletion(
  *   2. the platform D1 rows of the store (memberships, API keys, invitee addresses, card reference)
  *   3. the platform payer fields (InstaPay receipts, manual-payment claims), anonymised not deleted
  *   4. the store's product vectors in Vectorize (embeddings of product text; cost + stale data)
+ *   5. the store's VAT-registration change records (platform `system_settings` rows + the private evidence object)
  * Idempotent, so a retry or a second delete call converges.
  */
 export async function anonymiseDeletedStore(
@@ -63,6 +64,8 @@ export async function anonymiseDeletedStore(
     erasePayments?: (storeId: string, requestId: string) => Promise<unknown>;
     /** The store's product vectors in Vectorize (P2-7): idempotent, throws on failure so the retry + P1 alert apply. */
     purgeVectors?: (storeId: string) => Promise<unknown>;
+    /** The store's VAT-registration change records (a pending request, its private evidence object, the decision notice): platform rows with a legal name and a registration number. */
+    purgeTaxChange?: (storeId: string) => Promise<unknown>;
     alert?: (title: string, body: string) => Promise<unknown> | unknown;
     requestId?: string;
   }
@@ -103,6 +106,10 @@ export async function anonymiseDeletedStore(
   if (deps.purgeVectors) {
     const purgeVectors = deps.purgeVectors;
     await step('vectorize', async () => void (await purgeVectors(storeId)));
+  }
+  if (deps.purgeTaxChange) {
+    const purgeTaxChange = deps.purgeTaxChange;
+    await step('tax-change-records', async () => void (await purgeTaxChange(storeId)));
   }
   if (failed.length)
     await alert(

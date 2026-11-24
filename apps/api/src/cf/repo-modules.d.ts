@@ -323,7 +323,11 @@ declare module '@ebda-src/repo' {
     storeId: string,
     fields: Record<string, unknown>
   ): { profile: string[]; config: string[]; directoryOnly: string[] };
-  export type JsonKeyPatch = { set?: Record<string, unknown>; remove?: string[] };
+  export type JsonKeyPatch = {
+    set?: Record<string, unknown>;
+    remove?: string[];
+    expect?: Record<string, Record<string, unknown>>;
+  };
   export function patchStoreSettings(
     sql: SqlRunner,
     meta: Meta,

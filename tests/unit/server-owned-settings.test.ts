@@ -29,6 +29,7 @@ describe('server-owned settings keys: the MCP switch and the gold flag (BE:S-8, 
     expect([...ECHOED_SERVER_OWNED_KEYS].sort()).toEqual([
       'assistantMode',
       'autoRecommendationsEnabled',
+      'deletionRequest',
       'goldAllowDeferredPayment',
       'mcpWriteEnabled',
     ]);

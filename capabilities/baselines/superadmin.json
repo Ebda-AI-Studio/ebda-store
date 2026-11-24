@@ -4,7 +4,6 @@
     "operator-reason-invalid|platform.manual-payment",
     "operator-reason-invalid|platform.provider-activation",
     "operator-reason-invalid|platform.scans-rollups",
-    "operator-reason-invalid|platform.store-delete",
     "superadmin-route-unreasoned|DELETE /admin/stores/:id/features",
     "superadmin-route-unreasoned|DELETE /admin/stores/:id/features/:featureKey",
     "superadmin-route-unreasoned|DELETE /stores/:id",

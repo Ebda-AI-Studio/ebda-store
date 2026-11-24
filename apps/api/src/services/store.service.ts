@@ -83,6 +83,7 @@ import { bustCorsCache } from '../lib/cors-cache';
 import { syncStoreDirectoryFromPg } from '../lib/store-directory-sync';
 import { anonymiseDeletedStore, finishStoreDeletion } from '../lib/store-delete-post-commit';
 import { purgeStoreVectors } from '../lib/search/purge-store-vectors';
+import { purgeTaxChangeRecords } from '../lib/tax-change-purge';
 import { cfBindings } from '../cf/bindings';
 import { eraseStorePlatformData, type D1Like } from '../cf/erasure/platform-subject';
 import { paymentsErasurePort } from './billing/payments-erasure';
@@ -995,7 +996,16 @@ export class StoreService {
    * Caller is responsible for super_admin authorization (route enforces it)
    * and for writing the STORE_DELETED audit log AFTER this returns successfully.
    */
-  static async delete(storeId: string, actorUserId?: string) {
+  static async delete(
+    storeId: string,
+    actorUserId?: string,
+    /**
+     * Owner self-service deletion (STORE-LIFECYCLE-1): the actor is the store OWNER, not a super_admin. The platform-operator
+     * block below (owner profile cleanup) needs a super_admin and would throw for the owner, so it is skipped: the owner keeps
+     * their account (closing the account is the separate account-closure flow). The request id is audited by the caller.
+     */
+    opts?: { ownerRequest?: { requestId: string } }
+  ) {
     // Decided BEFORE the Postgres delete (Ruling NZ-D14): the post-commit teardown must know whether the store lived on its DO.
     const wasOnDo = await storeWritesToDo(storeId);
     // N-18 (Ruling NZ-D14): a store created on D1 + its DO has NO Postgres row, so the Postgres phase (getById, the raw SQL deletes)
@@ -1183,7 +1193,7 @@ export class StoreService {
               // The owner's row is outside this store's scope (users.store_id NULL): only the
               // platform operator may read and delete it ('platform-operator' hatch, checked by
               // `ebda_is_super_admin()` in this same transaction).
-              if (!actorUserId) return;
+              if (!actorUserId || opts?.ownerRequest) return;
               await asPlatformOperator(actorUserId, async () => {
                 const owner = await tx.user.findUnique({
                   where: { id: store.ownerId },
@@ -1234,6 +1244,21 @@ export class StoreService {
       }
       throw err;
     }
+    await this.postCommitDelete(store, wasOnDo, erasedOwnerId);
+
+    return { id: storeId, name: store.name, slug: store.slug };
+  }
+
+  /**
+   * Everything AFTER the delete committed. Every step is idempotent (client removal, directory retire, anonymisation, cache and
+   * R2 purges), so `finishDeletedStore` can run it again when a first run threw part-way (STORE-LIFECYCLE-1 follow-up).
+   */
+  private static async postCommitDelete(
+    store: { id: string; slug: string; domain?: string | null; ownerId?: string | null },
+    wasOnDo: boolean,
+    erasedOwnerId: string | null
+  ) {
+    const storeId = store.id;
     // Integrator clients (identity v1.3) are bound to the store and die with it. Post-commit (a rolled-back deletion never gets
     // here, so no client is lost with a store that still exists) and idempotent, so it is retried; a final failure is logged loudly:
     // the store is gone, so its clients' tokens reach nothing, but the rows stay until the next attempt.
@@ -1263,6 +1288,9 @@ export class StoreService {
 
     // PDPL (Ruling FOLD-ERASURE-2): a DO store's people are anonymised once the delete is committed (the DO stays, closed, for the
     // legal retention period; fiscal / VAT / payment rows are kept, everything that identifies a person goes).
+    // The VAT change records are platform rows for EVERY store (not only DO ones), so they are purged on both paths.
+    if (!wasOnDo)
+      await anonymiseDeletedStore(storeId, { purgeTaxChange: id => purgeTaxChangeRecords(id) });
     if (wasOnDo)
       await anonymiseDeletedStore(storeId, {
         eraseDo: async (id, requestId) =>
@@ -1284,6 +1312,7 @@ export class StoreService {
         },
         erasePayments: (id, requestId) => paymentsErasurePort.scrub([id], requestId),
         purgeVectors: id => purgeStoreVectors(id),
+        purgeTaxChange: id => purgeTaxChangeRecords(id),
       });
 
     // Invalidate store cache (best-effort, post-commit)
@@ -1357,8 +1386,16 @@ export class StoreService {
         '[STORE_DELETE] private R2 prefix purge failed or not configured (DB delete stands)'
       );
     }
+  }
 
-    return { id: storeId, name: store.name, slug: store.slug };
+  /** Re-run the post-commit steps of an owner deletion whose delete already committed (the store row is gone). */
+  static async finishDeletedStore(snap: {
+    id: string;
+    slug: string;
+    ownerId: string;
+    onDo: boolean;
+  }) {
+    await this.postCommitDelete({ ...snap, domain: null }, snap.onDo, null);
   }
 
   static async getStoreStats(storeId: string) {
@@ -1780,6 +1817,73 @@ export class StoreService {
    */
   static async updateQrSettings(storeId: string, qr: Record<string, unknown>) {
     await this.setSettingsKey(storeId, 'qr', qr);
+  }
+
+  /**
+   * STORE-LIFECYCLE-1: write the owner's store-deletion request (`settings.deletionRequest`, a SERVER-OWNED key: no generic
+   * settings write can plant, change or erase it). One atomic key write, so a concurrent settings save never clobbers it.
+   */
+  static async setDeletionRequest(
+    storeId: string,
+    request: Record<string, unknown> | object | null
+  ) {
+    await this.setSettingsKey(storeId, 'deletionRequest', request);
+  }
+
+  /**
+   * STORE-LIFECYCLE-1: compare-and-set of the deletion request. Writes `to` only while the stored request still has `from.id` and
+   * `from.state` (a cancel and the executor's claim cannot both win). Postgres: ONE conditional UPDATE. Durable Object store: the
+   * precondition (`expect`) is checked inside the StoreDO's own transaction, atomic with the write (Ruling STORE-LIFECYCLE-1).
+   */
+  static async compareAndSetDeletionRequest(
+    storeId: string,
+    from: { id: string; state: string },
+    to: object
+  ): Promise<boolean> {
+    const store = await this.getById(storeId);
+    if (await storeWritesToDo(storeId)) {
+      // The precondition runs INSIDE the StoreDO's synchronous transaction (single threaded), so a cancel and the executor's
+      // claim cannot both win: the loser's patch finds the other's state and writes nothing.
+      try {
+        await storePatchOnDo(storeId, {
+          json: {
+            settings: {
+              set: { deletionRequest: to },
+              expect: { deletionRequest: { id: from.id, state: from.state } },
+            },
+          },
+        });
+      } catch (e) {
+        if (e instanceof AppError && e.code === 'PATCH_PRECONDITION_FAILED') return false;
+        throw e;
+      }
+      await this.afterDeletionRequestWrite(store, storeId);
+      return true;
+    }
+    const rows = await withStore(
+      storeId,
+      tx => tx.$queryRaw<Array<{ settings: unknown; updatedAt?: Date }>>`
+        UPDATE stores
+        SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), ARRAY['deletionRequest']::text[], ${JSON.stringify(to)}::jsonb),
+            updated_at = now()
+        WHERE id = ${storeId}
+          AND settings -> 'deletionRequest' ->> 'id' = ${from.id}
+          AND settings -> 'deletionRequest' ->> 'state' = ${from.state}
+        RETURNING settings, updated_at AS "updatedAt"`
+    );
+    if (!rows?.length) return false;
+    await copyStoreSettings(storeId, { settings: rows[0]?.settings ?? {}, ...stamp(rows[0]) });
+    await this.afterDeletionRequestWrite(store, storeId);
+    return true;
+  }
+
+  private static async afterDeletionRequestWrite(
+    store: { slug: string; domain?: string | null },
+    storeId: string
+  ) {
+    await StoreService.invalidateCache(store);
+    const fresh = await this.getById(storeId);
+    await bustStoreCaches(fresh.id, fresh.slug, fresh.domain);
   }
 
   /** BARCODE-1: replace `settings.labels` only (atomic jsonb_set, see updateQrSettings). */

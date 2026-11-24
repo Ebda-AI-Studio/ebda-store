@@ -83,6 +83,7 @@ import storeLayoutRoutes from './store-layout.routes';
 import pageBuilderRoutes from './page-builder.routes';
 import publicStoreLayoutRoutes from './public-store-layout.routes';
 import pagesRoutes from './pages.routes';
+import storeDeletionRoutes from './store-deletion.routes';
 import typographyRoutes from './typography.routes';
 import agentCredentialRoutes from './agent-credential.routes';
 import merchantKeyRoutes from './merchant-key.routes';
@@ -425,6 +426,8 @@ router.use('/public', publicLoyaltyRoutes);
 // context is set via `router.param('storeId', tenantContext)` registered
 // inside each of pages.routes.ts / blog.routes.ts / locations.routes.ts.
 router.use('/', tenantContext, pagesRoutes);
+// A11 (Ruling STORE-LIFECYCLE-1): owner deletes the store (14-day cooling-off) and exports its data.
+router.use('/', tenantContext, storeDeletionRoutes);
 
 // Blog (Bucket E1, 2026-05-17) — same dual-surface pattern as pages.
 // Admin CRUD under /stores/:storeId/blog, public reads under

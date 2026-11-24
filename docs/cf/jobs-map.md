@@ -36,6 +36,7 @@ Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of tr
 | `queue-depth-watch`                        | 1-observability | queue    | cron    |             |
 | `abandoned-cart-purge-weekly`              | 2-housekeeping  | queue    | cron    | yes         |
 | `account-erased-propagation`               | 2-housekeeping  | workflow | event   |             |
+| `store-deletion-execute`                   | 2-housekeeping  | workflow | event   |             |
 | `audit-log-archive-weekly`                 | 2-housekeeping  | queue    | cron    | yes         |
 | `bulk-import-orphan-cleanup`               | 2-housekeeping  | queue    | cron    | yes         |
 | `domain-claim-sweep`                       | 2-housekeeping  | queue    | cron    |             |

@@ -13,6 +13,7 @@ import { apiGet, apiPatch } from '../../../../lib/api';
 import { SubscriptionPlanRow } from '../../../../components/billing/SubscriptionPlanRow';
 import { SettingsSearch } from '../../../../components/SettingsSearch';
 import { SETTINGS_GROUPS } from '../../../../lib/settings-groups';
+import { OwnerStoreLifecycle } from './_components/OwnerStoreLifecycle';
 import { ConnectChatCard } from './ConnectChatCard';
 
 /**
@@ -663,6 +664,8 @@ export default function StoreSettingsPage() {
           </Button>
         </div>
       </Modal>
+      {/* A11: owner-only data export + store deletion (the section hides itself for anyone who is not the owner) */}
+      <OwnerStoreLifecycle storeId={storeId} />
     </AdminLayout>
   );
 }

@@ -2253,7 +2253,15 @@ export async function storePatchOnDo(
   storeId: string,
   patch: {
     fields?: Record<string, unknown>;
-    json?: Record<string, { set?: Record<string, unknown>; remove?: string[] }>;
+    json?: Record<
+      string,
+      {
+        set?: Record<string, unknown>;
+        remove?: string[];
+        /** Precondition checked inside the DO's transaction (compare-and-set), see JsonKeyPatch.expect. */
+        expect?: Record<string, Record<string, unknown>>;
+      }
+    >;
   },
   args: { select?: unknown; include?: { owner?: unknown } } = {}
 ): Promise<any> {
@@ -2269,6 +2277,8 @@ export async function storePatchOnDo(
   };
   const { encodeRpc } = await import('@ebda-src/repo');
   const r = await stub.patchSettings(storeId, encodeRpc({ fields, json: patch.json ?? {} }));
+  if (!r.ok && r.code === 'PATCH_PRECONDITION_FAILED')
+    throw new AppError(409, 'PATCH_PRECONDITION_FAILED', 'The stored value changed first');
   if (!r.ok) throw new AppError(502, 'SETTINGS_COPY_FAILED', `settings patch refused: ${r.code}`);
   if ((await d1StoreWrite({ id: storeId }, d1StorePatch(fields))) === 0)
     throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
