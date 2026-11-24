@@ -150,7 +150,7 @@ test('initial editor interactive on throttled Fast 4G', async ({ page, browserNa
   const t0 = Date.now();
   await page.goto(`/stores/${STORE_ID}/builder`);
   await expect(page.getByTestId('builder')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId('publish')).toBeEnabled();
+  await expect(page.getByTestId('publish-open')).toBeEnabled();
   const ms = Date.now() - t0;
   console.log(`PERF interactive-fast4g ${ms}ms (next dev: compiles on demand)`);
   expect(ms).toBeLessThan(2500);

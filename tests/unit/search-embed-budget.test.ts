@@ -132,8 +132,16 @@ describe('takeQueryEmbed', () => {
   });
 
   it('per searcher: 1000 attempts by one client in a minute are granted the per-minute cap', async () => {
+    // The window is a FIXED minute: a wall-clock run straddling :59 -> :00 grants the cap twice (CI saw
+    // 120 vs 60). Freeze Date mid-minute so the 1000 attempts all land in one window.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-01T12:00:30Z'));
     let granted = 0;
-    for (let i = 0; i < 1000; i++) if (await takeQueryEmbed(A, 'ip:203.0.113.7')) granted++;
+    try {
+      for (let i = 0; i < 1000; i++) if (await takeQueryEmbed(A, 'ip:203.0.113.7')) granted++;
+    } finally {
+      vi.useRealTimers();
+    }
     expect(granted).toBe(SEARCH_EMBED_PER_SEARCHER_PER_MIN);
     // The 980 refused attempts never reached the store's or the platform's daily budget.
     const storeCount = [...store.entries()].find(([k]) => k.startsWith(`search:embed:query:${A}:`));

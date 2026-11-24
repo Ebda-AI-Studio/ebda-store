@@ -46,6 +46,21 @@ export function spacingValues(node: SectionNode): Values {
 
 const AXES: readonly SpacingAxis[] = ['Top', 'Bottom'];
 
+/** The three whole-section presets and the existing scale step each one writes to both sides. */
+// pq-allow(unused-export): test seam, imported by SectionSpacingField.quick.test.tsx
+export const QUICK_PRESETS: ReadonlyArray<{
+  key: 'compact' | 'normal' | 'roomy';
+  value: SectionSpacingPreset;
+}> = [
+  { key: 'compact', value: 'tight' },
+  { key: 'normal', value: 'normal' },
+  { key: 'roomy', value: 'loose' },
+];
+
+/** Preview height of one side: half the real padding, capped so a wide step still fits the card. */
+// pq-allow(unused-export): test seam, imported by SectionSpacingField.quick.test.tsx
+export const previewHeight = (px: number) => Math.min(48, Math.round(px / 2));
+
 export function SectionSpacingField({
   node,
   viewport,
@@ -125,6 +140,49 @@ export function SectionSpacingField({
           ))}
         </div>
       )}
+      <div data-testid="spacing-quick">
+        <span className="mb-1 block text-xs font-semibold text-foreground">
+          {t('spacing.quick')}
+        </span>
+        <div role="radiogroup" aria-label={t('spacing.quick')} className="grid grid-cols-3 gap-1">
+          {QUICK_PRESETS.map(q => {
+            const on = AXES.every(a => resolveSpacingPreset(values, a, editing) === q.value);
+            return (
+              <button
+                key={q.key}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                data-testid={`spacing-quick-${q.key}`}
+                onClick={() => AXES.forEach(a => write(a, editing, q.value))}
+                className={`rounded-md border px-1 py-1.5 text-xs max-lg:min-h-11 ${
+                  on
+                    ? 'border-primary bg-primary/10 font-semibold text-primary-ink'
+                    : 'border-border text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                {t(`spacing.quickPreset.${q.key}`)}
+              </button>
+            );
+          })}
+        </div>
+        <div
+          role="img"
+          aria-label={t('spacing.preview')}
+          data-testid="spacing-preview"
+          className="mt-2 flex flex-col rounded-md border border-dashed border-border bg-muted/40 p-1"
+        >
+          <div
+            data-testid="spacing-preview-top"
+            style={{ height: previewHeight(resolveSpacingPx(values, 'Top', editing)) }}
+          />
+          <div className="h-3 rounded-sm bg-primary/30" />
+          <div
+            data-testid="spacing-preview-bottom"
+            style={{ height: previewHeight(resolveSpacingPx(values, 'Bottom', editing)) }}
+          />
+        </div>
+      </div>
       {AXES.map(axis => {
         const current = resolveSpacingPreset(values, axis, editing);
         const own = ownValue(axis, editing);

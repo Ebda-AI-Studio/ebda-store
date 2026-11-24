@@ -18,6 +18,7 @@ import {
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { Field } from './SettingsPanel';
+import { SettingsEmptyState, type EmptyActions } from './SettingsEmptyState';
 import { Disclosure } from '../../../../../components/ui/Disclosure';
 
 /** The value at `a` or `a.b` inside a settings group. */
@@ -34,6 +35,7 @@ export function PageSettingsPanel({
   theme,
   dispatch,
   onSwitchPage,
+  emptyActions,
 }: {
   storeId: string;
   pageKey: PageKind;
@@ -41,6 +43,8 @@ export function PageSettingsPanel({
   theme: StoreTheme | undefined;
   dispatch: (action: DocumentAction, coalesceKey?: string) => unknown;
   onSwitchPage?: (next: PageKind) => void;
+  /** The teaching card's next steps (F57); each shows only when wired. */
+  emptyActions?: EmptyActions;
 }) {
   const t = useT('builder.pageSettings');
   const locale = useLocale();
@@ -60,6 +64,7 @@ export function PageSettingsPanel({
         <p className="mt-1 text-xs text-muted-foreground">{t('hint')}</p>
       </div>
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        <SettingsEmptyState actions={emptyActions} />
         {groups.map((g, i) => {
           const group = doc.siteSettings[g.key];
           return (

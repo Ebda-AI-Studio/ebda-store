@@ -44,6 +44,15 @@ function locale(): 'ar' | 'en' {
 const narrow = (page: Page) => (page.viewportSize()?.width ?? 1280) < 1024;
 const L = (ar: string, en: string) => (locale() === 'ar' ? ar : en);
 
+/** A row's overflow menu action (Duplicate / Move up / Move down / Delete live there, not on the row). */
+async function rowMenu(page: Page, sectionId: string, item: string) {
+  await page
+    .getByTestId(`tree-row-${sectionId}`)
+    .getByRole('button', { name: /^(خيارات|Options)/ })
+    .click();
+  await page.getByRole('menuitem', { name: item, exact: true }).click();
+}
+
 async function openBuilder(page: Page) {
   await page.request.post(`${API}/__test/reset`);
   await page
@@ -106,29 +115,18 @@ test('add, reorder (keyboard + buttons), duplicate, hide, delete, autosave', asy
   await page.getByTestId('tree-select-image-text-1').press('Alt+ArrowUp');
   expect((await templateIds(page)).indexOf('image-text-1')).toBe(at - 1);
   // button reorder
-  await page
-    .getByRole('button', {
-      name: L('حرّك صورة مع نص لأعلى', 'Move Image with text up'),
-      exact: true,
-    })
-    .click();
+  await rowMenu(page, 'image-text-1', L('تحريك لأعلى', 'Move up'));
   expect((await templateIds(page)).indexOf('image-text-1')).toBe(at - 2);
 
   // duplicate, hide, delete
-  await page
-    .getByRole('button', { name: L('تكرار صورة مع نص', 'Duplicate Image with text'), exact: true })
-    .first()
-    .click();
+  await rowMenu(page, 'image-text-1', L('تكرار', 'Duplicate'));
   await structure(page);
   await expect(page.getByTestId('tree-row-image-text-2')).toBeVisible();
   await page
     .getByTestId('tree-row-image-text-2')
     .getByRole('button', { name: L('إخفاء صورة مع نص', 'Hide Image with text'), exact: true })
     .click();
-  await page
-    .getByTestId('tree-row-image-text-1')
-    .getByRole('button', { name: L('حذف صورة مع نص', 'Remove Image with text'), exact: true })
-    .click();
+  await rowMenu(page, 'image-text-1', L('حذف', 'Delete'));
   await expect(page.getByTestId('tree-row-image-text-1')).toHaveCount(0);
 
   // autosave reaches the API as a validated draft
@@ -489,6 +487,7 @@ test('fonts and typography zones are draft edits: they reach the draft, and noth
   expect((await state(page)).liveWrites).toEqual([]);
 
   // publish promotes the draft; still no direct write to the live theme/typography endpoints
+  await page.getByTestId('publish-open').click();
   await page.getByTestId('publish').click();
   await expect.poll(async () => (await state(page)).publishes, { timeout: 15_000 }).toBe(1);
   expect((await state(page)).liveWrites).toEqual([]);
@@ -514,6 +513,7 @@ test('publish flushes the draft and publishes it', async ({ page }) => {
     .getByTestId('tree-row-hero')
     .getByRole('button', { name: L('إخفاء البانر الرئيسي', 'Hide Hero banner'), exact: true })
     .click();
+  await page.getByTestId('publish-open').click();
   await page.getByTestId('publish').click();
   await expect.poll(async () => (await state(page)).publishes).toBe(1);
   const s = await state(page);
@@ -548,6 +548,7 @@ test('publish keeps the latest edit made while an earlier autosave is pending', 
     await title.fill('First catalogue');
     await started;
     await title.fill('Second catalogue');
+    await page.getByTestId('publish-open').click();
     await page.getByTestId('publish').click();
     await title.fill('Latest catalogue');
     // Let the latest edit debounce while the first HTTP response stays held.
@@ -588,6 +589,7 @@ test('autosave waits for an in-flight publish and keeps later edits as a draft',
     await route.continue();
   });
   try {
+    await page.getByTestId('publish-open').click();
     await page.getByTestId('publish').click();
     await started;
     await title.fill('Next draft catalogue');
@@ -663,7 +665,7 @@ test('no horizontal document overflow on any editor panel (EDITOR-MOBILE-1)', as
     expect(m.sw, `${what}: scrollWidth ${m.sw} > clientWidth ${m.cw}`).toBeLessThanOrEqual(m.cw);
   };
   await noOverflow('top bar + canvas');
-  await expect(page.getByTestId('publish')).toBeInViewport();
+  await expect(page.getByTestId('publish-open')).toBeInViewport();
   await expect(page.getByTestId('builder-canvas')).toBeVisible();
 
   await structure(page);
@@ -692,7 +694,8 @@ test('no horizontal document overflow on any editor panel (EDITOR-MOBILE-1)', as
 // ---- Product, collection and cart pages are section documents (Ruling VE-3 amended, VE-12) ----
 
 async function openPage(page: Page, kind: 'product' | 'collection' | 'cart') {
-  await page.getByTestId('page-switcher').selectOption(kind);
+  await page.getByTestId('page-switcher').click();
+  await page.getByTestId(`page-option-${kind}`).click();
   await expect(page).toHaveURL(new RegExp(`[?&]page=${kind}`));
   await expect(page.getByTestId('builder')).toBeVisible();
   await structure(page);
@@ -711,10 +714,18 @@ test('cart page: sections only, the main block is pinned, the canvas loads /cart
   const main = page.getByTestId('tree-row-cart-main');
   await expect(page.getByTestId('tree-pinned-cart-main')).toBeVisible();
   await expect(main.getByRole('button', { name: /^(إخفاء|Hide) /u })).toHaveCount(0);
-  await expect(main.getByRole('button', { name: /^(حذف|Remove) /u })).toHaveCount(0);
+  await main.getByRole('button', { name: /^(خيارات|Options)/ }).click();
+  await expect(page.getByRole('menuitem', { name: L('حذف', 'Delete'), exact: true })).toHaveCount(
+    0
+  );
+  await page.keyboard.press('Escape');
   const recs = page.getByTestId('tree-row-cart-recommendations');
   await expect(recs.getByRole('button', { name: /^(إخفاء|Hide) /u })).toHaveCount(1);
-  await expect(recs.getByRole('button', { name: /^(حذف|Remove) /u })).toHaveCount(1);
+  await recs.getByRole('button', { name: /^(خيارات|Options)/ }).click();
+  await expect(page.getByRole('menuitem', { name: L('حذف', 'Delete'), exact: true })).toHaveCount(
+    1
+  );
+  await page.keyboard.press('Escape');
   // the theme belongs to the home document only
   // (sections, ai, history: the AI tab exists since #271) and no theme tab
   await expect(page.getByRole('tab')).toHaveCount(3);
@@ -755,6 +766,8 @@ test('product page: the picker offers what belongs here, reorder autosaves and p
   // the home document was never touched
   expect((await state(page, 'home')).saves).toBe(0);
 
+  await page.getByTestId('publish-open').click();
+
   await page.getByTestId('publish').click();
   await expect.poll(async () => (await state(page, 'product')).publishes).toBe(1);
   expect((await state(page, 'home')).publishes).toBe(0);
@@ -767,7 +780,8 @@ test('switching page saves the unsaved edit first, and the URL carries the page'
   await openPage(page, 'product');
   await page.getByTestId('tree-select-product-related').press('Alt+ArrowUp');
   // do not wait for the autosave debounce: the switch itself must flush it
-  await page.getByTestId('page-switcher').selectOption('home');
+  await page.getByTestId('page-switcher').click();
+  await page.getByTestId('page-option-home').click();
   await expect(page).not.toHaveURL(/page=/);
   await expect.poll(async () => (await state(page, 'product')).saves).toBe(1);
   expect((await state(page, 'product')).draft!.definition.sections[4].id).toBe('product-related');

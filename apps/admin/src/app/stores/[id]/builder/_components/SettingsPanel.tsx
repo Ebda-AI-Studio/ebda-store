@@ -16,7 +16,8 @@
  *   merchant to the classic page (Ruling BUILDER2-ADVANCED-1, superseded by VE-6).
  */
 import { Button } from '@/components/ui/Button';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { RotateCcw } from 'lucide-react';
 import { rovingKeyDown } from '../_lib/roving';
 import { useLocale } from 'next-intl';
 import {
@@ -47,7 +48,10 @@ import { ChromeContentPanel } from './ChromeContentPanel';
 import { DividersField } from './DividersField';
 import { SectionTypographyField } from './SectionTypographyField';
 import { SectionSpacingField } from './SectionSpacingField';
-import { MediaPicker } from './MediaPicker';
+import { ImageDropField } from './ImageDropField';
+import { SegmentedEnum, SEGMENTED_MAX } from './SegmentedEnum';
+import { SettingsEmptyState } from './SettingsEmptyState';
+import { groupFieldErrors, type FieldIssue } from '../_lib/field-errors';
 import { VideoField } from './VideoField';
 import type { Selection } from './SectionTree';
 import { fieldDefId } from '../_lib/deeplink';
@@ -100,6 +104,7 @@ export function SettingsPanel({
   const t = useT('builder.settings');
   const locale = useLocale();
   const [mode, setMode] = useState<Mode>('content');
+  const panelRef = useRef<HTMLDivElement>(null);
   const at = selection ? locateSection(doc, selection.sectionId) : null;
   // A deep link to a Design control opens the Design mode first, or the control is not rendered.
   useEffect(() => {
@@ -119,7 +124,7 @@ export function SettingsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusField, selection?.sectionId, selection?.blockId]);
   if (!selection || !at) {
-    return <p className="p-4 text-sm text-muted-foreground">{t('empty')}</p>;
+    return <SettingsEmptyState />;
   }
   const node = at.node;
   const d = getSectionDefinition(node.type);
@@ -156,7 +161,28 @@ export function SettingsPanel({
       ? d.labelAr
       : d.labelEn;
   const sectionPath = `/${at.list === 'template' ? 'sections' : `sectionGroups/${at.list}`}/${at.index}`;
-  const sectionErrors = errors.filter(e => e.path.startsWith(sectionPath));
+  const blockIndex = block ? (node.blocks ?? []).findIndex(b => b.id === block.id) : null;
+  const { byDef: fieldErrors, loose: looseErrors } = groupFieldErrors(
+    errors,
+    sectionPath,
+    blockIndex,
+    defs
+  );
+  const sectionErrors = [...Object.values(fieldErrors).flat(), ...looseErrors];
+  /** Jump from the summary to the field: open its mode, then focus its first control. */
+  const jumpTo = (defId: string) => {
+    const def = (blockDef ? blockDef.settings : d.settings).find(x => x.id === defId);
+    if (def && def.group === 'design' && mode !== 'design') setMode('design');
+    window.requestAnimationFrame(() => {
+      const el = panelRef.current?.querySelector<HTMLElement>(`[data-field-id="${defId}"]`);
+      el?.scrollIntoView?.({ block: 'center' });
+      el?.querySelector<HTMLElement>(
+        'input,textarea,select,button[role="radio"][tabindex="0"]'
+      )?.focus();
+    });
+  };
+  const defIdOf = (e: FieldIssue) =>
+    Object.keys(fieldErrors).find(k => fieldErrors[k].includes(e)) ?? null;
 
   const set = (s: SettingDefinition, key: string, value: unknown) => {
     const coalesce = `${node.id}/${block?.id ?? ''}/${key}`;
@@ -177,9 +203,10 @@ export function SettingsPanel({
       : values[key];
 
   const renderDef = (s: SettingDefinition) => (
-    <div key={s.id} data-field-id={s.id}>
+    <div key={s.id} data-field-id={s.id} className="group/field">
       <Field
         def={s}
+        errors={fieldErrors[s.id]}
         storeId={storeId}
         theme={theme}
         locale={locale}
@@ -229,20 +256,44 @@ export function SettingsPanel({
         </div>
       </div>
       <div
+        ref={panelRef}
         role="tabpanel"
         id="settings-mode-panel"
         aria-labelledby={`settings-mode-${mode}`}
         className="flex-1 space-y-4 overflow-y-auto p-4"
       >
         {sectionErrors.length > 0 && (
-          <ul
+          <div
             role="alert"
-            className="space-y-1 rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive-ink"
+            className="rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive-ink"
+            data-testid="error-summary"
           >
-            {sectionErrors.map(e => (
-              <li key={e.path}>{locale === 'ar' ? e.messageAr : e.messageEn}</li>
-            ))}
-          </ul>
+            <p className="font-semibold">
+              {t('errorsTitle', { count: String(sectionErrors.length) })}
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {sectionErrors.map(e => {
+                const text = locale === 'ar' ? e.messageAr : e.messageEn;
+                const target = defIdOf(e);
+                return (
+                  <li key={e.path}>
+                    {target ? (
+                      <button
+                        type="button"
+                        onClick={() => jumpTo(target)}
+                        className="text-start underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        data-testid={`error-jump-${target}`}
+                      >
+                        {text}
+                      </button>
+                    ) : (
+                      text
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         )}
         {hasSpacing && mode === 'design' && (
           <SectionSpacingField
@@ -406,6 +457,7 @@ export function Field({
   onChange,
   onReset,
   sectionType,
+  errors,
 }: {
   def: SettingDefinition;
   storeId: string;
@@ -417,319 +469,354 @@ export function Field({
   onChange: (key: string, value: unknown) => void;
   onReset: () => void;
   sectionType: string;
+  /** Issues the API reported for this field: shown under the control (F56). */
+  errors?: FieldIssue[];
 }) {
   const t = useT('builder.settings');
   const label = locale === 'ar' ? def.labelAr : def.labelEn;
   const id = `setting-${def.id}`;
+  const invalid = !!errors?.length;
+  const errId = `${id}-error`;
+  const ariaErr = {
+    'aria-invalid': invalid || undefined,
+    'aria-describedby': invalid ? errId : undefined,
+  };
+  const valueKeys = def.localized ? [def.id, `${def.id}Ar`] : [def.id];
+  // One "Edited" cue for every field: a stored value that is not the default (F55).
+  const edited =
+    overridden ||
+    valueKeys.some(k => {
+      const v = valueOf(k);
+      return (
+        v !== undefined &&
+        JSON.stringify(v) !== JSON.stringify(k === def.id ? def.default : undefined)
+      );
+    });
+  const resetAll = () => {
+    if (overridden) onReset();
+    else for (const k of valueKeys) onChange(k, undefined);
+  };
   const empty = (v: string) => (v === '' ? undefined : v);
   const str = (key: string) => (typeof valueOf(key) === 'string' ? (valueOf(key) as string) : '');
 
   const header = (
     <div className="mb-1 flex items-center justify-between gap-2">
-      <span className="text-xs font-semibold text-foreground">{label}</span>
-      {overridden && (
+      <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+        {label}
+        {edited && (
+          <span
+            role="img"
+            aria-label={t('edited')}
+            title={t('edited')}
+            className="inline-block h-1.5 w-1.5 rounded-full bg-primary"
+            data-testid={`edited-${def.id}`}
+          />
+        )}
+      </span>
+      {overridden ? (
         <Button variant="link" size="sm" type="button" onClick={onReset}>
           {t('resetViewport', { viewport: t(`viewport.${viewport}`) })}
         </Button>
+      ) : (
+        edited && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            type="button"
+            onClick={resetAll}
+            aria-label={`${t('resetField')}: ${label}`}
+            title={t('resetField')}
+            className="text-muted-foreground opacity-0 transition-opacity duration-150 focus-visible:opacity-100 group-hover/field:opacity-100 group-focus-within/field:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100"
+            data-testid={`reset-${def.id}`}
+          >
+            <RotateCcw className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+          </Button>
+        )
       )}
     </div>
   );
 
-  switch (def.type) {
-    case 'text':
-    case 'textarea': {
-      const Input = def.type === 'textarea' ? 'textarea' : 'input';
-      const keys: Array<[string, 'rtl' | 'ltr', string]> = def.localized
-        ? [
-            [`${def.id}Ar`, 'rtl', t('arabic')],
-            [def.id, 'ltr', t('english')],
-          ]
-        : [[def.id, locale === 'ar' ? 'rtl' : 'ltr', '']];
-      return (
-        <div>
-          {header}
-          <div className={def.localized ? 'grid grid-cols-1 gap-2 xl:grid-cols-2' : ''}>
-            {keys.map(([key, dir, tag]) => (
-              <label key={key} className="block">
-                {tag && <span className="mb-0.5 block text-xs text-muted-foreground">{tag}</span>}
-                <Input
-                  id={`${id}-${key}`}
-                  dir={dir}
-                  // The visible name is a sibling span (the field) plus the language tag, so a
-                  // screen reader would read "Arabic" alone, or nothing for a plain field.
-                  aria-label={tag ? `${label} - ${tag}` : label}
+  const body = (() => {
+    switch (def.type) {
+      case 'text':
+      case 'textarea': {
+        const Input = def.type === 'textarea' ? 'textarea' : 'input';
+        const keys: Array<[string, 'rtl' | 'ltr', string]> = def.localized
+          ? [
+              [`${def.id}Ar`, 'rtl', t('arabic')],
+              [def.id, 'ltr', t('english')],
+            ]
+          : [[def.id, locale === 'ar' ? 'rtl' : 'ltr', '']];
+        return (
+          <div>
+            {header}
+            <div className={def.localized ? 'grid grid-cols-1 gap-2 xl:grid-cols-2' : ''}>
+              {keys.map(([key, dir, tag]) => (
+                <label key={key} className="block">
+                  {tag && <span className="mb-0.5 block text-xs text-muted-foreground">{tag}</span>}
+                  <Input
+                    id={`${id}-${key}`}
+                    dir={dir}
+                    // The visible name is a sibling span (the field) plus the language tag, so a
+                    // screen reader would read "Arabic" alone, or nothing for a plain field.
+                    aria-label={tag ? `${label} - ${tag}` : label}
+                    value={str(key)}
+                    {...ariaErr}
+                    rows={def.type === 'textarea' ? 3 : undefined}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+                      onChange(key, empty(e.target.value))
+                    }
+                    className={fieldControlClasses()}
+                    data-testid={`field-${key}`}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+      }
+      case 'url': {
+        const v = str(def.id);
+        const bad = v !== '' && !isSafeUrl(v);
+        return (
+          <div>
+            {header}
+            <input
+              id={id}
+              aria-label={label}
+              dir="ltr"
+              value={v}
+              aria-invalid={bad || invalid || undefined}
+              aria-describedby={invalid ? errId : undefined}
+              onChange={e => onChange(def.id, empty(e.target.value))}
+              placeholder={PATH_EXAMPLE}
+              className={fieldControlClasses()}
+            />
+            {bad && (
+              <span className="mt-1 block text-xs text-destructive-ink">{t('unsafeUrl')}</span>
+            )}
+          </div>
+        );
+      }
+      case 'image':
+        return (
+          <div>
+            {header}
+            <div className={def.localized ? 'grid grid-cols-2 gap-2' : ''}>
+              {(def.localized
+                ? [
+                    [`${def.id}Ar`, t('arabic')],
+                    [def.id, t('english')],
+                  ]
+                : [[def.id, '']]
+              ).map(([key, tag]) => (
+                <ImageDropField
+                  key={key}
+                  storeId={storeId}
+                  label={label}
+                  tag={tag}
                   value={str(key)}
-                  rows={def.type === 'textarea' ? 3 : undefined}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-                    onChange(key, empty(e.target.value))
-                  }
-                  className={fieldControlClasses()}
-                  data-testid={`field-${key}`}
+                  onChange={v => onChange(key, v)}
                 />
-              </label>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      );
-    }
-    case 'url': {
-      const v = str(def.id);
-      const bad = v !== '' && !isSafeUrl(v);
-      return (
-        <label className="block">
-          {header}
-          <input
-            id={id}
-            dir="ltr"
-            value={v}
-            aria-invalid={bad}
-            onChange={e => onChange(def.id, empty(e.target.value))}
-            placeholder={PATH_EXAMPLE}
-            className={fieldControlClasses()}
+        );
+      case 'video':
+        return (
+          <div>
+            {header}
+            <div className={def.localized ? 'grid grid-cols-2 gap-2' : ''}>
+              {(def.localized
+                ? [
+                    [`${def.id}Ar`, t('arabic')],
+                    [def.id, t('english')],
+                  ]
+                : [[def.id, '']]
+              ).map(([key, tag]) => (
+                <VideoField
+                  key={key}
+                  storeId={storeId}
+                  tag={tag}
+                  value={str(key)}
+                  onChange={v => onChange(key, v)}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      case 'color':
+        return (
+          <ColorField
+            label={label}
+            value={str(def.id) || undefined}
+            onChange={v => onChange(def.id, empty(v))}
+            theme={theme ?? DEFAULT_THEME}
           />
-          {bad && <span className="mt-1 block text-xs text-destructive-ink">{t('unsafeUrl')}</span>}
-        </label>
-      );
-    }
-    case 'image':
-      return (
-        <div>
-          {header}
-          <div className={def.localized ? 'grid grid-cols-2 gap-2' : ''}>
-            {(def.localized
-              ? [
-                  [`${def.id}Ar`, t('arabic')],
-                  [def.id, t('english')],
-                ]
-              : [[def.id, '']]
-            ).map(([key, tag]) => (
-              <ImageField
-                key={key}
-                storeId={storeId}
+        );
+      case 'select': {
+        const opts = def.options ?? [];
+        const hint = def.hintEn && (
+          <span className="mt-1 block text-xs text-muted-foreground">
+            {locale === 'ar' ? (def.hintAr ?? def.hintEn) : def.hintEn}
+          </span>
+        );
+        // A few named choices read at a glance as one segmented control (F52). A longer list stays a
+        // select. No layout thumbnails exist for these options, so there are no pictogram tiles.
+        if (opts.length > 0 && opts.length <= SEGMENTED_MAX) {
+          const current = valueOf(def.id);
+          return (
+            <div>
+              {header}
+              <SegmentedEnum
                 label={label}
-                tag={tag}
-                value={str(key)}
-                onChange={v => onChange(key, v)}
+                options={opts.map(o => ({
+                  value: o.value,
+                  label: locale === 'ar' ? o.labelAr : o.labelEn,
+                }))}
+                value={current === undefined ? def.default : current}
+                onPick={v => onChange(def.id, v)}
+                invalid={invalid}
+                describedBy={invalid ? errId : undefined}
+                testId={`field-${def.id}`}
               />
-            ))}
-          </div>
-        </div>
-      );
-    case 'video':
-      return (
-        <div>
-          {header}
-          <div className={def.localized ? 'grid grid-cols-2 gap-2' : ''}>
-            {(def.localized
-              ? [
-                  [`${def.id}Ar`, t('arabic')],
-                  [def.id, t('english')],
-                ]
-              : [[def.id, '']]
-            ).map(([key, tag]) => (
-              <VideoField
-                key={key}
-                storeId={storeId}
-                tag={tag}
-                value={str(key)}
-                onChange={v => onChange(key, v)}
-              />
-            ))}
-          </div>
-        </div>
-      );
-    case 'color':
-      return (
-        <ColorField
-          label={label}
-          value={str(def.id) || undefined}
-          onChange={v => onChange(def.id, empty(v))}
-          theme={theme ?? DEFAULT_THEME}
-        />
-      );
-    case 'select':
-      return (
-        <label className="block">
-          {header}
-          <select
-            id={id}
-            value={valueOf(def.id) === undefined ? '' : String(valueOf(def.id))}
-            onChange={e => {
-              const opt = def.options?.find(o => String(o.value) === e.target.value);
-              onChange(def.id, opt ? opt.value : undefined);
-            }}
-            className={fieldControlClasses()}
-          >
-            <option value="">{t('default')}</option>
-            {def.options?.map(o => (
-              <option key={String(o.value)} value={String(o.value)}>
-                {locale === 'ar' ? o.labelAr : o.labelEn}
-              </option>
-            ))}
-          </select>
-          {def.hintEn && (
-            <span className="mt-1 block text-xs text-muted-foreground">
-              {locale === 'ar' ? (def.hintAr ?? def.hintEn) : def.hintEn}
-            </span>
-          )}
-        </label>
-      );
-    case 'range': {
-      const v = typeof valueOf(def.id) === 'number' ? (valueOf(def.id) as number) : '';
-      return (
-        <label className="block">
-          {header}
-          <input
-            id={id}
-            type="number"
-            dir="ltr"
-            min={def.min}
-            max={def.max}
-            step={def.step ?? 1}
-            value={v}
-            onChange={e =>
-              onChange(
-                def.id,
-                e.target.value === ''
-                  ? undefined
-                  : Math.min(
-                      def.max ?? Infinity,
-                      Math.max(def.min ?? -Infinity, Number(e.target.value))
-                    )
-              )
-            }
-            className={fieldControlClasses('w-28')}
-          />
-        </label>
-      );
-    }
-    case 'checkbox':
-      return (
-        <label className="flex items-center justify-between text-sm">
-          <span>{label}</span>
-          <Toggle checked={valueOf(def.id) === true} onChange={on => onChange(def.id, on)} />
-        </label>
-      );
-    case 'category':
-      return (
-        <div>
-          {header}
-          <CategoryPicker
-            storeId={storeId}
-            label={label}
-            value={str(def.id)}
-            locale={locale}
-            onChange={v => onChange(def.id, v)}
-          />
-        </div>
-      );
-    case 'product_list':
-      return (
-        <div>
-          {header}
-          <ProductListPicker
-            storeId={storeId}
-            label={label}
-            value={Array.isArray(valueOf(def.id)) ? (valueOf(def.id) as string[]) : []}
-            max={def.max ?? 50}
-            locale={locale}
-            onChange={v => onChange(def.id, v.length ? v : undefined)}
-          />
-        </div>
-      );
-    case 'typography':
-      return (
-        <SectionTypographyField
-          storeId={storeId}
-          sectionType={sectionType}
-          value={valueOf(def.id) as SectionTypographyOverride | undefined}
-          theme={theme}
-          onChange={next => onChange(def.id, next)}
-        />
-      );
-    case 'dividers':
-      return (
-        <DividersField
-          sectionType={sectionType}
-          settings={{
-            dividers: valueOf(def.id),
-            showKickerLines: valueOf('showKickerLines'),
-            showSubtitleLines: valueOf('showSubtitleLines'),
-          }}
-          theme={theme}
-          onChange={next => onChange(def.id, next)}
-        />
-      );
-  }
-}
-
-function ImageField({
-  storeId,
-  label,
-  tag,
-  value,
-  onChange,
-}: {
-  storeId: string;
-  /** The field's own name: several images on one section share the same button text. */
-  label: string;
-  tag: string;
-  value: string;
-  onChange: (v: string | undefined) => void;
-}) {
-  const t = useT('builder.settings');
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="min-w-0">
-      {tag && <span className="mb-0.5 block text-xs text-muted-foreground">{tag}</span>}
-      <div className="flex items-center gap-2">
-        {value ? (
-          <img
-            src={value}
-            alt=""
-            className="h-12 w-12 rounded-md border border-border object-cover"
-          />
-        ) : (
-          <span
-            className="h-12 w-12 rounded-md border border-dashed border-border"
-            aria-hidden="true"
-          />
-        )}
-        <div className="flex flex-col items-start gap-0.5">
-          <Button
-            variant="link"
-            size="sm"
-            type="button"
-            onClick={() => setOpen(true)}
-            aria-label={`${value ? t('changeImage') : t('chooseImage')}: ${tag ? `${label} - ${tag}` : label}`}
-          >
-            {value ? t('changeImage') : t('chooseImage')}
-          </Button>
-          {value && (
-            <Button
-              variant="ghost"
-              size="sm"
-              type="button"
-              onClick={() => onChange(undefined)}
-              aria-label={`${t('removeImage')}: ${tag ? `${label} - ${tag}` : label}`}
-              className="text-muted-foreground"
+              {hint}
+            </div>
+          );
+        }
+        return (
+          <div>
+            {header}
+            <select
+              id={id}
+              aria-label={label}
+              value={valueOf(def.id) === undefined ? '' : String(valueOf(def.id))}
+              onChange={e => {
+                const opt = def.options?.find(o => String(o.value) === e.target.value);
+                onChange(def.id, opt ? opt.value : undefined);
+              }}
+              {...ariaErr}
+              className={fieldControlClasses()}
             >
-              {t('removeImage')}
-            </Button>
-          )}
-        </div>
-      </div>
-      {open && (
-        <MediaPicker
-          storeId={storeId}
-          onClose={() => setOpen(false)}
-          onPick={url => {
-            onChange(url);
-            setOpen(false);
-          }}
-        />
-      )}
-    </div>
+              <option value="">{t('default')}</option>
+              {def.options?.map(o => (
+                <option key={String(o.value)} value={String(o.value)}>
+                  {locale === 'ar' ? o.labelAr : o.labelEn}
+                </option>
+              ))}
+            </select>
+            {def.hintEn && (
+              <span className="mt-1 block text-xs text-muted-foreground">
+                {locale === 'ar' ? (def.hintAr ?? def.hintEn) : def.hintEn}
+              </span>
+            )}
+          </div>
+        );
+      }
+      case 'range': {
+        const v = typeof valueOf(def.id) === 'number' ? (valueOf(def.id) as number) : '';
+        return (
+          <div>
+            {header}
+            <input
+              id={id}
+              aria-label={label}
+              type="number"
+              dir="ltr"
+              min={def.min}
+              max={def.max}
+              step={def.step ?? 1}
+              value={v}
+              {...ariaErr}
+              onChange={e =>
+                onChange(
+                  def.id,
+                  e.target.value === ''
+                    ? undefined
+                    : Math.min(
+                        def.max ?? Infinity,
+                        Math.max(def.min ?? -Infinity, Number(e.target.value))
+                      )
+                )
+              }
+              className={fieldControlClasses('w-28')}
+            />
+          </div>
+        );
+      }
+      case 'checkbox':
+        return (
+          <label className="flex items-center justify-between text-sm">
+            <span>{label}</span>
+            <Toggle checked={valueOf(def.id) === true} onChange={on => onChange(def.id, on)} />
+          </label>
+        );
+      case 'category':
+        return (
+          <div>
+            {header}
+            <CategoryPicker
+              storeId={storeId}
+              label={label}
+              value={str(def.id)}
+              locale={locale}
+              onChange={v => onChange(def.id, v)}
+            />
+          </div>
+        );
+      case 'product_list':
+        return (
+          <div>
+            {header}
+            <ProductListPicker
+              storeId={storeId}
+              label={label}
+              value={Array.isArray(valueOf(def.id)) ? (valueOf(def.id) as string[]) : []}
+              max={def.max ?? 50}
+              locale={locale}
+              onChange={v => onChange(def.id, v.length ? v : undefined)}
+            />
+          </div>
+        );
+      case 'typography':
+        return (
+          <SectionTypographyField
+            storeId={storeId}
+            sectionType={sectionType}
+            value={valueOf(def.id) as SectionTypographyOverride | undefined}
+            theme={theme}
+            onChange={next => onChange(def.id, next)}
+          />
+        );
+      case 'dividers':
+        return (
+          <DividersField
+            sectionType={sectionType}
+            settings={{
+              dividers: valueOf(def.id),
+              showKickerLines: valueOf('showKickerLines'),
+              showSubtitleLines: valueOf('showSubtitleLines'),
+            }}
+            theme={theme}
+            onChange={next => onChange(def.id, next)}
+          />
+        );
+    }
+  })();
+  if (!invalid) return body;
+  return (
+    <>
+      {body}
+      <ul
+        id={errId}
+        className="mt-1 space-y-0.5 text-xs text-destructive-ink"
+        data-testid={`error-${def.id}`}
+      >
+        {errors!.map(e => (
+          <li key={e.path}>{locale === 'ar' ? e.messageAr : e.messageEn}</li>
+        ))}
+      </ul>
+    </>
   );
 }
 

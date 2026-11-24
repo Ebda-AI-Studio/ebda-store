@@ -12,7 +12,7 @@ import { BRAND, type SectionOp } from '@ebda/shared';
 
 export type ToolbarLocale = 'en' | 'ar';
 
-const COPY: Record<ToolbarLocale, Record<SectionOp | 'drag', string>> = {
+const COPY: Record<ToolbarLocale, Record<SectionOp | 'drag' | 'tools', string>> = {
   en: {
     moveUp: 'Move up',
     moveDown: 'Move down',
@@ -21,6 +21,7 @@ const COPY: Record<ToolbarLocale, Record<SectionOp | 'drag', string>> = {
     remove: 'Remove',
     aiFill: 'Write with AI',
     drag: 'Drag to reorder',
+    tools: 'Section tools',
   },
   ar: {
     moveUp: 'حرّك لفوق',
@@ -30,6 +31,7 @@ const COPY: Record<ToolbarLocale, Record<SectionOp | 'drag', string>> = {
     remove: 'حذف',
     aiFill: 'اكتب بالذكاء الاصطناعي',
     drag: 'اسحب لتغيير الترتيب',
+    tools: 'أدوات القسم',
   },
 };
 
@@ -135,7 +137,7 @@ export function CanvasToolbar({
   return (
     <div
       role="toolbar"
-      aria-label={rtl ? 'أدوات القسم' : 'Section tools'}
+      aria-label={copy.tools}
       data-builder-toolbar-root
       dir={rtl ? 'rtl' : 'ltr'}
       style={{

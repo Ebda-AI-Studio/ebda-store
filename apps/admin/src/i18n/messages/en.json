@@ -10682,7 +10682,15 @@
       "dirty": "Unsaved changes",
       "saving": "Saving…",
       "error": "Not saved — fix the highlighted fields",
-      "conflict": "Changed elsewhere"
+      "conflict": "Changed elsewhere",
+      "short": {
+        "loading": "Loading",
+        "saved": "Saved",
+        "dirty": "Unsaved",
+        "saving": "Saving…",
+        "error": "Not saved",
+        "conflict": "Conflict"
+      }
     },
     "rejected": {
       "cardinality": "This page already has the maximum number of these sections.",
@@ -10717,9 +10725,10 @@
       "mobile": "Mobile"
     },
     "conflict": {
-      "message": "This page was changed in another tab or by another editor. Choose which version to keep.",
+      "message": "It happened in another tab or by another editor. Choose which version to keep.",
       "takeTheirs": "Discard my changes, load the latest",
-      "keepMine": "Keep mine"
+      "keepMine": "Keep mine",
+      "title": "Someone else saved a newer version."
     },
     "live": {
       "added": "Added {name}, now {pos} of {total}",
@@ -10747,13 +10756,41 @@
       "hide": "Hide {name}",
       "duplicate": "Duplicate {name}",
       "remove": "Remove {name}",
-      "pinned": "{name} is the core of this page, it can move but not be removed"
+      "pinned": "{name} is the core of this page, it can move but not be removed",
+      "options": "Options for {name}",
+      "hiddenTag": "Hidden",
+      "duplicateItem": "Duplicate",
+      "moveUpItem": "Move up",
+      "moveDownItem": "Move down",
+      "removeItem": "Delete",
+      "insertHere": "Add a section here",
+      "empty": {
+        "header": "Nothing in the header yet. Add a section and it shows on every page.",
+        "template": "This page has no sections yet. Add one to start building it.",
+        "footer": "Nothing in the footer yet. Add a section and it shows on every page."
+      }
     },
     "addSection": {
       "title": "Add a section",
       "close": "Close",
       "limitReached": "Limit reached ({max})",
-      "more": "More sections"
+      "more": "More sections",
+      "search": "Search sections",
+      "searchPlaceholder": "Search sections (press / to focus)",
+      "categoryLabel": "Section type",
+      "all": "All",
+      "noResults": "No section matches that search.",
+      "maxReached": "Max {max} reached",
+      "showExisting": "Show existing",
+      "categories": {
+        "hero": "Hero",
+        "products": "Products",
+        "story": "Story",
+        "trust": "Trust",
+        "header": "Header",
+        "footer": "Footer",
+        "other": "More"
+      }
     },
     "ai": {
       "filled": "Added a kicker and subtitle. You can edit or undo them.",
@@ -10872,9 +10909,26 @@
         },
         "resetDefault": "Back to default",
         "resetInherit": "Same as desktop",
-        "hint": "The gap between two sections is the bottom of one plus the top of the next."
+        "hint": "The gap between two sections is the bottom of one plus the top of the next.",
+        "quick": "Whole section",
+        "quickPreset": {
+          "compact": "Compact",
+          "normal": "Normal",
+          "roomy": "Roomy"
+        },
+        "preview": "How the section sits between its neighbours"
       },
-      "advanced": "Advanced: text styles and dividers"
+      "advanced": "Advanced: text styles and dividers",
+      "edited": "Edited",
+      "resetField": "Reset to default",
+      "errorsTitle": "{count} to fix in this section. Tap one to jump to it.",
+      "dropImage": "Drop an image here, or click to choose one",
+      "uploadingImage": "Uploading…",
+      "emptyTitle": "Click anything on the page to edit it",
+      "emptyHint": "Texts, pictures and whole sections open here. Until then, these are the settings for the whole page.",
+      "emptyAdd": "Add a section",
+      "emptyTheme": "Change colours and fonts",
+      "emptyTemplate": "Change the template"
     },
     "theme": {
       "smartPalette": "Smart Palette",
@@ -10946,13 +11000,21 @@
         "named": "by {name}",
         "removed": "Removed user"
       },
-      "restoredFrom": "Restored from version {rev}"
+      "restoredFrom": "Restored from version {rev}",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "summary": {
+        "published": "Went live",
+        "draft": "Saved as a draft"
+      }
     },
     "pages": {
       "label": "Page",
       "previewProduct": "Preview with product",
       "noProducts": "Add a product to preview this page",
-      "saveFirst": "Fix the errors on this page before switching."
+      "saveFirst": "Fix the errors on this page before switching.",
+      "searchProduct": "Search your products",
+      "noMatch": "No product matches that search."
     },
     "pageSettings": {
       "title": "{page} page settings",
@@ -11045,6 +11107,30 @@
       "bar": "This is a suggestion on a read-only preview. Apply it to your draft or discard it.",
       "on": "on",
       "off": "off"
+    },
+    "more": "More actions",
+    "publishPopover": {
+      "pending": "You have changes that are not live yet.",
+      "live": "Everything on the page is already live.",
+      "count": "{count} edits since you opened the editor",
+      "confirm": "Publish now"
+    },
+    "publishedView": "View store",
+    "undone": "Undone",
+    "redone": "Redone",
+    "loadErrorTitle": "We couldn't open the editor",
+    "loadErrorHint": "Check your connection and try again. Everything you saved is safe.",
+    "shortcuts": {
+      "title": "Keyboard shortcuts",
+      "undo": "Undo",
+      "redo": "Redo",
+      "move": "Move the selected section up or down",
+      "canvas": "Show the selected section on the page",
+      "tabs": "Switch between the panel tabs",
+      "search": "Search in Add section",
+      "close": "Close",
+      "help": "Show this list",
+      "esc": "Close a menu or window"
     }
   },
   "instapayReceipt": {
