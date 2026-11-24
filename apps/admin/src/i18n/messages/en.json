@@ -10410,6 +10410,7 @@
       "resolve": "Resolve",
       "resolveTitle": "Resolve this held payment",
       "actionLabel": "What did you do?",
+      "creditedHelp": "Resolving as \"activated by hand\" only closes this hold. The original charge row stays failed, so the money reaches the books only when you also record the payment on the manual payment form (it creates its own ledger row).",
       "actions": {
         "credited": "Activated the plan by hand",
         "refunded": "Refunded it at the provider",

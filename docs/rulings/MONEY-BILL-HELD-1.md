@@ -48,3 +48,10 @@ Review of #687 (AI review, critical + 8 warnings), how each landed:
   then fails, is harmless because the resolve is retriable and idempotent. The note is audit-only, never shown to merchants.
 - Panel (warning 8): every error refreshes the list (a 409 never leaves a stale open row); a conflicting earlier decision shows the
   server's own sentence.
+
+Runbook note, resolving a hold as `credited` (money review of #687): this only closes the hold. The original ledger row moves to `failed` /
+`held_resolved:credited` and is never settled, so the money reaches the books only when the operator ALSO records the payment on the
+manual payment form (`POST /admin/stores/:id/manual-payment`, which writes its own `manual_payment` ledger row and moves the subscription).
+Order for a paid-but-unmatched charge the team accepts: record the manual payment first, then resolve the hold as `credited` with the
+manual payment's reference in the note. The held payments panel says this next to the action (`billingEvents.held.creditedHelp`, ar + en).
+`refunded` and `not_ours` need no second step.
