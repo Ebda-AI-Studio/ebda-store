@@ -211,8 +211,8 @@ function PrivacyFallback() {
               </li>
               <li>
                 {t(
-                  'OneSignal (push notifications) — to send order and promotional notifications, only if you opt in.',
-                  'OneSignal (الإشعارات الفورية) — لإرسال إشعارات الطلبات والعروض الترويجية، فقط إذا اخترت ذلك.'
+                  'Browser push notifications (Web Push) — to send order and promotional notifications, only if you opt in.',
+                  'إشعارات المتصفح (Web Push) — لإرسال إشعارات الطلبات والعروض الترويجية، فقط إذا اخترت ذلك.'
                 )}
               </li>
               <li>
