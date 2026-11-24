@@ -70,8 +70,26 @@ export async function approveAddonClaim(a: { storeId: string; claimId: string; a
     throw new AppError(404, 'CLAIM_NOT_FOUND', 'No add-on claim with this id');
   if (claim.status === 'rejected')
     throw new AppError(409, 'CLAIM_NOT_PENDING', 'This claim was rejected');
-  if (!skuOfPlanCode(claim.planCode))
+  if (claim.status === 'pending' && !claim.reviewedBy && !skuOfPlanCode(claim.planCode))
     throw new AppError(409, 'ADDON_NOT_FOUND', 'This add-on is no longer sold: reject the claim');
+  // Claim the approval FIRST, atomically (one compare-and-set), then grant. A concurrent reject only acts on a claim nobody has
+  // taken (`reviewedBy` still empty), so it can never leave a granted add-on behind a rejected claim; and a reject that won the
+  // race makes this CAS match nothing. A claim already taken (a half-finished approval, a retry, a double click) resumes: every
+  // step after the CAS is idempotent.
+  const taken = await withStore(a.storeId, tx =>
+    tx.manualPaymentClaim.updateMany({
+      where: { id: claim.id, storeId: a.storeId, status: 'pending', reviewedBy: null },
+      data: { reviewedBy: a.actorId, reviewedAt: new Date() },
+    })
+  );
+  if (taken.count === 0) {
+    const now = await withStore(a.storeId, tx =>
+      tx.manualPaymentClaim.findFirst({ where: { id: claim.id, storeId: a.storeId } })
+    );
+    if (!now || now.status === 'rejected')
+      throw new AppError(409, 'CLAIM_NOT_PENDING', 'This claim was rejected');
+    // pending with a reviewer = a half-finished approval; confirmed = finished: both resume below
+  }
   const key = `addon-instapay:${claim.id}`;
   let eventId = await claimEvent({
     storeId: a.storeId,

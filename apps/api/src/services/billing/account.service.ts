@@ -928,8 +928,15 @@ async function rejectClaimInner(args: {
       where: { id: args.claimId, storeId: args.storeId, status: 'pending' },
     });
     if (!claim) throw new AppError(409, 'CLAIM_NOT_PENDING', 'This claim is not pending');
-    await tx.manualPaymentClaim.update({
-      where: { id: claim.id, storeId: args.storeId },
+    // An add-on approval takes the claim first (reviewedBy set while it is still pending): never reject under it.
+    if (claim.reviewedBy)
+      throw new AppError(
+        409,
+        'APPROVAL_IN_PROGRESS',
+        'This claim is being approved: finish the approval instead of rejecting it'
+      );
+    const guarded = await tx.manualPaymentClaim.updateMany({
+      where: { id: claim.id, storeId: args.storeId, status: 'pending', reviewedBy: null },
       data: {
         status: 'rejected',
         payerReference: freedReference(claim.payerReference, claim.id, 'rejected'),
@@ -938,6 +945,8 @@ async function rejectClaimInner(args: {
         reviewedAt: new Date(),
       },
     });
+    if (guarded.count === 0)
+      throw new AppError(409, 'CLAIM_NOT_PENDING', 'This claim is no longer pending');
     const receipt = await tx.instapayReceipt.findFirst({
       where: { storeId: args.storeId, claimId: claim.id },
       select: { id: true },

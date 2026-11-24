@@ -318,6 +318,62 @@ describe('P5: reversing an approved InstaPay add-on purchase', () => {
     expect(refundTx.billingEvent.createMany).not.toHaveBeenCalled();
   });
 
+  it('CRASH between the refund row and its settlement: the retry settles the still-pending row (never a bare duplicate)', async () => {
+    use(instapayCharge());
+    // the first run created the row (pending) and died; the retry finds it by its key
+    refundTx.billingEvent.findFirst.mockResolvedValue({ id: 'r-pending', status: 'pending' });
+    const out = await reverseInstapayAddonPayment({
+      eventId: 'c1',
+      reason: 'fake receipt',
+      actorId: 'admin2',
+    });
+    expect(out).toEqual({ refundEventId: 'r-pending', duplicate: false });
+    expect(refundTx.billingEvent.createMany).not.toHaveBeenCalled(); // no second refund row
+    const flips = refundTx.billingEvent.updateMany.mock.calls
+      .map((c: any[]) => c[0])
+      .filter((a: any) => a.data?.status === 'refunded' || a.data?.status === 'succeeded');
+    expect(flips.map((a: any) => a.data.status).sort()).toEqual(['refunded', 'succeeded']);
+    expect(inv.invalidate).toHaveBeenCalledWith('s1'); // the add-on is cut off
+  });
+
+  it('CRASH after the refund row succeeded but before the charge flipped: the retry finishes the charge, once', async () => {
+    use(instapayCharge());
+    refundTx.billingEvent.findFirst.mockResolvedValue({ id: 'r-done', status: 'succeeded' });
+    refundTx.billingEvent.findUnique.mockImplementation(async ({ where }: any) =>
+      where.id === 'c1'
+        ? instapayCharge()
+        : { id: where.id, relatedEventId: 'c1', storeId: 's1', status: 'succeeded' }
+    );
+    // the pending -> succeeded step matches nothing (already done); the charge flip must still happen
+    refundTx.billingEvent.updateMany.mockImplementation(async (a: any) => ({
+      count: a.where.status === 'pending' ? 0 : 1,
+    }));
+    const out = await reverseInstapayAddonPayment({
+      eventId: 'c1',
+      reason: 'again',
+      actorId: 'admin2',
+    });
+    expect(out).toEqual({ refundEventId: 'r-done', duplicate: false });
+    const flipped = refundTx.billingEvent.updateMany.mock.calls
+      .map((c: any[]) => c[0])
+      .filter((a: any) => a.data?.status === 'refunded');
+    expect(flipped).toHaveLength(1);
+    expect(inv.invalidate).toHaveBeenCalledWith('s1');
+    refundTx.billingEvent.updateMany.mockImplementation(async () => ({ count: 1 }));
+  });
+
+  it('a fully reversed purchase (refund succeeded AND charge refunded) stays a no-op duplicate', async () => {
+    use(instapayCharge({ status: 'refunded' }));
+    refundTx.billingEvent.findFirst.mockResolvedValue({ id: 'r-first', status: 'succeeded' });
+    const out = await reverseInstapayAddonPayment({
+      eventId: 'c1',
+      reason: 'again',
+      actorId: 'admin2',
+    });
+    expect(out).toEqual({ refundEventId: 'r-first', duplicate: true });
+    expect(refundTx.billingEvent.updateMany).not.toHaveBeenCalled();
+  });
+
   it('only an InstaPay add-on payment: a card add-on or a plan payment is refused untouched', async () => {
     for (const over of [{ provider: 'kashier' }, { planCode: 'growth' }]) {
       use(instapayCharge(over));
