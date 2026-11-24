@@ -84,19 +84,26 @@ describe.skipIf(!hasDb)('staff invite consent', () => {
         invites.push(input);
         return { id: input.id, created: true };
       },
-      getAccountState: async id => ({
-        id,
-        email: `${id}@example.test`,
-        emailVerified: verifiedStaff.has(id),
-        mfaEnabled: false,
-        mfaEnrolledAt: null,
-        status: 'active',
-        role: 'staff',
-        firstName: '',
-        lastName: '',
-        phone: null,
-        language: 'ar',
-      }),
+      // The live account state is the authority for store_admin vs staff (accountsUser(claims, account.role)): the fake identity
+      // service answers with the profile row's role, so the OWNER signing in is a store_admin and an invitee stays staff.
+      // (A hard-coded 'staff' for every id made the owner's own request fail authorize('store_admin'), a 403.)
+      getAccountState: async id => {
+        // staff = an id the invite flow minted or one marked verified; every other id is the signed-in owner
+        const owner = !verifiedStaff.has(id) && !invites.some(i => i.id === id);
+        return {
+          id,
+          email: `${id}@example.test`,
+          emailVerified: owner || verifiedStaff.has(id),
+          mfaEnabled: false,
+          mfaEnrolledAt: null,
+          status: 'active',
+          role: owner ? 'store_admin' : 'staff',
+          firstName: '',
+          lastName: '',
+          phone: null,
+          language: 'ar',
+        };
+      },
     });
   });
   afterAll(() => configureIdentityClient(undefined));

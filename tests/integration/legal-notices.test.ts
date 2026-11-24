@@ -14,6 +14,7 @@ import { meLegalAcceptanceRoutes, meLegalNoticeRoutes } from '@api/routes/legal-
 import { errorHandler } from '@api/middleware/error-handler';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import { __setLegalPoliciesForTests } from '@api/services/legal-notice.service';
+import { configureIdentityClient } from '@api/lib/identity-client';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw';
@@ -119,6 +120,23 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
     app.use(errorHandler);
     merchant = await mkUser('m', 'store_admin');
     operator = await mkUser('op', 'super_admin');
+    // An impersonation token is only as alive as the platform admin who minted it (TEN-2): the live check asks the identity
+    // service. Without a client it fails closed with 503 before the route can refuse with 403 IMPERSONATION_FORBIDDEN.
+    configureIdentityClient({
+      getAccountState: async id => ({
+        id,
+        email: `${id}@example.test`,
+        emailVerified: true,
+        mfaEnabled: true,
+        mfaEnrolledAt: null,
+        status: 'active',
+        role: id === operator ? 'super_admin' : 'store_admin',
+        firstName: '',
+        lastName: '',
+        phone: null,
+        language: 'en',
+      }),
+    });
     // A merchant who signed up through the click-wrap: has a row per document at 1.0.
     signedUp = await mkUser('su', 'store_admin');
     await owner.legalAcceptance.createMany({
@@ -143,6 +161,7 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
   });
   beforeEach(wipe);
   afterAll(async () => {
+    configureIdentityClient(undefined);
     await wipe();
     __setLegalPoliciesForTests(null);
     await owner.store.deleteMany({ where: { id: { in: storeIds } } });
