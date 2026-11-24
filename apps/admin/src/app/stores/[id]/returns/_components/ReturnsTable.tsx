@@ -4,7 +4,6 @@ import { Badge } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
-import { RETURN_COLORS } from './types';
 import type { ListMeta, ReturnRecord } from './types';
 
 import { formatDate } from '@/lib/format';
@@ -69,11 +68,7 @@ export function ReturnsTable({
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="font-semibold text-foreground">#{ret.returnNumber}</span>
-                    <OrderStatusBadge
-                      status={ret.status}
-                      namespace="returns.status"
-                      colorMap={RETURN_COLORS}
-                    />
+                    <OrderStatusBadge status={ret.status} family="return" />
                     <Badge variant="outline">{tType(ret.type)}</Badge>
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">

@@ -77,13 +77,6 @@ interface ImportResult {
 }
 
 const CARRIERS = ['bosta', 'shipblu', 'mylerz', 'aramex', 'manual'];
-const STATUS_COLORS = {
-  awaiting: { className: 'bg-muted text-foreground' },
-  partial: { className: 'bg-warning/10 text-warning-ink' },
-  settled: { className: 'bg-success/10 text-success-ink' },
-  over_remitted: { className: 'bg-destructive/10 text-destructive-ink' },
-  mismatch: { className: 'bg-destructive/10 text-destructive-ink' },
-} as const;
 const PAGE_SIZE = 25;
 
 /**
@@ -366,11 +359,7 @@ export default function CodReconciliationPage() {
                           : formatMoney(r.result.outstanding)}
                       </td>
                       <td className="px-3 py-2">
-                        <OrderStatusBadge
-                          status={r.result.status}
-                          namespace="codReconciliation.statuses"
-                          colorMap={STATUS_COLORS}
-                        />
+                        <OrderStatusBadge status={r.result.status} family="codReconciliation" />
                       </td>
                     </tr>
                   ))}
