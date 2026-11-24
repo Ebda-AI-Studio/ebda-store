@@ -2,7 +2,7 @@
  * Independent review of store#775 (money): renewal consent, admin override, renewal guards, refund cache, append-only cancel.
  * Each describe is one finding; every guard here was removed once to see its test go red (see the PR comment).
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
   claimEvent: vi.fn(),
@@ -190,7 +190,11 @@ vi.mock('@ebda/database', () => ({
   storeDirectory: vi.fn(),
 }));
 
+// The fixtures are dated from the fixed NOW and the code under test reads the clock (running terms, chained terms): freeze the
+// clock on NOW, or a term dated NOW + 10 days quietly stops running when the real date passes it (a latent time bomb).
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(NOW);
   vi.clearAllMocks();
   h.events = [];
   h.effects = [];
@@ -205,6 +209,8 @@ beforeEach(() => {
   h.chargeAndSettle.mockResolvedValue({ settled: 'succeeded' });
   tx = fakeTx();
 });
+
+afterEach(() => vi.useRealTimers());
 
 describe('finding 1: the renewal is disclosed, bound into the token, and announced before each charge', () => {
   it('a feature preview states the renewal; an AI pack does not renew', async () => {

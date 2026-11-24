@@ -3,7 +3,7 @@
  * entitlement is granted exactly once per payment, a failed payment grants nothing, cancel ends it at the period end,
  * staff are refused, and the confirm step is a single-use token bound to the previewed payload.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 
@@ -135,7 +135,11 @@ const ev = (over: Record<string, any>) => ({
   ...over,
 });
 
+// The fixtures are dated from the fixed NOW and the code under test reads the clock (running terms, chained terms): freeze the
+// clock on NOW, or a term dated NOW + 10 days quietly stops running when the real date passes it (a latent time bomb).
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(NOW);
   vi.clearAllMocks();
   h.events = [];
   h.features = {};
@@ -151,6 +155,8 @@ beforeEach(() => {
   h.aiStoreToday.mockResolvedValue(0);
   tx = fakeTx();
 });
+
+afterEach(() => vi.useRealTimers());
 
 describe('catalog', () => {
   it('feature add-ons are real, visible Business-baseline registry keys with integer positive prices', async () => {
