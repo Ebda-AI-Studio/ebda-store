@@ -26,6 +26,7 @@ const keyOf = (address: string): string =>
  * on Gmail also drop the dots in the local part and read googlemail.com as gmail.com (both reach one mailbox). A local part that
  * would become empty keeps its original form, so `+x@` aliases do not all collapse together.
  */
+// pq-allow(unused-export): a test seam, tests/unit/trial-eligibility.test.ts pins the alias folding on the pure function
 export function normalizeTrialEmail(email: string): string {
   const lower = email.trim().toLowerCase();
   const at = lower.lastIndexOf('@');
