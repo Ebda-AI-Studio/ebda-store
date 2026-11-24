@@ -42,6 +42,7 @@ import {
 } from '../../templates/shared/section-typography';
 import { ProductListItem } from './ProductListItem';
 import { getSortOptions } from './products-sort';
+import { filterUrlSync } from './products-url-sync';
 import { ProductsFilterSidebar } from './ProductsFilterSidebar';
 import { ProductsPagination } from './ProductsPagination';
 import { recordLastListing, consumeFocusProduct } from '@/lib/last-listing';
@@ -200,16 +201,12 @@ export default function ProductsClient({
   // list can be shared. replaceState (no navigation, no refetch) keeps every other param as it was.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const url = new URL(window.location.href);
-    const set = (k: string, v: string | null) =>
-      v ? url.searchParams.set(k, v) : url.searchParams.delete(k);
-    set('category', categoryFilter || null);
-    set('tag', tagFilter || null);
-    set('sort', sortBy && sortBy !== 'default' ? sortBy : null);
-    const next = url.pathname + url.search + url.hash;
-    if (next !== window.location.pathname + window.location.search + window.location.hash) {
-      window.history.replaceState(window.history.state, '', next);
-    }
+    const next = filterUrlSync(window.location.href, {
+      category: categoryFilter,
+      tag: tagFilter,
+      sort: sortBy,
+    });
+    if (next) window.history.replaceState(window.history.state, '', next);
   }, [categoryFilter, tagFilter, sortBy]);
   // Track which product ids are in the compare list so buttons re-render on change
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());

@@ -33,7 +33,7 @@ vi.mock('../../../lib/slug-redirect', async importOriginal => {
 
 // Imported AFTER the mocks above so it picks up the mocked navigation +
 // slug-redirect modules.
-import { ProductDetailBody, fetchInitialProduct } from './ProductDetailBody';
+import { ProductDetailBody, buildProductMetadata, fetchInitialProduct } from './ProductDetailBody';
 import { STORE_UNAVAILABLE_DIGEST } from '../../../lib/store-unavailable';
 
 const mockedPermanentRedirect = vi.mocked(permanentRedirect);
@@ -184,5 +184,25 @@ describe('fetchInitialProduct under API load shedding (audit UI-7)', () => {
     global.fetch = fetchMock as unknown as typeof fetch;
     await expect(fetchInitialProduct('x', store)).rejects.toThrow('product fetch failed: 500');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('buildProductMetadata og:type (STORE-QA-49)', () => {
+  const product = { id: 'p1', name: 'Ring', slug: 'ring', price: 5000 } as Parameters<
+    typeof buildProductMetadata
+  >[0];
+  const store = { name: 'Amelia', slug: 'amelia', domain: 'amelia.example' };
+  it.each(['en', 'ar'] as const)('%s: emits og:type=product and no website type', locale => {
+    const m = buildProductMetadata(product, store, locale);
+    expect((m.other as Record<string, unknown>)['og:type']).toBe('product');
+    expect((m.openGraph as { type?: string } | undefined)?.type).toBeUndefined();
+  });
+  it('the OpenGraph locale follows the page language', () => {
+    expect(
+      (buildProductMetadata(product, store, 'ar').openGraph as { locale?: string }).locale
+    ).toBe('ar_EG');
+    expect(
+      (buildProductMetadata(product, store, 'en').openGraph as { locale?: string }).locale
+    ).toBe('en_US');
   });
 });

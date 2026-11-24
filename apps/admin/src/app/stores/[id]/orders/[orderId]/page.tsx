@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { isOrderId } from '@/lib/order-id';
 import { notFound, useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@ebda/ui';
@@ -38,9 +39,8 @@ export default function OrderDetailPage() {
   const router = useRouter();
   const storeId = params?.id as string;
   const orderId = params?.orderId as string;
-  // STORE-QA-33: `/orders/invoices` (a guessed sub-path) is not an order id: 404, never an endless "loading order".
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId ?? ''))
-    notFound();
+  // STORE-QA-33: a guessed sub-path is not an order id.
+  if (!isOrderId(orderId)) notFound();
   const { isEnabled, isLoading: featuresLoading } = useFeatures();
   const t = useT('orders.detail');
   const tList = useT('orders.list');

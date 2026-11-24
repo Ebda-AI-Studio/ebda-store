@@ -1,5 +1,6 @@
 'use client';
 
+import { isEmptyAnswerEngineSummary } from './summary-empty';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -68,9 +69,7 @@ export default function AnswerEnginePage() {
           )}
 
           {/* STORE-QA-34: nothing to show in any of the three = ONE empty state, not three copies of it. */}
-          {summary.engines.length === 0 &&
-          summary.trend.length === 0 &&
-          summary.prompts.length === 0 ? (
+          {isEmptyAnswerEngineSummary(summary) ? (
             <p className="text-sm text-muted-foreground">{t('noData')}</p>
           ) : (
             <>
