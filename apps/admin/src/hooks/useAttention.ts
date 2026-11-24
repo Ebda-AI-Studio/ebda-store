@@ -34,7 +34,7 @@ function publish(storeId: string, feed: Feed) {
   listeners.forEach(l => l());
 }
 
-export function refreshAttention(storeId: string): Promise<void> {
+function refreshAttention(storeId: string): Promise<void> {
   const running = inflight.get(storeId);
   if (running) return running;
   const p = (async () => {

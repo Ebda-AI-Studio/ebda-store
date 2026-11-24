@@ -97,7 +97,7 @@ export function NeedsAction({ storeId }: { storeId: string }) {
               key={i.id}
               href={`${base}/${i.section}`}
               data-testid={`needs-action-${i.id}`}
-              className="flex min-h-20 flex-col justify-center rounded-xl border border-warning/50 bg-warning/10 p-4 shadow-sm transition hover:border-warning hover:shadow-md"
+              className="flex min-h-20 flex-col justify-center rounded-lg border border-warning/50 bg-warning/10 p-4 shadow-sm transition hover:border-warning hover:shadow-md"
             >
               {typeof i.count === 'number' && (
                 <span className="text-3xl font-bold text-foreground">{i.count}</span>

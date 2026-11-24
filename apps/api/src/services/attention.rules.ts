@@ -14,7 +14,7 @@ export interface GatewayFact {
   testOk: boolean | null;
 }
 
-export interface AttentionFacts {
+interface AttentionFacts {
   features: { tax: boolean; whatsapp: boolean; staffAccounts: boolean };
   domain: { pendingDomain: string | null; domainStatus: string | null };
   emailDomain: { id: string | null; verifiedAt: Date | null };

@@ -43,7 +43,7 @@ export function NeedsAttentionList({ storeId }: { storeId: string }) {
   return (
     <section
       aria-labelledby="settings-attention-title"
-      className="rounded-xl border border-warning/40 bg-warning/10 p-4 sm:p-5"
+      className="rounded-lg border border-warning/40 bg-warning/10 p-4 sm:p-5"
       data-testid="needs-attention-list"
     >
       <div className="mb-3 flex items-center gap-2">

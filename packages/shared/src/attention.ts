@@ -7,10 +7,10 @@
  * `section` is the page under /stores/[id] the fix lives on, the same value as
  * `SettingsGroupItem.path` in the admin, so a badge can be matched to its settings card.
  */
-export const ATTENTION_SEVERITIES = ['action', 'info'] as const;
-export type AttentionSeverity = (typeof ATTENTION_SEVERITIES)[number];
+const ATTENTION_SEVERITIES = ['action', 'info'] as const;
+type AttentionSeverity = (typeof ATTENTION_SEVERITIES)[number];
 
-export const ATTENTION_IDS = [
+const ATTENTION_IDS = [
   'domain_unverified',
   'email_dns_missing',
   'gateway_connection_failed',
@@ -27,7 +27,7 @@ export const ATTENTION_IDS = [
   'instapay_orders_unconfirmed',
   'payments_failed',
 ] as const;
-export type AttentionId = (typeof ATTENTION_IDS)[number];
+type AttentionId = (typeof ATTENTION_IDS)[number];
 
 export interface AttentionItem {
   id: AttentionId;
