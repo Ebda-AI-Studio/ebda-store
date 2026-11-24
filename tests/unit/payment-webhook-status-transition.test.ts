@@ -54,7 +54,7 @@ vi.mock('@ebda/database', () => ({
       },
       updateMany: (...a: unknown[]) => paymentUpdateMany(...a),
       update: (...a: unknown[]) => paymentUpdate(...a),
-      // lockPayment (refund-settle) and PaymentService.refund both re-read the payment: serve the current fixture
+      // readPayment (refund-settle) and PaymentService.refund both re-read the payment: serve the current fixture
       findUnique: async () => {
         const r = (await paymentFindFirst()) as Record<string, unknown> | undefined;
         return r ? { ...r, metadata: r.metadata ?? {} } : { metadata: {} };
@@ -80,8 +80,6 @@ vi.mock('@ebda/database', () => ({
   Prisma: {},
   // Each refund record commits on its own transaction; with no database the
   // callback simply runs.
-  hasTenantContext: () => true,
-  currentTenantGucs: () => undefined,
   runInTenantContext: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
   // The factory reads a store's provider configs inside that store's scope.
   withStore: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),

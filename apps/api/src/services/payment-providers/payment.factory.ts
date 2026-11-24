@@ -69,8 +69,7 @@ import {
 import {
   settleRefundEvent,
   settleClaimRelease,
-  inSettlementTx,
-  lockPayment,
+  readPayment,
   absorbedRefundIdFor,
 } from './refund-settle';
 
@@ -1446,7 +1445,7 @@ export class PaymentService {
     // would silently fail to release anything.
     const releaseClaim = async (reason: string, err: unknown) => {
       try {
-        // ONE function decides under the payment lock: released, or (a webhook already absorbed the claim) flagged for review
+        // ONE function decides: released, or (a webhook already absorbed the claim) flagged for review
         const outcome = await commitOnOwnTransaction(moneyStoreId, () =>
           settleClaimRelease({
             paymentId: payment.id,
@@ -1547,9 +1546,9 @@ export class PaymentService {
     // caller the money moved.
     try {
       await commitOnOwnTransaction(moneyStoreId, async () => {
-        // Under the payment LOCK, from the LOCKED row: a webhook that committed meanwhile (its id, its status map) must not be
-        // overwritten by a stale spread, or its redelivery would be booked a second time.
-        const locked = await lockPayment(payment.id);
+        // From the RE-READ row: a webhook that committed meanwhile (its id, its status map) must not be overwritten by a stale
+        // spread, or its redelivery would be booked a second time. No row lock (Ruling NZ-REFUND-LOCK-1, Postgres path only).
+        const locked = await readPayment(payment.id);
         const currentMetadata = locked?.metadata ?? payment.metadata;
         // A settle webhook already ABSORBED this claim under a different refund id than the one the provider just answered
         // with: two refunds were reconciled as one. Nothing is overwritten; a human reviews it.
@@ -1920,11 +1919,13 @@ export class PaymentService {
     // re-mutate the order's payment lifecycle every time a refund updates.
     if (webhookData.refund) {
       const refundEvent = webhookData.refund;
-      // The whole refund branch (lock, decide, effects, write) is ONE transaction holding the payment row lock.
-      return await inSettlementTx(payment.order?.storeId ?? storeId ?? '', async () => {
-        // ONE function settles a refund event against the payment: it takes the payment row lock, re-reads the payment and its
-        // refund events, decides (absorb only a COMPLETED event; Kashier/Fawry hold rules) and returns the decision. The
-        // effects below run under that lock; `settle.commit` writes the payment patch and the consumed claim atomically.
+      // Postgres path only (Node: unit tests, local dev); no row lock (Ruling NZ-REFUND-LOCK-1). On the Worker a store took
+      // `handleWebhookOnDo` above, where the whole refund webhook is ONE `transactionSync` (applyPaymentEventSync ->
+      // applyRefundWebhook), and a `pg` store answers 410 before reaching here.
+      {
+        // ONE function settles a refund event against the payment: it re-reads the payment and its refund events, decides
+        // (absorb only a COMPLETED event; Kashier/Fawry hold rules) and returns the decision; `settle.commit` writes the
+        // payment patch and the consumed claim.
         const settle = await settleRefundEvent({
           paymentId: payment.id,
           storeId: payment.order?.storeId ?? storeId ?? '',
@@ -1943,7 +1944,7 @@ export class PaymentService {
         const prevMeta = settle.payment.metadata;
         const newStatus = refundEvent.status;
 
-        // Idempotent — a REDELIVERY of this same refund at this same state is a no-op (decided under the lock).
+        // Idempotent — a REDELIVERY of this same refund at this same state is a no-op (decided by settleRefundEvent).
         if (settle.seen) {
           logger.info(
             {
@@ -2252,7 +2253,7 @@ export class PaymentService {
         }
 
         return { success: true, status: newStatus, orderId: payment.orderId };
-      });
+      }
     }
 
     // Paid-amount reconciliation (money-integrity audit F3, 2026-07-02).

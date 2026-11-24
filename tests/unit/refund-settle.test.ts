@@ -1,7 +1,8 @@
 /**
  * settleRefund: the ONE function the refund webhook, the manual refresh route and the in-band claim release all call.
- * An in-memory stand-in for the payment row and its events; the payment lock is modelled by running calls one at a time
- * (the real `SELECT … FOR UPDATE` serialises them), so each race is tested in BOTH orders.
+ * An in-memory stand-in for the payment row and its events. This module takes no lock any more (Ruling NZ-REFUND-LOCK-1:
+ * production serialises refunds in the StoreDO, apps/api/workers-do/payments.test.ts); the race tests below run the flows one
+ * at a time in BOTH orders, which checks the settlement rules are order-independent.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,27 +34,14 @@ const db = vi.hoisted(() => ({
   events: [] as Ev[],
   clock: 0,
   uniqueViolations: 0,
-  ambient: true,
-  scope: undefined as string | undefined,
   yieldRandom: false,
   mutex: Promise.resolve() as Promise<unknown>,
   rnd: 1,
 }));
 vi.mock('@ebda/database', () => ({
   Prisma: {},
-  hasTenantContext: () => db.ambient,
-  currentTenantGucs: () => (db.scope ? { storeId: db.scope } : undefined),
-  // a separate transaction: one at a time, like the payment row lock serialises them
-  runInTenantContext: (_s: unknown, fn: () => Promise<unknown>) => {
-    const run = db.mutex.then(fn, fn);
-    db.mutex = run.catch(() => undefined);
-    return run;
-  },
+  // no `$queryRaw`: the settlement issues no raw SQL (no row lock); a call would throw
   prisma: {
-    $queryRaw: async () => {
-      await tick();
-      return [];
-    },
     payment: {
       findUnique: async () => {
         await tick();
@@ -92,7 +80,6 @@ import {
   settleRefundEvent,
   settleClaimRelease,
   matchRefundToClaim,
-  inSettlementTx,
 } from '@api/services/payment-providers/refund-settle';
 
 const NOW = 1_000_000_000;
@@ -479,8 +466,13 @@ describe('Kashier: an unknown id while our own refund is open is HELD, never aut
   });
 });
 
-describe('the settlement owns its transaction: interleaved at every await point (refresh route + webhooks)', () => {
-  const inTx = (fn: () => Promise<unknown>) => inSettlementTx('s1', fn);
+describe('serialised flows in both orders (refresh route + webhooks), random yields at every await point', () => {
+  // one at a time, as the StoreDO runs its refund sections (the module itself no longer serialises them)
+  const inTx = (fn: () => Promise<unknown>) => {
+    const run = db.mutex.then(fn, fn);
+    db.mutex = run.catch(() => undefined);
+    return run;
+  };
   const flow = (provider: string, id: string, amount: number) =>
     inTx(async () => {
       const s = await settleRefundEvent(event(provider, id, amount));
@@ -504,7 +496,6 @@ describe('the settlement owns its transaction: interleaved at every await point 
 
   it('route + webhook for the SAME refund, and a different genuine refund, over 60 random interleavings: one effect, no lost metadata', async () => {
     for (let seed = 1; seed <= 60; seed++) {
-      db.ambient = false;
       db.yieldRandom = true;
       db.rnd = seed * 7919;
       db.mutex = Promise.resolve();
@@ -537,13 +528,11 @@ describe('the settlement owns its transaction: interleaved at every await point 
         'R9',
       ]);
     }
-    db.ambient = true;
     db.yieldRandom = false;
   });
 
   it('release racing a webhook over 60 interleavings: never both a decrement and an absorb', async () => {
     for (let seed = 1; seed <= 60; seed++) {
-      db.ambient = false;
       db.yieldRandom = true;
       db.rnd = seed * 104729;
       db.mutex = Promise.resolve();
@@ -567,12 +556,11 @@ describe('the settlement owns its transaction: interleaved at every await point 
       // absorbed -> the claim stands (1500); released first -> the webhook is a real refund (1500). Money never lost either way.
       expect(db.payment.refundedAmount, `seed ${seed}`).toBe(1500);
     }
-    db.ambient = true;
     db.yieldRandom = false;
   });
 });
 
-describe('review fixes: operator match validation, absorbed id filed, lock mode, store scope', () => {
+describe('review fixes: operator match validation, absorbed id filed', () => {
   it('the operator match refuses an id no held webhook delivered, and an id already accounted', async () => {
     claim('c1', 1000, { executedRef: 'API-ID' });
     await expect(
@@ -591,22 +579,6 @@ describe('review fixes: operator match validation, absorbed id filed, lock mode,
     expect((db.payment.metadata.refundStatusById as Record<string, string>).R1).toBe('completed');
     // a replay after the claim closed is therefore still seen
     expect((await settleRefundEvent(event('paymob', 'R1', 1000))).seen).toBe(true);
-  });
-  it('the payment is locked FOR NO KEY UPDATE (serialises writers, does not conflict with FK key-share locks)', () => {
-    const src = fs.readFileSync(
-      path.join(__dirname, '../../apps/api/src/services/payment-providers/refund-settle.ts'),
-      'utf8'
-    );
-    expect(src).toContain('FOR NO KEY UPDATE');
-    expect(src).not.toMatch(/FROM payments WHERE id = \$\{paymentId\} FOR UPDATE/);
-  });
-  it('an ambient transaction scoped to ANOTHER store is refused (RLS would hide the events: fail open)', async () => {
-    db.ambient = true;
-    db.scope = 'other-store';
-    await expect(inSettlementTx('s1', async () => 1)).rejects.toThrow('another store');
-    db.scope = 's1';
-    expect(await inSettlementTx('s1', async () => 1)).toBe(1);
-    db.scope = undefined;
   });
 });
 

@@ -136,6 +136,31 @@ describe('StoreDO.moneyOp payments', () => {
     ).toBe(1);
   });
 
+  // Ruling NZ-REFUND-LOCK-1: the Postgres `SELECT ... FOR NO KEY UPDATE` on the payment is gone; the over-refund guard is the
+  // remaining-balance check inside `beginRefund`'s ONE transactionSync section (packages/repo/src/do/payments.ts). Partial
+  // claims that each fit but together exceed the payment are the case the lock existed for: a lost check lets two land.
+  it('concurrent partial refunds that together exceed the payment: one claim, never over-refunded (2 and 20 at once)', async () => {
+    for (const n of [2, 20]) {
+      const store = `pay-overrefund-${n}`;
+      const { stub, p } = await seed(store);
+      await op(stub, store, 'paymentWebhook', hook('evt-1'));
+      const answers = await Promise.all(
+        Array.from({ length: n }, () =>
+          op(stub, store, 'refundBegin', { paymentId: p.paymentId, amount: 2000 })
+        )
+      );
+      expect(codes(answers), `n=${n}`).toEqual({ ok: 1, REFUND_EXCEEDS_REMAINING: n - 1 });
+      expect(await num(stub, `SELECT refunded_amount AS n FROM payments`), `n=${n}`).toBe(2000);
+      expect(
+        await num(
+          stub,
+          `SELECT count(*) AS n FROM payment_events WHERE event_type = 'refund_initiated'`
+        ),
+        `n=${n}`
+      ).toBe(1);
+    }
+  });
+
   it('20 concurrent refunds with one refundKey: exactly one claim', async () => {
     const { stub, p } = await seed('pay-refundkey');
     await op(stub, 'pay-refundkey', 'paymentWebhook', hook('evt-1'));
