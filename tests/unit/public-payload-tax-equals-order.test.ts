@@ -177,6 +177,8 @@ vi.mock('@api/middleware/security', () => {
   return {
     publicLimiter: pass,
     publicTenantLimiter: pass,
+    guestReturnIpLimiter: pass,
+    guestReturnOrderLimiter: pass,
     storeResolveLimiter: pass,
     storeMissLimiter: pass,
     publicSearchLimiter: pass,

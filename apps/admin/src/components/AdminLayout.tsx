@@ -436,7 +436,7 @@ export function AdminLayout({
           />
         </svg>
         <span className="flex-1 text-start">{tcp('trigger')}</span>
-        <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-xs lg:inline-block">
+        <kbd className="hidden shrink-0 rounded-md border border-border px-1.5 py-0.5 text-xs lg:inline-block">
           {/* i18n-gate-allow: keyboard shortcut keycap */}
           ⌘K
         </kbd>
@@ -514,7 +514,7 @@ export function AdminLayout({
       {/* Mobile Sidebar */}
       <aside
         id="admin-mobile-sidebar"
-        className={`fixed inset-y-0 start-0 z-50 w-72 transform border-e border-border/50 bg-card shadow-2xl transition-transform duration-300 ease-out lg:hidden ${
+        className={`fixed inset-y-0 start-0 z-50 w-72 transform border-e border-border/50 bg-card shadow-xl transition-transform duration-300 ease-out lg:hidden ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'
         }`}
         aria-hidden={!isSidebarOpen}

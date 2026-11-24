@@ -23,7 +23,7 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": ["البوابة pending ليه؟"],
+    "ar": ["البوابة pending ليه؟", "ازاي افعل مزود الدفع لمتجر؟", "مزود الشحن لسه pending ليه؟"],
     "en": ["Why is my provider pending?"]
   },
   "steps": ["Super-admin console only."],

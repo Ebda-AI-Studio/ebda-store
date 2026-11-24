@@ -1,8 +1,9 @@
 'use client';
 
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 import { useEffect, useState } from 'react';
 import { Modal, useToast } from '@ebda/ui';
-import { moveSearchToHeader } from '@ebda/shared';
+import { minorToDecimalString, moveSearchToHeader } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiRequest } from '../../../../../lib/api';
@@ -144,7 +145,7 @@ export function NewReturnModal({ open, storeId, onClose, onCreated }: Props) {
               <div className="min-w-0 flex-1">
                 <label
                   htmlFor="new-return-order"
-                  className="mb-1 block text-xs font-medium text-foreground"
+                  className="mb-1 block text-sm font-medium text-foreground"
                 >
                   {t('orderLabel')}
                 </label>
@@ -153,7 +154,7 @@ export function NewReturnModal({ open, storeId, onClose, onCreated }: Props) {
                   value={term}
                   onChange={e => setTerm(e.target.value)}
                   placeholder={t('orderPlaceholder')}
-                  className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className={FIELD_CLASSES}
                   autoFocus
                 />
               </div>
@@ -217,10 +218,24 @@ export function NewReturnModal({ open, storeId, onClose, onCreated }: Props) {
                 disabled={busy}
               />
             )}
+            <p
+              aria-live="polite"
+              className="rounded-lg border border-border p-3 text-sm text-foreground"
+              data-testid="new-return-estimate"
+            >
+              {items.length === 0
+                ? t('pickLines')
+                : loading || quote.estimate === null
+                  ? t('estimating')
+                  : t('estimate', {
+                      amount: minorToDecimalString(quote.estimate),
+                      currency: quote.currency,
+                    })}
+            </p>
             <div>
               <label
                 htmlFor="new-return-reason"
-                className="mb-1 block text-xs font-medium text-foreground"
+                className="mb-1 block text-sm font-medium text-foreground"
               >
                 {t('reasonLabel')}
               </label>
@@ -232,7 +247,7 @@ export function NewReturnModal({ open, storeId, onClose, onCreated }: Props) {
                 rows={2}
                 maxLength={500}
                 placeholder={t('reasonPlaceholder')}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+                className={TEXTAREA_CLASSES}
               />
             </div>
           </>

@@ -18,7 +18,7 @@
   },
   "helpArticle": "store-look-controls",
   "questions": {
-    "ar": ["ازاي اعمل شريط اعلان فوق المتجر؟", "اعلان خصم العيد"],
+    "ar": ["ازاي اعمل شريط اعلان فوق المتجر؟", "اعلان خصم العيد", "ازاي اقفل شريط الاعلان؟"],
     "en": ["Add a sale banner at the top"]
   },
   "steps": ["Announcement page: text AR/EN, link, colours, on/off."],
