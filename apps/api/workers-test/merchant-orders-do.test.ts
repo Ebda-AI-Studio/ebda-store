@@ -875,6 +875,85 @@ describe.skipIf(e.E2E_DB === '1')(
 
       expect.soft(reachReport(await pgReaches(true)), steps.join('\n')).toBe('');
     }, 120_000);
+    it('SUSPEND-AI-1: an admin-suspended store is refused AI spend on its Durable Object, and obeyed on the very next call after reactivation', async () => {
+      await pgReaches(true);
+      await authState('user:tv:super-ai-susp', [['set', 'user:tv:super-ai-susp', '0', {}]]);
+      const su = await accessToken({
+        userId: 'super-ai-susp',
+        jti: 'j-ai-susp-su',
+        role: 'super_admin',
+      });
+      const status = (to: string) =>
+        api(`/stores/${storeId}/status`, {
+          method: 'PATCH',
+          headers: { authorization: `Bearer ${su}` },
+          body: JSON.stringify({ status: to }),
+        });
+      const ai = async () => {
+        const r = await api(`/stores/${storeId}/ai/seo`, {
+          method: 'POST',
+          headers: merchant,
+          body: JSON.stringify({ kind: 'store' }),
+        });
+        return { status: r.status, body: await r.text() };
+      };
+      const sus = await status('suspended');
+      expect(sus.status, await sus.clone().text()).toBe(200);
+      try {
+        const refused = await ai();
+        expect(refused.status, refused.body).toBe(403);
+        expect(refused.body).toContain('STORE_AI_SUSPENDED');
+      } finally {
+        const act = await status('active');
+        expect(act.status, await act.clone().text()).toBe(200);
+      }
+      // reactivated: the very next call is no longer refused for the suspension (it goes on to the model / its own checks)
+      const after = await ai();
+      expect(after.body).not.toContain('STORE_AI_SUSPENDED');
+    }, 120_000);
+    it('STORE-QA-74: a refund is in the NEXT revenue read (finance Net sales / analytics were stale until the TTL)', async () => {
+      await pgReaches(true);
+      const S = `/stores/${storeId}`;
+      const stats = async () => {
+        const r = await api(`${S}/analytics/dashboard`, { headers: merchant });
+        const text = await r.text();
+        expect(r.status, text).toBe(200);
+        return JSON.parse(text).data.stats as { totalRevenue: number; totalOrders: number };
+      };
+      const ipOrder = await paidCodOrder({ phone: '+201000000505' }, productIds[0], {
+        method: 'instapay',
+      });
+      const conf = await stub(storeId).moneyOp(
+        storeId,
+        'confirmPayment',
+        JSON.stringify({ orderId: ipOrder })
+      );
+      expect(conf.ok, JSON.stringify(conf)).toBe(true);
+      const pay = (
+        await doRead<Array<{ amount: number }>>(storeId, 'Payment', {
+          where: { orderId: ipOrder, provider: 'instapay' },
+        })
+      )[0]!;
+      // this read FILLS the cache (same window, same minute) and includes the order
+      const before = await stats();
+      expect(await stats()).toEqual(before); // a second read is the cached one
+      const refund = await api(`${S}/orders/${ipOrder}/instapay-refund`, {
+        method: 'POST',
+        headers: merchant,
+        body: JSON.stringify({
+          reference: '90909090',
+          refundDate: '2026-11-10',
+          refundTime: '12:00',
+          recipientName: 'N*** B***',
+          amountMinor: pay.amount,
+        }),
+      });
+      expect(refund.status, await refund.clone().text()).toBeLessThan(300);
+      // the very next read: the refunded order is gone from net sales and from the count, no waiting for the TTL
+      const after = await stats();
+      expect(after.totalRevenue).toBe(before.totalRevenue - pay.amount);
+      expect(after.totalOrders).toBe(before.totalOrders - 1);
+    }, 120_000);
     it('a COD "refused" racing the merchant ship never cancels or restocks a shipped order (Fixes #614)', async () => {
       await pgReaches(true);
       const steps: string[] = [];

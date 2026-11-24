@@ -13,6 +13,7 @@ const m = vi.hoisted(() => ({
   carts: [] as Record<string, any>[],
   findManyArgs: [] as any[],
   created: [] as any[],
+  due: [] as Record<string, any>[],
   directory: [
     { id: 'baseline-only', status: 'active' },
     { id: 'row-only', status: 'active' },
@@ -50,12 +51,14 @@ vi.mock('@ebda/database', () => ({
   storeDirectory: async (filter?: (s: Record<string, unknown>) => boolean) =>
     m.directory.filter(s => (filter ? filter(s) : true)),
   acrossStores: async () => [],
-  acrossStoresFlat: async () => [],
+  acrossStoresFlat: async () => m.due,
   withStore: async (_id: string, fn: (tx: unknown) => Promise<unknown>) => fn({}),
   currentStoreId: () => m.scope,
 }));
 vi.mock('@api/services/feature.service', () => ({
   featureService: {
+    selectEnabled: async (ids: string[], key: string) =>
+      ids.filter(id => key === 'abandoned_cart' && m.entitled.has(id)),
     isFeatureEnabled: async (id: string, key: string) =>
       key === 'abandoned_cart' && m.entitled.has(id),
   },
@@ -156,5 +159,22 @@ describe('guest carts with email consent', () => {
     await abandonedCartService.detectNewAbandonments();
     expect(m.created[0].customerEmail).toBe('sara@example.com');
     expect(m.created[0].nextStepAt).toBeInstanceOf(Date);
+  });
+});
+
+describe('processReminders re-checks the entitlement live before it sends', () => {
+  it('a store downgraded after detection gets no reminder; an entitled one still does', async () => {
+    m.entitled = new Set(['baseline-only']); // 'row-only' was downgraded mid-run
+    m.due = ['baseline-only', 'row-only'].map(storeId => ({
+      id: `ac-${storeId}`,
+      storeId,
+      status: 'pending',
+      nextStepAt: new Date(0),
+    }));
+    const send = vi.spyOn(abandonedCartService, 'sendStep').mockResolvedValue(undefined);
+    await abandonedCartService.processReminders();
+    expect(send.mock.calls.map(c => c[0].storeId)).toEqual(['baseline-only']);
+    send.mockRestore();
+    m.due = [];
   });
 });

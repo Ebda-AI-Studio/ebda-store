@@ -18,7 +18,7 @@ import {
   requestShapeGuard,
   API_JSON_BODY_LIMIT_BYTES,
 } from '@api/middleware/request-shape-guard';
-import { bodyShapeViolation } from '@api/lib/body-shape';
+import { bodyShapeViolation } from '@ebda/shared/request-guard';
 import express, { type Request, type Response } from 'express';
 import request from 'supertest';
 
