@@ -43,12 +43,16 @@ export interface ReturnRecord {
     orderNumber: string;
     total: number;
   };
+  /** null: a guest order's return whose order snapshot was not joined, or a deleted customer */
   customer: {
-    id: string;
+    id: string | null;
     email: string;
     firstName: string;
     lastName: string;
-  };
+    phone?: string | null;
+    /** a guest order's return: the identity is the order's own name/email/phone, there is no account */
+    isGuest?: boolean;
+  } | null;
   items: ReturnItem[];
 }
 

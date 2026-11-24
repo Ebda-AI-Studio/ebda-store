@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDate } from '@/lib/format';
 import { useState, useEffect, useCallback } from 'react';
 import { Input, useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
@@ -13,10 +14,11 @@ import {
 } from '../../../lib/accounts';
 import { useAuth } from '../../../lib/auth';
 import { useT } from '@/i18n/useT';
-import { withNumerals } from '@ebda/shared';
 import { LegalAcceptancesPanel } from '../../../components/legal/LegalAcceptancesPanel';
 import { PasskeysPanel } from '../../../components/account/PasskeysPanel';
 import { PhonePanel } from '../../../components/account/PhonePanel';
+import { CloseAccountPanel } from '../../../components/account/CloseAccountPanel';
+import { RecoveryCodesPanel } from '../../../components/account/RecoveryCodesPanel';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -595,14 +597,7 @@ export default function SecurityPage() {
                     </p>
                     {status?.mfaEnabled && status.mfaEnrolledAt && (
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {new Date(status.mfaEnrolledAt).toLocaleDateString(
-                          undefined,
-                          withNumerals({
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                          })
-                        )}
+                        {formatDate(status.mfaEnrolledAt)}
                       </p>
                     )}
                   </div>
@@ -683,8 +678,13 @@ export default function SecurityPage() {
             onSignInAgain={() => void logout()}
           />
         )}
+        {status?.mfaEnabled && step === 'idle' && <RecoveryCodesPanel />}
         {status && <PhonePanel mfaEnabled={status.mfaEnabled} />}
         <LegalAcceptancesPanel />
+        {/* platform administrators are removed by the operator only (docs/privacy/erasure-export.md) */}
+        {user && user.role !== 'super_admin' && (
+          <CloseAccountPanel onClosed={() => void logout()} />
+        )}
       </div>
     </AdminLayout>
   );
