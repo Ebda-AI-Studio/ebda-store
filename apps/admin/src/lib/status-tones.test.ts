@@ -3,14 +3,11 @@ import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import en from '../i18n/messages/en.json';
 import ar from '../i18n/messages/ar.json';
-import {
-  STATUS_FAMILIES,
-  TONE_CLASSES,
-  UNKNOWN_STATUS,
-  getStatusEntry,
-  isKnownStatus,
-  type StatusFamily,
-} from './status-tones';
+import { STATUS_FAMILIES, TONE_CLASSES, getStatusEntry, type StatusFamily } from './status-tones';
+
+/** An own-property check against the registry (the test's own, so the module exports nothing it does not use). */
+const isKnownStatus = (f: StatusFamily, s: string): boolean =>
+  Object.prototype.hasOwnProperty.call(STATUS_FAMILIES[f].statuses, s);
 
 type Json = { [k: string]: Json | string };
 const at = (root: Json, path: string): Json | undefined =>
@@ -74,7 +71,9 @@ describe('status tone registry', () => {
     status => {
       for (const f of families) {
         const entry = getStatusEntry(f, status);
-        expect(entry).toBe(UNKNOWN_STATUS);
+        // every unknown status resolves to the one shared fallback entry, in every family
+        expect(entry).toBe(getStatusEntry('order', 'a_status_nobody_registered'));
+        expect(entry.tone).toBe('neutral');
         expect(isKnownStatus(f, status)).toBe(false);
       }
     }

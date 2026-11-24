@@ -294,14 +294,10 @@ export const STATUS_FAMILIES = {
 export type StatusFamily = keyof typeof STATUS_FAMILIES;
 
 /** Fallback for a status the backend added before the registry knew it: neutral + generic icon, never a crash. */
-export const UNKNOWN_STATUS: StatusEntry = { tone: 'neutral', icon: CircleDashed };
+const UNKNOWN_STATUS: StatusEntry = { tone: 'neutral', icon: CircleDashed };
 
 export function getStatusEntry(family: StatusFamily, status: string): StatusEntry {
   const statuses: Record<string, StatusEntry> = STATUS_FAMILIES[family].statuses;
   // Own-property check: API strings like "constructor" / "__proto__" must not reach Object.prototype members.
   return Object.prototype.hasOwnProperty.call(statuses, status) ? statuses[status] : UNKNOWN_STATUS;
-}
-
-export function isKnownStatus(family: StatusFamily, status: string): boolean {
-  return Object.prototype.hasOwnProperty.call(STATUS_FAMILIES[family].statuses, status);
 }
