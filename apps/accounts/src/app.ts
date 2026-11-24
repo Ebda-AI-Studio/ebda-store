@@ -1,4 +1,4 @@
-import { logAuditEvent } from './audit-log';
+import { logAuditEvent, logEvent } from './audit-log';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod/v3';
 import bcrypt from 'bcryptjs';
@@ -1001,9 +1001,7 @@ export function createApp() {
   app.get('/health', c => {
     const noExp = retiredKeysWithoutExp(c.env);
     if (noExp.length)
-      console.error(
-        JSON.stringify({ msg: 'JWT_PREVIOUS_PUBLIC_JWKS entry without exp', kids: noExp })
-      );
+      logEvent('jwt_previous_public_jwks_entry_without_exp', { kids: noExp }, 'error');
     return c.json({
       status: 'ok',
       ...(noExp.length

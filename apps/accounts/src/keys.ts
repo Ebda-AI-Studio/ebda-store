@@ -3,6 +3,7 @@
  * The private key is a Worker secret (a JWK JSON string carrying its `kid`); it is never stored in D1 or logged.
  * The public JWKS is derived from it plus the retired public keys that stay published for 24 h after a rotation.
  */
+import { logEvent } from './audit-log';
 import { importJWK, type JWK, type CryptoKey as JoseKey } from 'jose';
 
 export interface SigningKey {
@@ -71,13 +72,11 @@ export async function jwks(env: {
     .filter(k => {
       const exp = (k as JWK & { exp?: unknown }).exp;
       if (typeof exp !== 'number') {
-        console.error(JSON.stringify({ msg: 'retired jwk has no exp, not published', kid: k.kid }));
+        logEvent('retired_jwk_without_exp_not_published', { kid: k.kid ?? '' }, 'error');
         return false;
       }
       if (exp > nowS + RETIRED_KEY_MAX_AHEAD_SECONDS) {
-        console.error(
-          JSON.stringify({ msg: 'retired jwk exp too far ahead, not published', kid: k.kid })
-        );
+        logEvent('retired_jwk_exp_too_far_not_published', { kid: k.kid ?? '' }, 'error');
         return false;
       }
       return exp > nowS;
