@@ -27,6 +27,9 @@ export const HEAVY_ONLY_JOBS = [
   'workerd-integration',
 ];
 
+/** The workerd dry-run is skipped, and accepted as `skipped` by the gate, ONLY for a strictly docs-only merge group (CRITICAL-PATH-1). */
+export const DOCS_ONLY_SKIPPABLE_JOBS = ['worker-dry-run'];
+
 /** Rails: always the full tier. Beyond classify()'s own `all` (root files, packages/shared, packages/database). */
 const RAILS =
   /^(package(-lock)?\.json$|packages\/(shared|repo|database)\/|\.github\/|scripts\/|tests\/|.*\bmigrations?\/|.*\.sql$|.*prisma\/)/;
@@ -34,26 +37,39 @@ const RAILS =
 const DOCS_ONLY = /^(docs\/|.*\.md$|\.github\/ISSUE_TEMPLATE\/|\.vscode\/|\.editorconfig$)/;
 
 /**
+ * STRICT docs-only (CRITICAL-PATH-1): every changed file is under docs/ or is a Markdown file, and none is on a rail (a workflow,
+ * script, test, migration, lockfile, shared package ...). One other file, or an empty diff, is NOT docs-only. Narrower than DOCS_ONLY
+ * above on purpose: no .vscode, no .editorconfig, no issue templates.
+ */
+const DOCS_STRICT = /^(docs\/.*|(.*\/)?[^/]*\.md)$/;
+export function isDocsOnly(files) {
+  const changed = (files ?? []).filter(Boolean);
+  return changed.length > 0 && changed.every(f => DOCS_STRICT.test(f) && !RAILS.test(f));
+}
+
+/**
  * @param {{ files: string[], labels?: string[], workspaces?: any[] }} a
- * @returns {{ heavy: boolean, reason: string }}
+ * @returns {{ heavy: boolean, reason: string, docsOnly: boolean }}
  */
 export function decideScope({ files, labels = [], workspaces = loadWorkspaces() }) {
   const changed = (files ?? []).filter(Boolean);
-  if (labels.includes('ci:full')) return { heavy: true, reason: 'ci:full label' };
+  if (labels.includes('ci:full')) return { heavy: true, reason: 'ci:full label', docsOnly: false };
   if (changed.length === 0)
-    return { heavy: true, reason: 'empty diff: refusing to guess, full tier' };
+    return { heavy: true, reason: 'empty diff: refusing to guess, full tier', docsOnly: false };
+  const docsOnly = isDocsOnly(changed);
   const code = changed.filter(f => !DOCS_ONLY.test(f) || RAILS.test(f));
   const rail = code.find(f => RAILS.test(f) && !DOCS_ONLY.test(f));
-  if (rail) return { heavy: true, reason: `rail file ${rail}` };
+  if (rail) return { heavy: true, reason: `rail file ${rail}`, docsOnly: false };
   const r = classify(changed, workspaces);
-  if (r.all) return { heavy: true, reason: 'classify: every workspace affected' };
+  if (r.all) return { heavy: true, reason: 'classify: every workspace affected', docsOnly: false };
   if (integrationPlan(changed).integration)
-    return { heavy: true, reason: 'integration tests affected' };
+    return { heavy: true, reason: 'integration tests affected', docsOnly: false };
   const heavyWs = r.workspaces.filter(w => !LIGHT_WORKSPACES.includes(w));
   if (heavyWs.length)
-    return { heavy: true, reason: `non-light workspace affected: ${heavyWs.join(' ')}` };
+    return { heavy: true, reason: `non-light workspace affected: ${heavyWs.join(' ')}`, docsOnly: false };
   return {
     heavy: false,
+    docsOnly,
     reason: `only light workspaces / docs changed (${r.workspaces.join(' ') || 'docs'}): heavy-only jobs skipped`,
   };
 }
@@ -88,7 +104,7 @@ async function main() {
   let out;
   try {
     if (EVENT !== 'merge_group')
-      out = { heavy: true, reason: `event ${EVENT}: full lane rules apply` };
+      out = { heavy: true, reason: `event ${EVENT}: full lane rules apply`, docsOnly: false };
     else {
       if (!BASE_SHA || !HEAD_SHA) throw new Error('missing merge group shas');
       const files = await changedFiles(BASE_SHA, HEAD_SHA, GITHUB_REPOSITORY, GITHUB_TOKEN);
@@ -96,10 +112,11 @@ async function main() {
       out = decideScope({ files, labels });
     }
   } catch (e) {
-    out = { heavy: true, reason: `fail closed: ${e.message}` };
+    out = { heavy: true, reason: `fail closed: ${e.message}`, docsOnly: false };
   }
-  console.log(`mq-scope: heavy=${out.heavy} (${out.reason})`);
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `heavy=${out.heavy}\n`);
+  console.log(`mq-scope: heavy=${out.heavy} docs_only=${out.docsOnly} (${out.reason})`);
+  if (process.env.GITHUB_OUTPUT)
+    appendFileSync(process.env.GITHUB_OUTPUT, `heavy=${out.heavy}\ndocs_only=${out.docsOnly}\n`);
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) await main();

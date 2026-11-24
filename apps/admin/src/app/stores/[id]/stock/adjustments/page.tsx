@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDate } from '@/lib/format';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -12,7 +13,8 @@ import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ErrorState';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
-import { reportRangeQueryString, minorToDecimalString, withNumerals } from '@ebda/shared';
+import { reportRangeQueryString, minorToDecimalString } from '@ebda/shared';
+import { EmptyState } from '@/components/EmptyState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -108,11 +110,7 @@ export default function StockAdjustmentsPage() {
     {
       header: t('date'),
       className: 'w-32',
-      cell: adj => (
-        <span className="text-muted-foreground">
-          {new Date(adj.createdAt).toLocaleDateString(undefined, withNumerals())}
-        </span>
-      ),
+      cell: adj => <span className="text-muted-foreground">{formatDate(adj.createdAt)}</span>,
     },
     {
       header: t('impact'),
@@ -180,7 +178,17 @@ export default function StockAdjustmentsPage() {
             columns={columns}
             rows={filteredAdjustments ?? adjustments}
             rowKey={adj => adj.id}
-            emptyState={<p className="text-muted-foreground text-sm">{t('emptyState')}</p>}
+            emptyState={
+              <EmptyState
+                card
+                icon="M4 7h16M4 12h16M4 17h10"
+                title={t('emptyState')}
+                action={{
+                  label: t('newButton'),
+                  href: `/stores/${storeId}/stock/adjustments/new`,
+                }}
+              />
+            }
           />
         </div>
       )}

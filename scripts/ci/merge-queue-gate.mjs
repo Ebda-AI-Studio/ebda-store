@@ -13,11 +13,15 @@
  *
  * Input: EVENT = github.event_name, NEEDS = toJSON(needs) (job id -> { result }). Exit 0 = pass, 1 = fail.
  */
-import { HEAVY_ONLY_JOBS } from './mq-scope.mjs';
+import { DOCS_ONLY_SKIPPABLE_JOBS, HEAVY_ONLY_JOBS } from './mq-scope.mjs';
 
 export function verdict(event, needs, opts = {}) {
   // MQ-SCOPE-1: when scripts/ci/mq-scope.mjs said heavy=false, these jobs were skipped ON PURPOSE and `skipped` counts as success for them only.
-  const lightSkippable = opts.heavy === 'false' ? new Set(HEAVY_ONLY_JOBS) : new Set();
+  // CRITICAL-PATH-1: a STRICTLY docs-only merge group (docs_only=true, which implies heavy=false) also skips the workerd dry-run on purpose.
+  const lightSkippable = new Set();
+  if (opts.heavy === 'false') for (const j of HEAVY_ONLY_JOBS) lightSkippable.add(j);
+  if (opts.heavy === 'false' && opts.docsOnly === 'true')
+    for (const j of DOCS_ONLY_SKIPPABLE_JOBS) lightSkippable.add(j);
   if (event === 'pull_request')
     return { ok: true, message: 'pull request: the full lane runs on the merge group' };
   if (event !== 'merge_group')
@@ -52,6 +56,7 @@ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).
   }
   const v = verdict(process.env.EVENT ?? '', needs, {
     heavy: needs?.['tested-tree']?.outputs?.heavy,
+    docsOnly: needs?.['tested-tree']?.outputs?.docs_only,
   });
   console.log(`merge-queue-gate: ${v.message}`);
   process.exit(v.ok ? 0 : 1);

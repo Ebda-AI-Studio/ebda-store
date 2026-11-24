@@ -73,6 +73,7 @@ interface CustomersListResponse {
 
 import { formatDate, formatPrice } from '@/lib/format';
 import { customerListFilterParams, moveSearchToHeader } from '@ebda/shared';
+import { EmptyState } from '@/components/EmptyState';
 
 export default function StoreCustomersPage() {
   const { user } = useAuth();
@@ -386,34 +387,16 @@ export default function StoreCustomersPage() {
   ];
 
   const emptyState = (
-    <div className="force-empty-state">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-        <svg
-          className="h-8 w-8 text-muted-foreground"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-          />
-        </svg>
-      </div>
-      <p className="font-semibold text-foreground">
-        {search || segment !== 'all' ? t('noMatch') : t('empty')}
-      </p>
-      {!search && segment === 'all' && (
-        <>
-          <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('emptyDescription')}</p>
-          <Link href={`/stores/${storeId}/products/new`} className="mt-4 inline-block">
-            <Button size="sm">{t('emptyAddProduct')}</Button>
-          </Link>
-        </>
-      )}
-    </div>
+    <EmptyState
+      icon="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+      title={search || segment !== 'all' ? t('noMatch') : t('empty')}
+      description={!search && segment === 'all' ? t('emptyDescription') : undefined}
+      action={
+        !search && segment === 'all'
+          ? { label: t('emptyAddProduct'), href: `/stores/${storeId}/products/new` }
+          : undefined
+      }
+    />
   );
 
   return (

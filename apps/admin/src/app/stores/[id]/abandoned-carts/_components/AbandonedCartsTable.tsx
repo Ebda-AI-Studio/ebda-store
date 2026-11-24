@@ -1,18 +1,15 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { CartIcon } from '@ebda/ui';
-import { minorToMajor } from '@/lib/format';
+import { formatPrice, formatDate } from '@/lib/format';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { ABANDONED_CART_COLORS, CART_STATUS_KEYS } from './types';
 import type { AbandonedCartRecord, ListMeta } from './types';
-import { withNumerals } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
-
-const formatMajor = minorToMajor;
+import { EmptyState } from '@/components/EmptyState';
 
 /** Best-effort display string for the customer column. */
 function customerDisplay(record: AbandonedCartRecord): string {
@@ -48,7 +45,6 @@ export function AbandonedCartsTable({
   const storeId = useParams().id as string;
   const t = useT('abandonedCarts.list');
   const tStatus = useT('abandonedCarts.status');
-  const tMajor = useT('abandonedCarts.stats');
   const tEmail = useT('abandonedCarts.emailStatus');
 
   const columns: DataTableColumn<AbandonedCartRecord>[] = [
@@ -61,7 +57,7 @@ export function AbandonedCartsTable({
       header: t('columns.total'),
       cell: record => (
         <span className="text-sm text-foreground whitespace-nowrap">
-          {tMajor('baseValue', { amount: formatMajor(record.cartTotal) })}
+          {formatPrice(record.cartTotal)}
         </span>
       ),
     },
@@ -95,29 +91,24 @@ export function AbandonedCartsTable({
       header: t('columns.date'),
       cell: record => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {new Date(record.createdAt).toLocaleDateString(undefined, withNumerals())}
+          {formatDate(record.createdAt)}
         </span>
       ),
     },
   ];
 
   const emptyState = (
-    <div className="bg-card rounded-xl border border-border overflow-hidden">
-      <div className="force-empty-state px-6">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-          <CartIcon className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
-        </div>
-        <p className="font-semibold text-foreground">{t('empty')}</p>
-        <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('emptyDescription')}</p>
-        <p className="mt-3 max-w-md text-sm text-muted-foreground">{t('emptyOrdersHint')}</p>
-        <Link
-          href={`/stores/${storeId}/orders?status=pending`}
-          className="mt-1 text-sm font-medium text-primary hover:underline"
-        >
-          {t('emptyOrdersLink')}
-        </Link>
-      </div>
-    </div>
+    <EmptyState
+      card
+      icon={<CartIcon className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />}
+      title={t('empty')}
+      description={t('emptyDescription')}
+      hint={t('emptyOrdersHint')}
+      action={{
+        label: t('emptyOrdersLink'),
+        href: `/stores/${storeId}/orders?status=pending`,
+      }}
+    />
   );
 
   return (
