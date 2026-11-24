@@ -50,6 +50,11 @@ beforeAll(() => {
     path.join(REPO, '.github/pr-quality/slop-guard.mjs'),
     path.join(dir, '.github/pr-quality/slop-guard.mjs')
   );
+  // CI also builds the merge-base reference tree with the base branch's script; the hook must do the same
+  copyFileSync(
+    path.join(REPO, '.github/pr-quality/merge-base-tree.sh'),
+    path.join(dir, '.github/pr-quality/merge-base-tree.sh')
+  );
   write(
     '.pr-quality.json',
     JSON.stringify({ roots: ['apps'], baseline: '.pr-quality-baseline.json' })
@@ -114,6 +119,27 @@ describe('pre-push slop guard (same check as CI "Slop baselines")', () => {
     const r = run();
     expect(r.status).toBe(1);
     expect(r.stderr).toContain('no-console');
+  });
+
+  it('runs in CI form: the guard gets --merge-base-root with a merge-base tree built by merge-base-tree.sh', () => {
+    const r = run();
+    expect(r.stdout).toMatch(
+      /slop-guard\.mjs --root <tmp>\/pr --base-root <tmp>\/base --merge-base-root <tmp>\/mb/
+    );
+    expect(r.stdout).not.toContain('merge-base tree not built');
+  });
+
+  it('an export imported ONLY by a test file is not a use: it fails here exactly as it does in CI (negative control)', () => {
+    write('apps/x/src/testOnly.ts', 'export const onlyForTests = 4;\n');
+    write(
+      'apps/x/src/testOnly.test.ts',
+      "import { onlyForTests } from './testOnly';\nconsole.warn(onlyForTests);\n"
+    );
+    commit('export used only by a test');
+    const r = run();
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('unused-export');
+    expect(r.stderr).toContain('apps/x/src/testOnly.ts');
   });
 
   it('skips with a note, never fails, when the base ref is missing (CI is the gate)', () => {

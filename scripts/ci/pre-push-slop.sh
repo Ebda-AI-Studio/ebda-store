@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# SLOP-PREPUSH-1: the slop guard CI runs as "Slop baselines" (.github/workflows/pr-quality.yml: `slop-guard.mjs --root pr --base-root base`), run before the push.
+# SLOP-PREPUSH-1: the slop guard CI runs as "Slop baselines" (.github/workflows/pr-quality.yml: `slop-guard.mjs --root pr --base-root base --merge-base-root mb`), run before the push, in CI form.
+# Local command (same as the hook): bash scripts/ci/pre-push-slop.sh origin/main HEAD   Note: the guard counts a test-only import as NOT a use, so an export used only by a test fails here exactly as in CI.
 # Three money PRs (#887, #891, #890, 2026-11-17) were pushed and failed that CI check on a new unused export, each costing a CI cycle and a voided money review.
 # Usage: scripts/ci/pre-push-slop.sh <base-ref> [head-ref]   (the gate passes origin/main and HEAD)
 # Runs ONLY when a .ts/.tsx file differs between the merge base and head. Exports the pushed head and the base's guard + baseline with `git archive`
@@ -26,7 +27,22 @@ export_ref() { # <ref> <dest> <path>...
 export_ref "$HEAD_REF" "$T/pr" apps packages .pr-quality.json .pr-quality-baseline.json foundation.lock.json tests/unit/foundation-parity.test.ts
 export_ref "$BASE_REF" "$T/base" apps packages .github/pr-quality .pr-quality.json .pr-quality-baseline.json
 [ -f "$T/base/.github/pr-quality/slop-guard.mjs" ] || { echo "! slop guard skipped: $BASE_REF has no .github/pr-quality/slop-guard.mjs; CI runs it"; exit 0; }
-echo "-> slop guard (same check as CI 'Slop baselines', new violations vs $BASE_REF only)"
-if node "$T/base/.github/pr-quality/slop-guard.mjs" --root "$T/pr" --base-root "$T/base"; then exit 0; fi
+# CI form (.github/workflows/pr-quality.yml): the ratchet files as of the MERGE BASE are built by the base branch's merge-base-tree.sh, which needs a git
+# checkout whose HEAD is the base tip and whose refs/pr/head is the PR head. A throwaway --shared --no-checkout clone provides exactly that without copying
+# objects or files (and without touching this repo's refs: refs/pr/head is only set inside the clone).
+MBARGS=()
+if [ -f "$T/base/.github/pr-quality/merge-base-tree.sh" ]; then
+  GB="$T/gitbase"
+  git clone -q --shared --no-checkout "$(git rev-parse --show-toplevel)" "$GB" >/dev/null 2>&1 || true
+  if [ -d "$GB/.git" ]; then
+    git -C "$GB" update-ref --no-deref HEAD "$(git rev-parse "$BASE_REF^{commit}")"
+    git -C "$GB" update-ref refs/pr/head "$(git rev-parse "$HEAD_REF^{commit}")"
+    if bash "$T/base/.github/pr-quality/merge-base-tree.sh" "$GB" "$T/mb" >/dev/null 2>&1; then MBARGS=(--merge-base-root "$T/mb"); fi
+  fi
+  [ "${#MBARGS[@]}" -gt 0 ] || echo "! merge-base tree not built; judging against the base tip only (CI may allow slightly more)"
+fi
+GUARD_ARGS=(--root "$T/pr" --base-root "$T/base" "${MBARGS[@]}")
+echo "-> slop guard, CI form: slop-guard.mjs ${GUARD_ARGS[*]//$T/<tmp>} (new violations vs $BASE_REF only)"
+if node "$T/base/.github/pr-quality/slop-guard.mjs" "${GUARD_ARGS[@]}"; then exit 0; fi
 echo "slop-guard: BLOCKED. This is the check CI's 'Slop baselines' runs; it would fail there too. Fix it or justify it inline with  pq-allow(<rule>): <reason>" >&2
 exit 1
