@@ -2102,7 +2102,9 @@ async function heldQueueDb(): Promise<WebhookEvents> {
     const platform = await platformDb();
     if (platform) return platform.billingWebhookEvent as unknown as WebhookEvents;
   }
-  return prisma.billingWebhookEvent;
+  // before billing is on D1 the queue is still the Postgres table
+  const postgres = prisma as unknown as Tx;
+  return postgres.billingWebhookEvent;
 }
 
 /** Super-admin queue: every held subscription payment (newest first), with its facts. */
