@@ -126,10 +126,15 @@ describe('ci.yml wiring', () => {
     expect(j, id).toMatch(/needs: \[[^\]]*tested-tree[^\]]*\]/);
     expect(j, id).toContain(SKIP);
   });
-  it('downstream full-lane jobs hang off those roots (skipped when build is skipped), none is independently unconditional on push', () => {
-    for (const id of ['orphan-tests', 'test-e2e', 'builder-e2e'])
-      expect(job(id), id).toMatch(/needs: \[build\]/);
-    expect(job('test-integration')).toContain("needs.build.result == 'success'");
+  it('downstream full-lane jobs hang off tested-tree (not Build: CRITICAL-PATH-1), carry the skip + light-scope decision themselves, and none is unconditional on push', () => {
+    for (const id of ['orphan-tests', 'test-e2e', 'builder-e2e']) {
+      expect(job(id), id).toMatch(/needs: \[tested-tree\]/);
+      expect(job(id), id).toContain(SKIP);
+      expect(job(id), id).toContain("needs.tested-tree.outputs.heavy != 'false'");
+    }
+    expect(job('test-integration')).toMatch(/needs: \[tested-tree, changes\]/);
+    expect(job('test-integration')).toContain("needs.tested-tree.outputs.heavy != 'false'");
+    expect(job('test-integration')).not.toContain('needs.build.result');
   });
   it('API Worker boots on workerd: NO job-level if (a skipped required job reads as a PASS), the tested-tree skip is decided at STEP level, and it needs tested-tree', () => {
     const j = job('api-workerd-smoke');

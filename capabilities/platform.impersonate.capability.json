@@ -23,8 +23,12 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": [],
-    "en": []
+    "ar": [
+      "ازاي ادخل بحساب التاجر؟",
+      "عايز اشوف المتجر زي ما التاجر شايفه",
+      "اخرج من حساب التاجر ازاي؟"
+    ],
+    "en": ["How do I sign in as a merchant?"]
   },
   "steps": ["Super-admin console only."],
   "edgeCases": [

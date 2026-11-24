@@ -18,7 +18,7 @@
   },
   "helpArticle": "payment-providers",
   "questions": {
-    "ar": ["ازاي اظهر التقسيط؟", "valu متاح؟"],
+    "ar": ["ازاي اظهر التقسيط؟", "valu متاح؟", "ينفع العميل يدفع بالتقسيط؟"],
     "en": ["Show instalments on product pages"]
   },
   "steps": ["Payment settings > instalment line."],

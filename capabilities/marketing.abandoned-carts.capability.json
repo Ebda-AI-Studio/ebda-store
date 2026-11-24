@@ -23,7 +23,7 @@
   },
   "helpArticle": "abandoned-cart-recovery",
   "questions": {
-    "ar": ["فيه حد سايب سلة؟", "فعل رسايل استرجاع السلة"],
+    "ar": ["فيه حد سايب سلة؟", "فعل رسايل استرجاع السلة", "كام عميل سايب سلة عندي؟"],
     "en": ["Recover abandoned carts"]
   },
   "steps": ["Abandoned carts page + config."],

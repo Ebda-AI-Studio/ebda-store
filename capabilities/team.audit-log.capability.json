@@ -18,8 +18,18 @@
   },
   "helpArticle": "store-activity-log",
   "questions": {
-    "ar": ["مين غيّر حاجة في متجري؟", "عايز اشوف سجل النشاط"],
-    "en": ["Who changed something in my store?", "Where is the audit log?"]
+    "ar": [
+      "مين غير السعر ده؟",
+      "مين مسح المنتج؟",
+      "فين سجل التغييرات في المتجر؟",
+      "مين غيّر حاجة في متجري؟",
+      "عايز اشوف سجل النشاط"
+    ],
+    "en": [
+      "Who changed this price?",
+      "Who changed something in my store?",
+      "Where is the audit log?"
+    ]
   },
   "steps": ["Open Settings, Activity log", "Press Load more for older entries"],
   "edgeCases": [
