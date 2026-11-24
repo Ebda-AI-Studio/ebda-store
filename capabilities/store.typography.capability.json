@@ -18,7 +18,7 @@
   },
   "helpArticle": "store-fonts",
   "questions": {
-    "ar": ["ازاي اغير الخط؟", "ارفع خط خاص"],
+    "ar": ["ازاي اغير الخط؟", "ارفع خط خاص", "ازاي اغير حجم الخط في الموقع؟"],
     "en": ["Change my store font"]
   },
   "steps": ["Editor > Fonts / text styles by area."],

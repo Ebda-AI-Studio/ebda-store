@@ -1,3 +1,7 @@
+/* Ebda design language v1: the vendored foundation variables (--ebda-*: gold, night, type, radius, control, motion). Never edit
+   the vendored file; the admin roles below are derived from it (proved by tests/unit/admin-design-tokens-sync.test.ts). */
+@import '../../../../packages/shared/src/foundation/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -67,7 +71,7 @@
     --ring: 36.4 36.03% 51.57%;
 
     /* Radius - Softer, more modern */
-    --radius: 0.875rem;
+    --radius: var(--ebda-radius-surface);
 
     /* Sidebar - Subtle warmth */
     --sidebar: 30 20% 99%;
@@ -81,13 +85,12 @@
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.03);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.03);
     --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.06), 0 8px 10px -6px rgb(0 0 0 / 0.03);
-    --shadow-primary: 0 4px 14px 0 hsl(36.4 36.03% 51.57% / 0.25);
 
     /* Motion tokens (mirrors components/ui/tokens.ts MOTION): fast = colour/press, base = menus/tabs, slow = sheets. */
-    --dur-fast: 150ms;
-    --dur-base: 200ms;
-    --dur-slow: 300ms;
-    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+    --dur-fast: var(--ebda-dur-fast);
+    --dur-base: var(--ebda-dur-base);
+    --dur-slow: var(--ebda-dur-slow);
+    --ease-out: var(--ebda-ease);
   }
 
   @media (min-width: 768px) {
@@ -203,6 +206,23 @@
     color-scheme: dark;
   }
 
+  /* Native checkboxes and radios are 20px (the browser default is 13px, under the 24px WCAG 2.5.8 floor); a utility class on
+     the input still wins. On touch the wrapping label is a 44px row, so the whole row is the target (DESIGN.md: 44px on phones). */
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+  }
+  @media (pointer: coarse) {
+    label:has(> input[type='checkbox']),
+    label:has(> input[type='radio']) {
+      display: inline-flex;
+      min-height: 2.75rem;
+      align-items: center;
+    }
+  }
+
   /* Eliminate 300ms tap-zoom delay on touch devices */
   html {
     touch-action: manipulation;
@@ -217,7 +237,7 @@
 @layer components {
   /* Force Card Component */
   .force-card {
-    @apply rounded-xl border bg-card p-6 shadow-sm transition-all duration-200;
+    @apply rounded-md border bg-card p-6 shadow-sm transition-all duration-200;
     background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card)) 100%);
   }
 
@@ -230,7 +250,7 @@
      three quarters whitespace. Was p-6 (24px); 16/20px is enough to
      breathe without dominating the page. */
   .force-stat-card {
-    @apply relative overflow-hidden rounded-xl border bg-card px-5 py-4 transition-all duration-300;
+    @apply relative overflow-hidden rounded-md border bg-card px-5 py-4 transition-all duration-300;
   }
 
   .force-stat-card::before {
@@ -245,20 +265,18 @@
   }
 
   .force-stat-card:hover {
-    @apply shadow-lg border-primary/20;
+    @apply shadow-md border-primary/20;
     transform: translateY(-2px);
   }
 
   /* Force Button Variants */
   .force-btn-primary {
-    @apply inline-flex items-center justify-center rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-md transition-all duration-200;
-    box-shadow: 0 4px 14px 0 hsl(var(--primary) / 0.39);
+    @apply inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-md transition-all duration-200;
   }
 
   .force-btn-primary:hover {
     @apply bg-primary/90;
     transform: translateY(-1px);
-    box-shadow: 0 6px 20px 0 hsl(var(--primary) / 0.45);
   }
 
   .force-btn-primary:active {
@@ -267,7 +285,7 @@
 
   /* Force Input */
   .force-input {
-    @apply flex h-12 w-full rounded-xl border border-input bg-background px-4 py-3 text-sm transition-colors;
+    @apply flex h-12 w-full rounded-md border border-input bg-background px-4 py-3 text-sm transition-colors;
     @apply placeholder:text-muted-foreground;
     @apply focus:border-primary focus:ring-2 focus:ring-primary/20;
     @apply disabled:cursor-not-allowed disabled:opacity-50;
@@ -275,7 +293,7 @@
 
   /* Force Sidebar Nav Item */
   .force-nav-item {
-    @apply flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200;
+    @apply flex items-center gap-3 rounded-md px-4 py-3 text-sm font-medium transition-all duration-200;
     @apply text-muted-foreground hover:bg-muted hover:text-foreground;
   }
 
@@ -336,7 +354,7 @@
 
   /* Force Dropdown */
   .force-dropdown {
-    @apply absolute right-0 mt-2 w-56 rounded-xl border bg-card shadow-lg ring-1 ring-black/5;
+    @apply absolute right-0 mt-2 w-56 rounded-md border bg-card shadow-md ring-1 ring-black/5;
     animation: dropdownEnter 0.2s ease-out;
   }
 
@@ -351,7 +369,7 @@
   }
 
   .force-modal {
-    @apply fixed left-1/2 top-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-card p-6 shadow-2xl;
+    @apply fixed left-1/2 top-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg bg-card p-6 shadow-xl;
     animation: modalEnter 0.3s ease-out;
   }
 

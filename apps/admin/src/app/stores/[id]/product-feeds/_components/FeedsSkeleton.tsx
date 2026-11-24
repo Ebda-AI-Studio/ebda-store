@@ -5,7 +5,7 @@ export function FeedsSkeleton() {
     <div className="space-y-6" aria-hidden="true">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {[0, 1, 2].map(i => (
-          <div key={i} className="bg-card rounded-xl border border-border p-5 space-y-3">
+          <div key={i} className="bg-card rounded-lg border border-border p-5 space-y-3">
             <div className="h-4 w-40 force-skeleton" />
             <div className="h-3 w-56 force-skeleton" />
             <div className="h-9 w-full force-skeleton" />
@@ -21,7 +21,7 @@ export function FeedsSkeleton() {
           </div>
         ))}
       </div>
-      <div className="bg-card rounded-xl border border-border p-6">
+      <div className="bg-card rounded-lg border border-border p-6">
         <div className="h-40 force-skeleton" />
       </div>
     </div>

@@ -18,7 +18,7 @@
   },
   "helpArticle": "returns-and-refunds",
   "questions": {
-    "ar": ["اكتب سياسة الاسترجاع"],
+    "ar": ["اكتب سياسة الاسترجاع", "فين اغير مدة الارجاع؟", "ازاي اظهر سياسة الارجاع للعميل؟"],
     "en": ["Set my return policy"]
   },
   "steps": ["Shipping page > return policy."],

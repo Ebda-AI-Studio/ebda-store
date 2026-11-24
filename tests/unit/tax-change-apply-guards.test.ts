@@ -14,6 +14,8 @@ const m = vi.hoisted(() => ({
     { id: string; status: string; taxRegistrationNumber: string | null; reviewedAt: Date | null }
   >(),
   updateMany: vi.fn(),
+  reread: null as null | (() => void),
+  skipReads: 0,
   docCreate: vi.fn(),
 }));
 
@@ -37,7 +39,16 @@ vi.mock('@api/lib/platform-scope', () => ({
 vi.mock('@api/lib/definer', () => ({ taxProfilesForReview: async () => [] }));
 vi.mock('@api/lib/repo-factory', () => ({
   storeDb: async (storeId: string) => ({
-    storeTaxProfile: { findUnique: async () => m.profiles.get(storeId) ?? null },
+    storeTaxProfile: {
+      findUnique: async () => {
+        const row = m.profiles.get(storeId) ?? null;
+        const snapshot = row && { ...row };
+        // a concurrent re-review lands right after the apply's own read (the first read is the duplicate-TRN scan)
+        if (m.skipReads > 0) m.skipReads -= 1;
+        else m.reread?.();
+        return snapshot;
+      },
+    },
   }),
   storeWriter: async () => ({
     storeTaxProfile: { updateMany: m.updateMany },
@@ -65,6 +76,8 @@ const actor = { userId: 'admin-1' };
 
 beforeEach(() => {
   m.profiles.clear();
+  m.reread = null;
+  m.skipReads = 0;
   m.updateMany.mockReset().mockResolvedValue({ count: 1 });
   m.docCreate.mockReset().mockResolvedValue({});
   m.profiles.set(STORE, {
@@ -148,5 +161,33 @@ describe('applyApprovedTaxChange guards', () => {
     await expect(applyApprovedTaxChange(STORE, change(), actor)).rejects.toMatchObject({
       code: 'TAX_CHANGE_STALE',
     });
+  });
+
+  it('the write matches the reviewedAt it read: a re-review between the read and the write writes nothing (409)', async () => {
+    // a conditional write like the real store: it matches only while reviewedAt is still what the apply read
+    m.updateMany.mockImplementation(async ({ where }: any) => {
+      const now = m.profiles.get(STORE)!;
+      const same =
+        (now.reviewedAt ? now.reviewedAt.getTime() : null) ===
+        (where.reviewedAt ? where.reviewedAt.getTime() : null);
+      return { count: same && now.status === where.status ? 1 : 0 };
+    });
+    m.skipReads = 1;
+    m.reread = () => {
+      m.reread = null;
+      m.profiles.set(STORE, {
+        id: 'p1',
+        status: 'verified',
+        taxRegistrationNumber: '987654321',
+        reviewedAt: new Date('2026-11-12T00:00:00Z'),
+      });
+    };
+    const { applyApprovedTaxChange } = await import('@api/services/tax-profile.service');
+    await expect(applyApprovedTaxChange(STORE, change(), actor)).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'INVALID_TRANSITION',
+    });
+    expect(m.updateMany.mock.calls[0][0].where.reviewedAt).toEqual(REVIEWED);
+    expect(m.docCreate).not.toHaveBeenCalled();
   });
 });

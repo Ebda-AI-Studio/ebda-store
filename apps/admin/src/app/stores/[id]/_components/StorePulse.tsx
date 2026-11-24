@@ -18,7 +18,7 @@ import {
 } from '../_hooks/useStorePulse';
 import { sparkBars, toDelta, type Delta } from './pulse-format';
 
-const CARD = 'rounded-xl border bg-card shadow-sm';
+const CARD = 'rounded-md border bg-card shadow-sm';
 const count = (n: number) => n.toLocaleString('en-US');
 
 /* ---------- period switch ---------- */
@@ -36,7 +36,7 @@ export function PeriodSwitch({
     <div
       role="radiogroup"
       aria-label={t('periodLabel')}
-      className="inline-flex max-w-full overflow-x-auto rounded-xl border bg-muted/50 p-1"
+      className="inline-flex max-w-full overflow-x-auto rounded-md border bg-muted/50 p-1"
     >
       {PULSE_PERIODS.map(p => (
         <button
@@ -134,7 +134,7 @@ function SliceError({ message, onRetry }: { message: string; onRetry: () => void
   return (
     <div
       role="alert"
-      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4"
     >
       <p className="text-sm text-destructive-ink">{message}</p>
       <Button variant="outline" size="sm" onClick={onRetry}>
@@ -230,7 +230,7 @@ function Kpi({
   const t = useT('stores.dashboard.pulse');
   const body = (
     <>
-      <p className="text-xs font-medium text-muted-foreground sm:text-sm">{label}</p>
+      <p className="text-sm font-medium text-muted-foreground sm:text-sm">{label}</p>
       <p className="mt-1 text-2xl font-bold text-foreground" dir="ltr">
         {value}
       </p>
@@ -267,7 +267,7 @@ export function KpiRow({
     return (
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-busy="true">
         {[0, 1, 2, 3].map(i => (
-          <div key={i} className="force-skeleton h-24 rounded-xl" />
+          <div key={i} className="force-skeleton h-24 rounded-md" />
         ))}
       </div>
     );
@@ -299,7 +299,7 @@ export function KpiRow({
       {unpaid === 'error' ? (
         <Kpi testId="kpi-unpaid" label={t('unpaid')} value="—" hint={t('unpaidFailed')} />
       ) : unpaid === null ? (
-        <div className="force-skeleton h-24 rounded-xl" />
+        <div className="force-skeleton h-24 rounded-md" />
       ) : (
         <Kpi
           testId="kpi-unpaid"
