@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   markReviewed: vi.fn(),
   deleteImages: vi.fn(),
   updated: [] as any[],
+  beforeCas: null as null | (() => void),
   handle: 'ebda@instapay' as string | null,
 }));
 
@@ -43,7 +44,26 @@ vi.mock('@ebda/database', () => ({
     fn({
       manualPaymentClaim: {
         findFirst: async () => h.claim,
-        updateMany: async (a: unknown) => (h.updated.push(a), { count: 1 }),
+        // a real compare-and-set over the one claim row: `where` must match its current fields, then `data` applies
+        updateMany: async (a: {
+          where: Record<string, unknown>;
+          data: Record<string, unknown>;
+        }) => {
+          h.updated.push(a);
+          if (h.beforeCas && a.where.reviewedBy === null) {
+            const fn = h.beforeCas;
+            h.beforeCas = null;
+            fn();
+          }
+          const c = h.claim;
+          const ok =
+            !!c &&
+            Object.entries(a.where).every(
+              ([k, v]) => k === 'id' || k === 'storeId' || (c[k] ?? null) === v
+            );
+          if (ok) Object.assign(c, a.data);
+          return { count: ok ? 1 : 0 };
+        },
       },
       billingEvent: { findFirst: async () => h.held },
       storeSubscription: { findUnique: async () => ({ paymentReference: null }) },
@@ -70,6 +90,7 @@ const claim = (over: Record<string, any> = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   h.updated = [];
+  h.beforeCas = null;
   h.handle = 'ebda@instapay';
   h.claim = claim();
   h.held = null;
@@ -151,8 +172,11 @@ describe('super-admin approval', () => {
     });
     expect(h.settle).toHaveBeenCalledTimes(1);
     expect(h.settle.mock.calls[0][0]).toBe('ev1');
-    expect(h.updated[0].data).toMatchObject({ status: 'confirmed', reviewedBy: 'admin1' });
-    expect(h.updated[0].where.status).toBe('pending');
+    // 1st write: the atomic take (pending, nobody reviewing); 2nd: the flip to confirmed, still guarded on pending
+    expect(h.updated[0].where).toMatchObject({ status: 'pending', reviewedBy: null });
+    expect(h.updated[0].data).toMatchObject({ reviewedBy: 'admin1' });
+    expect(h.updated[1].data).toMatchObject({ status: 'confirmed', reviewedBy: 'admin1' });
+    expect(h.updated[1].where.status).toBe('pending');
     expect(h.markReviewed).toHaveBeenCalledWith('s1', 'r1', { status: 'approved' }, 'admin1');
   });
 
@@ -187,5 +211,40 @@ describe('super-admin approval', () => {
       approveAddonClaim({ storeId: 's1', claimId: 'c1', actorId: 'a' })
     ).rejects.toMatchObject({ code: 'ADDON_NOT_FOUND' });
     expect(h.settle).not.toHaveBeenCalled();
+  });
+});
+
+describe('approval takes the claim atomically (race with a reject)', () => {
+  it('a reject that wins the race: the approval grants NOTHING (no ledger row, no settle)', async () => {
+    // the reject lands between the approver reading the claim (pending) and its compare-and-set
+    h.beforeCas = () => Object.assign(h.claim, { status: 'rejected', reviewedBy: 'admin2' });
+    await expect(
+      approveAddonClaim({ storeId: 's1', claimId: 'c1', actorId: 'admin1' })
+    ).rejects.toMatchObject({ code: 'CLAIM_NOT_PENDING' });
+    expect(h.claimEvent).not.toHaveBeenCalled();
+    expect(h.settle).not.toHaveBeenCalled();
+    expect(h.claim.status).toBe('rejected'); // and the approval did not overwrite the reject
+  });
+
+  it('two approvers at once: exactly one takes the claim; both end on the same single ledger row', async () => {
+    const [a, b] = await Promise.all([
+      approveAddonClaim({ storeId: 's1', claimId: 'c1', actorId: 'admin1' }),
+      approveAddonClaim({ storeId: 's1', claimId: 'c1', actorId: 'admin2' }),
+    ]);
+    const takes = h.updated.filter(u => u.where.reviewedBy === null);
+    expect(takes).toHaveLength(2); // both tried
+    expect(h.updated.filter(u => u.data.reviewedBy && !u.data.status)).toHaveLength(2);
+    expect(h.claim.reviewedBy).toBe('admin1'); // the first take won; the second matched nothing
+    expect(a.billingEventId).toBe(b.billingEventId);
+  });
+
+  it('a crash after the take: the retry (any admin) resumes the same event and finishes', async () => {
+    h.claim = claim({ reviewedBy: 'admin1' }); // taken by an approval that died after the CAS
+    h.claimEvent.mockResolvedValue(null);
+    h.held = { id: 'ev-held' };
+    const out = await approveAddonClaim({ storeId: 's1', claimId: 'c1', actorId: 'admin2' });
+    expect(out.billingEventId).toBe('ev-held');
+    expect(h.settle.mock.calls[0][0]).toBe('ev-held');
+    expect(h.claim.status).toBe('confirmed');
   });
 });

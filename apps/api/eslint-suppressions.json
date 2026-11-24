@@ -174,11 +174,6 @@
       "count": 1
     }
   },
-  "src/services/auth.service.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/services/carriers/bosta.carrier.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
