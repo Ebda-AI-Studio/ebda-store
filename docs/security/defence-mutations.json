@@ -282,16 +282,6 @@
       "test": "tests/unit/return-complete-gateway-refund.test.ts"
     },
     {
-      "id": "money-return-order-lock",
-      "domain": "money / payment / refund",
-      "tier": "unit",
-      "why": "two returns on one order complete together and both refund the same line",
-      "source": "apps/api/src/services/return.service.ts",
-      "find": "    if (returnRequest.orderId) await lockOrderReturns(returnRequest.orderId);",
-      "replace": "    /* order lock removed */",
-      "test": "tests/unit/return-complete-gateway-refund.test.ts"
-    },
-    {
       "id": "csrf-cookieless-bypass-must-stay-narrow",
       "domain": "csrf / session",
       "tier": "unit",

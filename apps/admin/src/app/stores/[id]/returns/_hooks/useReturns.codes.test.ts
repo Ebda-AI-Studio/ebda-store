@@ -23,9 +23,6 @@ const NOT_ON_COMPLETION = new Set([
   'INVALID_ORDER',
   'NO_ITEMS',
   'INVALID_BUNDLE_GROUP',
-  // The bounded create-path lock (lockOrderReturnsBounded) — complete() takes
-  // the blocking lock, so a merchant completion never sees it.
-  'RETURN_ORDER_BUSY',
   // Create-path only: the store's published return window has closed / is 0.
   'RETURN_WINDOW_CLOSED',
   // Create-path only (Ruling B5-19): an exchange request that includes a gold-rate line is refused.

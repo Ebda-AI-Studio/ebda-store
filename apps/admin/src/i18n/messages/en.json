@@ -4529,6 +4529,7 @@
         "PROVIDER_REFUND_INDETERMINATE": "The refund reached the payment provider, but the return could not be completed. Do NOT refund it again: check the provider dashboard, then complete the return with \"Already refunded — record only\".",
         "REFUND_ALREADY_ISSUED": "A refund for this return was already sent to the payment provider. Check the provider dashboard, then complete the return with \"Already refunded — record only\".",
         "RETURN_ALREADY_COMPLETING": "This return is already being completed. Refresh the page before trying again.",
+        "RETURN_ORDER_BUSY": "Another return on this order is being completed right now. Wait a moment, refresh the page, then try again.",
         "PARTIAL_REFUND_EXCEEDS_PAYMENT": "Part of this payment was already refunded outside this return, so what is left is less than this return is worth. Complete it with store credit or bank transfer and settle the difference with the customer.",
         "GUEST_STORE_CREDIT": "This is a guest return with no wallet to credit. Refund it to the original method or by bank transfer.",
         "PARTIAL_REFUND_NOTHING_TO_REFUND": "Every item in this return was already refunded by an earlier return.",

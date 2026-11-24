@@ -204,55 +204,6 @@ function formatMajor(piastres: number): string {
 }
 
 /**
- * Serialise the return writes that read an order's claimed or returned
- * quantities and then act on them — `create()`'s over-claim check and
- * `complete()`'s allocation (#1393). Two of them on the same order would
- * otherwise each read the other's work as not there yet.
- *
- * A transaction-scoped ADVISORY lock, not `SELECT … FOR UPDATE` on the order
- * row like the inventory fanout takes. `complete()` holds this for the whole
- * request, provider call included, and PaymentService.refund commits the
- * order's `refunded` flip on a transaction of its own — which would wait
- * forever on a row lock this request holds, while this request waits for it.
- * The advisory key locks no row, so nothing else that touches the order is
- * blocked by it. Released when the request transaction ends; outside one
- * (scripts, tests) it is released at once and is a no-op.
- */
-async function lockOrderReturns(orderId: string): Promise<void> {
-  await prisma.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`return-order:${orderId}`}, 0))`;
-}
-
-/**
- * The same lock, for the CUSTOMER-facing `create()` — bounded (issues 2004 /
- * 2030). `complete()` holds this key across the provider refund round-trip
- * (a gateway refund can take several seconds), and a storefront return submission
- * must not sit on a pooled connection behind a merchant's refund until its own
- * 30s transaction times out as a P2028 500. It polls the non-blocking
- * `pg_try_advisory_xact_lock` for a short window — long enough for a racing
- * create or a quick completion to finish — then answers a clean 409 the
- * shopper can retry. Same key, so the serialisation #1393 needs is unchanged.
- */
-const CREATE_LOCK_WAIT_MS = 3_000;
-const CREATE_LOCK_POLL_MS = 100;
-async function lockOrderReturnsBounded(orderId: string): Promise<void> {
-  const deadline = Date.now() + CREATE_LOCK_WAIT_MS;
-  for (;;) {
-    const rows = await prisma.$queryRaw<
-      Array<{ locked: boolean }>
-    >`SELECT pg_try_advisory_xact_lock(hashtextextended(${`return-order:${orderId}`}, 0)) AS locked`;
-    if (rows[0]?.locked) return;
-    if (Date.now() >= deadline) {
-      throw new AppError(
-        409,
-        'RETURN_ORDER_BUSY',
-        'Another return on this order is being processed. Please try again in a moment.'
-      );
-    }
-    await new Promise(resolve => setTimeout(resolve, CREATE_LOCK_POLL_MS));
-  }
-}
-
-/**
  * A store's customers are User rows in the identity/Postgres side, not in its Durable Object: a DO read cannot `include`
  * them (prisma-lite refuses a cross-database relation), so the DO paths read the return without `customer` and attach it here.
  */
@@ -994,11 +945,9 @@ export class ReturnService {
     // requests and double-book the manual/store-credit refund side
     // (adversarial audit P1-2 blast radius).
     //
-    // Read under the order's returns lock: two requests submitted together
-    // (a double-tapped submit, two tabs) would otherwise both read the claims
-    // as they were before either, and both reserve the same units. Bounded:
-    // a merchant's in-flight gateway refund on this order holds the same key.
-    await lockOrderReturnsBounded(data.orderId);
+    // Postgres path only (Node: unit tests, local dev); no order lock (Ruling NZ-REFUND-LOCK-1). On the Worker a store took
+    // `createOnDo` above: `createReturn` reads the claims and inserts in ONE `transactionSync` (packages/repo/src/do/returns.ts),
+    // and a `pg` store answers 410 before reaching here.
     const priorReturns = await prisma.return.findMany({
       where: {
         storeId,
@@ -1351,12 +1300,10 @@ export class ReturnService {
       throw new AppError(400, 'INVALID_STATUS', 'Return must be received before completing');
     }
 
-    // One completion per ORDER at a time (#1393). The claim below is per
-    // Return row, so two DIFFERENT returns on the same order could both pass
-    // it, both read prior returns without the other (neither is completed
-    // yet), and both refund the same line. Held until the request commits, so
-    // the second one reads the first as completed.
-    if (returnRequest.orderId) await lockOrderReturns(returnRequest.orderId);
+    // One completion per ORDER at a time (#1393) is the DO's job now (Ruling NZ-REFUND-LOCK-1): on the Worker a store took
+    // `completeOnDo` above, whose `returnClaim` refuses a sibling return being completed (`assertOrderNotBusy`,
+    // RETURN_ORDER_BUSY) in ONE `transactionSync`; a `pg` store answers 410 before reaching here. This Postgres path (Node:
+    // unit tests, local dev) takes no order lock.
 
     // ATOMIC CLAIM. The check above is a read, and the flip to 'completed'
     // happens hundreds of lines later, AFTER the provider round-trip — so two
@@ -1911,7 +1858,7 @@ export class ReturnService {
    * Read-only, and computed by the same helpers `complete()` uses, so the
    * figure shown is the figure sent. It can still change if another return or
    * refund on the order lands before the merchant confirms; `complete()`
-   * recomputes under the order lock and refuses rather than overshooting.
+   * recomputes inside its claim (one DO section) and refuses rather than overshooting.
    */
   static async refundPreview(
     storeId: string,
