@@ -28,6 +28,10 @@
       "import": "./dist/constants/index.js",
       "default": "./src/constants/index.ts"
     },
+    "./design": {
+      "types": "./src/design.ts",
+      "default": "./src/design.ts"
+    },
     "./smart-layer": {
       "types": "./src/smart-layer-kit.ts",
       "require": "./dist/smart-layer-kit.js",

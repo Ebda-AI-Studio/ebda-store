@@ -111,7 +111,7 @@ function Row({
         <button
           data-ui="handle"
           type="button"
-          className="min-h-6 min-w-6 cursor-grab touch-none rounded px-1 text-muted-foreground hover:text-foreground"
+          className="min-h-6 min-w-6 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11 [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:items-center [@media(pointer:coarse)]:justify-center cursor-grab touch-none rounded-md px-1 text-muted-foreground hover:text-foreground"
           aria-label={t('drag', { name })}
           {...attributes}
           {...listeners}
@@ -229,7 +229,7 @@ function Row({
                     onSelect({ sectionId: node.id, blockId: b.id });
                     onFocusCanvas({ sectionId: node.id, blockId: b.id });
                   }}
-                  className={`min-w-0 flex-1 truncate rounded px-2 py-1 text-start text-xs ${
+                  className={`min-w-0 flex-1 truncate rounded-md px-2 py-1 text-start text-xs ${
                     bSelected ? 'bg-primary/15 ring-1 ring-primary' : 'hover:bg-muted'
                   } ${b.hidden ? 'text-muted-foreground line-through' : ''}`}
                 >

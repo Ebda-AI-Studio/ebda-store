@@ -104,7 +104,7 @@ export function RefundLinesPicker({ idPrefix, quote, currency, value, onChange, 
         })}
       </ul>
       {quote.coversWholeOrder && quote.returnsEnabled !== false && (
-        <p role="note" className="mt-2 text-xs text-muted-foreground">
+        <p role="note" className="mt-2 text-sm text-muted-foreground">
           {t('wholeOrderRestockNote')}
         </p>
       )}
