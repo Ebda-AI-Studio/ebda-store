@@ -22,7 +22,32 @@ import { storeDb, storeWriter } from '../lib/repo-factory';
  * add custom slugs alongside the built-ins.
  */
 
-const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
+// Arabic letters allowed, like product slugs (a page titled «صفحة اختبار» gets an Arabic address).
+const SLUG_REGEX = /^[a-z0-9؀-ۿ](?:[a-z0-9؀-ۿ-]{0,62}[a-z0-9؀-ۿ])?$/;
+
+/**
+ * Standard pages: a store admin may edit them but never delete them (the storefront and legal links expect them).
+ * Mirrored in the admin UI (content/page-slug.ts). A super_admin may still remove a shell.
+ */
+export const PROTECTED_PAGE_SLUGS: readonly string[] = [
+  'home',
+  'about',
+  'privacy',
+  'terms',
+  'shipping',
+  'faq',
+  'legal',
+  'returns',
+  'refund',
+  'cookies',
+  'contact',
+];
+
+/** True when this role may delete this page: custom pages for a store admin, any page for a super admin. */
+export function canDeletePage(role: string | undefined, slugRaw: string): boolean {
+  if (role === 'super_admin') return true;
+  return role === 'store_admin' && !PROTECTED_PAGE_SLUGS.includes(normalizeSlug(slugRaw));
+}
 
 function normalizeSlug(input: string): string {
   return input.trim().toLowerCase();
@@ -33,7 +58,7 @@ function assertValidSlug(slug: string): void {
     throw new AppError(
       400,
       'INVALID_SLUG',
-      'Slug must be 1-64 chars: lowercase letters, digits, dashes (cannot start/end with dash)'
+      'Slug must be 1-64 chars: lowercase letters, Arabic letters, digits, dashes (cannot start/end with dash)'
     );
   }
 }
@@ -200,6 +225,22 @@ export class PagesService {
       where: { storeId },
       orderBy: [{ position: 'asc' }, { slug: 'asc' }],
     });
+  }
+
+  /**
+   * Published CUSTOM pages (the standard slugs have their own storefront routes), for the sitemap. Slug + titles +
+   * updatedAt only: the public list never carries page content.
+   */
+  static async listPublicCustom(storeId: string) {
+    const rows = await PagesService.list(storeId);
+    return rows
+      .filter(p => p.isPublished && !PROTECTED_PAGE_SLUGS.includes(p.slug))
+      .map(p => ({
+        slug: p.slug,
+        title: p.title,
+        titleAr: p.titleAr,
+        updatedAt: p.updatedAt.toISOString(),
+      }));
   }
 
   /** Fetch a single page by slug. Returns null when not found. */

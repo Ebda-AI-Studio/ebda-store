@@ -181,6 +181,26 @@ async function fetchBundles(storeId: string): Promise<BundleEntry[]> {
   }
 }
 
+type CustomPageEntry = { slug: string; updatedAt?: string };
+
+/**
+ * A store's published custom pages (`/pages/<slug>`). One bounded request; a failure degrades to "no custom pages" like
+ * bundles (the products request is the one that must 5xx the sitemap).
+ */
+async function fetchCustomPages(storeId: string): Promise<CustomPageEntry[]> {
+  try {
+    const res = await fetch(`${API_URL}/public/${storeId}/pages`, {
+      next: { revalidate: 3600, tags: [`pages:${storeId}`] },
+      headers: { 'X-Store-ID': storeId },
+    });
+    if (!res.ok) return [];
+    const pages: CustomPageEntry[] = (await res.json())?.data?.pages ?? [];
+    return pages.map(p => ({ slug: p.slug, updatedAt: p.updatedAt }));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * The custom-domain branch of `sitemap()`: ONE store's URLs, rooted at its
  * own host (see `sitemap()`'s doc comment for why). Extracted unchanged from
@@ -218,11 +238,12 @@ async function buildTenantSitemap(
   // Single store, own domain: up to 10 pages x 100 = 1000 product URLs,
   // plus 1 unpaginated bundle-list request (see fetchBundles) — 12
   // subrequests worst case, nowhere near any Worker limit.
-  const [products, bundles] = await Promise.all([
+  const [products, bundles, customPages] = await Promise.all([
     // No catch (#2127): a products outage must 5xx this merchant's own
     // sitemap, not publish it with every product URL missing.
     fetchProducts(storeId, 10),
     fetchBundles(storeId),
+    fetchCustomPages(storeId),
   ]);
   const entries: MetadataRoute.Sitemap = [];
   for (const page of STORE_STATIC_PAGES) {
@@ -239,6 +260,16 @@ async function buildTenantSitemap(
             : now,
         'weekly',
         0.7
+      )
+    );
+  }
+  for (const cp of customPages) {
+    entries.push(
+      ...pageEntries(
+        `/pages/${encodeURIComponent(cp.slug)}`,
+        cp.updatedAt ? new Date(cp.updatedAt) : now,
+        'monthly',
+        0.4
       )
     );
   }

@@ -4782,7 +4782,7 @@
       "newPage": "Add a page",
       "newPagePrompt": "Page slug (lowercase letters, digits, dashes):",
       "newPageTitle": "Add a page",
-      "newPageInvalid": "Use lowercase letters, digits and dashes only.",
+      "newPageInvalid": "Type a page title. The address can use letters (Arabic too), digits and dashes.",
       "newPageConfirm": "Create page",
       "newPageCancel": "Cancel",
       "openEditor": "Edit",
@@ -4795,7 +4795,18 @@
       "builtInsHeading": "Standard pages",
       "customHeading": "Custom pages",
       "customEmpty": "No custom pages yet.",
-      "faqsLink": "Frequently asked questions live here."
+      "faqsLink": "Frequently asked questions live here.",
+      "deletePage": "Delete",
+      "deleteObject": "The page «{name}»",
+      "deleteConsequence": "The page is removed and its link stops working. This cannot be undone.",
+      "deleteConfirm": "Delete the page",
+      "deleted": "Page deleted",
+      "deleteError": "We could not delete the page. Please try again.",
+      "newPageNameLabel": "Page title (Arabic or English)",
+      "newPageNamePlaceholder": "e.g. Our story",
+      "newPageAdvanced": "Advanced: page address",
+      "newPageSlugLabel": "Page address (optional, made from the title)",
+      "viewPage": "View page"
     },
     "editor": {
       "title": "Edit page",
@@ -4847,7 +4858,13 @@
       "aiHowToNote": "AI-generated How-To guides live in SEO Tools, not here.",
       "wrapperNote": "This editor controls the static page wrapper (cover image, intro paragraphs, etc.). The accordion content the storefront actually renders comes from a separate surface.",
       "openFaqInSeo": "Open FAQ items in SEO",
-      "openHowToInSeo": "Open How-To items in SEO"
+      "openHowToInSeo": "Open How-To items in SEO",
+      "deletePage": "Delete page",
+      "deleteObject": "The page «{name}»",
+      "deleteConsequence": "The page is removed and its link stops working. This cannot be undone.",
+      "deleteConfirm": "Delete the page",
+      "deleted": "Page deleted",
+      "deleteError": "We could not delete the page. Please try again."
     },
     "faqsPage": {
       "title": "Questions and answers",

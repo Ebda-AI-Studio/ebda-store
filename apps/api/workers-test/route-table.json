@@ -152,6 +152,7 @@
   "GET /public/:storeId/loyalty/info",
   "GET /public/:storeId/loyalty/my-points",
   "GET /public/:storeId/loyalty/my-transactions",
+  "GET /public/:storeId/pages",
   "GET /public/:storeId/pages/:slug",
   "GET /public/:storeId/products/:productId/recommendations",
   "GET /public/:storeId/search/suggest",
