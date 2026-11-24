@@ -294,7 +294,7 @@ export default function AddonsPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               {locale === 'ar' ? a.descAr : a.descEn}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">{stateLine(a)}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{stateLine(a)}</p>
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -362,7 +362,7 @@ export default function AddonsPage() {
           {insta && (
             <section
               aria-labelledby="addon-instapay-title"
-              className="rounded-xl border border-border bg-card p-4"
+              className="rounded-lg border border-border bg-card p-4"
               data-testid="addon-instapay"
             >
               <h2 id="addon-instapay-title" className="text-sm font-semibold">
@@ -404,7 +404,7 @@ export default function AddonsPage() {
             <section
               role="alertdialog"
               aria-labelledby="addon-confirm-title"
-              className="rounded-xl border border-border bg-card p-4"
+              className="rounded-lg border border-border bg-card p-4"
               data-testid="addon-confirm"
             >
               <h2 id="addon-confirm-title" className="text-sm font-semibold">
@@ -426,7 +426,7 @@ export default function AddonsPage() {
                 </p>
               )}
               {preview.vatMinor > 0 && (
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   {t('confirmVat', { vat: money(preview.vatMinor) })}
                 </p>
               )}
@@ -440,14 +440,14 @@ export default function AddonsPage() {
               </div>
             </section>
           )}
-          <section className="rounded-xl border border-border bg-card p-4">
+          <section className="rounded-lg border border-border bg-card p-4">
             <h2 className="text-sm font-semibold">{t('featuresHeading')}</h2>
             <ul className="divide-y divide-border">{group('feature').map(row)}</ul>
-            <p className="mt-3 text-xs text-muted-foreground" data-testid="addon-instapay-note">
+            <p className="mt-3 text-sm text-muted-foreground" data-testid="addon-instapay-note">
               {t(data.instapayAvailable ? 'instapayNote' : 'instapayOff')}
             </p>
           </section>
-          <section className="rounded-xl border border-border bg-card p-4" id="ai">
+          <section className="rounded-lg border border-border bg-card p-4" id="ai">
             <h2 className="text-sm font-semibold">{t('aiHeading')}</h2>
             <div className="mt-2" data-testid="ai-meter">
               <div className="flex items-baseline justify-between text-sm">
@@ -473,7 +473,7 @@ export default function AddonsPage() {
                   }}
                 />
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {t('aiMeterSplit', { base: data.ai.baseCap, extra: data.ai.extra })}
               </p>
               {data.ai.packs.length > 0 && (
@@ -485,9 +485,9 @@ export default function AddonsPage() {
                   ))}
                 </ul>
               )}
-              <p className="mt-3 text-xs font-medium">{t('aiBreakdownTitle')}</p>
+              <p className="mt-3 text-sm font-medium">{t('aiBreakdownTitle')}</p>
               {data.ai.byFeature.length === 0 ? (
-                <p className="text-xs text-muted-foreground">{t('aiBreakdownEmpty')}</p>
+                <p className="text-sm text-muted-foreground">{t('aiBreakdownEmpty')}</p>
               ) : (
                 <ul className="mt-1 space-y-0.5 text-xs" data-testid="ai-breakdown">
                   {data.ai.byFeature.map(f => (
@@ -498,15 +498,15 @@ export default function AddonsPage() {
                   ))}
                 </ul>
               )}
-              <p className="mt-2 text-xs text-muted-foreground">{t('aiResets')}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{t('aiResets')}</p>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {t('aiBuyHint', { days: data.termDays })}
             </p>
             <ul className="divide-y divide-border">{group('ai_topup').map(row)}</ul>
           </section>
           <section
-            className="rounded-xl border border-border bg-card p-4"
+            className="rounded-lg border border-border bg-card p-4"
             data-testid="addon-history"
           >
             <h2 className="text-sm font-semibold">{t('historyHeading')}</h2>
@@ -521,7 +521,7 @@ export default function AddonsPage() {
                   >
                     <div className="min-w-0">
                       <p className="font-medium">{name(h)}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         {fmtDate(h.createdAt, locale)} · {money(h.amountMinor)} ·{' '}
                         {t(`history.${h.status}`)}
                         {h.termEnd && h.status === 'succeeded'
