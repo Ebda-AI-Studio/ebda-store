@@ -266,8 +266,15 @@ describe('merge-gate.sh', () => {
 });
 
 describe('merge-gate.sh safety rails in the script itself', () => {
+  it('scripts/ci/merge-gate.sh only supplies the Store defaults and hands over to the vendored gate', () => {
+    const wrapper = readFileSync(GATE, 'utf8');
+    expect(wrapper).toContain('exec bash "$here/../foundation/merge-gate.sh" "$@"');
+    expect(wrapper).toContain('--repo Ebda-AI-Studio/ebda-store');
+    expect(wrapper).not.toContain('gh pr merge');
+  });
   it('the real merge is pinned to the reviewed commit and squash-deletes the branch', () => {
-    const src = readFileSync(GATE, 'utf8');
+    // F10: scripts/ci/merge-gate.sh is a thin wrapper; the gate itself is the vendored foundation script
+    const src = readFileSync(join(ROOT, 'scripts/foundation/merge-gate.sh'), 'utf8');
     expect(src).toContain('--match-head-commit "$sha"');
     expect(src).toContain('--squash --delete-branch');
   });
