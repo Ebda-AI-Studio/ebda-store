@@ -18,7 +18,7 @@ import { freedReference } from './account.service';
 
 type Tx = Prisma.TransactionClient;
 
-export const ADDON_CLAIM_KEY_PREFIX = 'addon-instapay:';
+const ADDON_CLAIM_KEY_PREFIX = 'addon-instapay:';
 
 export async function closeAddonClaimForResolvedHold(
   tx: Tx,
