@@ -137,12 +137,12 @@ export function PaymentStep({
                 {t('phoneLabel')}
                 <input
                   type="tel"
-                  dir="ltr"
                   inputMode="tel"
+                  autoComplete="tel"
+                  dir="ltr"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                   placeholder={t('phonePlaceholder')}
-                  autoComplete="off"
                   className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
                 />
               </label>

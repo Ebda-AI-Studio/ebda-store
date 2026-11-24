@@ -376,8 +376,10 @@ export default function SettingsClient() {
           />
 
           <Input
-            label={t('Phone Number', 'رقم الموبايل')}
             type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            label={t('Phone Number', 'رقم الموبايل')}
             value={profileData.phone}
             onChange={e => setProfileData({ ...profileData, phone: e.target.value })}
           />

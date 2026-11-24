@@ -305,6 +305,9 @@ export function InstapayReceiptForm({
                 onChange={set('payerAddress')}
               />
               <Input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 id="ipr-payer-mobile"
                 dir="ltr"
                 label={t('payerMobile')}
@@ -331,6 +334,9 @@ export function InstapayReceiptForm({
                 onChange={set('receiverHandle')}
               />
               <Input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 id="ipr-receiver-mobile"
                 dir="ltr"
                 label={t('receiverMobile')}

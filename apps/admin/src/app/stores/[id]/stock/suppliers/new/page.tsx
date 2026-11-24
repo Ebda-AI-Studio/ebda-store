@@ -197,6 +197,8 @@ export default function NewSupplierPage() {
             <span className="text-sm font-medium">{t('phone')}</span>
             <input
               type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               value={phone}
               onChange={e => setPhone(e.target.value)}
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
