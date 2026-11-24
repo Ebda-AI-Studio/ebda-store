@@ -1,3 +1,4 @@
+import { logAuditEvent } from './audit-log';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod/v3';
 import bcrypt from 'bcryptjs';
@@ -445,6 +446,26 @@ async function bearerAuth(
   return { user, sid: verified.sid, aud: verifiedAud };
 }
 
+/** Unused recovery codes; a null or malformed column (legacy row, operator reset) reads as none instead of a 500. */
+function remainingRecoveryCodes(raw: string | null): number {
+  try {
+    const list: unknown = JSON.parse(raw ?? '[]');
+    return Array.isArray(list) ? list.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** 10 single-use recovery codes: the plain list is shown once, only bcrypt hashes are stored. */
+async function newRecoveryCodes(): Promise<{ plain: string[]; hashed: string[] }> {
+  const plain = Array.from({ length: 10 }, () =>
+    [...crypto.getRandomValues(new Uint8Array(5))]
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+  );
+  return { plain, hashed: await Promise.all(plain.map(x => bcrypt.hash(x, 10))) };
+}
+
 /** Step-up for sensitive changes: the account password again, throttled like a login (a bearer token alone must not allow free guessing). */
 async function requirePassword(c: C, user: UserRow, password: unknown): Promise<void> {
   const a = await hit(c.env.DB, user.id, clientIp(c), { ...LOGIN, name: 'pw', brake: false });
@@ -800,6 +821,11 @@ export function signInEntryUrl(product: string | undefined, ret: string | undefi
   return url.toString();
 }
 
+/** Ebda Chat sign-up is open only when the deploy var says so (mirror of Chat's STANDALONE_WORKSPACES != off). Fails closed. */
+function chatSignupOpen(env: { CHAT_SIGNUP_OPEN?: string }): boolean {
+  return env.CHAT_SIGNUP_OPEN === 'true';
+}
+
 export function createApp() {
   const app = new Hono<{ Bindings: Env }>();
 
@@ -934,7 +960,7 @@ export function createApp() {
             lang,
             product,
             returnTo,
-            showChatSignup: c.env.CHAT_SIGNUP_LINK === 'true',
+            showChatSignup: chatSignupOpen(c.env),
           }),
       { status: 200, headers: SIGN_IN_PAGE_HEADERS }
     );
@@ -943,6 +969,8 @@ export function createApp() {
   app.get('/signup', c => {
     if (signInProduct(c.req.query('product')) !== 'chat')
       return c.redirect('https://store.ebda.app/signup', 302);
+    // Closed (Chat's STANDALONE_WORKSPACES is off): nothing to sign up for, so no page and no form.
+    if (!chatSignupOpen(c.env)) return c.text('Not found', 404, { 'Cache-Control': 'no-store' });
     const lang = pickStudioLang(c.req.header('accept-language'), c.req.query('lang'));
     const returnTo = signupReturn(c.req.query('return') ?? c.req.query('return_to'));
     return new Response(c.req.method === 'HEAD' ? null : renderSignupPage({ lang, returnTo }), {
@@ -1216,6 +1244,9 @@ export function createApp() {
   });
 
   app.post('/signup', async c => {
+    // Server-side gate, not just a hidden form: this endpoint's only HTTP caller is the Chat sign-up page (the Store signs up
+    // through the api's `createUser` RPC), so while Chat sign-up is closed no identity can be registered here.
+    if (!chatSignupOpen(c.env)) throw err(404, 'NOT_FOUND');
     const body = await json(c, signupBody);
     if (!(await hit(c.env.DB, 'all', clientIp(c), PER_IP_ONLY('signup', 10))).ok)
       throw err(429, 'TOO_MANY_ATTEMPTS');
@@ -1381,12 +1412,7 @@ export function createApp() {
     if (!user.mfa_secret || !c.env.MFA_KEY || user.mfa_enabled) throw err(409, 'MFA_NOT_PENDING');
     if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
     const mode = await authorizeEnrolment(c, user, sid, body);
-    const plain = Array.from({ length: 10 }, () =>
-      [...crypto.getRandomValues(new Uint8Array(5))]
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('')
-    );
-    const hashed = await Promise.all(plain.map(x => bcrypt.hash(x, 10)));
+    const { plain, hashed } = await newRecoveryCodes();
     await c.env.DB.prepare(
       `UPDATE users SET mfa_enabled = 1, mfa_enrolled_at = ?2, mfa_backup_codes = ?3 WHERE id = ?1`
     )
@@ -1394,6 +1420,50 @@ export function createApp() {
       .run();
     const requiresSignIn = await finishEnrolment(c, user, mode, 'totp');
     return c.json({ success: true, data: { enabled: true, backupCodes: plain, requiresSignIn } });
+  });
+
+  // Recovery codes (A23): how many are left (never the codes), and a regenerate that retires the whole old set.
+  app.get('/mfa/recovery-codes', async c => {
+    const { user } = await bearerAuth(c);
+    if (!user.mfa_enabled) throw err(409, 'MFA_NOT_ENABLED');
+    return c.json({
+      success: true,
+      data: { remaining: remainingRecoveryCodes(user.mfa_backup_codes) },
+    });
+  });
+
+  // Step-up = the account password AND a live authenticator code (a recovery code is refused: it must not mint more of
+  // itself). Both go through the throttled paths. The new list REPLACES the old one in one statement, so every old code dies.
+  // Super-admin override: staff may still reset MFA via scripts/mfa-reset.ts (last resort, docs/runbooks/mfa-recovery.md).
+  app.post('/mfa/recovery-codes/regenerate', async c => {
+    const { user } = await bearerAuth(c);
+    const body = await json(c, z.object({ password: z.string(), code: z.string().max(20) }));
+    if (!user.mfa_enabled || !user.mfa_secret || !c.env.MFA_KEY) throw err(409, 'MFA_NOT_ENABLED');
+    await requirePassword(c, user, body.password);
+    if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
+    const { plain, hashed } = await newRecoveryCodes();
+    // The new set and its audit row land together (no code, no hash in the row; actor 'self').
+    await c.env.DB.batch([
+      c.env.DB.prepare(`UPDATE users SET mfa_backup_codes = ?2 WHERE id = ?1`).bind(
+        user.id,
+        JSON.stringify(hashed)
+      ),
+      c.env.DB.prepare(
+        `INSERT INTO admin_audit (event, user_id, email, actor, at, detail) VALUES ('mfa_recovery_codes_regenerated', ?1, ?2, 'self', ?3, '{}')`
+      ).bind(user.id, user.email.toLowerCase(), nowMs()),
+    ]);
+    // Tell the mailbox owner (best effort; the change already happened): a stolen session regenerating codes must not be silent.
+    queueMail(
+      c,
+      c.env.MAILER?.sendNotice({
+        to: user.email,
+        kind: 'recovery_codes_changed',
+        language: user.language === 'ar' ? 'ar' : 'en',
+        firstName: user.first_name,
+      }) ?? Promise.resolve()
+    );
+    logAuditEvent('mfa_recovery_codes_regenerated', user.id);
+    return c.json({ success: true, data: { backupCodes: plain } });
   });
 
   app.post('/mfa/disable', async c => {

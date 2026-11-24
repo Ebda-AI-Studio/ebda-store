@@ -14,6 +14,7 @@ import {
   sendFactorEnrolCodeEmail,
   sendFactorAddedNoticeEmail,
   sendCredentialChangeNoticeEmail,
+  sendRecoveryCodesChangedNoticeEmail,
   sendChatMemberAddedEmail,
   sendMerchantVerificationEmail,
 } from '../services/platform-mailer';
@@ -159,6 +160,7 @@ export type NoticeMail = {
   | { kind: 'chat_member_added'; workspaceName: string }
   /** ID-06: MFA disabled, passkey removed or phone changed (other sessions were signed out). */
   | { kind: 'credential_changed'; change: 'mfa_disabled' | 'passkey_removed' | 'phone_changed' }
+  | { kind: 'recovery_codes_changed' }
 );
 
 /** Security notices from the identity service that carry no code. */
@@ -168,6 +170,10 @@ export async function sendNoticeMail(m: NoticeMail): Promise<void> {
       { email: m.to, name: m.firstName, change: m.change },
       m.language
     );
+    return;
+  }
+  if (m.kind === 'recovery_codes_changed') {
+    await sendRecoveryCodesChangedNoticeEmail({ email: m.to, name: m.firstName }, m.language, true);
     return;
   }
   if (m.kind === 'chat_member_added') {

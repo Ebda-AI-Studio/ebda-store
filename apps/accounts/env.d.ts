@@ -20,7 +20,7 @@ export interface MailerRpc {
     ttlMinutes: number;
     storeName?: string;
   }): Promise<void>;
-  /** A security notice with no code (a sign-in method was added). */
+  /** A security notice with no code (a sign-in method was added; the recovery codes were regenerated; a member was added to a Chat workspace). */
   sendNotice(
     input: {
       to: string;
@@ -34,6 +34,7 @@ export interface MailerRpc {
           kind: 'credential_changed';
           change: 'mfa_disabled' | 'passkey_removed' | 'phone_changed';
         }
+      | { kind: 'recovery_codes_changed' }
     )
   ): Promise<void>;
 }
@@ -60,8 +61,8 @@ declare global {
       PRODUCTS: string;
       /** Set per deploy (`--var BUILD_COMMIT_SHA:$GITHUB_SHA`); empty locally. */
       BUILD_COMMIT_SHA?: string;
-      /** "true" shows the Ebda Chat sign-up link on the Chat sign-in page. Mirrors Chat's STANDALONE_WORKSPACES flag (open|invite -> true, off -> false); default hidden. */
-      CHAT_SIGNUP_LINK?: string;
+      /** "true" = Ebda Chat sign-up is open: accounts serves /signup?product=chat, accepts POST /signup and shows the link on the Chat sign-in page. Mirrors Chat's STANDALONE_WORKSPACES (not `off` -> true). Unset or anything else = closed (fail closed). */
+      CHAT_SIGNUP_OPEN?: string;
       CF_VERSION_METADATA?: { id?: string; tag?: string };
       /** `origin=product` pairs: the only audience a browser origin may request. */
       ORIGIN_PRODUCTS: string;
