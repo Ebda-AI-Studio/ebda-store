@@ -129,16 +129,11 @@ export const paymentAbandonmentSweep: JobDef = inngest.createFunction(
     // Per-store Enterprise feature check — only stamp for enabled stores.
     const storeIds = [...new Set(candidates.map((c: AbandonCandidate) => c.storeId))];
     // In a step: on a Workflow only step bodies hold a database connection.
+    // Selection only (stamping a flag, no paid side effect): one batched entitlement prefetch for the run.
     const enabledStoreIds = new Set(
-      await step.run('check-features', async () => {
-        const flags = await Promise.all(
-          storeIds.map(
-            async (sid: string) =>
-              [sid, await featureService.isFeatureEnabled(sid, 'payment_abandonment')] as const
-          )
-        );
-        return flags.filter(([, on]) => on).map(([sid]) => sid);
-      })
+      await step.run('check-features', () =>
+        featureService.selectEnabled(storeIds, 'payment_abandonment')
+      )
     );
 
     const eligible = candidates.filter((c: AbandonCandidate) => enabledStoreIds.has(c.storeId));
@@ -156,7 +151,16 @@ export const paymentAbandonmentSweep: JobDef = inngest.createFunction(
     // UPDATE. step.run gives Inngest per-item retry isolation.
     const results = await Promise.allSettled(
       eligible.map((order: AbandonCandidate) =>
-        step.run(`stamp-${order.id}`, async () => {
+        step.run(`stamp-${order.id}`, async (): Promise<boolean | 'disabled'> => {
+          // LIVE check per store, right before the stamp (like the other crons): `selectEnabled` above is a batched prefetch that
+          // only NARROWS the candidates and can be stale, so a merchant who turned the feature off since gets no stamp and no push.
+          if (!(await featureService.isFeatureEnabled(order.storeId, 'payment_abandonment'))) {
+            logger.info(
+              { storeId: order.storeId },
+              '[payment-abandonment-sweep] feature turned off since the batched check; not stamped'
+            );
+            return 'disabled';
+          }
           const now = new Date();
           // A store on its Durable Object stamps in its own section (the same guard: still unpaid, not yet stamped).
           const money = await storeMoney(order.storeId);
@@ -209,8 +213,12 @@ export const paymentAbandonmentSweep: JobDef = inngest.createFunction(
     );
     // Counted from the step results (memoised), not a closure counter a replay would reset.
     const stamped = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
+    const disabledLive = results.filter(
+      r => r.status === 'fulfilled' && r.value === 'disabled'
+    ).length;
+    const totalSkipped = skipped + disabledLive;
 
-    logger.info({ stamped, skipped }, '[payment-abandonment-sweep] tick complete');
-    return { stamped, skipped };
+    logger.info({ stamped, skipped: totalSkipped }, '[payment-abandonment-sweep] tick complete');
+    return { stamped, skipped: totalSkipped };
   }
 );

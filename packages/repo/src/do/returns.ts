@@ -462,8 +462,14 @@ function computeLineAdjustments(
 export interface ReturnCreateArgs {
   storeId: string;
   orderId: string;
-  /** the shopper (required unless `byMerchant`, which uses the order's own customer) */
+  /** the shopper's account id (required unless `byMerchant` or `guest`). Never null: a guest return says `guest: true`. */
   customerId?: string;
+  /**
+   * Ruling GUEST-RET-1 / GUEST-RETURN-MARKER-1: a SHOPPER-opened return on a GUEST order (no account). The order is matched by
+   * `customer_id IS NULL` (the route authenticated the shopper by order number + the order's phone/email) and the row stores the
+   * `guest:<orderId>` marker. Account shoppers keep `customer_id = ?3`.
+   */
+  guest?: boolean;
   type: string;
   reason: string;
   reasonDetail?: string;
@@ -539,19 +545,24 @@ export function createReturn(db: SyncSql, a: ReturnCreateArgs): { returnId: stri
       a.byMerchant
         ? `SELECT id, order_number, updated_at, delivered_at, customer_id FROM orders
             WHERE id = ?1 AND store_id = ?2 AND status = 'delivered' AND deleted_at IS NULL`
-        : `SELECT id, order_number, updated_at, delivered_at, customer_id FROM orders
+        : a.guest
+          ? `SELECT id, order_number, updated_at, delivered_at, customer_id FROM orders
+            WHERE id = ?1 AND store_id = ?2 AND customer_id IS NULL AND status = 'delivered' AND deleted_at IS NULL`
+          : `SELECT id, order_number, updated_at, delivered_at, customer_id FROM orders
             WHERE id = ?1 AND store_id = ?2 AND customer_id = ?3 AND status = 'delivered' AND deleted_at IS NULL`,
-      a.byMerchant
+      a.byMerchant || a.guest
         ? [sid(a.orderId, 'orderId'), storeId]
         : [sid(a.orderId, 'orderId'), storeId, sid(a.customerId, 'customerId')]
     )[0];
     if (!o)
       throw new MoneyError('INVALID_ORDER', 'Order not found or not eligible for return', 400);
-    const returnCustomerId = a.byMerchant
-      ? typeof o.customer_id === 'string'
-        ? o.customer_id
-        : guestReturnCustomerId(o.id as string)
-      : (a.customerId as string);
+    // a shopper-opened return: an account shopper matched `customer_id = ?3`; a guest (`guest: true`) matched a NULL-customer order
+    const returnCustomerId =
+      a.byMerchant || a.guest
+        ? typeof o.customer_id === 'string'
+          ? o.customer_id
+          : guestReturnCustomerId(o.id as string)
+        : (a.customerId as string);
     const lines = orderLines(db, o.id as string);
 
     // the merchant's published return window binds the seller (evaluateReturnWindow)

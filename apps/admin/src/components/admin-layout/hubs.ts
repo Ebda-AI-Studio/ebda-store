@@ -295,6 +295,7 @@ export const HUBS: HubDefinition[] = [
       '/billing',
       '/delivery',
       '/staff',
+      '/activity',
     ],
     // Settings pages share one hub for nav highlighting; they have no sub-tabs.
     buildTabs: () => [],

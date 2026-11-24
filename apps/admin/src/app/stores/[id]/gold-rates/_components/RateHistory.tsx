@@ -36,7 +36,7 @@ export function RateHistory({ storeId, reloadKey }: { storeId: string; reloadKey
   }, [load, reloadKey]);
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+    <section className="rounded-md border bg-card p-4 shadow-sm sm:p-6">
       <h2 className="text-lg font-semibold">{t('title')}</h2>
       {error && (
         <p role="alert" className="mt-2 text-sm text-destructive-ink">
