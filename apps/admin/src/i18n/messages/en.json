@@ -4424,7 +4424,7 @@
     },
     "emailNudge": {
       "title": "Get abandoned carts back by email",
-      "body": "One reminder email per cart, sent as your store and only to shoppers who opted in. It is off until you turn it on.",
+      "body": "One email per cart, sent as your store and only to shoppers who opted in to your newsletter. The reminder steps below (up to 3 reminders by message and notification) are separate, and reach only shoppers who agreed to them. The email is off until you turn it on.",
       "review": "Review settings",
       "dismiss": "Not now"
     }
@@ -4995,9 +4995,12 @@
     },
     "push": {
       "title": "Push Notifications",
-      "subtitle": "Standards-based Web Push (W3C Push API)",
+      "subtitle": "Send order updates and offers to shoppers who allow notifications in their browser.",
+      "statusAvailable": "Push is available",
+      "statusUnavailable": "Push is not available yet",
+      "unavailableHint": "We are setting push up for all stores. You do not need to do anything, we will let you know when it is ready.",
       "subscribers": "{count, number, latn} subscribers",
-      "platformNote": "Push notifications use the platform VAPID configuration. No per-store setup needed — just toggle Enabled."
+      "platformNote": "Nothing to set up on your side. Switch it on and shoppers who allow notifications will start receiving them."
     },
     "broadcast": {
       "title": "Send a broadcast",
@@ -5020,17 +5023,19 @@
       "send": "Send broadcast",
       "sending": "Sending…",
       "sentTitle": "Broadcast sent",
-      "sentDescription": "Targeted {count, number, latn} subscriber(s).",
+      "sentDescription": "Sent to {count, number, latn} subscriber(s).",
+      "channelOffTitle": "Push is switched off",
+      "channelOffDescription": "Turn on push notifications for this store above, then send again.",
       "sendFailed": "Failed to send broadcast.",
-      "notConfiguredTitle": "Push notifications are not available yet",
-      "notConfiguredDescription": "Push notifications are not available for your store yet. Try again later.",
+      "notConfiguredTitle": "Push is not available yet",
+      "notConfiguredDescription": "We are setting push up for all stores. This form unlocks as soon as it is ready. There is nothing for you to do.",
       "recentTitle": "Recent broadcasts",
       "recentEmpty": "No broadcasts sent yet.",
       "refresh": "Refresh",
       "refreshing": "Refreshing…",
       "untitled": "(untitled)",
       "deliveredCount": "{count, number, latn} delivered",
-      "clickedCount": "{count, number, latn} clicked"
+      "failedCount": "{count, number, latn} did not arrive"
     },
     "events": {
       "title": "Event Configuration",
