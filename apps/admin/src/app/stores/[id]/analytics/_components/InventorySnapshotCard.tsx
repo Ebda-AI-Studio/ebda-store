@@ -58,7 +58,7 @@ export function InventorySnapshotCard({ snapshot }: InventorySnapshotCardProps) 
           <div key={row.label} className="flex flex-col gap-1">
             <dt className="text-sm text-muted-foreground">{row.label}</dt>
             <dd className="text-base font-semibold text-foreground tabular-nums">{row.value}</dd>
-            {row.note && <dd className="text-xs text-muted-foreground">{row.note}</dd>}
+            {row.note && <dd className="text-sm text-muted-foreground">{row.note}</dd>}
           </div>
         ))}
       </dl>

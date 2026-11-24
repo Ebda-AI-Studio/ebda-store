@@ -230,7 +230,7 @@ export function DashboardAccountingSummary({ storeId }: Props) {
                 <span className="ms-1 text-sm font-medium text-muted-foreground">{tile.unit}</span>
               )}
             </p>
-            {tile.note && <p className="mt-1 text-xs text-muted-foreground">{tile.note}</p>}
+            {tile.note && <p className="mt-1 text-sm text-muted-foreground">{tile.note}</p>}
           </Link>
         ))}
       </div>

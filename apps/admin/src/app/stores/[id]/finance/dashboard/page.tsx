@@ -354,10 +354,10 @@ export default function FinanceDashboardPage() {
                   )}
                 </p>
                 {!dashboardErr && costsStatus === 'unknown' && (
-                  <p className="text-xs text-muted-foreground">{t('netNoCostsNote')}</p>
+                  <p className="text-sm text-muted-foreground">{t('netNoCostsNote')}</p>
                 )}
                 {!dashboardErr && costsStatus === 'partial' && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     {t('netPartialNote', {
                       missing: data?.thisMonth?.costsMissing ?? 0,
                       total: data?.thisMonth?.costsTotal ?? 0,
@@ -437,12 +437,12 @@ export default function FinanceDashboardPage() {
                     </p>
                   ) : null}
                   {!dashboardErr && stockState.kind === 'unknown' && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                       {t('stockValueMissingCost', { count: data?.uncostedProducts ?? 0 })}
                     </p>
                   )}
                   {!dashboardErr && stockState.kind === 'partial' && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                       {t('stockValuePartial', {
                         costed: stockState.costed,
                         stocked: stockState.stocked,
