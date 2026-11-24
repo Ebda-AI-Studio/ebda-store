@@ -280,6 +280,32 @@ describe('order money operations: the door', () => {
     ).toBe(1);
   });
 
+  it('CF-FINAL-1: a cart line note is stored as the order item personalisation, a line without one stores NULL', () => {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO products (id, store_id, name, slug, price, inventory, status) VALUES ('sku2', 's1', 'Plain', 'plain', 900, 5, 'active')`
+    );
+    r.op(
+      'createOrder',
+      r.order({
+        lines: [
+          { productId: 'sku', quantity: 1, note: 'Happy birthday Mona' },
+          { productId: 'sku2', quantity: 1 },
+        ],
+      })
+    );
+    expect(
+      r.n(
+        `SELECT count(*) n FROM order_items WHERE product_id = 'sku' AND personalisation = 'Happy birthday Mona'`
+      )
+    ).toBe(1);
+    expect(
+      r.n(
+        `SELECT count(*) n FROM order_items WHERE product_id = 'sku2' AND personalisation IS NULL`
+      )
+    ).toBe(1);
+  });
+
   // QA-COUPON-1 / QA-HOLDS-1 on the Durable Object path (the storefront-shaped COD payload).
   it('QA-COUPON-1: a COD order with a percentage coupon is charged EXACTLY the quoted total (cap and expectedTotal agree)', () => {
     const r = rig();
@@ -470,5 +496,65 @@ describe('cancel onlyFrom: a COD refusal never cancels a shipped order (Fixes #6
   it('an unknown order is refused; without onlyFrom the cancel is unchanged', () => {
     const r = rig();
     expect(r.code('cancel', { orderId: 'missing', onlyFrom: ['pending'] })).toBe('ORDER_NOT_FOUND');
+  });
+});
+
+describe('admin order: minimum order quantity (ported from repo-factory-orders-contract)', () => {
+  const admin = (qty: number, over: Record<string, unknown> = {}) => ({
+    lines: [{ productId: 'sku', quantity: qty }],
+    shippingAddress: { firstName: 'A', lastName: 'B', phone: '01012345678' },
+    actorId: 'admin',
+    actorRole: 'store_admin',
+    ...over,
+  });
+  const events = (r: ReturnType<typeof rig>) =>
+    (
+      r.raw
+        .prepare(`SELECT to_status s, metadata m FROM order_events ORDER BY created_at, id`)
+        .all() as {
+        s: string;
+        m: string;
+      }[]
+    ).map(e => ({ to: e.s, meta: JSON.parse(e.m) }));
+  const moq5 = () => {
+    const r = rig(10);
+    r.raw.exec(`UPDATE products SET moq = 5 WHERE id = 'sku'`);
+    return r;
+  };
+
+  it('below the MOQ is refused 422 BELOW_MOQ and writes nothing', () => {
+    const r = moq5();
+    try {
+      r.op('createAdminOrder', admin(2));
+      throw new Error('expected a refusal');
+    } catch (e) {
+      expect(e).toMatchObject({ code: 'BELOW_MOQ', status: 422 });
+    }
+    expect(r.n(`SELECT count(*) n FROM orders`)).toBe(0);
+  });
+
+  it('with the override and a reason the order is placed and ONE moq_override event names the reason, role and product', () => {
+    const r = moq5();
+    const o = r.op(
+      'createAdminOrder',
+      admin(2, { overrideMoq: true, moqOverrideReason: ' phone deal ' })
+    );
+    expect(o.total).toBeGreaterThan(0);
+    const ev = events(r).filter(e => e.to === 'moq_override');
+    expect(ev).toEqual([
+      {
+        to: 'moq_override',
+        meta: { reason: 'phone deal', actorRole: 'store_admin', productIds: ['sku'] },
+      },
+    ]);
+  });
+
+  it('at or above the MOQ no override event is written, even when the flag is sent', () => {
+    const r = moq5();
+    r.op('createAdminOrder', admin(5, { overrideMoq: true, moqOverrideReason: 'x' }));
+    expect(events(r).filter(e => e.to === 'moq_override')).toEqual([]);
+    const plain = moq5();
+    plain.op('createAdminOrder', admin(5));
+    expect(plain.n(`SELECT count(*) n FROM orders`)).toBe(1);
   });
 });
