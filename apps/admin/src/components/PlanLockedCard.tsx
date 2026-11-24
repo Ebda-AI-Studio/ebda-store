@@ -33,6 +33,10 @@ export function PlanLockedCard({ info, message }: { info: PlanGateInfo; message:
       ? t('unlocksAnalyticsTierAdvanced')
       : t('unlocksAnalyticsTierStandard')
     : message || t('unlocksGeneric');
+  const addonHref =
+    storeId && view.addonSku
+      ? `/stores/${encodeURIComponent(storeId)}/billing/addons?sku=${encodeURIComponent(view.addonSku)}`
+      : null;
   const href = storeId
     ? `/stores/${encodeURIComponent(storeId)}/billing${
         view.plan ? `?plan=${encodeURIComponent(view.plan.code)}` : ''
@@ -63,7 +67,22 @@ export function PlanLockedCard({ info, message }: { info: PlanGateInfo; message:
           )}
           {href && (
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link href={href} className={buttonVariants({ size: 'lg' })}>
+              {addonHref && (
+                <Link
+                  href={addonHref}
+                  className={buttonVariants({ size: 'lg' })}
+                  data-testid="get-addon-cta"
+                >
+                  {t('getAddonCta')}
+                </Link>
+              )}
+              <Link
+                href={href}
+                className={buttonVariants({
+                  size: 'lg',
+                  variant: addonHref ? 'outline' : undefined,
+                })}
+              >
                 {planName ? t('upgradeCta', { plan: planName }) : t('seePlansCta')}
               </Link>
               {planName && (

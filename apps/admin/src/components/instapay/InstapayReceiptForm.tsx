@@ -81,10 +81,13 @@ const orNull = (v: string) => (v.trim() ? v.trim() : null);
  */
 export function InstapayReceiptForm({
   baseUrl,
+  submitBaseUrl,
   reviewerNote,
   onSubmitted,
 }: {
   baseUrl: string;
+  /** Where `:id/submit` goes when it differs from `baseUrl` (an add-on payment: upload and poll are shared). */
+  submitBaseUrl?: string;
   /** "The Ebda team will review your transfer." (already translated). */
   reviewerNote: string;
   onSubmitted: () => void;
@@ -179,7 +182,7 @@ export function InstapayReceiptForm({
 
     setMessage(null);
     setPhase('submitting');
-    const { error } = await apiPost(`${baseUrl}/${receipt.id}/submit`, {
+    const { error } = await apiPost(`${submitBaseUrl ?? baseUrl}/${receipt.id}/submit`, {
       amountMinor,
       reference,
       transferDate: date,

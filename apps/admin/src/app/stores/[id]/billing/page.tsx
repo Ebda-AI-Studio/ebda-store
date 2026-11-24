@@ -546,6 +546,15 @@ export default function StoreBillingPage() {
 
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
+      <p className="mb-4 text-sm">
+        <Link
+          href={`/stores/${storeId}/billing/addons`}
+          className="font-medium underline"
+          data-testid="billing-addons-link"
+        >
+          {t('addonsLink')}
+        </Link>
+      </p>
       {error && (
         <div className="rounded-xl border bg-card p-6 text-center">
           <p className="text-sm text-destructive-ink">{t('loadError')}</p>
