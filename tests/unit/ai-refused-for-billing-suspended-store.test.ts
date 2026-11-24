@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const h = vi.hoisted(() => ({
-  row: { aiFeaturesEnabled: true, billingSuspendedReason: null as string | null },
+  row: { aiFeaturesEnabled: true, status: 'active', billingSuspendedReason: null as string | null },
   counts: 0,
 }));
 
@@ -41,7 +41,7 @@ import { assertAiQuota, isAiQuotaCapError } from '@api/lib/ai-quota';
 import { isStoreAiEnabled } from '@api/lib/store-ai-switch';
 
 beforeEach(() => {
-  h.row = { aiFeaturesEnabled: true, billingSuspendedReason: null };
+  h.row = { aiFeaturesEnabled: true, status: 'active', billingSuspendedReason: null };
   h.counts = 0;
 });
 
