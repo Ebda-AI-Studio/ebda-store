@@ -1137,6 +1137,84 @@ describe('#627 review: ONE may-settle predicate on every settle path (a held cha
     expect(plan(db)).toBe('free');
   });
 
+  // Review of #687 (info): the `charge_request` trust path (the gateway's direct answer to OUR charge of this row's amount).
+  describe('charge_request trust path', () => {
+    const settleAs = (o: Record<string, unknown>) =>
+      settleInTx(
+        prisma as never,
+        EV,
+        {
+          status: 'succeeded',
+          providerRef: 'ref-1',
+          amountSource: 'charge_request',
+          ...o,
+        } as never,
+        NOW,
+        []
+      );
+
+    it('our own charge call that states nothing more settles the row and applies the plan, once', async () => {
+      const db = rig();
+      renewal(db, { type: 'upgrade' }); // an upgrade row: settling it moves the plan free -> basic
+      const r = await settleAs({});
+      expect(r).toMatchObject({ transitioned: true });
+      expect(status(db)).toMatchObject({ s: 'succeeded' });
+      expect(plan(db)).toBe('basic');
+      // a replay of the same answer changes nothing
+      expect(await settleAs({})).toMatchObject({ transitioned: false });
+      expect(plan(db)).toBe('basic');
+    });
+
+    it('a stated amount or currency that disagrees is HELD (queued, P1), never settled on the strength of the call', async () => {
+      for (const [stated, reason] of [
+        [{ amountMinor: 900, currency: 'EGP' }, 'amount_mismatch'],
+        [{ amountMinor: 1000, currency: 'USD' }, 'currency_mismatch'],
+      ] as const) {
+        const db = rig();
+        renewal(db);
+        vi.mocked(sendAlert).mockClear();
+        const r = await settleAs(stated);
+        expect(r).toMatchObject({ transitioned: false, held: expect.objectContaining({ reason }) });
+        expect(status(db)).toEqual({ s: 'pending', f: `held:${reason}` });
+        expect(plan(db)).toBe('free');
+        expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(1);
+      }
+    });
+
+    it('a stated amount and currency that MATCH settle, and the trust path never bypasses an open hold', async () => {
+      const db = rig();
+      renewal(db);
+      expect(await settleAs({ amountMinor: 1000, currency: 'egp' })).toMatchObject({
+        transitioned: true,
+      });
+      const held = rig();
+      renewal(held);
+      await applyWebhookEvent('stub', paid900());
+      expect(await settleAs({})).toMatchObject({ transitioned: false, refused: 'held' });
+      expect(plan(held)).toBe('free');
+    });
+
+    it('maySettle: the rule table for charge_request', () => {
+      const row = { type: 'renewal', amountMinor: 1000, currency: 'EGP', failureReason: null };
+      const may = (o: Record<string, unknown>) =>
+        maySettle(row, { status: 'succeeded', amountSource: 'charge_request', ...o } as never);
+      expect(may({})).toEqual({ ok: true });
+      expect(may({ amountMinor: 1000, currency: 'EGP' })).toEqual({ ok: true });
+      expect(may({ amountMinor: 999 })).toEqual({ ok: false, reason: 'amount_mismatch' });
+      expect(may({ currency: 'USD' })).toEqual({ ok: false, reason: 'currency_mismatch' });
+      // a failure is never judged by amount, and a held row is never settled whatever the source
+      expect(maySettle(row, { status: 'failed', amountSource: 'charge_request' } as never)).toEqual(
+        { ok: true }
+      );
+      expect(
+        maySettle({ ...row, failureReason: 'held:amount_mismatch' }, {
+          status: 'succeeded',
+          amountSource: 'charge_request',
+        } as never)
+      ).toEqual({ ok: false, reason: 'held' });
+    });
+  });
+
   // Review of #687 (critical): the resolve must never strand a paid merchant. Ledger row first, queue row second, retriable.
   const heldLedger = (db: DatabaseSync) =>
     db.prepare('SELECT status s, failure_reason f FROM billing_events WHERE id = ?').get(EV) as {

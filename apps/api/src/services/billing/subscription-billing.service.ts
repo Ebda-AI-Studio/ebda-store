@@ -160,7 +160,15 @@ export function maySettle(
   if (row.failureReason?.startsWith(RESOLVED_ROW_PREFIX)) return { ok: false, reason: 'resolved' };
   if (row.failureReason?.startsWith(HELD_ROW_PREFIX)) return { ok: false, reason: 'held' };
   if (o.status !== 'succeeded' || row.type === 'card_setup') return { ok: true };
-  if (o.amountSource === 'charge_request') return { ok: true };
+  if (o.amountSource === 'charge_request') {
+    // The gateway's direct answer to OUR charge of this row's amount: trusted when it states nothing more. If it DOES state an
+    // amount or currency (a lookup-style body), a disagreement is still a hold, never a settle on the strength of the call.
+    if (typeof o.amountMinor === 'number' && o.amountMinor !== row.amountMinor)
+      return { ok: false, reason: 'amount_mismatch' };
+    if (o.currency && o.currency.toUpperCase() !== String(row.currency).toUpperCase())
+      return { ok: false, reason: 'currency_mismatch' };
+    return { ok: true };
+  }
   if (o.amountSource !== 'gateway' || typeof o.amountMinor !== 'number')
     return { ok: false, reason: 'amount_missing' };
   if (!o.currency) return { ok: false, reason: 'currency_missing' };
@@ -863,6 +871,8 @@ async function chargeAndSettle(args: {
       raw: res.raw,
       // the gateway's direct answer to OUR charge of `args.amountMinor` for this row
       amountSource: 'charge_request',
+      amountMinor: res.amountMinor ?? undefined,
+      currency: res.currency ?? undefined,
     },
     args.now
   );
