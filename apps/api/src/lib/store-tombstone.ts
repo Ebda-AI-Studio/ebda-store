@@ -14,10 +14,7 @@
  * wa-plan: not-plan-state (the store_subscriptions UPDATE below clears only the card reference and the provider customer id; plan,
  * status and period are untouched, so the WhatsApp plan observer has nothing to be told).
  */
-export const PURGED_SLUG_PREFIX = '~purged~';
-
-export const isPurgedSlug = (slug: string | null | undefined): boolean =>
-  typeof slug === 'string' && slug.startsWith(PURGED_SLUG_PREFIX);
+const PURGED_SLUG_PREFIX = '~purged~';
 
 export interface Statement {
   sql: string;
@@ -73,10 +70,3 @@ export function tombstoneStatements(storeId: string, now: number = Date.now()): 
     },
   ];
 }
-
-/** Latest date over the platform records that must outlive the store (Ebda's invoices and payment proofs), epoch ms or null. */
-export const PLATFORM_RECORDS_LAST_AT_SQL =
-  `SELECT max(t) AS last FROM (` +
-  `SELECT max("created_at") AS t FROM "billing_events" WHERE "store_id" = ?1 UNION ALL ` +
-  `SELECT max("created_at") FROM "instapay_receipts" WHERE "store_id" = ?1 UNION ALL ` +
-  `SELECT max("created_at") FROM "manual_payment_claims" WHERE "store_id" = ?1)`;
