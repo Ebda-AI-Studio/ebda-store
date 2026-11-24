@@ -18,6 +18,7 @@ import { RowActions } from '../../../../../components/RowActions';
 import { majorToMinor, getIncompleteNewRows } from './areaRateValidation';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface AreaRate {
@@ -163,7 +164,7 @@ function FeeInputs({
           value={feeMajor}
           onChange={e => onFeeChange(e.target.value)}
           aria-label={feeLabel}
-          className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+          className={`${FIELD_CLASSES} w-24 text-end`}
         />
         <span className="text-xs text-muted-foreground">{currencyLabel}</span>
       </div>
@@ -179,7 +180,7 @@ function FeeInputs({
           value={thresholdMajor}
           onChange={e => onThresholdChange(e.target.value)}
           aria-label={freeOverLabel}
-          className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+          className={`${FIELD_CLASSES} w-24 text-end`}
         />
         <span className="text-xs text-muted-foreground">{currencyLabel}</span>
       </div>
@@ -843,14 +844,14 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
       {!hasAnyRate && (
         <section
           data-testid="shipping-first-run"
-          className="space-y-3 rounded-xl border border-primary/30 bg-card p-5"
+          className="space-y-3 rounded-md border border-primary/30 bg-card p-5"
         >
           <div>
             <h2 className="text-base font-semibold text-foreground">{t('firstRunTitle')}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{t('firstRunHint')}</p>
           </div>
           <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            <label className="flex flex-col gap-1 text-sm text-muted-foreground">
               {t('firstRunFee')}
               <span className="flex items-center gap-1">
                 <input
@@ -861,12 +862,12 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   placeholder={t('firstRunFeePlaceholder')}
                   value={oneFee}
                   onChange={e => setOneFee(e.target.value)}
-                  className="w-28 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                  className={`${FIELD_CLASSES} w-28`}
                 />
                 <span>{t('currency')}</span>
               </span>
             </label>
-            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            <label className="flex flex-col gap-1 text-sm text-muted-foreground">
               {t('firstRunFreeOver')}
               <span className="flex items-center gap-1">
                 <input
@@ -877,7 +878,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   placeholder={t('firstRunFreeOverPlaceholder')}
                   value={oneThreshold}
                   onChange={e => setOneThreshold(e.target.value)}
-                  className="w-28 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                  className={`${FIELD_CLASSES} w-28`}
                 />
                 <span>{t('currency')}</span>
               </span>
@@ -897,7 +898,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
       {/* Import preview modal */}
       {preview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl border border-border bg-background p-5 shadow-xl space-y-4">
+          <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-md border border-border bg-background p-5 shadow-xl space-y-4">
             <h3 className="text-lg font-semibold text-foreground">{t('previewTitle')}</h3>
 
             {preview.wouldUpsert > 0 ? (
@@ -946,14 +947,14 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
       )}
 
       {/* ── Global apply-to-all-areas control ───────────────────────────── */}
-      <details className="rounded-xl border border-border bg-muted/20 px-4 py-3" open={false}>
+      <details className="rounded-md border border-border bg-muted/20 px-4 py-3" open={false}>
         <summary className="cursor-pointer text-sm font-medium text-foreground">
           {t('applyAllGlobal')}
         </summary>
         <div className="mt-3">
           <div className="flex flex-wrap items-end gap-2">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground">{t('applyAllGlobalFee')}</label>
+              <label className="text-sm text-muted-foreground">{t('applyAllGlobalFee')}</label>
               <div className="flex items-center gap-1">
                 <input
                   type="number"
@@ -963,13 +964,13 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   value={globalBulkFeeMajor}
                   onChange={e => setGlobalBulkFeeMajor(e.target.value)}
                   aria-label={t('applyAllGlobalFee')}
-                  className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+                  className={`${FIELD_CLASSES} w-24 text-end`}
                 />
                 <span className="text-xs text-muted-foreground">{t('currency')}</span>
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground">
+              <label className="text-sm text-muted-foreground">
                 {t('applyAllGlobalThreshold')}
               </label>
               <div className="flex items-center gap-1">
@@ -984,7 +985,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   value={globalBulkThresholdMajor}
                   onChange={e => setGlobalBulkThresholdMajor(e.target.value)}
                   aria-label={t('applyAllGlobalThreshold')}
-                  className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+                  className={`${FIELD_CLASSES} w-24 text-end`}
                 />
                 <span className="text-xs text-muted-foreground">{t('currency')}</span>
               </div>
@@ -1015,7 +1016,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
       <p className="-mt-3 text-sm text-muted-foreground">{t('perGovernorateHint')}</p>
 
       {/* ── Static Egypt governorate accordion ─────────────────────────── */}
-      <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+      <div className="divide-y divide-border rounded-md border border-border overflow-hidden">
         {EGYPT_GOVERNORATES.map(gov => {
           const isOpen = openGov === gov.en;
           const count = feeCount(gov.en);
@@ -1067,7 +1068,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                         setBulkFeeMajor(prev => ({ ...prev, [gov.en]: e.target.value }))
                       }
                       aria-label={t('applyAll')}
-                      className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                      className={`${FIELD_CLASSES} w-24`}
                     />
                     <span className="text-xs text-muted-foreground">{t('currency')}</span>
                     <Button
@@ -1092,7 +1093,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                         setBulkThresholdMajor(prev => ({ ...prev, [gov.en]: e.target.value }))
                       }
                       aria-label={t('freeOver')}
-                      className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                      className={`${FIELD_CLASSES} w-24`}
                     />
                     <span className="text-xs text-muted-foreground">{t('currency')}</span>
                     <Button
@@ -1124,6 +1125,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                           <Toggle
                             checked={row.isActive}
                             onChange={v => updateRow(k, { isActive: v })}
+                            label={isAr ? area.ar : area.en}
                           />
                           <div className="flex-1 min-w-0">
                             <span className="text-sm text-foreground">
@@ -1166,6 +1168,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                             <Toggle
                               checked={row.isActive}
                               onChange={v => updateCustomRow(idx, { isActive: v })}
+                              label={isAr && row.areaAr ? row.areaAr : row.area}
                             />
                             <div className="flex-1 min-w-0">
                               <span className="text-sm text-foreground">
@@ -1235,7 +1238,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                     ) : (
                       <div className="flex flex-wrap items-end gap-2 py-1">
                         <div className="flex flex-col gap-1">
-                          <label className="text-xs text-muted-foreground">{t('areaEn')}</label>
+                          <label className="text-sm text-muted-foreground">{t('areaEn')}</label>
                           <input
                             type="text"
                             placeholder={t('areaNameEnSample')}
@@ -1246,11 +1249,11 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                                 [addKey]: { ...addForm, area: e.target.value },
                               }))
                             }
-                            className="w-32 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                            className={`${FIELD_CLASSES} w-32`}
                           />
                         </div>
                         <div className="flex flex-col gap-1">
-                          <label className="text-xs text-muted-foreground">{t('areaAr')}</label>
+                          <label className="text-sm text-muted-foreground">{t('areaAr')}</label>
                           <input
                             type="text"
                             placeholder={t('areaNameArSample')}
@@ -1262,11 +1265,11 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                                 [addKey]: { ...addForm, areaAr: e.target.value },
                               }))
                             }
-                            className="w-32 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                            className={`${FIELD_CLASSES} w-32`}
                           />
                         </div>
                         <div className="flex flex-col gap-1">
-                          <label className="text-xs text-muted-foreground">{t('feeLabel')}</label>
+                          <label className="text-sm text-muted-foreground">{t('feeLabel')}</label>
                           <div className="flex items-center gap-1">
                             <input
                               type="number"
@@ -1280,7 +1283,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                                   [addKey]: { ...addForm, feeMajor: e.target.value },
                                 }))
                               }
-                              className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+                              className={`${FIELD_CLASSES} w-24 text-end`}
                             />
                             <span className="text-xs text-muted-foreground">{t('currency')}</span>
                           </div>
@@ -1330,7 +1333,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
         return (
           <div
             key={country}
-            className="divide-y divide-border rounded-xl border border-border overflow-hidden"
+            className="divide-y divide-border rounded-md border border-border overflow-hidden"
           >
             {/* Country header */}
             <button
@@ -1384,6 +1387,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                               <Toggle
                                 checked={row.isActive}
                                 onChange={v => updateCustomRow(idx, { isActive: v })}
+                                label={isAr && row.areaAr ? row.areaAr : row.area}
                               />
                               <div className="flex-1 min-w-0">
                                 <span className="text-sm text-foreground">
@@ -1452,7 +1456,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                         ) : (
                           <div className="flex flex-wrap items-end gap-2 py-1">
                             <div className="flex flex-col gap-1">
-                              <label className="text-xs text-muted-foreground">{t('areaEn')}</label>
+                              <label className="text-sm text-muted-foreground">{t('areaEn')}</label>
                               <input
                                 type="text"
                                 placeholder={t('areaNameEnSample')}
@@ -1463,11 +1467,11 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                                     [govAddKey]: { ...govAddForm, area: e.target.value },
                                   }))
                                 }
-                                className="w-32 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                                className={`${FIELD_CLASSES} w-32`}
                               />
                             </div>
                             <div className="flex flex-col gap-1">
-                              <label className="text-xs text-muted-foreground">{t('areaAr')}</label>
+                              <label className="text-sm text-muted-foreground">{t('areaAr')}</label>
                               <input
                                 type="text"
                                 placeholder={t('areaNameArSample')}
@@ -1479,11 +1483,11 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                                     [govAddKey]: { ...govAddForm, areaAr: e.target.value },
                                   }))
                                 }
-                                className="w-32 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                                className={`${FIELD_CLASSES} w-32`}
                               />
                             </div>
                             <div className="flex flex-col gap-1">
-                              <label className="text-xs text-muted-foreground">
+                              <label className="text-sm text-muted-foreground">
                                 {t('feeLabel')}
                               </label>
                               <div className="flex items-center gap-1">
@@ -1499,7 +1503,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                                       [govAddKey]: { ...govAddForm, feeMajor: e.target.value },
                                     }))
                                   }
-                                  className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+                                  className={`${FIELD_CLASSES} w-24 text-end`}
                                 />
                                 <span className="text-xs text-muted-foreground">
                                   {t('currency')}
@@ -1536,7 +1540,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
       })}
 
       {/* ── Add custom location panel ─────────────────────────────────────── */}
-      <div className="rounded-xl border border-dashed border-border overflow-hidden">
+      <div className="rounded-md border border-dashed border-border overflow-hidden">
         <button
           type="button"
           onClick={() => setAddLocOpen(v => !v)}
@@ -1571,30 +1575,30 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Country EN */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">{t('countryEn')} *</label>
+                <label className="text-sm font-medium text-foreground">{t('countryEn')} *</label>
                 <input
                   type="text"
                   placeholder={t('countryEnSample')}
                   value={addLocForm.country}
                   onChange={e => setAddLocForm(prev => ({ ...prev, country: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={FIELD_CLASSES}
                 />
               </div>
               {/* Country AR */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">{t('countryAr')}</label>
+                <label className="text-sm font-medium text-foreground">{t('countryAr')}</label>
                 <input
                   type="text"
                   placeholder={t('countryArSample')}
                   dir="rtl"
                   value={addLocForm.countryAr}
                   onChange={e => setAddLocForm(prev => ({ ...prev, countryAr: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                  className={FIELD_CLASSES}
                 />
               </div>
               {/* Governorate EN */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">
+                <label className="text-sm font-medium text-foreground">
                   {t('governorateEn')} *
                 </label>
                 <input
@@ -1602,12 +1606,12 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   placeholder={t('cityEnSample')}
                   value={addLocForm.governorate}
                   onChange={e => setAddLocForm(prev => ({ ...prev, governorate: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={FIELD_CLASSES}
                 />
               </div>
               {/* Governorate AR */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">{t('governorateAr')}</label>
+                <label className="text-sm font-medium text-foreground">{t('governorateAr')}</label>
                 <input
                   type="text"
                   placeholder={t('cityArSample')}
@@ -1616,35 +1620,35 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   onChange={e =>
                     setAddLocForm(prev => ({ ...prev, governorateAr: e.target.value }))
                   }
-                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                  className={FIELD_CLASSES}
                 />
               </div>
               {/* Area EN */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">{t('areaEn')} *</label>
+                <label className="text-sm font-medium text-foreground">{t('areaEn')} *</label>
                 <input
                   type="text"
                   placeholder={t('districtEnSample')}
                   value={addLocForm.area}
                   onChange={e => setAddLocForm(prev => ({ ...prev, area: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={FIELD_CLASSES}
                 />
               </div>
               {/* Area AR */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">{t('areaAr')}</label>
+                <label className="text-sm font-medium text-foreground">{t('areaAr')}</label>
                 <input
                   type="text"
                   placeholder={t('districtArSample')}
                   dir="rtl"
                   value={addLocForm.areaAr}
                   onChange={e => setAddLocForm(prev => ({ ...prev, areaAr: e.target.value }))}
-                  className="px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                  className={FIELD_CLASSES}
                 />
               </div>
               {/* Fee */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">{t('feeLabel')}</label>
+                <label className="text-sm font-medium text-foreground">{t('feeLabel')}</label>
                 <div className="flex items-center gap-1">
                   <input
                     type="number"
@@ -1653,7 +1657,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                     placeholder="0.00"
                     value={addLocForm.feeMajor}
                     onChange={e => setAddLocForm(prev => ({ ...prev, feeMajor: e.target.value }))}
-                    className="w-28 px-2 py-1.5 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+                    className={`${FIELD_CLASSES} w-28 text-end`}
                   />
                   <span className="text-xs text-muted-foreground">{t('currency')}</span>
                 </div>

@@ -18,7 +18,11 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": ["الكوريير حولي الفلوس ازاي اطابقها؟"],
+    "ar": [
+      "الكوريير حولي الفلوس ازاي اطابقها؟",
+      "فين ارفع كشف الكوريير؟",
+      "الكوريير حول مبلغ ناقص"
+    ],
     "en": ["Reconcile my courier statement"]
   },
   "steps": ["COD page: upload statement."],

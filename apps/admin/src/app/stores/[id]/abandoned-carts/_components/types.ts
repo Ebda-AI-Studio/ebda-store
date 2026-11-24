@@ -72,20 +72,3 @@ export const CART_STATUS_KEYS = [
 ] as const;
 
 export type CartStatus = (typeof CART_STATUS_KEYS)[number];
-
-/**
- * Color palette for the abandoned-cart status pill. Handed to the shared
- * OrderStatusBadge via `colorMap`. The step-sent statuses are informational
- * (not order-lifecycle steps) so they use the `info` token rather than the
- * warning/success palette used elsewhere.
- */
-export const ABANDONED_CART_COLORS = {
-  pending: { className: 'bg-warning/10 text-warning-ink dark:bg-warning/30 dark:text-warning-ink' },
-  step1_sent: { className: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink' },
-  step2_sent: { className: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink' },
-  step3_sent: { className: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink' },
-  recovered: {
-    className: 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success-ink',
-  },
-  expired: { className: 'bg-muted text-muted-foreground' },
-} as const;

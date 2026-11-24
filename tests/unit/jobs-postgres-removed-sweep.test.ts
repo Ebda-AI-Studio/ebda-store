@@ -157,6 +157,7 @@ describe('push fan-out (dispatched by every order job) on a Worker with no Postg
       p256dh: 'k',
       auth: 'a',
       audience: 'storefront',
+      customerId: 'cust-1',
       createdAt: new Date('2026-11-01T00:00:00Z'),
     });
     insertSqlite(sqlite, 'PushSubscription', [sub('s1', 'https://gone'), sub('s2', 'https://ok')]);
@@ -167,7 +168,7 @@ describe('push fan-out (dispatched by every order job) on a Worker with no Postg
 
     await runWithRequestDb(
       () => createPostgresRemovedClient(),
-      () => pushService.sendToStore(STORE, 't', 'b')
+      () => pushService.sendToStore(STORE, 't', 'b', undefined, { customerId: 'cust-1' })
     );
 
     expect(h.send).toHaveBeenCalledTimes(2);

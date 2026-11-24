@@ -48,10 +48,21 @@ export const stockDeadstockScanCron: JobDef = inngest.createFunction(
       ).then(list => list.filter(storeFilter(event)).map(s => ({ id: s.id })))
     );
 
+    // Stores to visit: entitlement read in one batched prefetch per run (selection only). The per-store gate below stays a
+    // LIVE read, so a downgrade mid-run is still honoured before any paid action (entitlements are NEVER-stale).
+    const enabledIds = new Set(
+      await step.run('select-enabled-stores', () =>
+        featureService.selectEnabled(
+          stores.map(s => s.id),
+          'inventory.basic'
+        )
+      )
+    );
+
     let totalFlagged = 0;
     let totalExpired = 0;
 
-    for (const store of stores) {
+    for (const store of stores.filter(s => enabledIds.has(s.id))) {
       const result = await step.run(`scan-${store.id}`, async () => {
         // Feature gate — dead-stock analysis requires inventory.basic.
         const enabled = await featureService.isFeatureEnabled(store.id, 'inventory.basic');
