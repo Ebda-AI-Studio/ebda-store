@@ -2,16 +2,24 @@
  * Owner-assistant RPC for Ebda Chat's Smart Layer: two methods on `WhatsAppBridge` (not shopper-facing, unlike the commerce RPC beside them).
  *   - `getTopProducts`  READ, owner or ACTIVE staff: best sellers of a period from the same analytics the admin dashboard uses (AnalyticsService.getTopProducts).
  *   - `createCoupon`    WRITE, OWNER ONLY: creates a percentage / fixed coupon through CouponService.create (no coupon logic is duplicated here beyond the guard rails).
+ *   - `getOrdersSummary` READ, OWNER ONLY: order count, collected sales, refunds and average order value for today / yesterday / this week / last 7 days / this month
+ *     (Ruling CHAT-ASSIST-ORDERS-1). Same revenue population as the dashboard (lib/revenue-sql.ts); "collected" = payment paid OR a delivered cash-on-delivery order (CHIP-COD-DELIVERED-1).
  * Authorised by the CALLING USER against the LIVE membership (never a token claim), like listStoreMembers; the tenant is `storeId` only, resolved and linked
  * BEFORE anything is read. Expected failures are data (`{ ok: false, reason, code }`), the envelope ebda-whatsapp's `bridgeResultSchema` parses; an unexpected
  * error rethrows and the caller turns it into `unavailable`. Pure over `OwnerToolsPorts`, so tests run the same logic against fakes.
  *
  * Rulings: CHAT-ASSIST-TOP-1 (rolling windows, "today" = since Cairo midnight, numbers only from analytics), CHAT-ASSIST-COUPON-1 (percent 1-90, fixed <= MAX_FIXED_MINOR,
  * window <= 90 days, usage limit <= 100000, replay-safe on code + recency; the Chat tool ALWAYS shows the merchant a preview and waits for the press before this runs).
- * STALENESS: both are live reads / writes, nothing is cached here; the per-store token bucket below is BOUNDED-stale (per isolate) and only sheds a runaway caller.
+ * STALENESS: top products and coupons are live reads / writes, nothing is cached; the orders summary is BOUNDED-stale: cached per store + period for 60 s per isolate (the residual window is
+ * that minute; the role and the link are re-checked on every call, only the figures are reused); the per-store token bucket below is BOUNDED-stale (per isolate) and only sheds a runaway caller.
  */
 import { z } from 'zod/v3';
 import { args as bridgeArgs } from './schemas';
+import {
+  NON_REVENUE_ORDER_STATUSES,
+  NON_REVENUE_PAYMENT_STATUSES,
+  netOrderRevenueMinor,
+} from '../../revenue-sql';
 
 /** Pinned against ebda-whatsapp's COUPON_LIMITS (src/core/store-bridge.ts) by a test in each repo: change both together. */
 // pq-allow(unused-export): contract pin, imported by tests/unit/wa-bridge/wa-bridge-owner-tools.test.ts
@@ -48,6 +56,41 @@ export interface TopProductsValue {
   toMs: number;
   items: Array<{ name: string; nameAr: string | null; units: number; revenueMinor: number }>;
 }
+
+const ordersSummaryArgs = z.object({
+  period: z.enum(['today', 'yesterday', 'this_week', 'last_7_days', 'this_month']),
+});
+type OrdersPeriod = z.infer<typeof ordersSummaryArgs>['period'];
+// pq-allow(unused-export): named by the emitted declarations of ownerTools (index.ts) and the worker RPC getOrdersSummary (TS4023/TS4053 without it)
+export interface OrdersSummaryValue {
+  currency: string;
+  period: OrdersPeriod;
+  fromMs: number;
+  toMs: number;
+  /** Orders placed in the window that count as sales (the dashboard's revenue population). */
+  orderCount: number;
+  /** Of those, the orders whose money is collected: payment paid, or a delivered cash-on-delivery order. */
+  collectedOrders: number;
+  /** Net of refunds, minor units, over the collected orders. */
+  salesMinor: number;
+  /** Refunded minor units on the window's orders (completed non-exchange returns / payment refunds, capped at each order's total). */
+  refundsMinor: number;
+  /** salesMinor / collectedOrders, rounded; 0 when none. */
+  avgOrderMinor: number;
+}
+/** One order as the summary needs it; the port derives `online` / `cod` from the payment rows and `refundedMinor` from returns + payments. */
+// pq-allow(unused-export): test seam, imported by tests/unit/wa-bridge/wa-bridge-owner-tools.test.ts
+export interface OrderRowLite {
+  total: number;
+  status: string;
+  paymentStatus: string;
+  online: boolean;
+  cod: boolean;
+  refundedMinor: number;
+}
+// pq-allow(unused-export): test seam, imported by tests/unit/wa-bridge/wa-bridge-owner-tools.test.ts
+export const MAX_SUMMARY_ORDERS = 20_000;
+const SUMMARY_TTL_MS = 60_000;
 
 const code = z
   .string()
@@ -108,6 +151,12 @@ export interface OwnerToolsPorts {
     range: { startDate: Date; endDate: Date },
     limit: number
   ): Promise<Array<{ name: string; nameAr: string | null; quantity: number; revenue: number }>>;
+  /** Every non-deleted order created in the window (any status), at most `cap + 1` rows so the caller can tell it was cut. */
+  ordersInWindow(
+    storeId: string,
+    range: { startDate: Date; endDate: Date },
+    cap: number
+  ): Promise<OrderRowLite[]>;
   findCoupon(storeId: string, code: string): Promise<CouponRowLite | null>;
   /** CouponService.create. Throws `{ code: 'DUPLICATE_CODE' }` when the code exists (a race the find above did not see). */
   createCoupon(
@@ -174,6 +223,88 @@ function takeToken(key: string, now: number, perMin = 30): boolean {
 // pq-allow(unused-export): test seam, imported by tests/unit/wa-bridge/wa-bridge-owner-tools.test.ts
 export const resetOwnerToolBuckets = () => buckets.clear();
 
+const HOUR = 3_600_000;
+const SAT_FIRST = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+/** The Cairo calendar day before the one that starts at `dayStart`. */
+const dayBefore = (dayStart: number): number => cairoStartOfDay(dayStart - HOUR);
+/**
+ * Cairo calendar windows. The week starts on Saturday (the Egyptian week), the month on the 1st; "today", "this week" and "this month" end now,
+ * "yesterday" ends at today's midnight, "last 7 days" is rolling.
+ */
+// pq-allow(unused-export): test seam, imported by tests/unit/wa-bridge/wa-bridge-owner-tools.test.ts
+export function periodWindow(period: OrdersPeriod, now: number): { fromMs: number; toMs: number } {
+  const today = cairoStartOfDay(now);
+  const mid = new Date(today + 12 * HOUR); // noon of the Cairo day: safe from any midnight offset edge
+  const part = (opt: Intl.DateTimeFormatOptions, t: string) =>
+    new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', ...opt })
+      .formatToParts(mid)
+      .find(x => x.type === t)!.value;
+  switch (period) {
+    case 'today':
+      return { fromMs: today, toMs: now };
+    case 'yesterday':
+      return { fromMs: dayBefore(today), toMs: today - 1 };
+    case 'last_7_days':
+      return { fromMs: now - 7 * 24 * HOUR, toMs: now };
+    case 'this_week': {
+      let from = today;
+      for (let i = SAT_FIRST.indexOf(part({ weekday: 'short' }, 'weekday')); i > 0; i--)
+        from = dayBefore(from);
+      return { fromMs: from, toMs: now };
+    }
+    case 'this_month': {
+      let from = today;
+      for (let i = Number(part({ day: 'numeric' }, 'day')) - 1; i > 0; i--) from = dayBefore(from);
+      return { fromMs: from, toMs: now };
+    }
+  }
+}
+
+/** The dashboard's revenue population (revenue-sql.ts) split into counted / collected, plus refunds. Pure over the rows. */
+// pq-allow(unused-export): test seam, imported by tests/unit/wa-bridge/wa-bridge-owner-tools.test.ts
+export function summariseOrders(
+  rows: readonly OrderRowLite[]
+): Pick<
+  OrdersSummaryValue,
+  'orderCount' | 'collectedOrders' | 'salesMinor' | 'refundsMinor' | 'avgOrderMinor'
+> {
+  let orderCount = 0;
+  let collectedOrders = 0;
+  let salesMinor = 0;
+  let refundsMinor = 0;
+  for (const o of rows) {
+    refundsMinor += Math.min(o.total, Math.max(0, o.refundedMinor));
+    const net = netOrderRevenueMinor({
+      total: o.total,
+      status: o.status,
+      paymentStatus: o.paymentStatus,
+      refundedMinor: o.refundedMinor,
+      hasOnlinePayment: o.online,
+    });
+    const counts =
+      !(NON_REVENUE_ORDER_STATUSES as readonly string[]).includes(o.status) &&
+      !(NON_REVENUE_PAYMENT_STATUSES as readonly string[]).includes(o.paymentStatus) &&
+      !(o.paymentStatus === 'unpaid' && o.online);
+    if (!counts) continue;
+    orderCount += 1;
+    if (o.paymentStatus === 'paid' || (o.status === 'delivered' && o.cod)) {
+      collectedOrders += 1;
+      salesMinor += net;
+    }
+  }
+  return {
+    orderCount,
+    collectedOrders,
+    salesMinor,
+    refundsMinor,
+    avgOrderMinor: collectedOrders > 0 ? Math.round(salesMinor / collectedOrders) : 0,
+  };
+}
+
+const summaryCache = new Map<string, { at: number; value: OrdersSummaryValue }>();
+// pq-allow(unused-export): test seam, imported by tests/unit/wa-bridge/wa-bridge-owner-tools.test.ts
+export const resetOrdersSummaryCache = () => summaryCache.clear();
+
 export function createOwnerTools(ports: OwnerToolsPorts) {
   /** Store resolves + linked + the caller is a live member (roles: who may pass). Same order for both methods. */
   async function gate(
@@ -229,6 +360,39 @@ export function createOwnerTools(ports: OwnerToolsPorts) {
           })),
         },
       };
+    },
+
+    async getOrdersSummary(
+      storeId: string,
+      asUserId: string,
+      raw: unknown
+    ): Promise<OwnerResult<OrdersSummaryValue>> {
+      const a = ordersSummaryArgs.safeParse(raw);
+      if (!a.success) return fail('invalid', 'INVALID_ARGS', a.error.issues[0]?.path.join('.'));
+      const g = await gate('getOrdersSummary', storeId, asUserId, ['owner']);
+      if (!g.ok) return g;
+      const now = ports.now();
+      const key = `${g.value.storeId}:${a.data.period}`;
+      const hit = summaryCache.get(key);
+      if (hit && now - hit.at < SUMMARY_TTL_MS && now >= hit.at)
+        return { ok: true, value: hit.value };
+      const w = periodWindow(a.data.period, now);
+      const rows = await ports.ordersInWindow(
+        g.value.storeId,
+        { startDate: new Date(w.fromMs), endDate: new Date(w.toMs) },
+        MAX_SUMMARY_ORDERS
+      );
+      // Never a partial figure: a window we could not read in full is refused, not summed.
+      if (rows.length > MAX_SUMMARY_ORDERS) return fail('unavailable', 'RANGE_TOO_LARGE');
+      const value: OrdersSummaryValue = {
+        currency: g.value.currency,
+        period: a.data.period,
+        ...w,
+        ...summariseOrders(rows),
+      };
+      if (summaryCache.size > 2000) summaryCache.clear();
+      summaryCache.set(key, { at: now, value });
+      return { ok: true, value };
     },
 
     async createCoupon(

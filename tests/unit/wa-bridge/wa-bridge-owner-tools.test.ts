@@ -6,6 +6,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   createOwnerTools,
   cairoStartOfDay,
+  periodWindow,
+  summariseOrders,
+  resetOrdersSummaryCache,
+  MAX_SUMMARY_ORDERS,
+  type OrderRowLite,
   resetOwnerToolBuckets,
   MAX_FIXED_MINOR,
   MAX_PERCENT,
@@ -23,7 +28,7 @@ const KEY = 'preview-key-0001';
 function fake(over: Partial<OwnerToolsPorts> = {}) {
   const coupons: any[] = [];
   const audits: any[] = [];
-  const calls = { top: [] as any[], created: 0 };
+  const calls = { top: [] as any[], created: 0, orders: 0 };
   const ports: OwnerToolsPorts = {
     memberRole: async (_s, u) => (u === OWNER ? 'owner' : u === STAFF ? 'staff' : null),
     currency: async s => (s === S ? 'EGP' : null),
@@ -35,6 +40,10 @@ function fake(over: Partial<OwnerToolsPorts> = {}) {
         { name: 'Ring', nameAr: 'خاتم', quantity: 9, revenue: 450000 },
         { name: 'Chain', nameAr: null, quantity: 4, revenue: 120000 },
       ];
+    },
+    ordersInWindow: async () => {
+      calls.orders++;
+      return ROWS;
     },
     findCoupon: async (_s, code) =>
       coupons.find(c => c.code.toLowerCase() === code.toLowerCase()) ?? null,
@@ -50,6 +59,22 @@ function fake(over: Partial<OwnerToolsPorts> = {}) {
   };
   return { t: createOwnerTools(ports), coupons, audits, calls };
 }
+const row = (o: Partial<OrderRowLite> & { total: number }): OrderRowLite => ({
+  status: 'confirmed',
+  paymentStatus: 'paid',
+  online: true,
+  cod: false,
+  refundedMinor: 0,
+  ...o,
+});
+const ROWS: OrderRowLite[] = [
+  row({ total: 10_000, refundedMinor: 2_000 }), // paid online, partly refunded: counts, collected, net 8000
+  row({ total: 5_000, status: 'delivered', paymentStatus: 'unpaid', online: false, cod: true }), // delivered COD: collected (CHIP-COD-DELIVERED-1)
+  row({ total: 3_000, status: 'confirmed', paymentStatus: 'unpaid', online: false, cod: true }), // COD not yet delivered: a sale, not collected
+  row({ total: 7_000, status: 'cancelled', paymentStatus: 'unpaid', online: false }), // cancelled: nothing
+  row({ total: 9_000, status: 'pending', paymentStatus: 'unpaid', online: true }), // abandoned online checkout: nothing
+  row({ total: 4_000, status: 'refunded', paymentStatus: 'refunded', refundedMinor: 4_000 }), // fully refunded: not a sale, its refund is counted
+];
 const base = {
   code: 'SAVE10',
   type: 'percentage' as const,
@@ -290,5 +315,111 @@ describe('createCoupon', () => {
       },
     });
     expect(await f.t.createCoupon(S, OWNER, base)).toMatchObject({ ok: true });
+  });
+});
+
+describe('getOrdersSummary', () => {
+  const sale = (over: Partial<OwnerToolsPorts> = {}) => fake(over);
+  beforeEach(() => resetOrdersSummaryCache());
+
+  it('counts like the dashboard, collects paid and delivered-COD orders net of refunds, counts refunds, averages over collected orders', () => {
+    expect(summariseOrders(ROWS)).toEqual({
+      orderCount: 3,
+      collectedOrders: 2,
+      salesMinor: 8_000 + 5_000,
+      refundsMinor: 2_000 + 4_000,
+      avgOrderMinor: 6_500,
+    });
+    expect(summariseOrders([])).toEqual({
+      orderCount: 0,
+      collectedOrders: 0,
+      salesMinor: 0,
+      refundsMinor: 0,
+      avgOrderMinor: 0,
+    });
+  });
+
+  it('Cairo windows: today, yesterday, week from Saturday, month from the 1st, rolling 7 days', () => {
+    const w = (p: Parameters<typeof periodWindow>[0]) => {
+      const r = periodWindow(p, NOW);
+      return [new Date(r.fromMs).toISOString(), new Date(r.toMs).toISOString()];
+    };
+    expect(w('today')).toEqual(['2026-11-22T22:00:00.000Z', '2026-11-23T12:00:00.000Z']);
+    expect(w('yesterday')).toEqual(['2026-11-21T22:00:00.000Z', '2026-11-22T21:59:59.999Z']);
+    expect(w('this_week')[0]).toBe('2026-11-20T22:00:00.000Z'); // Monday 23rd: the week began Saturday the 21st, Cairo midnight
+    expect(w('this_month')[0]).toBe('2026-10-31T22:00:00.000Z'); // 1 Nov Cairo midnight
+    expect(w('last_7_days')).toEqual(['2026-11-16T12:00:00.000Z', '2026-11-23T12:00:00.000Z']);
+  });
+
+  it('owner only: staff and non-members are FORBIDDEN and nothing is read; a bad period is INVALID_ARGS', async () => {
+    const f = sale();
+    expect(await f.t.getOrdersSummary(S, STAFF, { period: 'today' })).toMatchObject({
+      ok: false,
+      code: 'FORBIDDEN',
+    });
+    expect(
+      await f.t.getOrdersSummary(S, '33333333-3333-4333-8333-333333333333', { period: 'today' })
+    ).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+    expect(await f.t.getOrdersSummary(S, OWNER, { period: 'year' })).toMatchObject({
+      ok: false,
+      code: 'INVALID_ARGS',
+    });
+    expect(f.calls.orders).toBe(0);
+  });
+
+  it('answers from the store: figures in minor units with the store currency', async () => {
+    const f = sale();
+    expect(await f.t.getOrdersSummary(S, OWNER, { period: 'today' })).toMatchObject({
+      ok: true,
+      value: {
+        currency: 'EGP',
+        period: 'today',
+        orderCount: 3,
+        collectedOrders: 2,
+        salesMinor: 13_000,
+        refundsMinor: 6_000,
+        avgOrderMinor: 6_500,
+      },
+    });
+  });
+
+  it('BOUNDED-stale cache: a repeat within 60 s reuses the figures, after 60 s it reads again; the role is re-checked on every call', async () => {
+    let clock = NOW;
+    const f = sale({ now: () => clock });
+    await f.t.getOrdersSummary(S, OWNER, { period: 'today' });
+    clock += 30_000;
+    await f.t.getOrdersSummary(S, OWNER, { period: 'today' });
+    expect(f.calls.orders).toBe(1);
+    expect(await f.t.getOrdersSummary(S, STAFF, { period: 'today' })).toMatchObject({
+      ok: false,
+      code: 'FORBIDDEN',
+    }); // a cached figure is never handed to a non-owner
+    await f.t.getOrdersSummary(S, OWNER, { period: 'this_week' });
+    expect(f.calls.orders).toBe(2); // another period is its own entry
+    clock += 31_000;
+    await f.t.getOrdersSummary(S, OWNER, { period: 'today' });
+    expect(f.calls.orders).toBe(3);
+  });
+
+  it('never a partial figure: a window too large to read in full is refused', async () => {
+    const f = sale({
+      ordersInWindow: async () =>
+        Array.from({ length: MAX_SUMMARY_ORDERS + 1 }, () => row({ total: 1 })),
+    });
+    expect(await f.t.getOrdersSummary(S, OWNER, { period: 'this_month' })).toMatchObject({
+      ok: false,
+      reason: 'unavailable',
+      code: 'RANGE_TOO_LARGE',
+    });
+  });
+
+  it('is rate-limited per store', async () => {
+    const f = sale();
+    let limited = false;
+    for (let i = 0; i < 40; i++) {
+      const r = await f.t.getOrdersSummary(S, OWNER, { period: 'today' });
+      if (!r.ok && r.code === 'RATE_LIMITED') limited = true;
+    }
+    expect(limited).toBe(true);
   });
 });

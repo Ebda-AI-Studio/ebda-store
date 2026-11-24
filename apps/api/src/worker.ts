@@ -568,6 +568,12 @@ export class WhatsAppBridge extends WorkerEntrypoint<CfBindings> {
       ownerTools().getTopProducts(storeId, asUserId, req)
     );
   }
+  /** Owner assistant: order count, collected sales, refunds and average order value for a Cairo-day period (owner only, cached 60 s per store + period). */
+  getOrdersSummary(storeId: string, asUserId: string, req: unknown) {
+    return withWorkerContext(this.env, this.ctx as Ctx, () =>
+      ownerTools().getOrdersSummary(storeId, asUserId, req)
+    );
+  }
   /** Owner assistant: create a percentage / fixed coupon. OWNER ONLY (live), replay-safe; Chat only calls it after the merchant's confirm press. */
   createCoupon(storeId: string, asUserId: string, req: unknown) {
     return withWorkerContext(this.env, this.ctx as Ctx, () =>
