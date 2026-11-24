@@ -29,7 +29,9 @@ import {
 import { configureIdentityClient } from '@api/lib/identity-client';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import type { AccountsRpc } from '@api/cf/bindings';
-import { hasDb, storeAdminAccessTokenFor, type FixtureStore } from '../helpers/bundle-fixtures';
+import { hasDb, type FixtureStore } from '../helpers/bundle-fixtures';
+import { installTestIdentity } from '@api/lib/test-identity';
+import { identityTokenFor } from '../helpers/identity-session';
 
 function buildApp(): Express {
   const app = express();
@@ -74,6 +76,8 @@ describe.skipIf(!hasDb)('staff invite consent', () => {
   const verifiedStaff = new Set<string>();
 
   beforeAll(() => {
+    // staff add / remove sit behind requireRecentLogin (TEN-4): the owner signs in through an identity token with a fresh auth_time
+    expect(installTestIdentity(), 'EBDA_TEST_IDENTITY_JWK + NODE_ENV=test').toBe(true);
     app = buildApp();
     configureIdentityClient({
       inviteUser: async input => {
@@ -120,7 +124,7 @@ describe.skipIf(!hasDb)('staff invite consent', () => {
   it('a brand-new staff account is created at the identity service (which mails the code); the Store binds profile + seat only', async () => {
     const run = crypto.randomUUID().slice(0, 8);
     const store = await seedPlainStore(run);
-    const token = storeAdminAccessTokenFor(store.ownerId);
+    const token = await identityTokenFor(store.ownerId);
     const staffEmail = `new-staff-${run}@example.com`;
     clearCapturedMail();
     invites.length = 0;
@@ -155,7 +159,7 @@ describe.skipIf(!hasDb)('staff invite consent', () => {
   it('an owner-supplied password is never forwarded or stored: the invitee sets it through the identity service', async () => {
     const run = crypto.randomUUID().slice(0, 8);
     const store = await seedPlainStore(run);
-    const token = storeAdminAccessTokenFor(store.ownerId);
+    const token = await identityTokenFor(store.ownerId);
     const staffEmail = `owner-set-${run}@example.com`;
     clearCapturedMail();
     invites.length = 0;
@@ -191,7 +195,7 @@ describe.skipIf(!hasDb)('staff invite consent', () => {
 
     const firstAdd = await request(app)
       .post(`/api/v1/stores/${storeA.storeId}/staff`)
-      .set('Authorization', `Bearer ${storeAdminAccessTokenFor(storeA.ownerId)}`)
+      .set('Authorization', `Bearer ${await identityTokenFor(storeA.ownerId)}`)
       .send({ email: staffEmail, firstName: 'Omar', lastName: 'Said' });
     expect(firstAdd.status).toBe(201);
     // Drain the first add's OWN deferred work before clearing: it runs after the response (`deferAfterTenantCommit`).
@@ -202,7 +206,7 @@ describe.skipIf(!hasDb)('staff invite consent', () => {
     clearCapturedMail();
     const secondAdd = await request(app)
       .post(`/api/v1/stores/${storeB.storeId}/staff`)
-      .set('Authorization', `Bearer ${storeAdminAccessTokenFor(storeB.ownerId)}`)
+      .set('Authorization', `Bearer ${await identityTokenFor(storeB.ownerId)}`)
       .send({ email: staffEmail, firstName: 'Omar', lastName: 'Said' });
     expect(secondAdd.status).toBe(201);
 
