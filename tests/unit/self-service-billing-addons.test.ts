@@ -149,12 +149,12 @@ beforeEach(() => {
 describe('catalog', () => {
   it('feature add-ons are real, visible add-on-tier registry keys with integer positive prices', async () => {
     const { ADDON_CATALOG } = await import('@api/services/billing/addon-catalog');
-    const { FEATURE_REGISTRY } = await import('@ebda/shared');
+    const { FEATURE_REGISTRY, PLAN_BASELINE } = await import('@ebda/shared');
     for (const a of Object.values(ADDON_CATALOG)) {
       expect(Number.isSafeInteger(a.priceMinor) && a.priceMinor > 0).toBe(true);
       if (a.kind === 'feature') {
         const def = (FEATURE_REGISTRY as any)[a.featureKey!];
-        expect(def?.tier).toBe('addon');
+        expect(PLAN_BASELINE.enterprise).toContain(a.featureKey);
         expect(def?.hidden).not.toBe(true);
       }
     }

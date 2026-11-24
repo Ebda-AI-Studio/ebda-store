@@ -1,7 +1,7 @@
 /**
  * What a merchant can buy outside the plan (SELF-SERVICE A8 + A9). One catalog, integer piastres.
  *
- * Ruling ADDON-1 - prices are placeholders pending Ahmad's number: EGP 99 per add-on per 30 days, AI packs EGP 49 / 149.
+ * Ruling ADDON-1 - feature prices are the list Ahmad approved 2026-11-15 (`addon-prices.ts` in @ebda/shared); a feature without an approved price, and the AI packs (EGP 49 / 149), stay placeholders until he approves them.
  * Change them HERE only (the preview, the ledger row and the screen all read this file). Cost if wrong: a merchant is
  * quoted and charged the wrong amount; the quote is shown and confirmed before any charge, so the damage is bounded
  * to one wrong-price purchase that can be refunded from the ledger.
@@ -11,7 +11,12 @@
  * the D1 split, erasure and tenant-guard snapshots. The prefix keeps every plan reader safe: `plans` has no such code,
  * so each of them fails closed on it.
  */
-import type { FeatureKey } from '@ebda/shared';
+import {
+  FEATURE_REGISTRY,
+  addonFeatureKeys,
+  addonFeaturePriceMinor,
+  type FeatureKey,
+} from '@ebda/shared';
 
 export const ADDON_TERM_DAYS = 30;
 export const ADDON_PLAN_PREFIX = 'addon:';
@@ -30,25 +35,35 @@ export interface AddonItem {
   priceMinor: number;
   nameEn: string;
   nameAr: string;
+  /** What it does for the merchant, one or two sentences (Egyptian Arabic, full sentences). */
+  descEn: string;
+  descAr: string;
+  /** Preview image under `apps/admin/public/addons/` (served at `/addons/<file>`); the card renders without one. */
+  previewImage?: string;
 }
 
-const FEATURE_PRICE_MINOR = 9900;
-const feature = (key: FeatureKey, nameEn: string, nameAr: string): AddonItem => ({
-  sku: `feature:${key}`,
-  kind: 'feature',
-  featureKey: key,
-  priceMinor: FEATURE_PRICE_MINOR,
-  nameEn,
-  nameAr,
-});
+/**
+ * One add-on per feature Business holds (`addonFeatureKeys`, computed from the plan baselines, never hand-listed). Name and
+ * description come from the feature registry (en + ar). Whether a given STORE may buy it is decided per store at quote time
+ * (`canBuyFeatureOnPlan`). Prices come from `addon-prices.ts` (approved list; a not-yet-priced feature keeps the placeholder).
+ */
+const featureItems = (): AddonItem[] =>
+  addonFeatureKeys().map(key => {
+    const def = FEATURE_REGISTRY[key];
+    return {
+      sku: `feature:${key}`,
+      kind: 'feature' as const,
+      featureKey: key,
+      priceMinor: addonFeaturePriceMinor(key),
+      nameEn: def.name,
+      nameAr: def.nameAr,
+      descEn: def.description,
+      descAr: def.descriptionAr,
+    };
+  });
 
 const ITEMS: AddonItem[] = [
-  feature('floating_widget', 'Floating Widget', 'الزر العائم'),
-  feature('customer_wallet_checkout', 'Pay with Wallet at Checkout', 'الدفع من المحفظة عند الشراء'),
-  feature('loyalty', 'Loyalty Program', 'برنامج الولاء'),
-  feature('upsell_crosssell', 'Upsell & Cross-sell', 'البيع الإضافي'),
-  feature('push_notifications', 'Push Notifications', 'الإشعارات'),
-  feature('affiliate', 'Affiliate Program', 'برنامج التسويق بالعمولة'),
+  ...featureItems(),
   {
     sku: 'ai:topup_300',
     kind: 'ai_topup',
@@ -56,6 +71,10 @@ const ITEMS: AddonItem[] = [
     priceMinor: 4900,
     nameEn: '+300 AI requests a day',
     nameAr: '300 طلب ذكاء اصطناعي زيادة كل يوم',
+    descEn:
+      'Raises your store daily AI limit by 300 requests for 30 days. Use it when you run out before the day ends.',
+    descAr:
+      'بيزوّد حد الذكاء الاصطناعي اليومي لمتجرك 300 طلب لمدة 30 يوم. اشتريه لو بيخلص منك قبل آخر اليوم.',
   },
   {
     sku: 'ai:topup_1000',
@@ -64,6 +83,10 @@ const ITEMS: AddonItem[] = [
     priceMinor: 14900,
     nameEn: '+1000 AI requests a day',
     nameAr: '1000 طلب ذكاء اصطناعي زيادة كل يوم',
+    descEn:
+      'Raises your store daily AI limit by 1000 requests for 30 days, for stores that use AI on many products every day.',
+    descAr:
+      'بيزوّد حد الذكاء الاصطناعي اليومي لمتجرك 1000 طلب لمدة 30 يوم، للمتاجر اللي بتستخدم الذكاء الاصطناعي على منتجات كتير كل يوم.',
   },
 ];
 
