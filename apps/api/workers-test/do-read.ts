@@ -21,6 +21,7 @@ const e = env as unknown as {
 };
 
 /** Read rows straight from a store's StoreDO (the state after an HTTP write), as feature-gated-do.test.ts does. */
+// pq-allow(unused-export): test seam; its only importers are workerd test files (demo-store.test.ts), which the guard does not count as a use
 export async function doRead<T = Record<string, any>>(
   storeId: string,
   model: string,
@@ -34,6 +35,7 @@ export async function doRead<T = Record<string, any>>(
 }
 
 /** The Store record (profile + config columns) from the StoreDO: the Store row is not a findMany delegate in the DO. */
+// pq-allow(unused-export): workerd test seam; its importers are workers-test/*.test.ts files, which the guard does not count as a use
 export async function doStoreRecord(
   storeId: string,
   fields?: string[]
@@ -44,6 +46,7 @@ export async function doStoreRecord(
 }
 
 /** Insert a row straight into a store's StoreDO (a fixture an HTTP route cannot make, e.g. a legacy archived revision). */
+// pq-allow(unused-export): workerd test seam; its importers are workers-test/*.test.ts files, which the guard does not count as a use
 export async function doCreate(
   storeId: string,
   model: string,
@@ -56,6 +59,7 @@ export async function doCreate(
 }
 
 /** Write Store record fields into the StoreDO as the settings copy does (an out-of-band write: template, layoutSettings, ...). */
+// pq-allow(unused-export): workerd test seam; its importers are workers-test/*.test.ts files, which the guard does not count as a use
 export async function doSetStoreFields(
   storeId: string,
   fields: Record<string, unknown>
@@ -68,6 +72,7 @@ export async function doSetStoreFields(
 }
 
 /** Delete rows straight from a store's StoreDO (resets a fixture an HTTP route seeded, e.g. the onboarding page revisions). */
+// pq-allow(unused-export): workerd test seam; its importers are workers-test/*.test.ts files, which the guard does not count as a use
 export async function doDeleteMany(
   storeId: string,
   model: string,
@@ -80,6 +85,7 @@ export async function doDeleteMany(
 }
 
 /** A customer-auth op on the StoreDO (what /auth/register and friends call): the customer accounts are `_cauth_*` tables, not Prisma models. */
+// pq-allow(unused-export): workerd test seam; its importers are workers-test/*.test.ts files, which the guard does not count as a use
 export function doAuthOp(
   storeId: string,
   op: string,

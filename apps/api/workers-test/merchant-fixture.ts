@@ -20,6 +20,7 @@ const b64url = (b: ArrayBuffer | string): string => {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
 
+// pq-allow(unused-export): workerd test seam; its importers are workers-test/*.test.ts files, which the guard does not count as a use
 export async function identityToken(
   sub: string,
   email: string,
@@ -60,6 +61,7 @@ export async function identityToken(
 
 export interface Res {
   status: number;
+  // pq-allow(no-any): the parsed response body is dynamic JSON that every workerd test reads by path (`.json?.data?.x`); typing it per call site is the callers' job
   json: any;
   text: string;
   headers: Headers;
@@ -83,6 +85,7 @@ export async function call(
     ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
   });
   const text = await res.text();
+  // pq-allow(no-any): same dynamic response body as `Res.json` above
   let json: any = null;
   try {
     json = JSON.parse(text);
@@ -93,6 +96,7 @@ export async function call(
 }
 
 let seeded = false;
+// pq-allow(unused-export): workerd test seam; its importers are workers-test/*.test.ts files, which the guard does not count as a use
 export async function seedPlatform(): Promise<void> {
   if (seeded) return;
   await applyD1Migrations(e.PLATFORM_DB as never, e.TEST_PLATFORM_MIGRATIONS as never);
@@ -124,6 +128,7 @@ export interface Merchant {
 }
 let n = 0;
 /** A signed-in merchant with one LIVE store (create, look, trial plan, payment methods, go-live; `live:false` stops after create, `look:false` skips the look PUT). `label` must be unique per file. */
+// pq-allow(unused-export): workerd test seam; its importers are workers-test/*.test.ts files, which the guard does not count as a use
 export async function bootstrapMerchant(
   label: string,
   opts: { live?: boolean; look?: boolean } = {}
