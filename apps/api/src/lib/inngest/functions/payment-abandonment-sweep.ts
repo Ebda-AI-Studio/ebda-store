@@ -129,16 +129,11 @@ export const paymentAbandonmentSweep: JobDef = inngest.createFunction(
     // Per-store Enterprise feature check — only stamp for enabled stores.
     const storeIds = [...new Set(candidates.map((c: AbandonCandidate) => c.storeId))];
     // In a step: on a Workflow only step bodies hold a database connection.
+    // Selection only (stamping a flag, no paid side effect): one batched entitlement prefetch for the run.
     const enabledStoreIds = new Set(
-      await step.run('check-features', async () => {
-        const flags = await Promise.all(
-          storeIds.map(
-            async (sid: string) =>
-              [sid, await featureService.isFeatureEnabled(sid, 'payment_abandonment')] as const
-          )
-        );
-        return flags.filter(([, on]) => on).map(([sid]) => sid);
-      })
+      await step.run('check-features', () =>
+        featureService.selectEnabled(storeIds, 'payment_abandonment')
+      )
     );
 
     const eligible = candidates.filter((c: AbandonCandidate) => enabledStoreIds.has(c.storeId));

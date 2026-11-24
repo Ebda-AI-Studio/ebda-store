@@ -290,7 +290,7 @@ export function SizeChartEditor({
   };
 
   return (
-    <section className="rounded-xl border bg-card p-6 shadow-sm">
+    <section className="rounded-md border bg-card p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">
         {isNew ? t('createTitle') : t('editTitle')}
       </h2>
@@ -344,7 +344,7 @@ export function SizeChartEditor({
               role="radio"
               aria-checked={c.unit === u}
               onClick={() => update({ ...c, unit: u })}
-              className={`h-9 min-w-[4rem] rounded px-3 text-sm ${c.unit === u ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`h-9 min-w-[4rem] rounded-md px-3 text-sm ${c.unit === u ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
             >
               {u === 'cm' ? t('unitCm') : t('unitIn')}
             </button>
@@ -483,7 +483,7 @@ export function SizeChartEditor({
                 role="radio"
                 aria-checked={previewLang === l}
                 onClick={() => setPreviewLang(l)}
-                className={`h-7 rounded px-2 ${previewLang === l ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                className={`h-7 rounded-md px-2 ${previewLang === l ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 {l === 'ar' ? t('previewAr') : t('previewEn')}
               </button>

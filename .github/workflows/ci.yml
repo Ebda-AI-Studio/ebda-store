@@ -156,6 +156,7 @@ jobs:
     outputs:
       skip: ${{ steps.decide.outputs.skip }}
       heavy: ${{ steps.scope.outputs.heavy }}
+      docs_only: ${{ steps.scope.outputs.docs_only }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -209,6 +210,15 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
+
+      # Foundation drift (register row "Foundation version drift"): the vendored foundation may be one release behind, never two or
+      # more for over 7 days. A GitHub read failure warns and passes (an api.github.com outage must not block every merge).
+      - name: Foundation drift (vendored tag vs latest foundation tag)
+        # The script bounds every GitHub read (10 s each, 30 s overall) and warns-and-passes on a hang; this is the backstop.
+        timeout-minutes: 2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/foundation-drift-check.mjs
 
       # Migration ordering (Ruling MIG-ORD-1): a PR may not add a migration
       # folder whose 14-digit timestamp sorts at or before main's newest, and
@@ -410,6 +420,12 @@ jobs:
         # The unit suite measures chart layout in a real browser, including on Umbra.
         run: bash scripts/ci/install-chromium.sh
 
+      - name: Fetch the base branch (admin design ratchet compares baselines against it)
+        # actions/checkout is shallow and never fetches main, so tests/unit/admin-design-tokens.test.ts could not
+        # read the base baseline. It fails closed under CI, so the base ref must exist. No --depth on purpose: tests/unit/migration-order-gate.test.ts bans a bare
+        # shallow `git fetch` in workflows; this fetches ONE branch, which is cheap enough.
+        run: git fetch --no-tags origin "${{ github.base_ref || 'main' }}:refs/remotes/origin/${{ github.base_ref || 'main' }}"
+
       - name: Run unit tests (affected paths)
         env:
           UNIT_PATHS: ${{ needs.changes.outputs.unit }}
@@ -466,8 +482,16 @@ jobs:
   # (docs/ebda/ci.md budget); run it locally before a PR with
   # `npx playwright test -c playwright.builder.config.ts`.
   builder-e2e:
-    name: Builder E2E (ar/en x 390/820/1280)
-    needs: [build]
+    name: ${{ format('Builder E2E (ar/en x 390/820/1280) shard {0}/2', matrix.shard) }}
+    # CRITICAL-PATH-1: it does not wait for Build (the job installs and builds what it needs itself, no artifact comes from Build), so it starts with the
+    # unit shards instead of after an 11 min Build; 2 shards of the 192 tests (Playwright --shard) halve its 18.5 min. The job id stays for the
+    # `Merge queue gate`; the check names are not branch-ruleset requirements (only Repo guards, API Worker boots on workerd and the gate are).
+    needs: [tested-tree]
+    if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.heavy != 'false'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # 35, not 25: the green run 42827770627 took 20m03s for 192 tests on one worker (hosted 2 vCPU), 80% of the old
     # cap; a slow runner would cancel a passing suite.
@@ -501,7 +525,7 @@ jobs:
         timeout-minutes: 10 # CI-FAILFAST-1: a hung mirror fails fast (install-chromium.sh also bounds each attempt)
         run: bash scripts/ci/install-chromium.sh
       - name: Run builder E2E
-        run: npx playwright test -c playwright.builder.config.ts
+        run: npx playwright test -c playwright.builder.config.ts --shard=${{ matrix.shard }}/2
         env:
           CI: 'true'
       - name: Release the heavy-job host lock
@@ -521,7 +545,7 @@ jobs:
     # PR: only the Workers the PR touched. Full lane (main push, nightly, dispatch; `changes` is skipped there, hence
     # always()): marketing, so its page-weight budget is proven on main too. It broke unseen on main on 2026-11-10
     # because no main run measured it (Ruling MKT-LEGAL-HTML-BUDGET-2); the other Workers build in their deploy workflows.
-    if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true') && needs.tested-tree.outputs.skip != 'true'
+    if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true') && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.docs_only != 'true'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # Exempt from the hosted run+10 rule: cf-cache-bindings-assert guards a roomy budget (>=25) per leg (issue 2155).
     timeout-minutes: 90 # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
@@ -1004,6 +1028,12 @@ jobs:
         # The unit suite measures chart layout in a real browser, including on Umbra.
         run: bash scripts/ci/install-chromium.sh
 
+      - name: Fetch the base branch (admin design ratchet compares baselines against it)
+        # actions/checkout is shallow and never fetches main, so tests/unit/admin-design-tokens.test.ts could not
+        # read the base baseline. It fails closed under CI, so the base ref must exist. No --depth on purpose: tests/unit/migration-order-gate.test.ts bans a bare
+        # shallow `git fetch` in workflows; this fetches ONE branch, which is cheap enough.
+        run: git fetch --no-tags origin "${{ github.base_ref || 'main' }}:refs/remotes/origin/${{ github.base_ref || 'main' }}"
+
       - name: Run unit tests with coverage
         # Globs BEYOND tests/unit are load-bearing, not tidiness. vitest.config.ts
         # has a broad `include`, so a colocated `__tests__` file passes locally and
@@ -1138,7 +1168,8 @@ jobs:
     # test lands outside every job's glob again.
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: 15
-    needs: [build]
+    needs: [tested-tree]
+    if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.heavy != 'false'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -1246,19 +1277,24 @@ jobs:
           "
 
   test-integration:
-    name: Integration Tests
+    name: ${{ format('Integration Tests (shard {0}/2)', matrix.shard) }}
     # Two lanes (2026-10-25, #227 merged four edited integration test files that never ran): the FULL/nightly lane runs
     # the whole tier after `build`; a pull request runs it ONLY when scripts/ci-affected.mjs says an integration test
     # or a service one imports changed (`changes.outputs.integration`), and then just those files.
     if: >-
       always() && !cancelled() && (
-        (github.event_name != 'pull_request' && needs.build.result == 'success') ||
+        (github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.heavy != 'false') ||
         (github.event_name == 'pull_request' && needs.changes.outputs.integration == 'true'))
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     # 40, not 25: the full suite (305 files + serial lane) reached its last lane and was cancelled at 25:01 on a
     # hosted runner (run 42046806700, PR 437); a wide PR runs every integration file.
     timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 50 || 100 }} # 40 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
-    needs: [build, changes]
+    needs: [tested-tree, changes]
+    # CRITICAL-PATH-1: 2 shards (vitest --shard on the parallel pass, the serial planner lane split by file), no wait for Build.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     services:
       postgres:
         image: ${{ !contains(vars.EBDA_RUNS_ON, 'ebda-mac') && 'pgvector/pgvector:0.8.0-pg17' || '' }}
@@ -1449,16 +1485,20 @@ jobs:
           # --passWithNoTests: a narrowed PR run can select ONLY planner-lane files (payment-outage-isolation), which
           # PLANNER_EXCLUDES removes from this parallel pass; they run in the serial pass below, so an empty parallel
           # pass is correct, not a failure (it died with "No test files found" on #565).
-          npx vitest run $targets $PLANNER_EXCLUDES --passWithNoTests --reporter=verbose --retry=1
+          npx vitest run $targets $PLANNER_EXCLUDES --passWithNoTests --reporter=verbose --retry=1 --shard="$SHARD/$SHARDS"
           # serial planner pass: the whole lane on a full run, only the selected planner files on a narrowed PR run
           lane="$(bash scripts/ci/planner-lane.sh list)"
           if [ "$targets" != "tests/integration apps/api/src" ]; then
             lane="$(for f in $lane; do for t in $targets; do case "$f" in "$t"*) echo "$f";; esac; done; done)"
           fi
+          # the serial lane is split by file across the shards (scripts/ci/shard-lines.sh: line N goes to shard ((N-1) mod SHARDS) + 1)
+          lane="$(printf '%s\n' "$lane" | bash scripts/ci/shard-lines.sh "$SHARD" "$SHARDS")"
           if [ -n "$lane" ]; then npx vitest run $lane --no-file-parallelism --reporter=verbose --retry=1; fi
         env:
           EVENT_NAME: ${{ github.event_name }}
           INTEGRATION_PATHS: ${{ needs.changes.outputs.integration_paths }}
+          SHARD: ${{ matrix.shard }}
+          SHARDS: '2'
           # Integration tests run against the ephemeral postgres SERVICE CONTAINER
           # (localhost below), never a Neon branch. The old TEST_DATABASE_URL path
           # (pointed at the ep-spring-dew preview branch) is retired with staging —
@@ -1496,7 +1536,8 @@ jobs:
     name: E2E Tests
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: ${{ (contains(vars.EBDA_RUNS_ON, 'ubuntu') && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 35 || 85 }} # 25 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
-    needs: [build]
+    needs: [tested-tree]
+    if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true' && needs.tested-tree.outputs.heavy != 'false'
     services:
       postgres:
         image: ${{ !contains(vars.EBDA_RUNS_ON, 'ebda-mac') && 'pgvector/pgvector:0.8.0-pg17' || '' }}
@@ -1651,7 +1692,7 @@ jobs:
       - name: Check for secrets
         # The action runs trufflehog in a docker container; the Mac runner has no docker, so it runs on Linux only.
         if: runner.os == 'Linux'
-        uses: trufflesecurity/trufflehog@ea68ca03c865c5f324e86e849ced20ed3cf9dbbb # v3.99.8
+        uses: trufflesecurity/trufflehog@d232362a64a09a9e7d58267b8f5acef00ae90e23 # v3.100.0
         with:
           path: ./
           extra_args: --only-verified

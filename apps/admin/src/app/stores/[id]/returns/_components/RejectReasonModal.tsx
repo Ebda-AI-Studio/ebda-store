@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Modal } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 interface RejectReasonModalProps {
   open: boolean;
@@ -50,7 +51,7 @@ export function RejectReasonModal({
             onChange={e => setReason(e.target.value)}
             placeholder={t('rejectPlaceholder')}
             rows={4}
-            className="mt-1 w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={`${TEXTAREA_CLASSES} mt-1`}
             autoFocus
           />
         </label>

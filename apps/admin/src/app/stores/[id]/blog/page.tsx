@@ -185,17 +185,17 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
           </div>
         )}
 
-        <div className="rounded-xl border bg-card">
+        <div className="rounded-md border bg-card">
           {isLoading ? (
             <ul className="divide-y">
               {Array.from({ length: 3 }).map((_, i) => (
                 <li key={i} className="flex items-center gap-3 p-4 animate-pulse">
-                  <div className="h-16 w-20 shrink-0 rounded bg-muted" />
+                  <div className="h-16 w-20 shrink-0 rounded-md bg-muted" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 w-1/2 rounded bg-muted" />
-                    <div className="h-3 w-1/3 rounded bg-muted" />
+                    <div className="h-4 w-1/2 rounded-md bg-muted" />
+                    <div className="h-3 w-1/3 rounded-md bg-muted" />
                   </div>
-                  <div className="hidden h-7 w-16 shrink-0 rounded bg-muted sm:block" />
+                  <div className="hidden h-7 w-16 shrink-0 rounded-md bg-muted sm:block" />
                 </li>
               ))}
             </ul>

@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { useT } from '@/i18n/useT';
 import { ProviderLogo } from '@/components/ProviderLogo';
 import { SOCIAL_PLATFORMS, type StoreBranding } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface SocialLinksTabProps {
   branding: StoreBranding;
@@ -91,7 +92,7 @@ export function SocialLinksTab({ branding, onChange }: SocialLinksTabProps) {
   return (
     <div className="space-y-6">
       {/* URL inputs — one per SOCIAL_PLATFORMS entry */}
-      <div className="bg-card rounded-xl border p-6 space-y-6">
+      <div className="bg-card rounded-md border p-6 space-y-6">
         {SOCIAL_PLATFORMS.map(social => (
           <div key={social.key}>
             <label className="mb-1 flex items-center gap-2 text-sm font-medium text-foreground">
@@ -108,14 +109,14 @@ export function SocialLinksTab({ branding, onChange }: SocialLinksTabProps) {
                 })
               }
               placeholder={social.placeholder}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
         ))}
       </div>
 
       {/* Reorder control — shows only platforms that have a URL */}
-      <div className="bg-card rounded-xl border p-6">
+      <div className="bg-card rounded-md border p-6">
         <h3 className="text-sm font-semibold text-foreground mb-1">{tOrder('title')}</h3>
         <p className="text-xs text-muted-foreground mb-4">{tOrder('hint')}</p>
 

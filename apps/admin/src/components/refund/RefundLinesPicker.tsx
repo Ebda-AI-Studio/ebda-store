@@ -31,6 +31,8 @@ export function RefundLinesPicker({ idPrefix, quote, currency, value, onChange, 
         {quote.lines.map(l => {
           const c = value[l.orderItemId];
           const none = l.remaining <= 0;
+          // REFUND-GATE-1: no restock choice on a plan without `returns` (the server forces no-restock); untracked lines never have one
+          const showRestock = l.trackInventory && quote.returnsEnabled !== false;
           const checkId = `${idPrefix}-check-${l.orderItemId}`;
           const qtyId = `${idPrefix}-qty-${l.orderItemId}`;
           const restockId = `${idPrefix}-restock-${l.orderItemId}`;
@@ -79,7 +81,7 @@ export function RefundLinesPicker({ idPrefix, quote, currency, value, onChange, 
                       className="h-11 w-20 rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </label>
-                  {l.trackInventory ? (
+                  {showRestock && (
                     <label htmlFor={restockId} className="flex min-h-11 items-center gap-2 text-sm">
                       <input
                         id={restockId}
@@ -91,7 +93,8 @@ export function RefundLinesPicker({ idPrefix, quote, currency, value, onChange, 
                       />
                       <span className="text-foreground">{t('restock')}</span>
                     </label>
-                  ) : (
+                  )}
+                  {!l.trackInventory && (
                     <span className="text-sm text-muted-foreground">{t('notTracked')}</span>
                   )}
                 </div>
@@ -100,8 +103,8 @@ export function RefundLinesPicker({ idPrefix, quote, currency, value, onChange, 
           );
         })}
       </ul>
-      {quote.coversWholeOrder && (
-        <p role="note" className="mt-2 text-xs text-muted-foreground">
+      {quote.coversWholeOrder && quote.returnsEnabled !== false && (
+        <p role="note" className="mt-2 text-sm text-muted-foreground">
           {t('wholeOrderRestockNote')}
         </p>
       )}

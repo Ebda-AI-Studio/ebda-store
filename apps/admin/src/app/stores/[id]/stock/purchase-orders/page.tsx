@@ -12,6 +12,7 @@ import { apiGetPage, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { minorToMajor, formatDate } from '@/lib/format';
 import { withNumerals } from '@ebda/shared';
+import { EmptyState } from '@/components/EmptyState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ export default function PurchaseOrdersPage() {
                 className: 'w-28',
                 cell: po => (
                   <span
-                    className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                    className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium ${
                       STATUS_CLASSES[po.status] ?? 'bg-muted text-muted-ink'
                     }`}
                   >
@@ -182,7 +183,17 @@ export default function PurchaseOrdersPage() {
             rows={orders ?? []}
             rowKey={po => po.id}
             onRowClick={po => router.push(`/stores/${storeId}/stock/purchase-orders/${po.id}`)}
-            emptyState={<p className="text-muted-foreground text-sm">{t('emptyState')}</p>}
+            emptyState={
+              <EmptyState
+                card
+                icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                title={t('emptyState')}
+                action={{
+                  label: t('newButton'),
+                  href: `/stores/${storeId}/stock/purchase-orders/new`,
+                }}
+              />
+            }
           />
           <PageControls meta={meta} onPageChange={setPage} />
         </PageState>

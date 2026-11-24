@@ -7,6 +7,7 @@ import { useT } from '@/i18n/useT';
 
 import { INSTAPAY_DEFAULT_EXPIRY_HOURS, minorToDecimalString, roundToMinor } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 export interface StorePaymentConfig {
   id?: string;
@@ -67,7 +68,7 @@ export function ProviderCard({
 
   return (
     <div
-      className={`rounded-xl border bg-card shadow-sm overflow-hidden transition-all ${
+      className={`rounded-md border bg-card shadow-sm overflow-hidden transition-all ${
         form.isEnabled ? 'border-s-4' : ''
       }`}
       style={form.isEnabled ? { borderInlineStartColor: provider.color } : undefined}
@@ -100,7 +101,7 @@ export function ProviderCard({
                   disabled={saving}
                   className="sr-only peer"
                 />
-                <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-400/30 peer-disabled:opacity-50" />
+                <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-success peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-success/30 peer-disabled:opacity-50" />
               </label>
             </div>
 
@@ -175,7 +176,7 @@ function CodFields({
             value={form.displayName || ''}
             onChange={e => onUpdateField('displayName', e.target.value)}
             placeholder={t('displayNamePlaceholder')}
-            className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
         </div>
         <div>
@@ -189,7 +190,7 @@ function CodFields({
             value={form.displayNameAr || ''}
             onChange={e => onUpdateField('displayNameAr', e.target.value)}
             placeholder={t('displayNameArPlaceholder')}
-            className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
         </div>
         <div className="sm:col-span-2">
@@ -212,7 +213,7 @@ function CodFields({
                 )
               }
               placeholder={t('fixedFeePlaceholder')}
-              className="w-40 rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={`${FIELD_CLASSES} w-40`}
             />
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -243,7 +244,7 @@ function CodFields({
               })
             )
           }
-          className="w-40 rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className={`${FIELD_CLASSES} w-40`}
         />
         <p className="mt-1 text-xs text-muted-foreground">{t('percentHelp')}</p>
       </div>
@@ -347,7 +348,7 @@ function InstapayFields({
                 )
               )
             }
-            className="w-32 rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={`${FIELD_CLASSES} w-32`}
           />
           <p className="mt-1 text-xs text-muted-foreground">{t('expiryHelp')}</p>
         </div>

@@ -12,7 +12,7 @@ import { ProviderLogo } from '@/components/ProviderLogo';
 export function ManualCarrierCard({ storeId }: { storeId: string }) {
   const t = useT('shipping.carriers.manual');
   return (
-    <div className="bg-card rounded-xl border border-border p-6">
+    <div className="bg-card rounded-md border border-border p-6">
       <div className="flex items-center gap-3">
         <ProviderLogo code="manual" name={t('title')} />
         <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>

@@ -30,7 +30,7 @@ export function TaxGeneralSettings({
   const t = useT('tax.settings');
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6 mb-6">
+    <div className="bg-card rounded-md border border-border p-6 mb-6">
       <h2 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h2>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
