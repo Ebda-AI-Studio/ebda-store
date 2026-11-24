@@ -358,14 +358,23 @@ class FeatureService {
           }),
           platform.storeSubscription.findMany({
             where: { storeId: { in: known } },
-            select: { storeId: true, planCode: true, status: true },
+            select: {
+              storeId: true,
+              planCode: true,
+              status: true,
+              billingMethod: true,
+              nextRetryAt: true,
+            },
           }),
         ]);
-        const subBy = new Map<string, { planCode: string; status: string }>(
-          (subs as Array<{ storeId: string; planCode: string; status: string }>).map(r => [
-            r.storeId,
-            r,
-          ])
+        type SubRow = {
+          planCode: string;
+          status: string;
+          billingMethod: string | null;
+          nextRetryAt: Date | null;
+        };
+        const subBy = new Map<string, SubRow>(
+          (subs as Array<SubRow & { storeId: string }>).map(r => [r.storeId, r])
         );
         const codes = [
           ...new Set(

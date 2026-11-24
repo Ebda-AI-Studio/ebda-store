@@ -268,28 +268,32 @@ class PushService {
     customerId?: string,
     audience: PushAudience = 'storefront'
   ): Promise<void> {
-    await prisma.pushSubscription.upsert({
-      where: { storeId_endpoint: { storeId, endpoint: subscription.endpoint } },
-      create: {
-        storeId,
-        endpoint: subscription.endpoint,
-        p256dh: subscription.p256dh,
-        auth: subscription.auth,
-        deviceInfo: subscription.deviceInfo,
-        customerId: customerId ?? null,
-        audience,
-      },
-      update: {
-        p256dh: subscription.p256dh,
-        auth: subscription.auth,
-        deviceInfo: subscription.deviceInfo,
-        customerId: customerId ?? null,
-        // Re-tag on re-subscribe so a device that switched apps lands in the
-        // right audience (the unique key is (storeId, endpoint), shared across
-        // surfaces — but in practice each surface registers a distinct endpoint).
-        audience,
-      },
-    });
+    // `withStoreRw`: a store on its Durable Object keeps `push_subscriptions` there; a bare `prisma` call has no Postgres on the
+    // Worker (POSTGRES_REMOVED).
+    await withStoreRw(storeId, tx =>
+      tx.pushSubscription.upsert({
+        where: { storeId_endpoint: { storeId, endpoint: subscription.endpoint } },
+        create: {
+          storeId,
+          endpoint: subscription.endpoint,
+          p256dh: subscription.p256dh,
+          auth: subscription.auth,
+          deviceInfo: subscription.deviceInfo,
+          customerId: customerId ?? null,
+          audience,
+        },
+        update: {
+          p256dh: subscription.p256dh,
+          auth: subscription.auth,
+          deviceInfo: subscription.deviceInfo,
+          customerId: customerId ?? null,
+          // Re-tag on re-subscribe so a device that switched apps lands in the
+          // right audience (the unique key is (storeId, endpoint), shared across
+          // surfaces — but in practice each surface registers a distinct endpoint).
+          audience,
+        },
+      })
+    );
 
     logger.info({ storeId, customerId, audience }, '[PushService] Push subscription upserted');
   }
@@ -435,9 +439,10 @@ class PushService {
    * Unsubscribe a device by its endpoint.
    */
   async unsubscribe(endpoint: string): Promise<void> {
-    await prisma.pushSubscription.deleteMany({
-      where: { endpoint, storeId: currentStoreId() },
-    });
+    const storeId = currentStoreId();
+    await withStoreRw(storeId, tx =>
+      tx.pushSubscription.deleteMany({ where: { endpoint, storeId } })
+    );
     logger.info({ endpoint }, '[PushService] Push subscription removed');
   }
 
@@ -504,7 +509,7 @@ class PushService {
    * Count active push subscriptions for a store.
    */
   async getSubscriberCount(storeId: string): Promise<number> {
-    return prisma.pushSubscription.count({ where: { storeId } });
+    return withStoreRw(storeId, tx => tx.pushSubscription.count({ where: { storeId } }));
   }
 }
 
