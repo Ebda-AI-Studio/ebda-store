@@ -22,6 +22,7 @@ export interface StoreMcpToolSkill {
   steps: string[];
 }
 
+// pq-allow(unused-export): a test seam, the registry-parity guards (mcp-agent-skills-guard, well-known-mcp-discovery) walk it
 export const STORE_MCP_TOOL_SKILLS: readonly StoreMcpToolSkill[] = [
   {
     name: 'get_store_info',
@@ -111,6 +112,7 @@ export interface StoreMcpSkill {
 }
 
 /** `get_store_info` -> `get-store-info`. */
+// pq-allow(unused-export): a test seam, the same guards derive the expected skill names through it
 export const skillNameForTool = (tool: string): string => tool.replace(/_/g, '-');
 
 // pq-allow(unused-export): a test seam, tests/unit/mcp-agent-skills-guard.test.ts pins the workflow skill name through it
