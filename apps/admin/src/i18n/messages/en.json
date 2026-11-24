@@ -1798,6 +1798,7 @@
           "NOTHING_REFUNDABLE": "This order has nothing left to refund.",
           "INVALID_QUANTITY": "One of the quantities is more than what is still open on that line. Reopen this window and try again.",
           "FULL_RETURN_RESTOCK_ALL": "Refunding every line puts every line back on the shelf. Leave one unit out, or keep restocking on.",
+          "RETURNS_FEATURE_REQUIRED_FOR_RESTOCK": "Putting refunded goods back on the shelf needs the Returns feature on your plan. Refund again without restocking: the money refund still goes through, only the stock is left alone.",
           "GUEST_ORDER_RETURN_UNSUPPORTED": "This order was placed as a guest, so a refund by line is not available for it yet.",
           "INVALID_ORDER": "This order cannot be refunded here. It must be delivered.",
           "PROVIDER_REFUND_INDETERMINATE": "The refund reached the payment provider but could not be finished here. Do NOT refund again. Check the provider dashboard first.",
@@ -4520,6 +4521,7 @@
         "REFUND_ALREADY_ISSUED": "A refund for this return was already sent to the payment provider. Check the provider dashboard, then complete the return with \"Already refunded — record only\".",
         "RETURN_ALREADY_COMPLETING": "This return is already being completed. Refresh the page before trying again.",
         "PARTIAL_REFUND_EXCEEDS_PAYMENT": "Part of this payment was already refunded outside this return, so what is left is less than this return is worth. Complete it with store credit or bank transfer and settle the difference with the customer.",
+        "GUEST_STORE_CREDIT": "This is a guest return with no wallet to credit. Refund it to the original method or by bank transfer.",
         "PARTIAL_REFUND_NOTHING_TO_REFUND": "Every item in this return was already refunded by an earlier return.",
         "PAYMENT_FULLY_REFUNDED": "This payment has already been refunded in full.",
         "NO_COMPLETED_PAYMENT": "This order has no online payment to refund. Choose store credit or bank transfer.",
@@ -4538,7 +4540,8 @@
         "OVERRIDE_NOT_APPLICABLE": "A refund override only applies to a partial return of a tier-priced item. Complete the return without it.",
         "OVERRIDE_OUT_OF_RANGE": "The override must be between 0 and the standard refund for that item.",
         "OVERRIDE_UNKNOWN_ITEM": "The override names an item that is not on this return. Reopen the dialog and try again.",
-        "FULL_RETURN_RESTOCK_ALL": "Every line of this order is in this return, so every line goes back on the shelf. Open a new return that leaves one unit out if some goods are not coming back to stock."
+        "FULL_RETURN_RESTOCK_ALL": "Every line of this order is in this return, so every line goes back on the shelf. Open a new return that leaves one unit out if some goods are not coming back to stock.",
+        "RETURNS_FEATURE_REQUIRED_FOR_RESTOCK": "Putting refunded goods back on the shelf needs the Returns feature on your plan. Refund again without restocking: the money refund still goes through, only the stock is left alone."
       }
     },
     "modal": {
@@ -12470,5 +12473,17 @@
     "restock": "Put back on the shelf",
     "notTracked": "Stock is not tracked for this product",
     "wholeOrderRestockNote": "These lines cover the whole order, so every line is put back on the shelf. To skip restocking, leave one unit out."
+  },
+  "launchChip": {
+    "stepsLabel": "{done} of {total} steps",
+    "ordersLabel": "{done} of {goal} orders paid or delivered",
+    "openAria": "Launch readiness: {label}. Open the checklist",
+    "stepsTitle": "Get ready to launch",
+    "stepsHint": "Finish these steps so customers can start ordering.",
+    "ordersTitle": "Your first {goal} orders",
+    "ordersHint": "Share your store link with customers. This badge goes away after {goal} orders are paid or delivered (cash on delivery counts once delivered).",
+    "viewOrders": "See orders",
+    "open": "Open",
+    "done": "Done"
   }
 }

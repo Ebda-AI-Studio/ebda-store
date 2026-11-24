@@ -32,6 +32,8 @@ export interface RefundQuote {
   estimate: number | null;
   coversWholeOrder: boolean;
   canRefundToOriginal: boolean;
+  /** REFUND-GATE-1: false = the plan lacks `returns`: money still refunds, but nothing is restocked (no restock choice). Absent (older API) = on. */
+  returnsEnabled?: boolean;
 }
 
 interface LineChoice {
@@ -53,7 +55,11 @@ export function selectionItems(quote: RefundQuote, sel: Selection) {
     .map(l => ({
       orderItemId: l.orderItemId,
       quantity: Math.max(1, Math.min(l.remaining, Math.floor(sel[l.orderItemId].quantity) || 1)),
-      restock: l.trackInventory ? sel[l.orderItemId].restock : undefined,
+      restock: l.trackInventory
+        ? quote.returnsEnabled === false
+          ? false
+          : sel[l.orderItemId].restock
+        : undefined,
     }));
 }
 
