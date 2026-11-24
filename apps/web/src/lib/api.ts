@@ -1177,14 +1177,15 @@ class ApiClient {
   }
 
   async getProfile() {
-    const result = await this.request<{ user: User }>('/auth/me');
+    // The API may answer a guest 200 `{ user: null }` (the guest probe, #885): that is NOT a session.
+    const result = await this.request<{ user: User | null }>('/auth/me');
     // A 200 here is the other proof a session lives in this browser — it covers
     // sessions established before the marker existed, and it re-arms one whose
-    // localStorage was cleared while the cookies survived.
-    if (result.success && result.data) {
+    // localStorage was cleared while the cookies survived. `user: null` is the guest answer, not a session.
+    if (result.success && result.data?.user) {
       markSessionEstablished();
     }
-    return result;
+    return result as typeof result & { data?: { user: User } };
   }
 
   async updateProfile(data: { firstName?: string; lastName?: string; phone?: string }) {

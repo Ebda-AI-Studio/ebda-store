@@ -109,6 +109,25 @@ describe('AuthProvider mount check', () => {
     }
   );
 
+  it('a guest answer {user:null} (200) leaves a guest signed out without throwing, on mount and on refresh', async () => {
+    const GUEST = { success: true, data: { user: null } };
+    mocks.getProfileWithMountRetries.mockResolvedValue(GUEST);
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    );
+    await act(async () => {});
+    expect(latest!.isLoading).toBe(false);
+    expect(latest!.user).toBeNull();
+
+    mocks.getProfile.mockResolvedValue(GUEST);
+    await act(async () => {
+      await latest!.refreshUser();
+    });
+    expect(latest!.user).toBeNull();
+  });
+
   it('a definitive signed-out answer still clears the user', async () => {
     mocks.getProfileWithMountRetries.mockResolvedValue(CUSTOMER);
     render(
