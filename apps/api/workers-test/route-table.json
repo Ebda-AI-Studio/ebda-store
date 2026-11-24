@@ -247,6 +247,7 @@
   "GET /stores/:storeId/answer-engine/summary",
   "GET /stores/:storeId/assistant/conversations/:conversationId",
   "GET /stores/:storeId/assistant/status",
+  "GET /stores/:storeId/attention",
   "GET /stores/:storeId/backorders",
   "GET /stores/:storeId/barcodes/items",
   "GET /stores/:storeId/barcodes/settings",
