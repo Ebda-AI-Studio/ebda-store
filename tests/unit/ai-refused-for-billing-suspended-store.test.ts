@@ -18,6 +18,7 @@ vi.mock('@api/lib/repo-factory', () => ({
   storeUpdate: vi.fn(),
 }));
 vi.mock('@ebda/database', () => ({
+  withStore: async (_s: string, fn: (tx: unknown) => unknown) => fn({}),
   prisma: {
     aiUsage: {
       count: async () => {
@@ -27,6 +28,8 @@ vi.mock('@ebda/database', () => ({
     },
   },
 }));
+// the store's running AI packs (add-ons) are read through the ledger; none here
+vi.mock('@api/services/billing/addon-grant', () => ({ activeAddons: async () => [] }));
 vi.mock('@api/lib/definer', () => ({
   countAiUsage: async () => {
     h.counts++;
