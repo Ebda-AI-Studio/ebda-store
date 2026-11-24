@@ -197,7 +197,7 @@ export default function AiUsagePage() {
       </div>
 
       {/* ── Log table ──────────────────────────────────────────────── */}
-      <div className="rounded-xl border bg-card shadow-sm">
+      <div className="rounded-md border bg-card shadow-sm">
         <div className="flex items-center justify-between border-b px-6 py-4">
           <h2 className="text-base font-semibold text-foreground">{t('table.title')}</h2>
         </div>

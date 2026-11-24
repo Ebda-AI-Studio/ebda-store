@@ -32,6 +32,7 @@ import { ImageUpload } from '../../../../../../components/ImageUpload';
 import { ContactEbdaButton } from '../../../../../../components/support/ContactEbdaDialog';
 import { ColorField } from '../../../../../../components/ColorField';
 import { intlLocaleForUi } from '@/lib/format';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 const ProductModelViewer = dynamic(() => import('@ebda/ui/model3d'), {
   ssr: false,
@@ -390,8 +391,8 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
 
   if (loading || featuresLoading) {
     return (
-      <div className="rounded-xl border bg-card p-6">
-        <div className="h-6 w-40 animate-pulse rounded bg-muted" />
+      <div className="rounded-md border bg-card p-6">
+        <div className="h-6 w-40 animate-pulse rounded-md bg-muted" />
       </div>
     );
   }
@@ -399,7 +400,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
   const hasTargets = !!model && (model.materials.length > 0 || model.gltfVariants.length > 0);
 
   return (
-    <section className="rounded-xl border bg-card p-6" aria-labelledby="model3d-heading">
+    <section className="rounded-md border bg-card p-6" aria-labelledby="model3d-heading">
       <div className="mb-1 flex items-center justify-between gap-3">
         <h2 id="model3d-heading" className="text-lg font-semibold text-foreground">
           {t('title')}
@@ -601,10 +602,10 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
                           <span className="min-w-[6rem] text-sm text-foreground">
                             {locale === 'ar' && v.valueAr ? v.valueAr : v.value}
                           </span>
-                          <label className="text-xs text-muted-foreground">
+                          <label className="text-sm text-muted-foreground">
                             {t('target')}
                             <select
-                              className="mt-1 block h-9 rounded-md border border-input bg-background px-2 text-sm"
+                              className={`${FIELD_CLASSES} mt-1 block`}
                               value={row.target}
                               onChange={e => setRow(v.id, { target: e.target.value })}
                             >
@@ -630,10 +631,10 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
                             </select>
                           </label>
                           {isMaterial && (
-                            <label className="text-xs text-muted-foreground">
+                            <label className="text-sm text-muted-foreground">
                               {t('finish')}
                               <select
-                                className="mt-1 block h-9 rounded-md border border-input bg-background px-2 text-sm"
+                                className={`${FIELD_CLASSES} mt-1 block`}
                                 value={row.finish}
                                 onChange={e => setRow(v.id, { finish: e.target.value as Finish })}
                               >

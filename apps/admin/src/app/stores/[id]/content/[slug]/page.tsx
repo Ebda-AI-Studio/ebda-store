@@ -11,6 +11,7 @@ import { AdminLayout } from '../../../../../components/AdminLayout';
 import { Toggle } from '../../../../../components/Toggle';
 import { ImageUpload } from '../../../../../components/ImageUpload';
 import { apiGet, apiPut } from '../../../../../lib/api';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 // ---------- Block schema (mirrors apps/api/src/services/pages.service.ts) ----------
 
@@ -298,7 +299,7 @@ export default function ContentEditorPage() {
     >
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
         {isLoading ? (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
             …
           </div>
         ) : (
@@ -313,7 +314,7 @@ export default function ContentEditorPage() {
                 and see an empty editor. Fixes the recurring
                 "where did the data go?" confusion. */}
             {(slug === 'faq' || slug === 'how-to-guides') && (
-              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm text-foreground">
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm text-foreground">
                 <p className="font-medium">{slug === 'faq' ? t('aiFaqNote') : t('aiHowToNote')}</p>
                 <p className="mt-1 text-muted-foreground">{t('wrapperNote')}</p>
                 <Link
@@ -394,6 +395,7 @@ export default function ContentEditorPage() {
                 <Toggle
                   checked={data.isPublished}
                   onChange={v => setData(d => ({ ...d, isPublished: v }))}
+                  label={t('fieldShowOnStorefront')}
                 />
               </div>
             </SectionCard>
@@ -406,7 +408,7 @@ export default function ContentEditorPage() {
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm sm:p-6">
       <h2 className="mb-4 text-base font-semibold text-foreground">{title}</h2>
       {children}
     </section>
@@ -435,7 +437,7 @@ function FieldText({
         placeholder={placeholder}
         onChange={e => onChange(e.target.value)}
         dir={dir}
-        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        className={FIELD_CLASSES}
       />
     </label>
   );
@@ -515,7 +517,7 @@ function BlockColumn({
             <select
               value={pendingType}
               onChange={e => setPendingType(e.target.value as BlockType)}
-              className="rounded-lg border border-input bg-background px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={FIELD_CLASSES}
             >
               {BLOCK_TYPES.map(bt => (
                 <option key={bt} value={bt}>
@@ -640,7 +642,7 @@ function BlockFields({
             <select
               value={block.level}
               onChange={e => onChange({ ...block, level: Number(e.target.value) === 3 ? 3 : 2 })}
-              className="rounded-lg border border-input bg-background px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={FIELD_CLASSES}
             >
               {/* i18n-gate-allow: heading level token */}
               <option value={2}>H2</option>
@@ -654,7 +656,7 @@ function BlockFields({
             onChange={e => onChange({ ...block, text: e.target.value })}
             placeholder={t('headingTextPlaceholder')}
             dir={dir}
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
         </div>
       );
@@ -666,7 +668,7 @@ function BlockFields({
           placeholder={t('paragraphPlaceholder')}
           rows={5}
           dir={dir}
-          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className={TEXTAREA_CLASSES}
         />
       );
     case 'bullets':
@@ -695,7 +697,7 @@ function BlockFields({
             onChange={e => onChange({ ...block, alt: e.target.value })}
             placeholder={t('imageAltPlaceholder')}
             dir={dir}
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
         </div>
       );
@@ -708,14 +710,14 @@ function BlockFields({
             onChange={e => onChange({ ...block, label: e.target.value })}
             placeholder={t('buttonLabelPlaceholder')}
             dir={dir}
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
           <input
             type="text"
             value={block.url}
             onChange={e => onChange({ ...block, url: e.target.value })}
             placeholder={t('buttonUrlPlaceholder')}
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
         </div>
       );
@@ -755,7 +757,7 @@ function ItemListEditor({
             value={it}
             onChange={e => updateAt(idx, e.target.value)}
             dir={dir}
-            className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={`${FIELD_CLASSES} flex-1`}
           />
           <Button
             variant="ghost"

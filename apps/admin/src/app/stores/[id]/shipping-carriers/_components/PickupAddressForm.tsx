@@ -1,6 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 export interface PickupAddress {
   name: string;
@@ -40,7 +41,7 @@ export function PickupAddressForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         {FIELDS.map(field => (
           <div key={field}>
-            <label className="block text-xs text-muted-foreground mb-1">
+            <label className="block text-sm text-muted-foreground mb-1">
               {t(`fields.${field}`)}
             </label>
             <input
@@ -48,7 +49,7 @@ export function PickupAddressForm({
               value={value[field]}
               onChange={e => onChange({ [field]: e.target.value })}
               placeholder={t(`placeholders.${field}`)}
-              className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
         ))}

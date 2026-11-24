@@ -20,6 +20,7 @@ import {
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireCustomerStoreMatch } from '../middleware/customer-store-match';
 import { requireFeature } from '../middleware/feature-gate';
+import { featureService } from '../services/feature.service';
 import {
   OrderService,
   assertValidTransition,
@@ -763,6 +764,11 @@ router.put(
       // a payment that was actually captured, and a refund on record — a
       // provider refund, or the merchant's own confirmation recorded below.
       let recordManualRefund = false;
+      // QA-96: a repeat refund of an order with nothing left to refund is a refusal the
+      // merchant can see, not a silent 200 (the first refund stays the only effect).
+      if (status === 'refunded' && previousOrder.status === 'refunded') {
+        throw alreadyRefundedError();
+      }
       if (status === 'refunded' && previousOrder.status !== 'refunded') {
         if (!hasPermission(actor.role as Role, 'orders:refund')) {
           throw new AppError(
@@ -1877,6 +1883,19 @@ router.post(
  * provider), is refused 409 and the claim stays open for reconciliation; the key is also the DO claim's attempt key, so a
  * second claim under it is refused even if the key store lost it.
  */
+/** QA-96: 409 with a bilingual sentence; `details.messageAr` is for the admin's localizer. */
+function alreadyRefundedError(): AppError {
+  return new AppError(
+    409,
+    'ALREADY_REFUNDED',
+    'This order has already been fully refunded. Nothing was changed. / الطلب ده اتسترد بالكامل قبل كده. مفيش حاجة اتغيّرت.',
+    {
+      messageEn: 'This order has already been fully refunded. Nothing was changed.',
+      messageAr: 'الطلب ده اتسترد بالكامل قبل كده. مفيش حاجة اتغيّرت.',
+    }
+  );
+}
+
 const refundViaProviderSchema = z.object({
   amount: z.number().int().positive().optional(),
   reason: z.string().max(500).optional(),
@@ -1926,16 +1945,7 @@ router.post(
         });
         return;
       }
-      if (target.kind === 'already_refunded') {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'ALREADY_REFUNDED',
-            message: 'This order has already been fully refunded.',
-          },
-        });
-        return;
-      }
+      if (target.kind === 'already_refunded') throw alreadyRefundedError();
       const { order, payment } = target;
       const result = await refundThroughProvider({
         storeId,
@@ -2052,6 +2062,15 @@ router.get(
             ...quote,
             // the gateway leg is `orders:refund` only (staff lack it, like the return completion)
             canRefundToOriginal: hasPermission(req.user!.role as Role, 'orders:refund'),
+            // REFUND-GATE-1: money refunds are never plan-gated; the restock choice (the returns workflow) is
+            returnsEnabled: await featureService.isFeatureEnabled(storeId, 'returns').catch(err => {
+              // a failed lookup must not 500 the quote: off = no restock choice, the refund itself is unaffected
+              logger.error(
+                { err, storeId },
+                '[order] returns feature lookup failed; quote says off'
+              );
+              return false;
+            }),
           },
         },
       });
