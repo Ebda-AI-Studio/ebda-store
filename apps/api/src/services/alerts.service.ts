@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import { BRAND } from '@ebda/shared';
 import { config } from '../config';
 import logger from '../lib/logger';
@@ -131,10 +130,20 @@ function toAlertMessage(opts: AlertOptions): AlertMessage {
  * suppress a genuinely-new alert for store B that happens to share
  * a title. Platform alerts share a single bucket (no storeId).
  */
-function throttleKey(level: AlertLevel, title: string, storeId?: string): string {
-  const seed = storeId ? `${level}:${title}:${storeId}` : `${level}:${title}`;
-  const hash = crypto.createHash('sha1').update(seed).digest('hex').slice(0, 16);
-  return `alert-throttle:${hash}`;
+/** Longest title text used in a throttle key. */
+const THROTTLE_TITLE_MAX = 300;
+
+export function throttleKey(level: AlertLevel, title: string, storeId?: string): string {
+  // No hash at all: the bucket name IS the identity, so two distinct (level, store, title) can never share a bucket and a crafted
+  // title cannot suppress a real P1. `level` is a fixed set, and the store id and the title each carry their own length, so no field can
+  // spill into another. (The previous sha1 digest raised CodeQL js/weak-cryptographic-algorithm and js/insufficient-password-hash
+  // on every PR touching this file, because alert titles carry sign-in and password wording; a digest of any speed would still
+  // trip the second rule, and nothing here needs one.)
+  // The title is part of a Redis key, so it is capped, and it must NEVER carry personal data (an email, a phone, a name, a token):
+  // put those in `body` or `context`, which are not keyed. Titles are code-controlled constants of a few dozen characters; the cap only
+  // bounds a runaway one. The full length stays in the key, so two titles that differ in length never share a bucket.
+  const store = storeId ?? '';
+  return `alert-throttle:${level}:${store.length}:${store}:${title.length}:${title.slice(0, THROTTLE_TITLE_MAX)}`;
 }
 
 /**

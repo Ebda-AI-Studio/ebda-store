@@ -403,7 +403,9 @@ export async function applyApprovedTaxChange(
       const now = new Date();
       const moved = await guarded(async () =>
         (await storeWriter(storeId)).storeTaxProfile.updateMany({
-          where: { storeId, status: 'verified' },
+          // reviewedAt is part of the match: a re-review (revoke + re-verify) landing between the read above and this write moves it,
+          // so the check and the write are ONE atomic step and the write simply does not happen.
+          where: { storeId, status: 'verified', reviewedAt: current.reviewedAt },
           data: {
             taxRegistrationNumber: change.taxRegistrationNumber,
             legalName: change.legalName,

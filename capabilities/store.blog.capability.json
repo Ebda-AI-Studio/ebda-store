@@ -18,7 +18,7 @@
   },
   "helpArticle": "store-content-faqs-pages-blog",
   "questions": {
-    "ar": ["ازاي انزل مقال؟", "شيل المدونة"],
+    "ar": ["ازاي انزل مقال؟", "شيل المدونة", "ازاي افعل المدونة؟"],
     "en": ["How do I publish a blog post?"]
   },
   "steps": ["Blog page; enable blog in branding settings."],

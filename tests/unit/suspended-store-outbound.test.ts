@@ -87,6 +87,7 @@ import { emitStoreEventsFor } from '@api/lib/inngest/functions/wa-store-events';
 const base = {
   customerName: 'Sara',
   customerPhone: '+201012345678',
+  customerId: 'u1', // PUSH-AUDIENCE-1: a shopper push needs its addressee
   orderNumber: 'ORD-7',
   total: 55,
   storeId: 's1',
