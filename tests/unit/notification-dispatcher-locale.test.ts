@@ -59,6 +59,7 @@ import { notificationDispatcher } from '@api/services/notification-dispatcher.se
 const base = {
   customerName: 'سارة',
   customerPhone: '+201012345678',
+  customerId: 'u1', // PUSH-AUDIENCE-1: a shopper push needs its addressee
   orderNumber: 'ORD-7',
   total: 55,
   storeId: 's1',
