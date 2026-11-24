@@ -8,6 +8,7 @@
  *
  * `logos.test.ts` fails when a provider is added to PROVIDER_CATALOG without an entry here.
  */
+// pq-allow(unused-export): the declared return type of getProviderLogo (a declaration cannot name a private type)
 export interface ProviderLogoEntry {
   /** Public path of the vendored asset, or null for the wordmark tile. */
   asset: string | null;
@@ -20,6 +21,7 @@ const asset = (code: string, ext: 'webp' | 'svg' = 'webp'): ProviderLogoEntry =>
   missing: null,
 });
 
+// pq-allow(unused-export): test seam, imported by packages/shared/src/providers/logos.test.ts
 export const PROVIDER_LOGOS: Record<string, ProviderLogoEntry> = {
   paymob: asset('paymob'),
   kashier: asset('kashier'),
@@ -48,6 +50,7 @@ export const PROVIDER_LOGOS: Record<string, ProviderLogoEntry> = {
 };
 
 /** Registry keys that are social platforms, not catalog providers. */
+// pq-allow(unused-export): test seam, imported by apps/admin/src/components/ProviderLogo.test.tsx and packages/shared/src/providers/logos.test.ts
 export const SOCIAL_LOGO_CODES = [
   'instagram',
   'facebook',
