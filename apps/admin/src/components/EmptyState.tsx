@@ -76,7 +76,7 @@ export function EmptyState({
       data-testid="empty-state"
     >
       <div
-        className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted"
+        className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted"
         aria-hidden="true"
       >
         {typeof icon === 'string' ? (
@@ -112,7 +112,7 @@ export function EmptyState({
     </div>
   );
   return card ? (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">{body}</div>
+    <div className="overflow-hidden rounded-lg border border-border bg-card">{body}</div>
   ) : (
     body
   );

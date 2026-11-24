@@ -23,6 +23,7 @@ import type { CheckoutDeliverySettings, CheckoutDeliveryWindow } from '@ebda/sha
 
 import { minorToDecimalString } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 const DEFAULT_CONFIG: CheckoutDeliverySettings = {
   note: { enabled: false, text: '', textAr: '' },
   windows: { enabled: false, items: [] },
@@ -226,7 +227,7 @@ export default function CheckoutDeliveryPage() {
       <AdminLayout title={tHub('title')}>
         <ShippingTabs />
         <div className="animate-pulse space-y-4">
-          <div className="h-40 rounded-xl bg-muted" />
+          <div className="h-40 rounded-md bg-muted" />
         </div>
       </AdminLayout>
     );
@@ -237,7 +238,7 @@ export default function CheckoutDeliveryPage() {
       <ShippingTabs />
       <div className="space-y-4 pb-24">
         {/* Delivery info note */}
-        <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+        <section className="space-y-3 rounded-md border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 data-setting-id="delivery.note" className="text-sm font-semibold text-foreground">
@@ -251,7 +252,7 @@ export default function CheckoutDeliveryPage() {
                 type="checkbox"
                 checked={config.note.enabled}
                 onChange={e => patchNote({ enabled: e.target.checked })}
-                className="h-4 w-4 cursor-pointer accent-primary"
+                className="h-5 w-5 cursor-pointer accent-primary"
               />
             </label>
           </div>
@@ -262,7 +263,7 @@ export default function CheckoutDeliveryPage() {
                 value={config.note.text}
                 onChange={e => patchNote({ text: e.target.value })}
                 rows={3}
-                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                className={TEXTAREA_CLASSES}
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -272,14 +273,14 @@ export default function CheckoutDeliveryPage() {
                 onChange={e => patchNote({ textAr: e.target.value })}
                 rows={3}
                 dir="rtl"
-                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                className={TEXTAREA_CLASSES}
               />
             </label>
           </div>
         </section>
 
         {/* Delivery windows */}
-        <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+        <section className="space-y-3 rounded-md border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2
@@ -298,7 +299,7 @@ export default function CheckoutDeliveryPage() {
                 type="checkbox"
                 checked={config.windows.enabled}
                 onChange={e => patchWindows({ enabled: e.target.checked })}
-                className="h-4 w-4 cursor-pointer accent-primary"
+                className="h-5 w-5 cursor-pointer accent-primary"
               />
             </label>
           </div>
@@ -323,7 +324,7 @@ export default function CheckoutDeliveryPage() {
                 });
               }}
               aria-label={t('daysAheadLabel')}
-              className="min-h-10 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              className={FIELD_CLASSES}
             >
               <option value="">{t('daysAheadOff')}</option>
               {Array.from({ length: 14 }, (_, i) => i + 1).map(n => (
@@ -349,7 +350,7 @@ export default function CheckoutDeliveryPage() {
                         type="text"
                         value={w.label}
                         onChange={e => updateWindow(w.id, { label: e.target.value })}
-                        className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm"
+                        className={FIELD_CLASSES}
                       />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -361,7 +362,7 @@ export default function CheckoutDeliveryPage() {
                         value={w.labelAr}
                         onChange={e => updateWindow(w.id, { labelAr: e.target.value })}
                         dir="rtl"
-                        className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm"
+                        className={FIELD_CLASSES}
                       />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -372,7 +373,7 @@ export default function CheckoutDeliveryPage() {
                         type="time"
                         value={w.start}
                         onChange={e => updateWindow(w.id, { start: e.target.value })}
-                        className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm"
+                        className={FIELD_CLASSES}
                       />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -383,7 +384,7 @@ export default function CheckoutDeliveryPage() {
                         type="time"
                         value={w.end}
                         onChange={e => updateWindow(w.id, { end: e.target.value })}
-                        className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm"
+                        className={FIELD_CLASSES}
                       />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -394,7 +395,7 @@ export default function CheckoutDeliveryPage() {
                         type="time"
                         value={w.orderBy ?? ''}
                         onChange={e => updateWindow(w.id, { orderBy: e.target.value || undefined })}
-                        className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm"
+                        className={FIELD_CLASSES}
                       />
                     </label>
                     <Button
@@ -420,7 +421,7 @@ export default function CheckoutDeliveryPage() {
         {/* Minimum order value — opt-in per-store floor on the items
             subtotal. Platform-level: works for any store via this config,
             never hardcoded to a slug. Empty/0 = disabled. */}
-        <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+        <section className="space-y-3 rounded-md border bg-card p-4 shadow-sm">
           <div>
             <h2
               data-setting-id="delivery.min-order"
@@ -439,7 +440,7 @@ export default function CheckoutDeliveryPage() {
               value={minimumOrderMajor}
               onChange={e => setMinimumOrderMajor(e.target.value)}
               placeholder={t('minOrderPlaceholder')}
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              className={FIELD_CLASSES}
             />
           </label>
         </section>
@@ -447,7 +448,7 @@ export default function CheckoutDeliveryPage() {
         {/* Store-wide delivery estimate (business days): the storefront "arrives between"
             line falls back to it when no shipping zone carries a day estimate (area-rate
             stores). Both empty = hidden. */}
-        <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+        <section className="space-y-3 rounded-md border bg-card p-4 shadow-sm">
           <div>
             <h2 data-setting-id="delivery.days" className="text-sm font-semibold text-foreground">
               {t('deliveryDaysTitle')}
@@ -467,7 +468,7 @@ export default function CheckoutDeliveryPage() {
                 step={1}
                 value={deliveryDaysMin}
                 onChange={e => setDeliveryDaysMin(e.target.value)}
-                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                className={FIELD_CLASSES}
               />
             </label>
             <label className="flex w-28 flex-col gap-1">
@@ -482,7 +483,7 @@ export default function CheckoutDeliveryPage() {
                 step={1}
                 value={deliveryDaysMax}
                 onChange={e => setDeliveryDaysMax(e.target.value)}
-                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                className={FIELD_CLASSES}
               />
             </label>
             <Button
@@ -503,7 +504,7 @@ export default function CheckoutDeliveryPage() {
             <div>
               <h3
                 data-setting-id="delivery.off-days"
-                className="text-xs font-semibold text-foreground"
+                className="text-sm font-semibold text-foreground"
               >
                 {t('deliveryOffDaysTitle')}
               </h3>
@@ -516,7 +517,7 @@ export default function CheckoutDeliveryPage() {
         {/* Owner order-invoice email — opt-in per-store. Every order in this
             store auto-emails the rendered invoice to this address (e.g. the
             store owner). Empty = disabled. Platform-level, not slug-hardcoded. */}
-        <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+        <section className="space-y-3 rounded-md border bg-card p-4 shadow-sm">
           <div>
             <h2
               data-setting-id="delivery.invoice-email"
@@ -535,13 +536,13 @@ export default function CheckoutDeliveryPage() {
               value={orderInvoiceEmail}
               onChange={e => setOrderInvoiceEmail(e.target.value)}
               placeholder={t('invoiceEmailPlaceholder')}
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              className={FIELD_CLASSES}
             />
           </label>
         </section>
 
         {!isLoading && (
-          <section className="space-y-1 rounded-xl border bg-card p-4 shadow-sm">
+          <section className="space-y-1 rounded-md border bg-card p-4 shadow-sm">
             <h2 className="text-sm font-semibold text-foreground">
               {t('orderBarcodeMoved.title')}
             </h2>

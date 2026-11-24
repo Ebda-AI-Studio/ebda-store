@@ -90,7 +90,7 @@ export function CouponsTable({
       header: tTable('code'),
       primaryOnMobile: true,
       cell: coupon => (
-        <span className="font-mono text-sm bg-muted px-2 py-1 rounded">{coupon.code}</span>
+        <span className="font-mono text-sm bg-muted px-2 py-1 rounded-md">{coupon.code}</span>
       ),
     },
     {

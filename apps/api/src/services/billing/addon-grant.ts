@@ -131,6 +131,39 @@ export async function activeAddons(tx: Tx, storeId: string, now: Date): Promise<
   return out;
 }
 
+/**
+ * Running add-on terms of MANY stores in one read (the feature sweep prefetch). Same rules as `activeAddons` (succeeded,
+ * not refunded, still ahead, already started), but entitlement-only: the cancel markers do not change what a term unlocks,
+ * so they are not read. Chunk the store ids (D1: 100 bound parameters per statement).
+ */
+export async function activeAddonTermsForStores(
+  tx: Tx,
+  storeIds: readonly string[],
+  now: Date
+): Promise<Map<string, Array<{ sku: string; endsAt: Date }>>> {
+  const out = new Map<string, Array<{ sku: string; endsAt: Date }>>();
+  if (storeIds.length === 0) return out;
+  const rows = await tx.billingEvent.findMany({
+    where: {
+      storeId: { in: [...storeIds] },
+      type: 'upgrade',
+      status: 'succeeded',
+      planCode: { startsWith: ADDON_PLAN_PREFIX },
+      forPeriodEnd: { gt: now },
+    },
+    select: { storeId: true, planCode: true, forPeriodEnd: true },
+  });
+  for (const r of rows) {
+    const sku = skuOfPlanCode(r.planCode);
+    if (!sku || !r.forPeriodEnd) continue;
+    if (addDays(r.forPeriodEnd, -ADDON_TERM_DAYS) > now) continue; // chained term, not started yet
+    const list = out.get(r.storeId) ?? [];
+    list.push({ sku, endsAt: r.forPeriodEnd });
+    out.set(r.storeId, list);
+  }
+  return out;
+}
+
 const GRANT_PREFIX = 'addon-grant:';
 
 /**
