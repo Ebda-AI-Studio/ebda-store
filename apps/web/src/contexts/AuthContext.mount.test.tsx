@@ -128,6 +128,23 @@ describe('AuthProvider mount check', () => {
     expect(latest!.user).toBeNull();
   });
 
+  it('a guest answer after a signed-in session signs the user out (the old read threw and left them signed in)', async () => {
+    mocks.getProfileWithMountRetries.mockResolvedValue(CUSTOMER);
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    );
+    await act(async () => {});
+    expect(latest!.user?.id).toBe('u1');
+
+    mocks.getProfile.mockResolvedValue({ success: true, data: { user: null } });
+    await act(async () => {
+      await latest!.refreshUser();
+    });
+    expect(latest!.user).toBeNull();
+  });
+
   it('a definitive signed-out answer still clears the user', async () => {
     mocks.getProfileWithMountRetries.mockResolvedValue(CUSTOMER);
     render(
