@@ -117,6 +117,7 @@ Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of tr
 | `order-status-changed-fanout`              | 6-comms         | workflow | event   |             |
 | `review-moderation`                        | 6-comms         | workflow | event   |             |
 | `review-request`                           | 6-comms         | workflow | event   |             |
+| `addon-overlap-reconcile`                  | 7-money         | queue    | cron    |             |
 | `billing-renewal-daily`                    | 7-money         | workflow | cron    |             |
 | `instapay-expiry`                          | 7-money         | workflow | cron    |             |
 | `instapay-receipt-extract`                 | 7-money         | queue    | event   |             |

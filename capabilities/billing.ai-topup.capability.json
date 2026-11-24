@@ -1,0 +1,44 @@
+{
+  "id": "billing.ai-topup",
+  "status": "live",
+  "area": "billing",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "زوّد طلبات الذكاء الاصطناعي لمتجري",
+  "titleEn": "Buy more AI requests for my store",
+  "screens": ["/stores/[id]/billing/addons", "/stores/[id]/ai-usage"],
+  "api": [
+    "GET /stores/:storeId/billing/addons",
+    "POST /stores/:storeId/billing/addons/preview",
+    "POST /stores/:storeId/billing/addons/checkout"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "a pack is not refunded automatically and does not renew"
+  },
+  "helpArticle": "get-more-ai-requests",
+  "questions": {
+    "ar": [
+      "وصلت للحد اليومي للذكاء الاصطناعي",
+      "ازاي ازوّد طلبات الذكاء الاصطناعي؟",
+      "عايز اشتري طلبات ذكاء اصطناعي زيادة"
+    ],
+    "en": ["I hit the daily AI limit", "How do I get more AI requests?"]
+  },
+  "steps": [
+    "Open Billing, then Add-ons, then More AI requests (or press Get more requests on AI usage)",
+    "Choose a pack, read the exact total, press Yes, charge",
+    "The new daily limit applies as soon as the payment is confirmed"
+  ],
+  "edgeCases": [
+    "A pack raises only your store's own daily limit for 30 days; the platform-wide daily and monthly limits still apply",
+    "Packs add up while they run",
+    "The token budget of your store grows by the same factor",
+    "Remaining requests for today are shown on AI usage and on Add-ons"
+  ],
+  "gaps": []
+}

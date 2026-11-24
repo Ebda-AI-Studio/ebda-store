@@ -19,7 +19,6 @@
     "finance.expenses.new.errorFxRateRequired",
     "finance.fxRates.errorRatePositive",
     "finance.newEntry.errors.unbalanced",
-    "floatingWidget.featureNotEnabledBody",
     "navigation.page.toastAtLeastOne",
     "orders.detail.instapay.waiting",
     "orders.list.filters.awaiting_payment_confirmation",

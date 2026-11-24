@@ -21,6 +21,8 @@ export const DEEP_LINK_ONLY: Record<string, { secret: string }> = {
   'account.staff-accept-invite': { secret: 'invite token and new password' },
   'onboarding.signup': { secret: 'password / one-time code' },
   'billing.pay-card': { secret: 'card details' },
+  'billing.addons': { secret: 'card details on the hosted checkout' },
+  'billing.ai-topup': { secret: 'card details on the hosted checkout' },
   'tax.change-request': {
     secret:
       'the tax card / certificate FILE upload and a single-use confirm token (a document is never attached in chat)',
