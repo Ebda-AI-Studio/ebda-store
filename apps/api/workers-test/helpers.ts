@@ -20,6 +20,8 @@ export const testEnv = env as unknown as {
   EMAIL_QUEUE: { send(body: unknown, o?: { contentType?: string }): Promise<void> };
   EMAIL_DLQ: { send(body: unknown, o?: { contentType?: string }): Promise<void> };
   JWT_SECRET: string;
+  /** The private half of the key the accounts stub serves as its JWKS (vitest.workers.config.mts). */
+  TEST_ACCOUNTS_PRIVATE_JWK: string;
   E2E_DB: string;
 };
 
@@ -80,3 +82,48 @@ export async function accessToken(claims: {
 }
 
 export const ENV_DB = (): boolean => testEnv.E2E_DB === '1';
+
+/**
+ * An identity-service access token exactly as ebda-accounts mints it (ES256, typ at+jwt, aud=store) with a FRESH `auth_time`,
+ * so credential-class routes behind `requireRecentLogin` (TEN-4: agent / merchant keys, provider credentials, staff changes)
+ * accept it. A legacy HS256 `accessToken` has no `auth_time` and is refused there on purpose (fail closed).
+ */
+export async function identityAccessToken(claims: {
+  sub: string;
+  email?: string;
+  stores: Array<{ id: string; role: string }>;
+  /** Seconds since epoch of the sign-in; default now. */
+  authTime?: number;
+}): Promise<string> {
+  const jwk = JSON.parse(testEnv.TEST_ACCOUNTS_PRIVATE_JWK) as JsonWebKey & { kid: string };
+  const key = await crypto.subtle.importKey(
+    'jwk',
+    jwk,
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['sign']
+  );
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: 'ES256', typ: 'at+jwt', kid: jwk.kid }));
+  const payload = b64url(
+    JSON.stringify({
+      iss: 'https://accounts.ebda.app',
+      aud: 'store',
+      sub: claims.sub,
+      sid: `sid-${claims.sub}`,
+      jti: crypto.randomUUID(),
+      stores: claims.stores,
+      email: claims.email ?? 'tester@exit-test.invalid',
+      email_verified: true,
+      auth_time: claims.authTime ?? now,
+      iat: now,
+      exp: now + 600,
+    })
+  );
+  const sig = await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    key,
+    new TextEncoder().encode(`${header}.${payload}`)
+  );
+  return `${header}.${payload}.${b64url(sig)}`;
+}
