@@ -1750,7 +1750,7 @@ export interface WebhookResult {
  */
 const WEBHOOK_HELD = 'held';
 const WEBHOOK_HELD_RESOLVED = 'held_resolved';
-export interface HeldBillingWebhook {
+interface HeldBillingWebhook {
   reason:
     | 'unknown_order'
     | 'amount_mismatch'
