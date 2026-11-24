@@ -22,6 +22,7 @@ const ENTRIES = classification as unknown as Record<string, Entry>;
 const ident = (s: string) => `"${s.replace(/"/g, '""')}"`;
 
 /** table -> retention rule, D1 only. */
+// pq-allow(unused-export): a test seam, tests/unit/legal-evidence-retention.test.ts pins the plan read from the classification
 export function legalEvidenceRetentionPlan(): Record<string, Retention> {
   const plan: Record<string, Retention> = {};
   for (const [key, e] of Object.entries(ENTRIES))
@@ -34,6 +35,7 @@ export function legalEvidenceRetentionPlan(): Record<string, Retention> {
  * (31 Mar - 1 month = "31 Feb" = 3 Mar; 29 Feb - 12 months = "29 Feb" of a common year = 1 Mar), which moves the cutoff LATER and
  * would delete or NULL rows up to a few days younger than the retention window.
  */
+// pq-allow(unused-export): a test seam, the clamp cases (31 Mar - 1 month, 29 Feb - 12 months) are pinned on it directly
 export const monthsAgo = (now: number, months: number): number => {
   const d = new Date(now);
   const day = d.getUTCDate();
@@ -43,9 +45,10 @@ export const monthsAgo = (now: number, months: number): number => {
   d.setUTCDate(Math.min(day, lastDay));
   return d.getTime();
 };
+// pq-allow(unused-export): a test seam, the 7 year cutoff is pinned on it directly
 export const yearsAgo = (now: number, years: number): number => monthsAgo(now, years * 12);
 
-export interface RetentionResult {
+interface RetentionResult {
   nulled: Record<string, number>;
   deleted: Record<string, number>;
 }

@@ -739,7 +739,10 @@ export function emitTs(db, which) {
       extra = `, t => [primaryKey({ columns: [${t.pk.map(pc => `t.${t.columns.find(c => c.col === pc).prop}`).join(', ')}] })]`;
     }
     body.push(
-      `export const ${ident} = sqliteTable('${t.name}', {\n${cols.join('\n')}\n}${extra});`
+      // Every table is emitted for the drizzle/D1 consumers that read it through the schema namespace or raw SQL; a name that nothing
+      // imports yet (a table reached only by SQL) is a generated definition, not slop (the PR quality guard honours this marker).
+      `// pq-allow(unused-export): generated table definition, consumed as schema data\n` +
+        `export const ${ident} = sqliteTable('${t.name}', {\n${cols.join('\n')}\n}${extra});`
     );
   }
   const text = body.join('\n\n');
