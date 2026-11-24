@@ -85,7 +85,11 @@
   // DO store falls back to keyword search. A store on Postgres keeps halfvec (`product_embeddings`).
   "vectorize": [{ "binding": "PRODUCT_VECTORS", "index_name": "ebda-product-vectors" }],
   // Customer Intelligence dashboards: one point per outcome, no buyer key, no order id (lib/ci/sink.ts).
-  "analytics_engine_datasets": [{ "binding": "CI_OUTCOMES", "dataset": "ebda_commerce_outcomes" }],
+  "analytics_engine_datasets": [
+    { "binding": "CI_OUTCOMES", "dataset": "ebda_commerce_outcomes" },
+    // Per-route call counters + latency, 1-in-20 sampled (always non-2xx / slow); route template only, no PII (lib/request-budget.ts).
+    { "binding": "REQUEST_BUDGET", "dataset": "ebda_request_budget" },
+  ],
 
   // Storefront cache purge (POST /api/revalidate on ebda-web) over a Service Binding, not a
   // public hostname: no host to keep pointed at the storefront wildcard, no public hop
@@ -291,6 +295,10 @@
     // Workspace packages bundle from SOURCE (ESM), not their CommonJS dist: from dist, esbuild emits one
     // `__toESM(require_dist())` per import site (451 in this Worker), each copying every export of the
     // package, and nothing tree-shakes. Measured 2026-10-22: startup CPU 164 -> 90 ms (scripts/ci/worker-startup-budget.mjs).
+    // subpaths first: an alias key also prefix-matches `@ebda/shared/<sub>` and would resolve into the index FILE (ENOTDIR)
+    "@ebda/shared/observe": "../../packages/shared/src/observe-kit.ts",
+    "@ebda/shared/wa-v1": "../../packages/shared/src/foundation/contracts/wa-v1.ts",
+    "@ebda/shared/request-guard": "../../packages/shared/src/foundation/request-guard.ts",
     "@ebda/shared": "../../packages/shared/src/index.ts",
     "@ebda/database": "../../packages/database/src/index.ts",
     // StoreDO sources (apps/api/src/cf/repo-modules.d.ts explains why these names are not the package names).
@@ -310,6 +318,9 @@
     "ADMIN_URL": "https://store.ebda.app",
     "API_URL": "https://api.ebda.app",
     "TRUST_PROXY_HOPS": "1",
+    // "1" = every Chat bridge call that names a buyer or an order must carry its proof (Ruling WA-BRIDGE-BIND-4). The code also defaults to strict
+    // when this is unset; only the exact value "0" relaxes it. Needs the buyer-key backfill run first (docs/rulings/WA-BRIDGE-BIND-3.md).
+    "WA_BRIDGE_REQUIRE_BUYER_PROOF": "1",
     // STORE_DO_ENABLED_IDS is deliberately NOT set (Ruling CF-R6B-1): which stores are on the Durable Object is the D1 `stores.storage_backend`
     // column, read live by every consumer (lib/store-backend.ts backendFor / doStoreIdList). The env list is only the local / test fallback.
     // Which alarm-ready jobs fire as StoreSchedule alarms (src/lib/jobs/alarm-flag.ts): comma list or "all". Alarms are armed ONLY for
@@ -335,5 +346,9 @@
     // Billing is InstaPay-only until Kashier is approved (Rulings EBDA-FUNNEL-17, BILLING-NONE-1): "none" acknowledges it, so
     // an unset provider no longer pages a P1 at every boot (M-032). Card billing refuses cleanly; set "kashier" to turn cards on.
     "BILLING_PROVIDER": "none",
+    // PDPL erasure job (cf/erasure/job.ts): "true" since Ahmad's approval of 2026-11-20 (register row 33, M-024). Closure of a merchant /
+    // staff account (POST /auth/me/close-account) then erases instead of recording + answering 503 ERASURE_NOT_ENABLED. A wrangler var on
+    // purpose: a dashboard var is wiped by the next deploy. Verify after deploy: super-admin /health checks.pdplErasure=true.
+    "PDPL_CF_ERASURE_ENABLED": "true",
   },
 }

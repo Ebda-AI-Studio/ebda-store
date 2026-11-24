@@ -57,6 +57,11 @@
     "replacement": "TypeScript normaliseArabic() shared by indexer and query",
     "test": "packages/repo/test/contract/search.contract.ts"
   },
+  "ebda_ar_norm_h": {
+    "target": "store-do",
+    "replacement": "TypeScript foldArabicHamza() (fold A, F7-HAMZA-2) shared by indexer and query",
+    "test": "packages/repo/test/contract/search.contract.ts"
+  },
   "ebda_audit_log_exists": {
     "target": "store-do",
     "replacement": "StoreDO.audit.exists",
@@ -220,14 +225,29 @@
     "replacement": "TS buildProductDoc() (name part)",
     "test": "packages/repo/test/contract/search.contract.ts"
   },
+  "ebda_product_name_doc_h": {
+    "target": "store-do",
+    "replacement": "TS buildProductNameDocHamza() for the fold-A FTS5 column name_doc_h",
+    "test": "packages/repo/test/contract/search.contract.ts"
+  },
   "ebda_product_search_doc": {
     "target": "store-do",
     "replacement": "TS buildProductDoc() for the FTS5 row",
     "test": "packages/repo/test/contract/search.contract.ts"
   },
+  "ebda_product_search_doc_h": {
+    "target": "store-do",
+    "replacement": "TS buildProductDocHamza() for the fold-A FTS5 column doc_h",
+    "test": "packages/repo/test/contract/search.contract.ts"
+  },
   "ebda_product_search_ids": {
     "target": "store-do",
     "replacement": "StoreDO.search.products(q) over FTS5",
+    "test": "packages/repo/test/contract/search.contract.ts"
+  },
+  "ebda_product_search_ids_h": {
+    "target": "store-do",
+    "replacement": "StoreDO.search.products(q) fold-A arm over FTS5 doc_h / name_doc_h",
     "test": "packages/repo/test/contract/search.contract.ts"
   },
   "ebda_public_store_page": {
