@@ -90,3 +90,4 @@ export type { SmartLayerAnswer, SmartLayerOp } from './do/smart-layer';
 export { scrubUserFromStoreDo } from './platform-erasure';
 export type { ReceiptRow as InstapayReceiptRow } from './do/instapay-receipts';
 export type { VectorWork, VectorizeLike, EmbeddingProviderLike } from './do/search-vectors';
+export type { OrderRefundQuote } from './do/returns';
