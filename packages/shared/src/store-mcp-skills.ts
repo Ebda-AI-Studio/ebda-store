@@ -113,9 +113,10 @@ export interface StoreMcpSkill {
 /** `get_store_info` -> `get-store-info`. */
 export const skillNameForTool = (tool: string): string => tool.replace(/_/g, '-');
 
+// pq-allow(unused-export): a test seam, tests/unit/mcp-agent-skills-guard.test.ts pins the workflow skill name through it
 export const STORE_SHOPPING_SKILL_NAME = 'shop-this-store';
 
-export interface SkillStoreCtx {
+interface SkillStoreCtx {
   storeName: string;
   storeNameAr?: string;
   mcpUrl: string;
