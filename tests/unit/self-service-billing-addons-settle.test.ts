@@ -101,14 +101,14 @@ describe('add-on payment settlement', () => {
     const a = await settleInTx(
       f.tx,
       'e1',
-      { status: 'succeeded', providerRef: 'p1' },
+      { status: 'succeeded', providerRef: 'p1', amountSource: 'charge_request' },
       NOW,
       effects
     );
     const b = await settleInTx(
       f.tx,
       'e1',
-      { status: 'succeeded', providerRef: 'p1' },
+      { status: 'succeeded', providerRef: 'p1', amountSource: 'charge_request' },
       NOW,
       effects
     );
@@ -127,16 +127,16 @@ describe('add-on payment settlement', () => {
   });
   it('a late failure after the success does not take the grant away', async () => {
     const f = fakeTx();
-    await settleInTx(f.tx, 'e1', { status: 'succeeded' }, NOW, []);
+    await settleInTx(f.tx, 'e1', { status: 'succeeded', amountSource: 'charge_request' }, NOW, []);
     await settleInTx(f.tx, 'e1', { status: 'failed' }, NOW, []);
     expect(f.status()).toBe('succeeded');
     expect(f.grants).toHaveLength(1);
   });
   it('a failing grant write is surfaced, never swallowed', async () => {
     const f = fakeTx(true);
-    await expect(settleInTx(f.tx, 'e1', { status: 'succeeded' }, NOW, [])).rejects.toThrow(
-      'grant write failed'
-    );
+    await expect(
+      settleInTx(f.tx, 'e1', { status: 'succeeded', amountSource: 'charge_request' }, NOW, [])
+    ).rejects.toThrow('grant write failed');
   });
 });
 
