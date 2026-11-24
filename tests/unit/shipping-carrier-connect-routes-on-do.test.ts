@@ -1,87 +1,175 @@
 /**
- * "Connect a carrier" over HTTP (shipping batch, plan section 4): save credentials -> Test
- * connection -> enable -> make default, through the REAL shipping-carrier router, tenant context,
- * encryption and audit log, on a real Postgres with the code bound to an `ebda_app` login
- * (strict RLS, no bypass), and the REAL Bosta and ShipBlu adapters talking to their local stubs
- * (never a real carrier). The PAYMENT twin is `provider-connect-routes.test.ts`.
+ * "Connect a carrier" over HTTP (ported from tests/integration/shipping-carrier-connect-routes.test.ts): save credentials ->
+ * Test connection -> enable -> make default, through the REAL shipping-carrier router, the REAL encryption and the REAL Bosta and
+ * ShipBlu adapters talking to local stubs (never a real carrier). Each store has its OWN Durable Object schema (tests/helpers/
+ * multi-store-do.ts) and the directory + access gate live on the platform D1, so "store B cannot touch store A" is proven against two
+ * real, separate stores. `authenticate` is header-driven; `authorize` and `requireStoreAccess` (D1 owner / staff gate) run for real.
  *
  *   - credentials are write-only: no response, and no column but the ciphertext, ever holds them;
  *   - unknown credential keys (a base URL, a webhook secret) are refused: no SSRF, no merchant-set secret;
- *   - enabling needs a successful Test connection of EXACTLY the stored credentials, and any edit
- *     of the active mode, or a mode switch, takes that away;
- *   - an unverified carrier can be saved and tested by a merchant but enabled by nobody (until activated),
- *     and a row left enabled never books (PROVIDERS-2 at the point of use);
+ *   - enabling needs a successful Test connection of EXACTLY the stored credentials; any edit of the active mode, or a mode switch,
+ *     takes that away;
+ *   - an unverified carrier connects like any other (PROVIDERS-3); a row that is not enabled never books (CARRIER_NOT_ENABLED);
  *   - default needs enabled, and a store has exactly one default;
- *   - another store's admin can neither read nor drive this store's carrier;
+ *   - another store's admin can neither read nor drive this store's carrier; a customer and no token are refused;
  *   - rotating the webhook secret kills the old callback URL.
  *
  * Mutation proofs (each turns the named tests red):
- *   - shipping-carrier.service.ts upsertCarrierConfig: drop `assertCarrierEnableAllowed` -> "enable
- *     before test" and "unverified"
- *   - shipping-carrier.service.ts upsertCarrierConfig: `mustDisable = false` -> "editing the active key"
- *     and "switching the mode"
- *   - shipping-carrier.routes.ts: drop `assertMayConfigureCarrier` on PUT -> "unverified" (store_admin 403)
- *   - shipping-carrier.service.ts setDefaultCarrier: drop the `row?.enabled` check -> "default"
- *   - carrier-connection.service.ts publicCarrierConfig: stop deleting `credentials` -> "write-only"
+ *   - shipping-carrier.service.ts upsertCarrierConfig: drop `assertCarrierEnableAllowed` -> "enable before test";
+ *   - upsertCarrierConfig: `mustDisable = false` -> "editing the active key" and "switching the mode";
+ *   - shipping-carrier.service.ts setDefaultCarrier: drop the `row?.enabled` check -> "default";
+ *   - carrier-connection.service.ts publicCarrierConfig: stop deleting `credentials` -> "write-only".
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'node:crypto';
-import jwt from 'jsonwebtoken';
-import {
-  createPrismaClient,
-  Prisma,
-  runInTenantContext,
-  runWithRequestDb,
-  type AppPrismaClient,
-} from '@ebda/database';
-import { config } from '@api/config';
-import { inngest } from '@api/lib/inngest/client';
+import type { DatabaseSync } from 'node:sqlite';
+
+process.env.ENCRYPTION_KEY = '0'.repeat(64);
+
+const h = vi.hoisted(() => ({
+  audit: [] as Array<Record<string, unknown>>,
+  accounts: new Map<string, { role: string; email: string }>(),
+  withStoreRepo: (_id: string, fn: () => unknown): unknown => fn(),
+  currentStoreId: (): string | undefined => undefined,
+}));
+
+vi.mock('@ebda/database', async importOriginal => {
+  const real = await importOriginal<typeof import('@ebda/database')>();
+  // No tenant transaction on the platform D1 or a DO: a scope is the store's repo scope, as in production after the cutover.
+  return {
+    ...real,
+    withStore: (id: string, fn: (tx: unknown) => unknown) =>
+      h.withStoreRepo(id, () => fn(real.prisma)),
+    withUser: (_u: string, fn: (tx: unknown) => unknown) => fn(real.prisma),
+    runInTenantContext: (_i: unknown, fn: () => unknown) => fn(),
+    runInStoreScope: (id: string, fn: () => unknown) => h.withStoreRepo(id, fn),
+    runInUserScope: (_u: string, fn: () => unknown) => fn(),
+    currentStoreId: () => h.currentStoreId(),
+  };
+});
+vi.mock('@api/lib/identity-client', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  getAccountState: async (id: string) => {
+    const a = h.accounts.get(id);
+    return a ? { role: a.role, status: 'active' } : null;
+  },
+  getAccountsBrief: async (ids: string[]) =>
+    ids.flatMap(id => (h.accounts.has(id) ? [{ id, email: h.accounts.get(id)!.email }] : [])),
+}));
+vi.mock('@api/middleware/auth', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  // identity comes from a header; authorize / rejectImpersonated stay real
+  authenticate: (req: any, res: any, n: () => void) => {
+    const id = String(req.headers['x-test-user']);
+    const a = h.accounts.get(id);
+    if (!a) return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED' } });
+    req.user = { userId: id, email: a.email, role: a.role };
+    n();
+  },
+}));
+vi.mock('@api/middleware/require-mfa', () => ({
+  requireMfaEnrolled: (_q: unknown, _s: unknown, n: () => void) => n(),
+}));
+vi.mock('@api/middleware/feature-gate', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  requireFeature: () => (_q: unknown, _s: unknown, n: () => void) => n(),
+}));
+vi.mock('@api/middleware/tenant-context', async importOriginal => {
+  const pass = (_q: unknown, _s: unknown, n: () => void) => n();
+  return {
+    ...(await importOriginal<object>()),
+    tenantContext: pass,
+    paymentSettingsRouteContext: pass,
+    shippingCarrierRouteContext: pass,
+  };
+});
+vi.mock('@api/middleware/security', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  auditLog: async (e: Record<string, unknown>) => void h.audit.push(e),
+}));
+vi.mock('@api/lib/logger', () => ({
+  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
 import shippingCarrierRoutes from '@api/routes/shipping-carrier.routes';
 import webhookRoutes from '@api/routes/webhook.routes';
-import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import { errorHandler } from '@api/middleware/error-handler';
 import { shippingCarrierService } from '@api/services/shipping-carrier.service';
-import { planService } from '@api/services/plan.service';
-import { redis } from '@api/services/redis.service';
 import { decryptCarrierBlob } from '@api/services/carriers/carrier-credentials';
 import { webhookHeaderValue } from '@api/services/carriers/bosta.carrier';
 import { BostaStub, BOSTA_STUB } from '../stubs/bosta-stub';
 import { ShipbluStub, SHIPBLU_STUB } from '../stubs/shipblu-stub';
 import { serveStub, type ServedStub } from '../stubs/serve';
+import { DoStores } from '../helpers/multi-store-do';
+import { installPlatformD1, uninstallPlatformD1 } from '../helpers/platform-d1-rig';
+import { insertSqlite } from '../../packages/repo/test/diff-harness';
 
 // Customer / merchant notifications are not under test here.
 vi.mock('@api/services/notification-dispatcher.service', () => ({
   notificationDispatcher: { dispatch: vi.fn().mockResolvedValue(undefined) },
 }));
 
-const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
-const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw';
-const hasDb = !!OWNER_URL && !OWNER_URL.includes('localhost:5432/test_db');
-const run = crypto.randomUUID().slice(0, 8);
+const worlds = new DoStores();
+h.withStoreRepo = (id, fn) => worlds.withStoreRepo(id, fn);
+h.currentStoreId = () => worlds.currentStoreId();
+let d1: DatabaseSync;
+let app: Express;
+let seq = 0;
+const bosta = new BostaStub();
+const shipblu = new ShipbluStub();
+let bostaServer: ServedStub;
+let shipbluServer: ServedStub;
 
-function appUrl(): string {
-  const u = new URL(OWNER_URL);
-  u.username = 'ebda_app';
-  u.password = APP_PASSWORD;
-  return u.toString();
+type Actor = { id: string; userId: string; email: string };
+function account(role: string, tag: string): { userId: string; email: string } {
+  const userId = crypto.randomUUID();
+  const email = `${tag}-${userId.slice(0, 6)}@test.local`;
+  h.accounts.set(userId, { role, email });
+  return { userId, email };
 }
-const asApp = <T>(fn: () => Promise<T>) =>
-  runWithRequestDb(() => createPrismaClient({ connectionString: appUrl(), max: 3 }), fn, {
-    beforeDisconnect: () => awaitDeferredWork(5000),
-  });
+function mkStore(tag: string): Actor {
+  const u = account('store_admin', `owner-${tag}`);
+  const id = crypto.randomUUID();
+  const slug = `ccr-${tag}-${id.slice(0, 6)}`;
+  d1.prepare(
+    `INSERT INTO stores (id, name, slug, owner_id, status) VALUES (?, ?, ?, ?, 'active')`
+  ).run(id, `ccr-${tag}`, slug, u.userId);
+  worlds.add(id).seedProfile({ name: `ccr-${tag}`, slug, ownerId: u.userId });
+  return { id, ...u };
+}
+const mkSuperAdmin = () => account('super_admin', 'op');
 
-const token = (userId: string, role: 'store_admin' | 'super_admin' = 'store_admin') =>
-  jwt.sign({ userId, email: `${userId}@example.test`, role, tv: 0 }, config.jwtSecret, {
-    expiresIn: '30m',
-    issuer: 'ebda-api',
-    audience: 'ebda-app',
-  });
+function mkOrder(s: Actor) {
+  seq += 1;
+  const id = crypto.randomUUID();
+  insertSqlite(worlds.get(s.id).sqlite, 'Order', [
+    {
+      id,
+      storeId: s.id,
+      orderNumber: `CCR-${seq}-${id.slice(0, 4)}`,
+      status: 'confirmed',
+      paymentStatus: 'unpaid',
+      subtotal: 20_000,
+      total: 20_000,
+      shippingAddress: {
+        firstName: 'Mona',
+        lastName: 'Adel',
+        phone: '+201012345678',
+        address1: '5 Nile Corniche',
+        city: 'Giza',
+        state: 'Giza',
+        area: 'Dokki',
+        country: 'EG',
+      },
+      billingAddress: {},
+    },
+  ]);
+  return { id };
+}
 
-type Actor = { id: string; userId: string; jwt: string };
-
-/** Production's PROVIDERS-2: the stub-suite seam off, every carrier here is unverified. */
+/** Production's PROVIDERS-2: the stub-suite seam off. */
 async function asProduction<T>(fn: () => Promise<T>): Promise<T> {
   const prev = process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
   delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
@@ -93,149 +181,67 @@ async function asProduction<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable gate', () => {
-  let owner: AppPrismaClient;
-  let app: Express;
-  const bosta = new BostaStub();
-  const shipblu = new ShipbluStub();
-  let bostaServer: ServedStub;
-  let shipbluServer: ServedStub;
-  const stores: Actor[] = [];
-  const operators: string[] = [];
-  let seq = 0;
+const cfgUrl = (s: { id: string }, carrier: string) =>
+  `/api/v1/stores/${s.id}/shipping-carriers/configs/${carrier}`;
+const testUrl = (s: { id: string }, carrier: string) =>
+  `/api/v1/stores/${s.id}/shipping-carriers/test/${carrier}`;
+const defaultUrl = (s: { id: string }, carrier: string) =>
+  `/api/v1/stores/${s.id}/shipping-carriers/default/${carrier}`;
+const listUrl = (s: { id: string }) => `/api/v1/stores/${s.id}/shipping-carriers/configs`;
 
-  async function mkStore(tag: string): Promise<Actor> {
-    // Per-CALL unique (retry-safe): a retry gets a fresh store.
-    const t = `${tag}-${run}-${crypto.randomUUID().slice(0, 6)}`;
-    const user = await owner.user.create({
-      data: {
-        email: `ccr-${t}@test.local`,
-        passwordHash: 'x',
-        firstName: 'Cc',
-        lastName: tag,
-        role: 'store_admin',
-        emailVerified: true,
-      },
-    });
-    const store = await owner.store.create({
-      data: { name: `ccr-${t}`, slug: `ccr-${t}`, ownerId: user.id, status: 'active' },
-    });
-    await planService.assignPlan(store.id, { planCode: 'comped' });
-    const s = { id: store.id, userId: user.id, jwt: token(user.id) };
-    stores.push(s);
-    return s;
-  }
+type Who = { userId: string };
+const put = (who: Who, url: string, body: object) =>
+  request(app).put(url).set('x-test-user', who.userId).send(body);
+const post = (who: Who, url: string, body: object = {}) =>
+  request(app).post(url).set('x-test-user', who.userId).send(body);
+const get = (who: Who, url: string) => request(app).get(url).set('x-test-user', who.userId);
+const del = (who: Who, url: string) => request(app).delete(url).set('x-test-user', who.userId);
 
-  async function mkSuperAdmin(): Promise<{ jwt: string }> {
-    const t = `${run}-${crypto.randomUUID().slice(0, 6)}`;
-    const user = await owner.user.create({
-      data: {
-        email: `ccr-op-${t}@test.local`,
-        passwordHash: 'x',
-        firstName: 'Op',
-        lastName: 'Erator',
-        role: 'super_admin',
-        emailVerified: true,
-      },
-    });
-    operators.push(user.id);
-    return { jwt: token(user.id, 'super_admin') };
-  }
+const row = async (s: { id: string }, carrier: string) =>
+  (await worlds.get(s.id).repo.db.shippingCarrierConfig.findFirstOrThrow({
+    where: { storeId: s.id, carrier },
+  })) as Record<string, any>;
+const rowsOf = (s: { id: string }, where = '1=1', ...p: unknown[]) =>
+  worlds.get(s.id).rows(`SELECT * FROM shipping_carrier_configs WHERE ${where}`, ...p);
+const count = (s: { id: string }, carrier: string) => rowsOf(s, 'carrier = ?', carrier).length;
+const countAll = (s: { id: string }) => rowsOf(s).length;
+const countDefaults = (s: { id: string }) => rowsOf(s, 'is_default = 1').length;
+const hintsOf = async (who: Who, s: { id: string }, carrier: string) => {
+  const list = await get(who, listUrl(s));
+  expect(list.status, JSON.stringify(list.body)).toBe(200);
+  return list.body.data.configs.find((c: { carrier: string }) => c.carrier === carrier);
+};
+const defaults = (s: { id: string }) =>
+  rowsOf(s, 'is_default = 1').map(r => ({ carrier: r.carrier }));
 
-  async function mkOrder(s: Actor) {
-    seq += 1;
-    return owner.order.create({
-      data: {
-        storeId: s.id,
-        orderNumber: `CCR-${run}-${seq}-${crypto.randomUUID().slice(0, 4)}`,
-        status: 'confirmed',
-        paymentStatus: 'unpaid',
-        subtotal: 20_000,
-        total: 20_000,
-        shippingAddress: {
-          firstName: 'Mona',
-          lastName: 'Adel',
-          phone: '+201012345678',
-          address1: '5 Nile Corniche',
-          city: 'Giza',
-          state: 'Giza',
-          area: 'Dokki',
-          country: 'EG',
-        },
-        billingAddress: {},
-      },
-    });
-  }
+beforeAll(async () => {
+  d1 = installPlatformD1();
+  bostaServer = await serveStub(bosta.fetch);
+  shipbluServer = await serveStub(shipblu.fetch);
+  process.env.BOSTA_BASE_URL = `${bostaServer.url}/api/v2`;
+  process.env.SHIPBLU_BASE_URL = `${shipbluServer.url}/api`;
+  process.env.CARRIER_CALL_TIMEOUT_MS = '1500';
+  app = express();
+  app.set('trust proxy', true);
+  app.use(worlds.repoByPath());
+  app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
+  app.use(express.json());
+  app.use('/api/v1/stores', shippingCarrierRoutes);
+  app.use(errorHandler);
+});
+afterAll(async () => {
+  await bostaServer.close();
+  await shipbluServer.close();
+  delete process.env.BOSTA_BASE_URL;
+  delete process.env.SHIPBLU_BASE_URL;
+  delete process.env.CARRIER_CALL_TIMEOUT_MS;
+  uninstallPlatformD1();
+});
+beforeEach(() => {
+  h.audit.length = 0;
+});
 
-  const cfgUrl = (s: { id: string }, carrier: string) =>
-    `/api/v1/stores/${s.id}/shipping-carriers/configs/${carrier}`;
-  const testUrl = (s: { id: string }, carrier: string) =>
-    `/api/v1/stores/${s.id}/shipping-carriers/test/${carrier}`;
-  const defaultUrl = (s: { id: string }, carrier: string) =>
-    `/api/v1/stores/${s.id}/shipping-carriers/default/${carrier}`;
-  const listUrl = (s: { id: string }) => `/api/v1/stores/${s.id}/shipping-carriers/configs`;
-
-  type Who = { jwt: string };
-  const put = (who: Who, url: string, body: object) =>
-    asApp(async () => request(app).put(url).set('Authorization', `Bearer ${who.jwt}`).send(body));
-  const post = (who: Who, url: string, body: object = {}) =>
-    asApp(async () => request(app).post(url).set('Authorization', `Bearer ${who.jwt}`).send(body));
-  const get = (who: Who, url: string) =>
-    asApp(async () => request(app).get(url).set('Authorization', `Bearer ${who.jwt}`));
-  const del = (who: Who, url: string) =>
-    asApp(async () => request(app).delete(url).set('Authorization', `Bearer ${who.jwt}`));
-
-  const row = (s: { id: string }, carrier: string) =>
-    owner.shippingCarrierConfig.findFirstOrThrow({ where: { storeId: s.id, carrier } });
-  const hintsOf = async (who: Who, s: { id: string }, carrier: string) => {
-    const list = await get(who, listUrl(s));
-    expect(list.status, JSON.stringify(list.body)).toBe(200);
-    return list.body.data.configs.find((c: { carrier: string }) => c.carrier === carrier);
-  };
-  const defaults = (s: { id: string }) =>
-    owner.shippingCarrierConfig.findMany({
-      where: { storeId: s.id, isDefault: true },
-      select: { carrier: true },
-    });
-
-  beforeAll(async () => {
-    vi.spyOn(inngest, 'send').mockResolvedValue({ ids: [] } as never);
-    owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
-    await redis.connect().catch(() => undefined);
-    bostaServer = await serveStub(bosta.fetch);
-    shipbluServer = await serveStub(shipblu.fetch);
-    process.env.BOSTA_BASE_URL = `${bostaServer.url}/api/v2`;
-    process.env.SHIPBLU_BASE_URL = `${shipbluServer.url}/api`;
-    process.env.CARRIER_CALL_TIMEOUT_MS = '1500';
-    app = express();
-    app.set('trust proxy', true);
-    app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
-    app.use(express.json());
-    app.use('/api/v1/stores', shippingCarrierRoutes);
-    app.use(errorHandler);
-  });
-
-  afterAll(async () => {
-    const ids = stores.map(s => s.id);
-    await owner.auditLog.deleteMany({ where: { storeId: { in: ids } } }).catch(() => undefined);
-    await owner.shipment.deleteMany({ where: { storeId: { in: ids } } }).catch(() => undefined);
-    await owner.order.deleteMany({ where: { storeId: { in: ids } } }).catch(() => undefined);
-    await owner.shippingCarrierConfig
-      .deleteMany({ where: { storeId: { in: ids } } })
-      .catch(() => undefined);
-    await owner.store.deleteMany({ where: { id: { in: ids } } }).catch(() => undefined);
-    await owner.user
-      .deleteMany({ where: { id: { in: [...stores.map(s => s.userId), ...operators] } } })
-      .catch(() => undefined);
-    await owner.$disconnect();
-    await redis.disconnect().catch(() => undefined);
-    await bostaServer.close();
-    await shipbluServer.close();
-    delete process.env.BOSTA_BASE_URL;
-    delete process.env.SHIPBLU_BASE_URL;
-    delete process.env.CARRIER_CALL_TIMEOUT_MS;
-  });
-
+describe('connect a carrier on the DO: credentials, Test connection, enable gate', () => {
   /** What differs per carrier; everything else is the same contract. */
   const carriers = [
     {
@@ -361,9 +367,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
         expect(res.body.error.code).toBe('INVALID_CREDENTIALS');
       }
       // a refused save wrote nothing
-      expect(
-        await owner.shippingCarrierConfig.count({ where: { storeId: s.id, carrier: c.code } })
-      ).toBe(0);
+      expect(await count(s, c.code)).toBe(0);
       // credentials need their mode
       const noMode = await put(s, cfgUrl(s, c.code), { credentials: c.fields });
       expect(noMode.status).toBe(422);
@@ -380,10 +384,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
 
       // PROVIDERS-3: the save already checked these keys, so a passing proof of exactly the stored
       // credentials exists. Without one (no proof, or a failing one) enabling is still 409.
-      await owner.shippingCarrierConfig.updateMany({
-        where: { storeId: s.id, carrier: c.code },
-        data: { connectionTest: Prisma.DbNull },
-      });
+      worlds.get(s.id).sqlite.exec('UPDATE shipping_carrier_configs SET connection_test = NULL');
       const early = await put(s, cfgUrl(s, c.code), { enabled: true });
       expect(early.status).toBe(409);
       expect(early.body.error.code).toBe('CONNECTION_NOT_TESTED');
@@ -413,15 +414,16 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       expect((await row(s, c.code)).enabled).toBe(false);
 
       // the audit log names the changed fields, never their values
-      const logs = await owner.auditLog.findMany({
-        where: {
-          storeId: s.id,
-          action: {
-            in: ['shipping_carrier_config.updated', 'shipping_carrier_config.connection_tested'],
-          },
-        },
-      });
-      expect(logs.map(l => l.action)).toContain('shipping_carrier_config.connection_tested');
+      const logs = h.audit.filter(
+        l =>
+          l.storeId === s.id &&
+          ['shipping_carrier_config.updated', 'shipping_carrier_config.connection_tested'].includes(
+            String(l.action)
+          )
+      );
+      expect(logs.map(l => String(l.action))).toContain(
+        'shipping_carrier_config.connection_tested'
+      );
       expect(JSON.stringify(logs)).toContain('apiKey');
       expect(JSON.stringify(logs)).not.toContain(c.key);
     });
@@ -576,15 +578,13 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
     expect((await put(s, cfgUrl(s, 'bosta'), { isDefault: true })).status).toBe(200);
     expect(await defaults(s)).toEqual([{ carrier: 'bosta' }]);
     // exactly one, whichever way it moved
-    expect(
-      await owner.shippingCarrierConfig.count({ where: { storeId: s.id, isDefault: true } })
-    ).toBe(1);
+    expect(await countDefaults(s)).toBe(1);
   });
 
   describe('PROVIDERS-3: an unverified carrier connects like any other', () => {
     it('store_admin saves (the check runs on save), tests and enables it (PROVIDERS-3)', async () => {
       const s = await mkStore('soon');
-      const op = await mkSuperAdmin();
+      const op = mkSuperAdmin();
       const fields = { apiKey: BOSTA_STUB.apiKey };
 
       await asProduction(async () => {
@@ -622,7 +622,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
 
     it('a booking is refused for a carrier that was never connected or is not enabled (CARRIER_NOT_ENABLED)', async () => {
       const s = await mkStore('book');
-      const o = await mkOrder(s);
+      const o = mkOrder(s);
       const ship = () =>
         post(s, `/api/v1/stores/${s.id}/orders/${o.id}/ship`, { carrier: 'bosta' });
       const calls = bosta.requests.length;
@@ -648,15 +648,15 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       // none of the refusals reached the carrier or left a shipment row
       expect(bosta.requests.length).toBe(callsAfterTest);
       expect(callsAfterTest).toBeGreaterThan(calls); // (the Test connection itself did)
-      expect(await owner.shipment.count({ where: { orderId: o.id } })).toBe(0);
+      expect(
+        worlds.get(s.id).rows('SELECT id FROM shipments WHERE order_id = ?', o.id)
+      ).toHaveLength(0);
 
       // sanity: once enabled, this very order books. (Through the service: the 201 over HTTP
       // books but its response never completes under ebda_app, see the report.)
       expect((await put(s, cfgUrl(s, 'bosta'), { enabled: true })).status).toBe(200);
-      const ok = await asApp(() =>
-        runInTenantContext(s.id, () =>
-          shippingCarrierService.createShipmentForOrder(s.id, o.id, 'bosta')
-        )
+      const ok = await worlds.withStoreRepo(s.id, () =>
+        shippingCarrierService.createShipmentForOrder(s.id, o.id, 'bosta')
       );
       expect(ok.status).toBe('created');
     });
@@ -692,12 +692,10 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
         ['delete', cfgUrl(a, 'bosta'), 'delete'],
       ];
       for (const [m, url, label, body] of attempts) {
-        const res = await asApp(async () =>
-          (request(app) as unknown as Record<string, (u: string) => request.Test>)
-            [m](url)
-            .set('Authorization', `Bearer ${b.jwt}`)
-            .send(body ?? {})
-        );
+        const res = await (request(app) as unknown as Record<string, (u: string) => request.Test>)
+          [m](url)
+          .set('x-test-user', b.userId)
+          .send(body ?? {});
         expect([403, 404], `${label}: ${res.status}`).toContain(res.status);
         expect(JSON.stringify(res.body), label).not.toContain(BOSTA_STUB.apiKey);
       }
@@ -712,19 +710,15 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       const own = await get(b, listUrl(b));
       expect(own.status).toBe(200);
       expect(own.body.data.configs).toEqual([]);
-      expect(await owner.shippingCarrierConfig.count({ where: { storeId: b.id } })).toBe(0);
+      expect(await countAll(b)).toBe(0);
     });
 
     it('a customer token and no token are refused', async () => {
       const s = await mkStore('authz');
-      const noAuth = await asApp(async () => request(app).get(listUrl(s)));
+      const noAuth = await request(app).get(listUrl(s));
       expect(noAuth.status).toBe(401);
-      const customer = jwt.sign(
-        { userId: s.userId, email: 'c@example.test', role: 'customer', tv: 0, storeId: s.id },
-        config.jwtSecret,
-        { expiresIn: '5m', issuer: 'ebda-api', audience: 'ebda-app' }
-      );
-      const res = await get({ jwt: customer }, listUrl(s));
+      const customer = account('customer', 'cust');
+      const res = await get(customer, listUrl(s));
       expect(res.status).toBe(403);
     });
   });
@@ -744,13 +738,11 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       const secretOf = async () =>
         decryptCarrierBlob((await row(s, 'bosta')).credentials).webhookSecret as string;
       const callback = (tok: string, secret: string) =>
-        asApp(async () =>
-          request(app)
-            .post(`/api/v1/webhooks/shipping/bosta/${s.id}/${tok}`)
-            .set('Content-Type', 'application/json')
-            .set('x-ebda-webhook-secret', webhookHeaderValue(secret))
-            .send(JSON.stringify({ trackingNumber: 987654321, state: 45, timeStamp: Date.now() }))
-        );
+        request(app)
+          .post(`/api/v1/webhooks/shipping/bosta/${s.id}/${tok}`)
+          .set('Content-Type', 'application/json')
+          .set('x-ebda-webhook-secret', webhookHeaderValue(secret))
+          .send(JSON.stringify({ trackingNumber: 987654321, state: 45, timeStamp: Date.now() }));
 
       const oldSecret = await secretOf();
       expect(oldSecret).toMatch(/^[0-9a-f]{48}$/);
@@ -799,9 +791,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       settings: {},
     });
     expect((await del(s, cfgUrl(s, 'shipblu'))).status).toBe(200);
-    expect(
-      await owner.shippingCarrierConfig.count({ where: { storeId: s.id, carrier: 'shipblu' } })
-    ).toBe(0);
+    expect(await count(s, 'shipblu')).toBe(0);
     expect((await hintsOf(s, s, 'shipblu')) ?? null).toBeNull();
   });
 });

@@ -4,7 +4,7 @@
  * decides, and ci.yml's `Integration Tests` job runs on a PR exactly when it says so.
  */
 import { describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 // @ts-expect-error - plain .mjs script, no type declarations
@@ -126,24 +126,35 @@ describe('integrationPlan', () => {
     expect(r).toEqual({ integration: true, paths: 'all' });
   });
 
-  it('on the REAL tree: the four files #227 touched are selected, and so is a service they import', () => {
-    const four = [
-      'tests/integration/provider-activation.test.ts',
-      'tests/integration/provider-connect-routes.test.ts',
-      'tests/integration/shipping-carrier-connect-routes.test.ts',
-      'tests/integration/shipping-sp7.test.ts',
-    ];
+  it('on the REAL tree: edited integration test files are selected, and so is a service they import', () => {
+    // The integration tier is shrinking (NEON-ZERO ports), so the files are discovered, never hard-coded.
+    const dir = join(ROOT, 'tests/integration');
+    const all = readdirSync(dir)
+      .filter(f => f.endsWith('.test.ts'))
+      .sort()
+      .map(f => `tests/integration/${f}`);
+    const four = all.slice(0, 4);
+    expect(four.length).toBeGreaterThan(0);
     expect(integrationPlan(four, ROOT)).toEqual({ integration: true, paths: four });
-    const viaService = integrationPlan(['apps/api/src/services/shipping-carrier.service.ts'], ROOT);
-    expect(viaService.integration).toBe(true);
-    expect(viaService.paths).toContain('tests/integration/shipping-sp7.test.ts');
+    // a service some integration test imports selects that test; a service none imports selects nothing
+    const service = 'apps/api/src/services/shipping-carrier.service.ts';
+    const importers = all.filter(f =>
+      readFileSync(join(ROOT, f), 'utf8').includes('services/shipping-carrier.service')
+    );
+    const viaService = integrationPlan([service], ROOT);
+    for (const f of importers) expect(viaService.paths).toContain(f);
+    expect(viaService.integration).toBe(importers.length > 0);
   });
 
   it('the planner CLI emits the two outputs ci.yml reads', () => {
-    const files = ['tests/integration/shipping-sp7.test.ts'];
-    const lines = classifyOutputs(files);
+    const file = `tests/integration/${
+      readdirSync(join(ROOT, 'tests/integration'))
+        .filter(f => f.endsWith('.test.ts'))
+        .sort()[0]
+    }`;
+    const lines = classifyOutputs([file]);
     expect(lines).toContain('integration=true');
-    expect(lines).toContain('integration_paths=tests/integration/shipping-sp7.test.ts');
+    expect(lines).toContain(`integration_paths=${file}`);
   });
 });
 
