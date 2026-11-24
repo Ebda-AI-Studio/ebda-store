@@ -1408,6 +1408,7 @@
         "confirm": "Confirm",
         "cancel": "Cancel",
         "manualRefundTitle": "Mark Order as Refunded?",
+        "manualRefundPartialHint": "Refunding only some items, or want the goods back on the shelf? Close this and use “Refund part of the order” from the ⋯ menu on the order page.",
         "manualRefundDescription": "Confirm only after you have already given the customer their money back. This records the refund — it does not send any money. It restores stock, reverses the coupon and loyalty points, and the customer will be told their refund was issued.",
         "manualRefundDescriptionCancelled": "This order was cancelled, so its stock, coupon and loyalty points were already reversed. Confirm only after you have already given the customer their money back. This records the refund on the order — it does not send any money — and the customer will be told their refund was issued.",
         "refundMethodLabel": "How did you refund the customer?",
@@ -1561,6 +1562,9 @@
       "paid": "Paid",
       "unpaid": "Unpaid",
       "remain": "Remain {amount}",
+      "refunded": "Refunded",
+      "refundedAmount": "Refunded {amount}",
+      "disputed": "Disputed",
       "paymentMethod": "Payment method",
       "methodCod": "Cash on delivery",
       "paymentTransactionId": "Transaction ID",
@@ -1753,6 +1757,56 @@
         "object": "Order {number}",
         "consequence": "The order is cancelled and its status cannot be restored.",
         "confirmLabel": "Cancel the order"
+      },
+      "partialRefund": {
+        "button": "Partial refund",
+        "title": "Refund part of order {orderNumber}",
+        "loading": "Loading the order's refund balance…",
+        "loadFailed": "Could not load the refund balance. Close this window and try again.",
+        "paid": "Paid",
+        "alreadyRefunded": "Already refunded",
+        "remaining": "Can still be refunded",
+        "blocked": {
+          "NOT_DELIVERED": "Only a delivered order can be partly refunded here. Mark it delivered first.",
+          "GUEST_ORDER": "This order was placed as a guest, so a partial refund by line is not available for it yet."
+        },
+        "nothingLeft": "This order has nothing left to refund.",
+        "methodLabel": "How is the money going back?",
+        "methods": {
+          "original_payment": "Original payment method",
+          "cash": "Cash",
+          "bank_transfer": "Bank transfer",
+          "manual": "Already refunded - record only"
+        },
+        "methodHint": {
+          "original_payment": "The refund is sent to the payment provider for this amount.",
+          "cash": "You hand the money back yourself. The store records it.",
+          "bank_transfer": "You send the money yourself. The store records it.",
+          "manual": "The money already went back some other way. The store only records it."
+        },
+        "reasonLabel": "Reason (required)",
+        "reasonPlaceholder": "Damaged in transit, wrong size, customer request…",
+        "pickLines": "Tick the lines you are refunding.",
+        "estimating": "Working out the amount…",
+        "estimate": "This refund pays back about {amount} {currency}, the items' share of any discount and tax.",
+        "toastSuccessTitle": "Refund done",
+        "toastSuccessBody": "{amount} {currency} was refunded.",
+        "refunding": "Refunding…",
+        "confirm": "Refund now",
+        "errors": {
+          "REFUND_EXCEEDS_ORDER": "This would refund more than the customer paid. Nothing was refunded.",
+          "NOTHING_REFUNDABLE": "This order has nothing left to refund.",
+          "INVALID_QUANTITY": "One of the quantities is more than what is still open on that line. Reopen this window and try again.",
+          "FULL_RETURN_RESTOCK_ALL": "Refunding every line puts every line back on the shelf. Leave one unit out, or keep restocking on.",
+          "RETURNS_FEATURE_REQUIRED_FOR_RESTOCK": "Putting refunded goods back on the shelf needs the Returns feature on your plan. Refund again without restocking: the money refund still goes through, only the stock is left alone.",
+          "GUEST_ORDER_RETURN_UNSUPPORTED": "This order was placed as a guest, so a refund by line is not available for it yet.",
+          "INVALID_ORDER": "This order cannot be refunded here. It must be delivered.",
+          "PROVIDER_REFUND_INDETERMINATE": "The refund reached the payment provider but could not be finished here. Do NOT refund again. Check the provider dashboard first.",
+          "PROVIDER_REFUND_FAILED": "The payment provider refused the refund. Nothing was refunded. Try again or pick another method.",
+          "IDEMPOTENCY_IN_PROGRESS": "This refund is already being processed. Check the order before trying again.",
+          "FORBIDDEN": "Your role cannot refund to the original payment. Pick cash, bank transfer or record-only.",
+          "UNKNOWN": "The refund did not go through. Nothing was refunded. Try again."
+        }
       }
     },
     "layout": {
@@ -4379,7 +4433,8 @@
   "returns": {
     "page": {
       "title": "Returns & Exchanges",
-      "subtitle": "Manage return requests and refunds"
+      "subtitle": "Manage return requests and refunds",
+      "newReturn": "New return"
     },
     "stats": {
       "total": "Total Returns",
@@ -4467,6 +4522,7 @@
         "REFUND_ALREADY_ISSUED": "A refund for this return was already sent to the payment provider. Check the provider dashboard, then complete the return with \"Already refunded — record only\".",
         "RETURN_ALREADY_COMPLETING": "This return is already being completed. Refresh the page before trying again.",
         "PARTIAL_REFUND_EXCEEDS_PAYMENT": "Part of this payment was already refunded outside this return, so what is left is less than this return is worth. Complete it with store credit or bank transfer and settle the difference with the customer.",
+        "GUEST_STORE_CREDIT": "This is a guest return with no wallet to credit. Refund it to the original method or by bank transfer.",
         "PARTIAL_REFUND_NOTHING_TO_REFUND": "Every item in this return was already refunded by an earlier return.",
         "PAYMENT_FULLY_REFUNDED": "This payment has already been refunded in full.",
         "NO_COMPLETED_PAYMENT": "This order has no online payment to refund. Choose store credit or bank transfer.",
@@ -4484,7 +4540,9 @@
         "MANUAL_PROVIDER_REFUND": "This order was paid by InstaPay, which cannot refund through the system. Send the money back from your InstaPay app, then complete the return with \"Already refunded — record only\".",
         "OVERRIDE_NOT_APPLICABLE": "A refund override only applies to a partial return of a tier-priced item. Complete the return without it.",
         "OVERRIDE_OUT_OF_RANGE": "The override must be between 0 and the standard refund for that item.",
-        "OVERRIDE_UNKNOWN_ITEM": "The override names an item that is not on this return. Reopen the dialog and try again."
+        "OVERRIDE_UNKNOWN_ITEM": "The override names an item that is not on this return. Reopen the dialog and try again.",
+        "FULL_RETURN_RESTOCK_ALL": "Every line of this order is in this return, so every line goes back on the shelf. Open a new return that leaves one unit out if some goods are not coming back to stock.",
+        "RETURNS_FEATURE_REQUIRED_FOR_RESTOCK": "Putting refunded goods back on the shelf needs the Returns feature on your plan. Refund again without restocking: the money refund still goes through, only the stock is left alone."
       }
     },
     "modal": {
@@ -4559,6 +4617,37 @@
           "amount": "Enter an amount between 0 and {max}.",
           "reason": "Write a reason (at least 3 characters)."
         }
+      }
+    },
+    "newReturn": {
+      "title": "New return",
+      "orderLabel": "Order number",
+      "orderPlaceholder": "For example ORD-1042",
+      "search": "Find order",
+      "noDeliveredOrder": "No delivered order matches that number.",
+      "pick": "Choose",
+      "loading": "Loading the order…",
+      "loadFailed": "Could not load the order. Close this window and try again.",
+      "blocked": {
+        "NOT_DELIVERED": "Only a delivered order can be returned. Mark it delivered first.",
+        "GUEST_ORDER": "This order was placed as a guest, so a return cannot be opened for it from here yet."
+      },
+      "forOrder": "Return for order {number}",
+      "reasonLabel": "Reason (required)",
+      "reasonPlaceholder": "Wrong size, damaged, changed their mind…",
+      "creating": "Opening the return…",
+      "create": "Open return",
+      "toastSuccessTitle": "Return opened",
+      "toastSuccessBody": "Return {number} is waiting for your approval.",
+      "errors": {
+        "INVALID_QUANTITY": "One of the quantities is more than what is still open on that line.",
+        "INVALID_ORDER": "This order cannot be returned. It must be delivered.",
+        "INVALID_ITEM": "One of the lines does not belong to this order.",
+        "GUEST_ORDER_RETURN_UNSUPPORTED": "This order was placed as a guest, so a return cannot be opened for it from here yet.",
+        "NO_ITEMS": "Tick at least one line.",
+        "bundle_returns_are_atomic": "A bundle can only be returned as a complete box.",
+        "FORBIDDEN": "Your role cannot open returns.",
+        "UNKNOWN": "The return was not opened. Try again."
       }
     }
   },
@@ -5070,7 +5159,8 @@
         "totalEarned": "Total Earned",
         "totalRedeemed": "Total Redeemed",
         "actions": "Actions"
-      }
+      },
+      "owed": "Owes {count} points (spent before a refund)"
     },
     "award": {
       "title": "Award Points",
@@ -8470,6 +8560,16 @@
         "errorInvalid": "Enter a valid phone number, with the country code if it is not an Egyptian number.",
         "errorThrottle": "Too many attempts. Wait a few minutes and try again.",
         "errorGeneric": "Could not change the number. Try again."
+      },
+      "closeAccount": {
+        "title": "Close my account",
+        "description": "Permanently erases your personal data and closes your account. Stores you own must be transferred or closed first, and an account with a live paid store cannot be closed. Legally required order and tax records are kept without your identity. This cannot be undone.",
+        "confirmLabel": "Type {word} to confirm",
+        "confirmWord": "CLOSE",
+        "button": "Close my account permanently",
+        "closing": "Closing…",
+        "done": "Your account was closed.",
+        "errorGeneric": "Could not close the account. Try again, or contact support."
       }
     }
   },
@@ -10306,7 +10406,7 @@
       "rejected": "Your submission was rejected: {reason}. Fix the details and submit again.",
       "revoked": "Your VAT verification was revoked: {reason}. VAT is switched off until you are verified again."
     },
-    "verifiedNote": "To change these details, use Contact Ebda Store.",
+    "verifiedNote": "These details are locked while your registration is verified. To change them, send a change request below. Your current verification stays active until it is approved.",
     "form": {
       "trn": "Tax registration number",
       "trnHint": "9 digits, as printed on your tax card. Spaces and dashes are fine.",
@@ -10354,7 +10454,27 @@
       "incomplete": "Add your tax registration number, legal name and at least one document first.",
       "disclaimer": "Ebda Store does not file taxes or issue e-receipts on your behalf. You stay responsible for your own VAT filings."
     },
-    "error": "Something went wrong. Please try again."
+    "error": "Something went wrong. Please try again.",
+    "change": {
+      "title": "Change your VAT registration details",
+      "hint": "Your current verification stays active, and VAT keeps working, until Ebda Store approves the new details.",
+      "open": "Request a change",
+      "newTrn": "New tax registration number",
+      "newLegalName": "New legal business name",
+      "newDocument": "New tax card or certificate",
+      "send": "Review and send",
+      "sending": "Sending…",
+      "cancel": "Cancel",
+      "confirmObject": "Change to tax number {trn}, \"{name}\"",
+      "confirmConsequence": "The request goes to Ebda AI Studio for review. Nothing changes on your store until it is approved.",
+      "confirmLabel": "Send the change request",
+      "sent": "Change request sent. We will review it and your current verification stays active meanwhile.",
+      "pendingTitle": "A change request is waiting for review",
+      "pendingBody": "Requested: tax number {trn}, \"{name}\". Your current verification is still active.",
+      "withdraw": "Withdraw the request",
+      "withdrawn": "Request withdrawn.",
+      "rejected": "Your last change request was rejected: {reason}. Your current verification is unchanged."
+    }
   },
   "invoices": {
     "title": "Invoices & credit notes",
@@ -10484,6 +10604,34 @@
       "revoked": "Revoked",
       "failed": "Decision failed: {message}",
       "revokeObject": "Tax verification for this store"
+    },
+    "changes": {
+      "title": "Change requests from verified merchants ({count})",
+      "subtitle": "The merchant stays verified until you decide. The automatic read of the document only helps you spot differences; you approve or reject.",
+      "precheck": {
+        "clean": "Pre-check: no differences found",
+        "flagged": "Pre-check: needs a look"
+      },
+      "flags": {
+        "trn_mismatch": "The number on the document differs from the one entered",
+        "name_mismatch": "The name on the document differs from the one entered",
+        "trn_unreadable": "The number could not be read from the document",
+        "name_unreadable": "The name could not be read from the document",
+        "looks_edited": "The document looks edited",
+        "low_confidence": "The automatic read was not confident",
+        "not_pre_checked": "Not pre-checked (a PDF, or the automatic read was unavailable): read the document yourself",
+        "trn_in_use_by_other_store": "The number is already held by another store (verified or pending): check before approving"
+      },
+      "read": "Read from the document: {trn}, {name}",
+      "viewDocument": "View the document",
+      "approve": "Approve the change",
+      "reject": "Reject",
+      "reasonLabel": "Reason for the merchant",
+      "confirmReject": "Send the rejection",
+      "approveObject": "Change to tax number {trn}, \"{name}\"",
+      "approveConsequence": "The new number and name replace the verified ones and appear on the merchant's later tax invoices.",
+      "approved": "Change approved.",
+      "rejected": "Change rejected."
     }
   },
   "platformSettings": {
@@ -12318,5 +12466,60 @@
         "error": "I could not apply it. Nothing was changed, try again."
       }
     }
+  },
+  "refundLines": {
+    "legend": "Choose what is being refunded or returned",
+    "unitPrice": "{price} {currency} each",
+    "nothingLeft": "Nothing left to return on this line",
+    "remaining": "{remaining} of {ordered} still open",
+    "quantity": "Quantity",
+    "restock": "Put back on the shelf",
+    "notTracked": "Stock is not tracked for this product",
+    "wholeOrderRestockNote": "These lines cover the whole order, so every line is put back on the shelf. To skip restocking, leave one unit out."
+  },
+  "planLimits": {
+    "upgradeCta": "Upgrade plan",
+    "maxProducts": {
+      "warnTitle": "You are close to your product limit",
+      "warnBody": "{used} of {limit} products used. Upgrade before you hit the limit so you can keep adding products.",
+      "fullTitle": "You have reached your product limit",
+      "fullBody": "Your plan allows {limit} products and you are using all of them. Upgrade to add more."
+    },
+    "maxOrdersPerMonth": {
+      "warnTitle": "You are close to this month's order limit",
+      "warnBody": "{used} of {limit} orders this month. Upgrade to keep your store inside its plan.",
+      "fullTitle": "You have reached this month's order limit",
+      "fullBody": "{used} orders against a limit of {limit}. Orders still come through, but upgrade so your store stays within its plan."
+    },
+    "maxStaff": {
+      "warnTitle": "You are close to your team seat limit",
+      "warnBody": "{used} of {limit} team seats used. Upgrade to invite more people.",
+      "fullTitle": "All your team seats are used",
+      "fullBody": "Your plan includes {limit} team seats. Upgrade to invite more people."
+    },
+    "maxStorageMb": {
+      "warnTitle": "You are close to your storage limit",
+      "warnBody": "{used} of {limit} MB used. Upgrade before image uploads stop.",
+      "fullTitle": "Your storage is full",
+      "fullBody": "{used} of {limit} MB used. Upgrade to keep uploading images and files."
+    },
+    "ai": {
+      "warnTitle": "You are close to your AI allowance",
+      "warnBody": "{used} of {limit} AI requests used ({window, select, daily {today} other {this month}}). Upgrade for a bigger allowance.",
+      "fullTitle": "You have used your AI allowance",
+      "fullBody": "{used} of {limit} AI requests used ({window, select, daily {today} other {this month}}). Upgrade for a bigger allowance."
+    }
+  },
+  "launchChip": {
+    "stepsLabel": "{done} of {total} steps",
+    "ordersLabel": "{done} of {goal} orders paid or delivered",
+    "openAria": "Launch readiness: {label}. Open the checklist",
+    "stepsTitle": "Get ready to launch",
+    "stepsHint": "Finish these steps so customers can start ordering.",
+    "ordersTitle": "Your first {goal} orders",
+    "ordersHint": "Share your store link with customers. This badge goes away after {goal} orders are paid or delivered (cash on delivery counts once delivered).",
+    "viewOrders": "See orders",
+    "open": "Open",
+    "done": "Done"
   }
 }
