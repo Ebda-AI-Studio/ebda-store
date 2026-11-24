@@ -169,7 +169,21 @@ const answerEngineCitationScanCronFn = inngest.createFunction(
     // resumes past the rows its crashed attempt already wrote (#910).
     const runStartedAt = new Date(await step.run('run-started-at', () => dbNowIso()));
 
-    const batches = chunk(stores, BULK_AI_BATCH_SIZE);
+    // Stores to visit: entitlement read in one batched prefetch per run (selection only). The per-store gate below stays a
+    // LIVE read, so a downgrade mid-run is still honoured before any paid action (entitlements are NEVER-stale).
+    const enabledIds = new Set(
+      await step.run('select-enabled-stores', () =>
+        featureService.selectEnabled(
+          stores.map(s => s.id),
+          'answer_engine_insights'
+        )
+      )
+    );
+
+    const batches = chunk(
+      stores.filter(s => enabledIds.has(s.id)),
+      BULK_AI_BATCH_SIZE
+    );
 
     let scannedStores = 0;
     let skippedStores = 0;

@@ -76,7 +76,10 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('@api/services/feature.service', () => ({
-  featureService: { isFeatureEnabled: async () => true },
+  featureService: {
+    isFeatureEnabled: async () => true,
+    selectEnabled: async (ids: string[]) => ids,
+  },
 }));
 vi.mock('@api/services/answer-engine/gsc-client', () => ({
   isGscConfigured: () => true,

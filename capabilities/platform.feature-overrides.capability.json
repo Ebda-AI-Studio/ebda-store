@@ -23,7 +23,7 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": ["الميزة دي مقفولة", "عايز افعل ..."],
+    "ar": ["الميزة دي مقفولة", "عايز افعل ...", "ازاي افعل ميزة لمتجر معين؟"],
     "en": ["Enable this feature for me"]
   },
   "steps": ["Super-admin console only."],
