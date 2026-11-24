@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { publicTenantKey } from './public-limiter-keys';
+import { resolvedStoreId } from '../utils/resolved-store';
 import { isVerifiedCatalogueMiss } from './catalogue-miss';
 import rateLimit, {
   ipKeyGenerator,
@@ -2048,6 +2049,57 @@ function couponDistinctGate(field: 'couponCode' | 'code') {
 export const couponAttemptLimiter = couponDistinctGate('couponCode');
 /** POST /coupons/validate: `code` in the body. Runs after couponValidateLimiter. */
 export const couponValidateDistinctLimiter = couponDistinctGate('code');
+
+// Guest return request limiters (Foundation criterion 19, Ruling GUEST-RET-1). The route takes an order number
+// plus a second factor from an anonymous caller, so both axes are bounded: per IP (a scanner walking order
+// numbers) and per (store, order number) (one order's phone/email being guessed from many IPs). Every attempt
+// counts, success or not: a legitimate shopper files one return. Keyed on a hash, never the raw number.
+// `skipForLoadTest` (not `...OrTests`) on purpose: the tests drive the real 429. Fail-OPEN on a store error,
+// the posture of the other limiters here.
+const GUEST_RETURN_WINDOW_MS = 15 * 60 * 1000;
+const GUEST_RETURN_BODY = {
+  success: false,
+  error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again later.' },
+};
+// pq-allow(unused-export): test seam, imported by apps/api/src/middleware/__tests__/guest-return-limiter.test.ts
+export const GUEST_RETURN_IP_MAX = 10;
+// pq-allow(unused-export): test seam, imported by apps/api/src/middleware/__tests__/guest-return-limiter.test.ts
+export const GUEST_RETURN_ORDER_MAX = 5;
+export const guestReturnIpLimiter = plannedRateLimit('guest-return-ip', {
+  windowMs: GUEST_RETURN_WINDOW_MS,
+  max: GUEST_RETURN_IP_MAX,
+  message: GUEST_RETURN_BODY,
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTest,
+  keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
+});
+function guestReturnOrderKey(req: Request): string {
+  const raw = (req.body as Record<string, unknown> | undefined)?.orderNumber;
+  const num = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
+  // The RESOLVED store id (set by publicStoreContext from the host before the limiters run): POST /public/returns/guest has no
+  // :storeId param, so keying on the param alone put the same order number of every store in one bucket (cross-store lockout).
+  // The param / header fallbacks are only for an unresolved request, which is refused right after.
+  const hdr = (k: string) => (typeof req.headers[k] === 'string' ? (req.headers[k] as string) : '');
+  const store =
+    (resolvedStoreId(req) ??
+      String((req.params as Record<string, string> | undefined)?.storeId ?? '')) ||
+    hdr('x-store-id') ||
+    hdr('x-store-domain').toLowerCase();
+  return createHash('sha256').update(`${store}:${num}`).digest('hex');
+}
+export const guestReturnOrderLimiter = plannedRateLimit('guest-return-order', {
+  keyReadsBody: true, // the key is the order number from the body (plus the resolved store)
+  windowMs: GUEST_RETURN_WINDOW_MS,
+  max: GUEST_RETURN_ORDER_MAX,
+  message: GUEST_RETURN_BODY,
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTest,
+  keyGenerator: guestReturnOrderKey,
+});
 
 // Promotion preview limiter — public storefront targeting-preview endpoint.
 // Same posture as couponValidateLimiter (20/min per IP): generous for a

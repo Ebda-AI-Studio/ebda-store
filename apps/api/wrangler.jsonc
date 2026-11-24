@@ -85,7 +85,11 @@
   // DO store falls back to keyword search. A store on Postgres keeps halfvec (`product_embeddings`).
   "vectorize": [{ "binding": "PRODUCT_VECTORS", "index_name": "ebda-product-vectors" }],
   // Customer Intelligence dashboards: one point per outcome, no buyer key, no order id (lib/ci/sink.ts).
-  "analytics_engine_datasets": [{ "binding": "CI_OUTCOMES", "dataset": "ebda_commerce_outcomes" }],
+  "analytics_engine_datasets": [
+    { "binding": "CI_OUTCOMES", "dataset": "ebda_commerce_outcomes" },
+    // Per-route call counters + latency, 1-in-20 sampled (always non-2xx / slow); route template only, no PII (lib/request-budget.ts).
+    { "binding": "REQUEST_BUDGET", "dataset": "ebda_request_budget" },
+  ],
 
   // Storefront cache purge (POST /api/revalidate on ebda-web) over a Service Binding, not a
   // public hostname: no host to keep pointed at the storefront wildcard, no public hop

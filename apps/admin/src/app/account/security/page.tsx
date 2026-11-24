@@ -18,6 +18,7 @@ import { LegalAcceptancesPanel } from '../../../components/legal/LegalAcceptance
 import { PasskeysPanel } from '../../../components/account/PasskeysPanel';
 import { PhonePanel } from '../../../components/account/PhonePanel';
 import { CloseAccountPanel } from '../../../components/account/CloseAccountPanel';
+import { RecoveryCodesPanel } from '../../../components/account/RecoveryCodesPanel';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -677,6 +678,7 @@ export default function SecurityPage() {
             onSignInAgain={() => void logout()}
           />
         )}
+        {status?.mfaEnabled && step === 'idle' && <RecoveryCodesPanel />}
         {status && <PhonePanel mfaEnabled={status.mfaEnabled} />}
         <LegalAcceptancesPanel />
         {/* platform administrators are removed by the operator only (docs/privacy/erasure-export.md) */}
