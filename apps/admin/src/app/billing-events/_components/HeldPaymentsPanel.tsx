@@ -243,7 +243,7 @@ export function HeldPaymentsPanel({
               ))}
             </fieldset>
             {action === 'credited' && (
-              <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground" role="note">
+              <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground" role="note">
                 {t('creditedHelp')}
               </p>
             )}
