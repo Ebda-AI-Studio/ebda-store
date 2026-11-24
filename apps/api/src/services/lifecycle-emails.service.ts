@@ -255,7 +255,7 @@ export async function processLifecycleEmail(
   return { status: 'sent' };
 }
 
-export type LifecycleTestResult =
+type LifecycleTestResult =
   | { status: 'sent'; to: string }
   | { status: 'not_found' }
   | { status: 'not_owner' }
