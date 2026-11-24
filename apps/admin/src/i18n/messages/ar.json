@@ -3788,7 +3788,8 @@
       },
       "empty": {
         "title": "مفيش مسوّقين لسه",
-        "description": "سيظهر المسوّقون هنا عند تسجيلهم أو دعوتهم."
+        "description": "سيظهر المسوّقون هنا عند تسجيلهم أو دعوتهم.",
+        "invite": "ادعو مسوّق"
       },
       "pagination": {
         "summary": "الصفحة {page} من {totalPages} ({total} إجمالًا)",
@@ -6088,7 +6089,8 @@
       "aiSaveResponseBody": "تم حفظ رد صاحب المتجر على التقييم.",
       "aiSaveResponseFailed": "معرفناش نحفظ الرد. جرّب تاني من فضلك.",
       "saving": "جارٍ الحفظ...",
-      "searchPlaceholder": "ابحث في المراجعات…"
+      "searchPlaceholder": "ابحث في المراجعات…",
+      "emptyAction": "شوف منتجاتك"
     },
     "spam": "سبام"
   },
@@ -8780,7 +8782,8 @@
       "dateFrom": "من",
       "dateTo": "إلى",
       "dateApply": "تطبيق",
-      "guest": "زائر"
+      "guest": "زائر",
+      "emptyAction": "راجع إعدادات الدفع"
     }
   },
   "activity": {
