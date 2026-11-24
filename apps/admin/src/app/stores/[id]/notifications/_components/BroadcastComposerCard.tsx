@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { withNumerals } from '@ebda/shared';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 import { usePushStatus } from './usePushStatus';
 
 interface BroadcastFormState {
@@ -135,10 +136,10 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
   };
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6">
+    <div className="bg-card rounded-md border border-border p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+          <div className="w-10 h-10 bg-primary/10 rounded-md flex items-center justify-center">
             <svg
               className="w-5 h-5 text-primary"
               fill="none"
@@ -187,7 +188,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             placeholder={t('placeholders.titleEn')}
             maxLength={200}
             disabled={sending || notConfigured}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
+            className={FIELD_CLASSES}
           />
         </div>
         <div>
@@ -202,7 +203,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             maxLength={200}
             disabled={sending || notConfigured}
             dir="rtl"
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
+            className={FIELD_CLASSES}
           />
         </div>
         <div>
@@ -216,7 +217,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             maxLength={2000}
             rows={3}
             disabled={sending || notConfigured}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
+            className={TEXTAREA_CLASSES}
           />
         </div>
         <div>
@@ -231,7 +232,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             rows={3}
             disabled={sending || notConfigured}
             dir="rtl"
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
+            className={TEXTAREA_CLASSES}
           />
         </div>
         <div className="md:col-span-2">
@@ -245,7 +246,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             placeholder={t('placeholders.url')}
             maxLength={2000}
             disabled={sending || notConfigured}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
+            className={FIELD_CLASSES}
           />
           <p className="mt-1 text-xs text-muted-foreground">{t('urlHelp')}</p>
         </div>

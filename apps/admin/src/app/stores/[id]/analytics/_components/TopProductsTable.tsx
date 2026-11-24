@@ -19,7 +19,7 @@ export function TopProductsTable({ products }: TopProductsTableProps) {
   const isRtl = locale === 'ar';
 
   return (
-    <div className="bg-card rounded-xl border p-6 shadow-sm">
+    <div className="bg-card rounded-md border p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h2>
       {products.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t('empty')}</p>
@@ -36,10 +36,10 @@ export function TopProductsTable({ products }: TopProductsTableProps) {
                   }
                   width={40}
                   height={40}
-                  className="w-10 h-10 rounded object-cover"
+                  className="w-10 h-10 rounded-md object-cover"
                 />
               ) : (
-                <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center">
                   <svg
                     className="w-5 h-5 text-muted-foreground"
                     fill="none"

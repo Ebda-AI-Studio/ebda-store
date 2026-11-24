@@ -28,7 +28,7 @@ export function MultiImageGrid({ values, onMove, onRemove }: MultiImageGridProps
         >
           <Image src={url} alt={t('imageAlt', { index: i + 1 })} fill className="object-cover" />
           {i === 0 && (
-            <span className="absolute top-1 start-1 bg-primary text-primary-foreground text-xs font-medium px-1.5 py-0.5 rounded">
+            <span className="absolute top-1 start-1 bg-primary text-primary-foreground text-xs font-medium px-1.5 py-0.5 rounded-md">
               {t('main')}
             </span>
           )}

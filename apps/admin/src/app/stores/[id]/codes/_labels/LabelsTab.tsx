@@ -22,6 +22,7 @@ import { ShapePicker } from './_components/ShapePicker';
 import { SheetPreview } from './_components/SheetPreview';
 import { labelQrScene, toLabelItem, useLabels } from './useLabels';
 import { Button, buttonVariants } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 const MAX_TOTAL_COPIES = 2000;
 
@@ -169,7 +170,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <div className="space-y-6">
-        <div className="space-y-6 rounded-xl border border-border bg-card p-5 sm:p-6">
+        <div className="space-y-6 rounded-md border border-border bg-card p-5 sm:p-6">
           <section className="space-y-3" aria-labelledby="lb-items">
             <h2 id="lb-items" className="text-base font-semibold text-foreground">
               {ti('title')}
@@ -180,7 +181,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
               onChange={e => L.setSearch(e.target.value)}
               placeholder={ti('searchPlaceholder')}
               aria-label={ti('search')}
-              className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
+              className={FIELD_CLASSES}
             />
             {L.items.length === 0 && !L.itemsLoading ? (
               <p className="text-sm text-muted-foreground">{ti('empty')}</p>
@@ -195,7 +196,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
                     <li key={i.id} className="flex items-center gap-3 px-3 py-2 text-sm">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 accent-primary"
+                        className="h-5 w-5 accent-primary"
                         checked={!!pick}
                         onChange={() => L.toggle(i)}
                         aria-label={`${name}${variant ? ` / ${variant}` : ''}`}
@@ -205,7 +206,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
                         {variant && <span className="ms-2 text-muted-foreground">{variant}</span>}
                       </span>
                       {!i.barcode && (
-                        <span className="shrink-0 rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                           {ti('noBarcode')}
                         </span>
                       )}
@@ -218,7 +219,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
                           dir="ltr"
                           aria-label={`${ti('qty')}: ${name}${variant ? ` / ${variant}` : ''}`}
                           onChange={e => L.setQty(i.id, Number(e.target.value))}
-                          className="w-16 shrink-0 rounded-lg border border-input bg-card px-2 py-1 text-center text-sm"
+                          className={`${FIELD_CLASSES} w-16 shrink-0 text-center`}
                         />
                       )}
                     </li>
@@ -270,7 +271,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
                 <label key={k} className="flex items-center gap-2 text-sm text-foreground">
                   <input
                     type="checkbox"
-                    className="h-4 w-4 accent-primary"
+                    className="h-5 w-5 accent-primary"
                     checked={settings.content[k]}
                     onChange={e => set({ content: { ...settings.content, [k]: e.target.checked } })}
                   />
@@ -300,7 +301,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
               aria-label={t('size.title')}
               value={settings.preset}
               onChange={e => set({ preset: e.target.value })}
-              className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
+              className={FIELD_CLASSES}
             >
               <optgroup label={t('size.sheets')}>
                 {LABEL_PRESETS.filter(p => p.kind === 'sheet').map(p => (
@@ -343,9 +344,9 @@ export function LabelsTab({ storeId }: { storeId: string }) {
       </div>
 
       <aside className="lg:sticky lg:top-4 lg:self-start">
-        <div className="space-y-4 rounded-xl border border-border bg-card p-5">
+        <div className="space-y-4 rounded-md border border-border bg-card p-5">
           <h2 className="text-base font-semibold text-foreground">{tp('title')}</h2>
-          <div className="flex min-h-[10rem] items-center justify-center rounded-xl border border-border bg-muted/50 p-4">
+          <div className="flex min-h-[10rem] items-center justify-center rounded-md border border-border bg-muted/50 p-4">
             <canvas
               ref={shown}
               role="img"
