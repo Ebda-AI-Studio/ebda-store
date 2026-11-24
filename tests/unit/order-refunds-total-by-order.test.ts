@@ -13,6 +13,7 @@ const pays: Row[] = [
   { orderId: 'mixed', refundedAmount: 2000, metadata: { refundEventIds: ['rk-gw'] } },
   { orderId: 'gw', refundedAmount: 3000, metadata: null },
   { orderId: 'none', refundedAmount: 0, metadata: null },
+  { orderId: 'toyzwo', refundedAmount: 326_000, metadata: null }, // live Amelia ORD-TOYZWO-A88OH: a 3,260 EGP payment refund
 ];
 const events: Row[] = [
   { orderId: 'mixed', metadata: { amount: 1000, refundKey: 'rk-merchant' } }, // not on a payment row: counts
@@ -23,6 +24,7 @@ const returns: Row[] = [
   { orderId: 'mixed', refundMethod: 'cash', refundAmount: 500, type: 'return' },
   { orderId: 'mixed', refundMethod: 'original', refundAmount: 2000, type: 'return' }, // gateway: on the payment row
   { orderId: 'mixed', refundMethod: 'cash', refundAmount: 9999, type: 'exchange' }, // an exchange moves no money
+  { orderId: 'toyzwo', refundMethod: 'cash', refundAmount: 10_000, type: 'return' }, // ...plus a 100 EGP completed partial return outside the gateway
 ];
 const inIds = (w: any) => w.orderId?.in as string[];
 const fakeDb: any = {
@@ -66,9 +68,14 @@ describe('refundedTotalByOrder', () => {
     expect((await refundedMinorByOrder(fakeDb, 's', ['mixed'])).get('mixed')).toBe(2500); // the rule the summary used before: an undercount
   });
 
+  it('live shape ORD-TOYZWO-A88OH: 3,260 EGP payment refund + 100 EGP partial return = 3,360 on the card; max() gave 3,260 (the 100 EGP gap between the cards and the assistant)', async () => {
+    expect((await refundedTotalByOrder(fakeDb, 's', ['toyzwo'])).get('toyzwo')).toBe(336_000);
+    expect((await refundedMinorByOrder(fakeDb, 's', ['toyzwo'])).get('toyzwo')).toBe(326_000);
+  });
+
   it('agrees with the order page for every order (same function, per order)', async () => {
-    const m = await refundedTotalByOrder(fakeDb, 's', ['mixed', 'gw', 'none']);
-    for (const id of ['mixed', 'gw', 'none']) {
+    const m = await refundedTotalByOrder(fakeDb, 's', ['mixed', 'gw', 'none', 'toyzwo']);
+    for (const id of ['mixed', 'gw', 'none', 'toyzwo']) {
       const card = refundedTotal(
         pays.filter(p => p.orderId === id) as never,
         events.filter(e => e.orderId === id) as never,
