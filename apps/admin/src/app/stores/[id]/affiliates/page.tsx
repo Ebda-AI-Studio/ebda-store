@@ -355,6 +355,7 @@ export default function AffiliatesPage() {
               onPageChange={setPage}
               onStatusAction={handleStatusAction}
               onOpenPayout={openPayoutModal}
+              onInvite={openInviteModal}
             />
           )}
 

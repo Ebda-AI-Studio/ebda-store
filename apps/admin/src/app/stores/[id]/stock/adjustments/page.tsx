@@ -14,6 +14,7 @@ import { ErrorState } from '@/components/ErrorState';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
 import { reportRangeQueryString, minorToDecimalString } from '@ebda/shared';
+import { EmptyState } from '@/components/EmptyState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -177,7 +178,17 @@ export default function StockAdjustmentsPage() {
             columns={columns}
             rows={filteredAdjustments ?? adjustments}
             rowKey={adj => adj.id}
-            emptyState={<p className="text-muted-foreground text-sm">{t('emptyState')}</p>}
+            emptyState={
+              <EmptyState
+                card
+                icon="M4 7h16M4 12h16M4 17h10"
+                title={t('emptyState')}
+                action={{
+                  label: t('newButton'),
+                  href: `/stores/${storeId}/stock/adjustments/new`,
+                }}
+              />
+            }
           />
         </div>
       )}

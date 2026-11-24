@@ -91,6 +91,8 @@ interface RefundMethodModalProps {
   /** The store has the customer wallet on: store credit lands in the
    *  customer's wallet balance instead of being settled off-platform. */
   walletEnabled?: boolean;
+  /** A guest return (no account): store credit has no wallet to land in, so that option is disabled with the reason. */
+  guestReturn?: boolean;
 }
 
 /**
@@ -114,6 +116,7 @@ export function RefundMethodModal({
   onClose,
   isLoading = false,
   walletEnabled = false,
+  guestReturn = false,
 }: RefundMethodModalProps) {
   const t = useT('returns.modal');
   const [method, setMethod] = useState<RefundMethod | null>(null);
@@ -237,7 +240,8 @@ export function RefundMethodModal({
               </p>
             )}
             {visibleMethods.map(value => {
-              const disabled = value === 'original' && !gatewayEnabled;
+              const noWallet = value === 'store_credit' && guestReturn;
+              const disabled = (value === 'original' && !gatewayEnabled) || noWallet;
               const amount = amountFor(value);
               return (
                 <label
@@ -271,6 +275,11 @@ export function RefundMethodModal({
                         ? t('refundMethodOptions.store_credit.descriptionWallet')
                         : t(`refundMethodOptions.${value}.description`)}
                     </span>
+                    {noWallet && (
+                      <span className="mt-1 block text-xs text-destructive-ink">
+                        {t('storeCreditNeedsAccount')}
+                      </span>
+                    )}
                     {value === 'original' && disabled && previewState === 'ready' && (
                       <span className="mt-1 block text-xs text-destructive-ink">
                         {t(`gatewayUnavailable.${gatewayReasonKey}`)}

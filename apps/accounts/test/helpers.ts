@@ -40,6 +40,7 @@ export const fakes: Fakes = {
 export const testEnv = (): Cloudflare.Env =>
   ({
     ...env,
+    CHAT_SIGNUP_OPEN: 'true', // most tests register through POST /signup; the closed state is tested explicitly
     ...fakes.envOverride,
     ISSUER: 'https://accounts.ebda.app',
     PRODUCTS: 'store,whatsapp,crm,erp',

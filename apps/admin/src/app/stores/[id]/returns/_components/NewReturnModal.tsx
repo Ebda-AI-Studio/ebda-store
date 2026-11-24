@@ -3,7 +3,7 @@
 import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 import { useEffect, useState } from 'react';
 import { Modal, useToast } from '@ebda/ui';
-import { moveSearchToHeader } from '@ebda/shared';
+import { minorToDecimalString, moveSearchToHeader } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiRequest } from '../../../../../lib/api';
@@ -218,6 +218,20 @@ export function NewReturnModal({ open, storeId, onClose, onCreated }: Props) {
                 disabled={busy}
               />
             )}
+            <p
+              aria-live="polite"
+              className="rounded-lg border border-border p-3 text-sm text-foreground"
+              data-testid="new-return-estimate"
+            >
+              {items.length === 0
+                ? t('pickLines')
+                : loading || quote.estimate === null
+                  ? t('estimating')
+                  : t('estimate', {
+                      amount: minorToDecimalString(quote.estimate),
+                      currency: quote.currency,
+                    })}
+            </p>
             <div>
               <label
                 htmlFor="new-return-reason"

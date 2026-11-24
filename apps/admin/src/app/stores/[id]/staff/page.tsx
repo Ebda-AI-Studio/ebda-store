@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Badge, Modal, ModalBody, ModalFooter, Input, Label, useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { PlanLimitNotice } from '@/components/billing/PlanLimitNotice';
 import { apiGet, apiPost, apiDelete } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
 import { useRouter } from 'next/navigation';
@@ -266,6 +267,8 @@ export default function StoreStaffPage() {
         </Button>
       }
     >
+      <PlanLimitNotice storeId={storeId} keys={['maxStaff']} />
+
       {error && !isLoading && (
         <div className="mb-6 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-ink">
           {error}

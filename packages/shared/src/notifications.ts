@@ -25,6 +25,11 @@ export type NotificationEvent =
 export interface NotificationData {
   customerName: string;
   customerPhone?: string;
+  /**
+   * The ONE shopper a promotional message (abandoned-cart steps, back-in-stock) addresses. Its push goes only to that
+   * shopper's own subscriptions; without it a promotional push is not sent (it is never broadcast to the store).
+   */
+  customerId?: string;
   orderNumber: string;
   total?: number;
   trackingNumber?: string;

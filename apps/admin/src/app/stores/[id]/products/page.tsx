@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { PlanLimitNotice } from '@/components/billing/PlanLimitNotice';
 import { useAuth } from '../../../../lib/auth';
 import { apiGet, apiDelete } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
@@ -259,6 +260,8 @@ export default function StoreProductsPage() {
       subtitle={t('subtitle', { storeName: store?.name ?? t('fallbackThisStore') })}
       actions={<ProductsToolbar storeId={storeId} listUrl={listUrl} />}
     >
+      <PlanLimitNotice storeId={storeId} keys={['maxProducts']} />
+
       <ProductFilters
         search={search}
         onSearchChange={handleSearchChange}

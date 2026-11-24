@@ -12,6 +12,7 @@ import {
   type Meta,
 } from './types';
 import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/EmptyState';
 
 interface AffiliatesTableProps {
   storeId: string;
@@ -24,6 +25,8 @@ interface AffiliatesTableProps {
   onPageChange: (updater: (prev: number) => number) => void;
   onStatusAction: (affiliate: Affiliate, action: AffiliateStatusAction) => void;
   onOpenPayout: (affiliate: Affiliate) => void;
+  /** Opens the invite modal; the empty state's primary CTA. */
+  onInvite?: () => void;
 }
 
 /**
@@ -42,6 +45,7 @@ export function AffiliatesTable({
   onPageChange,
   onStatusAction,
   onOpenPayout,
+  onInvite,
 }: AffiliatesTableProps) {
   const t = useT('affiliates.list');
 
@@ -161,25 +165,12 @@ export function AffiliatesTable({
   ];
 
   const emptyState = (
-    <div className="p-12 text-center">
-      <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-        <svg
-          className="w-8 h-8 text-muted-foreground"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-          />
-        </svg>
-      </div>
-      <h3 className="text-lg font-semibold text-foreground mb-2">{t('empty.title')}</h3>
-      <p className="text-muted-foreground">{t('empty.description')}</p>
-    </div>
+    <EmptyState
+      icon="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+      title={t('empty.title')}
+      description={t('empty.description')}
+      action={onInvite ? { label: t('empty.invite'), onClick: onInvite } : undefined}
+    />
   );
 
   return (

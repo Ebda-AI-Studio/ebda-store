@@ -22,6 +22,7 @@ import { useT } from '@/i18n/useT';
 import { RowActions } from '@/components/RowActions';
 
 import { Button, buttonVariants } from '@/components/ui/Button';
+import { EmptyState } from '@/components/EmptyState';
 interface Category {
   id: string;
   name: string;
@@ -269,28 +270,12 @@ export function CategoryTable({
 
   if (categories.length === 0) {
     return (
-      <div className="force-empty-state px-6">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
-          <svg
-            className="h-8 w-8 text-muted-foreground"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-            />
-          </svg>
-        </div>
-        <p className="font-semibold text-foreground">{t('empty')}</p>
-        <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('emptyDescription')}</p>
-        <Button type="button" onClick={onAddFirst} variant="default" className="mt-4 font-semibold">
-          {t('addFirst')}
-        </Button>
-      </div>
+      <EmptyState
+        icon="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+        title={t('empty')}
+        description={t('emptyDescription')}
+        action={{ label: t('addFirst'), onClick: onAddFirst }}
+      />
     );
   }
 

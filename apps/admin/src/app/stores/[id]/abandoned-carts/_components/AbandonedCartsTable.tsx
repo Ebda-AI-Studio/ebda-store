@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { CartIcon } from '@ebda/ui';
@@ -11,6 +10,7 @@ import { ABANDONED_CART_COLORS, CART_STATUS_KEYS } from './types';
 import type { AbandonedCartRecord, ListMeta } from './types';
 import { Button } from '@/components/ui/Button';
 import { FIELD_CLASSES } from '@/components/ui/tokens';
+import { EmptyState } from '@/components/EmptyState';
 
 /** Best-effort display string for the customer column. */
 function customerDisplay(record: AbandonedCartRecord): string {
@@ -99,22 +99,17 @@ export function AbandonedCartsTable({
   ];
 
   const emptyState = (
-    <div className="bg-card rounded-md border border-border overflow-hidden">
-      <div className="force-empty-state px-6">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
-          <CartIcon className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
-        </div>
-        <p className="font-semibold text-foreground">{t('empty')}</p>
-        <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('emptyDescription')}</p>
-        <p className="mt-3 max-w-md text-sm text-muted-foreground">{t('emptyOrdersHint')}</p>
-        <Link
-          href={`/stores/${storeId}/orders?status=pending`}
-          className="mt-1 text-sm font-medium text-primary hover:underline"
-        >
-          {t('emptyOrdersLink')}
-        </Link>
-      </div>
-    </div>
+    <EmptyState
+      card
+      icon={<CartIcon className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />}
+      title={t('empty')}
+      description={t('emptyDescription')}
+      hint={t('emptyOrdersHint')}
+      action={{
+        label: t('emptyOrdersLink'),
+        href: `/stores/${storeId}/orders?status=pending`,
+      }}
+    />
   );
 
   return (

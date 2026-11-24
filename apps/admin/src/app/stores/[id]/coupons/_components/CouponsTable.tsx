@@ -7,6 +7,7 @@ import { RowActions } from '@/components/RowActions';
 import { useConfirm } from '@/hooks/useConfirm';
 import type { Coupon } from './types';
 import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/EmptyState';
 
 interface CouponsTableProps {
   coupons: Coupon[];
@@ -174,30 +175,13 @@ export function CouponsTable({
   ];
 
   const emptyState = (
-    <div className="bg-card rounded-md border overflow-hidden">
-      <div className="force-empty-state px-6">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
-          <svg
-            className="h-8 w-8 text-muted-foreground"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
-            />
-          </svg>
-        </div>
-        <p className="font-semibold text-foreground">{tEmpty('title')}</p>
-        <p className="mt-1 max-w-md text-sm text-muted-foreground">{tEmpty('description')}</p>
-        <Button variant="default" size="md" className="mt-4" type="button" onClick={onCreateFirst}>
-          {tEmpty('createFirst')}
-        </Button>
-      </div>
-    </div>
+    <EmptyState
+      card
+      icon="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
+      title={tEmpty('title')}
+      description={tEmpty('description')}
+      action={{ label: tEmpty('createFirst'), onClick: onCreateFirst }}
+    />
   );
 
   return (

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { RowActions } from '@/components/RowActions';
 import { useConfirm } from '@/hooks/useConfirm';
 import { FIELD_CLASSES } from '@/components/ui/tokens';
+import { EmptyState } from '@/components/EmptyState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -312,12 +313,12 @@ export default function WarehousesPage() {
           rows={warehouses}
           rowKey={w => w.id}
           emptyState={
-            <div className="rounded-lg border border-dashed border-border py-16 text-center">
-              <p className="text-muted-foreground">{t('empty')}</p>
-              <Button onClick={openNew} className="mt-4">
-                {t('newButton')}
-              </Button>
-            </div>
+            <EmptyState
+              card
+              icon="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+              title={t('empty')}
+              action={{ label: t('newButton'), onClick: openNew }}
+            />
           }
         />
       )}
