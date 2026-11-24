@@ -5,6 +5,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { RateFilter, TaxRate } from './types';
 
 import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/EmptyState';
 interface TaxRatesTableProps {
   rates: TaxRate[];
   filter: RateFilter;
@@ -115,32 +116,13 @@ export function TaxRatesTable({
   ];
 
   const emptyState = (
-    <div className="bg-card rounded-xl border border-border p-12 text-center">
-      <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-        <svg
-          className="w-8 h-8 text-muted-foreground"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-          />
-        </svg>
-      </div>
-      <h3 className="text-lg font-semibold text-foreground mb-2">{t('empty.title')}</h3>
-      <p className="text-muted-foreground mb-6">
-        {taxEnabled ? t('empty.enabled') : t('empty.disabled')}
-      </p>
-      {taxEnabled && (
-        <Button type="button" onClick={onAdd} variant="default">
-          {t('empty.createFirst')}
-        </Button>
-      )}
-    </div>
+    <EmptyState
+      card
+      icon="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+      title={t('empty.title')}
+      description={taxEnabled ? t('empty.enabled') : t('empty.disabled')}
+      action={taxEnabled ? { label: t('empty.createFirst'), onClick: onAdd } : undefined}
+    />
   );
 
   return (

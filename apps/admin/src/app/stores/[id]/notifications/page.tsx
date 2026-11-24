@@ -311,6 +311,7 @@ export default function NotificationsPage() {
 
               {pushEnabled && (
                 <PushChannelCard
+                  storeId={storeId}
                   config={configs.push_notifications}
                   saving={savingChannel === 'push_notifications'}
                   testing={testingChannel === 'push_notifications'}
