@@ -105,7 +105,7 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
       <AdminLayout title={pageTitle ?? featureName}>
         <div className="flex items-center justify-center min-h-[60vh] px-4 py-12">
           <div
-            className="w-full max-w-lg rounded-2xl border border-border bg-card p-8 shadow-sm"
+            className="w-full max-w-lg rounded-lg border border-border bg-card p-8 shadow-sm"
             role="status"
             dir={isAr ? 'rtl' : 'ltr'}
           >
