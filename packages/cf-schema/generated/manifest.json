@@ -139,7 +139,7 @@
       }
     },
     "d1": {
-      "tables": 32,
+      "tables": 33,
       "maxColumns": 38,
       "columnCounts": {
         "store_staff": 4,
@@ -162,6 +162,7 @@
         "billing_events": 33,
         "instapay_receipts": 38,
         "manual_payment_claims": 17,
+        "instapay_auto_confirmations": 21,
         "billing_reminders": 6,
         "store_lifecycle_emails": 6,
         "billing_webhook_events": 7,
@@ -1368,6 +1369,12 @@
       "name": "trust_requests_granted_limit_check",
       "table": "trust_requests",
       "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "check",
+      "name": "instapay_auto_confirmations_state_check",
+      "table": "instapay_auto_confirmations",
+      "disposition": "d1:instapay_auto_confirmations"
     },
     {
       "kind": "index",

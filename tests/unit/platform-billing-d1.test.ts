@@ -410,6 +410,7 @@ describe('cutover switch', () => {
         // N-10d
         'instapayReceipt',
         'manualPaymentClaim',
+        'instapayAutoConfirmation', // INSTAPAY-AUTO-1 (payments family, born on D1)
         'answerEngineProviderConfig',
         'storeUsageSnapshot',
         'ciInsight',

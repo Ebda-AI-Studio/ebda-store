@@ -1303,6 +1303,18 @@
       "reviewed_by": null
     }
   },
+  "d1:instapay_auto_confirmations": {
+    "db": "d1",
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["reverted_by"],
+    "subjectKeys": ["userId"],
+    "note": "auto-confirm decision rows; extracted_masked holds amount, reference, date and handle only (no payer PII), kept with the financial record, erased with the store",
+    "userIdColumns": ["reverted_by"],
+    "actorScrub": {
+      "reverted_by": null
+    }
+  },
   "d1:billing_reminders": {
     "db": "d1",
     "class": "no-pii",

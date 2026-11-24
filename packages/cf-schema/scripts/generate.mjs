@@ -792,6 +792,8 @@ const ANALYTICS_PLATFORM_TABLES = ['ai_usage'];
 const ONESIGNAL_PLATFORM_TABLES = ['onesignal_subscriptions'];
 // A13/A14/A16 trust requests, added after 0001 went live (a D1 that already ran 0001 never re-reads it).
 const TRUST_PLATFORM_TABLES = ['trust_requests'];
+// Ruling INSTAPAY-AUTO-1: the auto-confirm decision rows, added after 0001 went live.
+const INSTAPAY_AUTO_PLATFORM_TABLES = ['instapay_auto_confirmations'];
 const onlyTables = (db, names) => ({
   ...db,
   tables: db.tables.filter(t => names.includes(t.name)),
@@ -840,6 +842,10 @@ function main() {
     'migrations/platform/0012_trust_requests.sql': emitSql(
       onlyTables(out.d1, TRUST_PLATFORM_TABLES),
       'D1 trust_requests (A13/A14/A16), for a D1 that already ran 0001'
+    ),
+    'migrations/platform/0016_instapay_auto_confirm.sql': emitSql(
+      onlyTables(out.d1, INSTAPAY_AUTO_PLATFORM_TABLES),
+      'D1 instapay_auto_confirmations (Ruling INSTAPAY-AUTO-1), for a D1 that already ran 0001'
     ),
     ...Object.fromEntries(
       Object.entries(LATE_COLUMN_MIGRATIONS).map(([n, name]) => [

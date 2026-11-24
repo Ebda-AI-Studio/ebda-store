@@ -1134,7 +1134,6 @@
     "unused-export|apps/api/src/lib/wa/bridge/schemas.ts|chatPaymentMethod",
     "unused-export|apps/api/src/lib/wa/bridge/schemas.ts|newAddress",
     "unused-export|apps/api/src/lib/wa/bridge/schemas.ts|orderLine",
-    "unused-export|apps/api/src/lib/wa/bridge/service.ts|Bridge",
     "unused-export|apps/api/src/lib/wa/bridge/service.ts|BridgeDeps",
     "unused-export|apps/api/src/lib/wa/bridge/service.ts|BridgeFailure",
     "unused-export|apps/api/src/lib/wa/bridge/service.ts|BridgeResult",

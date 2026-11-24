@@ -1729,6 +1729,27 @@ export const adminReadLimiter = withoutLimitPlan(
   'keyed on req.user (set by authenticate, after the request-level prefetch)'
 );
 
+// The brain's HMAC-signed server-to-server calls (internal-instapay.routes.ts): no user, so keyed on the caller's address. The route
+// keeps its own per-isolate flood guard (per IP + global); this is the shared-store limiter CodeQL's missing-rate-limiting rule reads.
+const INTERNAL_BRIDGE_LIMIT_PER_MINUTE = 60;
+export const internalBridgeLimiter = withoutLimitPlan(
+  rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, 'internal-bridge'),
+    windowMs: 60 * 1000,
+    max: INTERNAL_BRIDGE_LIMIT_PER_MINUTE,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many requests' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skip: skipForLoadTest,
+    keyGenerator: req => `internal-bridge-${ipKeyGenerator(req.ip ?? '')}`,
+  }),
+  'keyed on the caller address: an HMAC-signed server-to-server call carries no req.user'
+);
+
 // Stricter limiter for payment operations
 export const paymentLimiter = plannedRateLimit('payment', {
   windowMs: 60 * 1000, // 1 minute

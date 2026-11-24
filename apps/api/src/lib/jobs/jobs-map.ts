@@ -235,6 +235,8 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
     alarm: true,
   },
   'instapay-receipt-extract': { group: '7-money', kind: 'queue', trigger: 'event' },
+  'instapay-auto-confirm': { group: '7-money', kind: 'queue', trigger: 'event' },
+  'instapay-auto-digest': { group: '7-money', kind: 'workflow', trigger: 'cron' },
   'order-auto-cancel-unpaid': {
     group: '7-money',
     kind: 'workflow',

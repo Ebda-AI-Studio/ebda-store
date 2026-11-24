@@ -52,6 +52,15 @@
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "../../packages/cf-schema/migrations/platform",
     },
+    // Ruling INSTAPAY-AUTO-1a: the platform-global InstaPay duplicate index, ONE D1 `ebda-instapay-dedupe` shared with Ebda Chat
+    // (separate database per environment). Its own placeholder id: scripts/ebda-cf-api-config.mjs substitutes EBDA_INSTAPAY_DEDUPE_D1_ID,
+    // or drops this binding from the deploy config while the variable is unset (the code then fails closed: every receipt waits for a person).
+    {
+      "binding": "INSTAPAY_DEDUPE_DB",
+      "database_name": "ebda-instapay-dedupe",
+      "database_id": "11111111-1111-1111-1111-111111111111",
+      "migrations_dir": "../../packages/cf-schema/migrations/instapay-dedupe",
+    },
   ],
 
   // Public caches (store / product payloads). Placeholder ids: `wrangler kv namespace create`.

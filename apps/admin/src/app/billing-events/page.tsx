@@ -31,6 +31,7 @@ import { useT } from '../../i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useLatestRequest } from '../../hooks/useLatestRequest';
 import { ClaimsPanel } from './_components/ClaimsPanel';
+import { AutoConfirmPanel } from './_components/AutoConfirmPanel';
 import { ManualPaymentForm, type ManualPaymentPrefill } from './_components/ManualPaymentForm';
 import { ManualRefundForm, type ManualRefundTarget } from './_components/ManualRefundForm';
 import { GrantsPanel } from './_components/GrantsPanel';
@@ -77,7 +78,7 @@ const TYPE_FILTERS = [
   'card_setup',
   'manual_payment',
 ] as const;
-const TABS = ['ledger', 'subscriptions', 'claims', 'grants'] as const;
+const TABS = ['ledger', 'subscriptions', 'claims', 'auto', 'grants'] as const;
 
 function statusVariant(s: string): 'success' | 'warning' | 'destructive' | 'default' {
   if (s === 'succeeded') return 'success';
@@ -428,6 +429,15 @@ function BillingEventsInner() {
           <SubscriptionsPanel refreshKey={refreshKey} onRecordPayment={setForm} />
         )}
         {tab === 'grants' && <GrantsPanel refreshKey={refreshKey} />}
+        {tab === 'auto' && (
+          <AutoConfirmPanel
+            refreshKey={refreshKey}
+            onChanged={m => {
+              setMessage(m);
+              setRefreshKey(k => k + 1);
+            }}
+          />
+        )}
         {tab === 'claims' && (
           <ClaimsPanel
             refreshKey={refreshKey}

@@ -778,9 +778,21 @@ export async function listStoreClaims(storeId: string) {
           where: { storeId, claimId: { in: claims.map(c => c.id) } },
         })
       : [];
+    // INSTAPAY-AUTO-1: what the auto-confirm path did with each claim, in the merchant's words (state + the end of the 48 h grace only)
+    const autos = claims.length
+      ? await tx.instapayAutoConfirmation.findMany({
+          where: { storeId, claimId: { in: claims.map(c => c.id) } },
+          select: { claimId: true, state: true, graceUntil: true },
+        })
+      : [];
     return claims.map(c => {
       const r = receipts.find(x => x.claimId === c.id);
-      return { ...c, receipt: r ? toReceiptView(r) : null };
+      const a = autos.find(x => x.claimId === c.id);
+      return {
+        ...c,
+        receipt: r ? toReceiptView(r) : null,
+        autoConfirm: a ? { state: a.state, graceUntil: a.graceUntil } : null,
+      };
     });
   });
 }
@@ -1065,6 +1077,19 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     return approvedReceiptIds;
   };
 
+  // INSTAPAY-AUTO-1 (review I2): a person's confirmation claims the receipt in the platform-global duplicate index BEFORE money moves. A
+  // receipt already claimed elsewhere (another merchant, Ebda Chat) is refused; an index error is refused; no index bound = today's path.
+  // A claim this call made is released if the payment then fails.
+  const preclaim =
+    input.actorId !== 'system:auto-confirm' && input.method === 'instapay'
+      ? await (
+          await import('./instapay-auto-confirm.service.js')
+        ).preclaimForHumanConfirm({
+          storeId: input.storeId,
+          claimId: input.claimId ?? null,
+          reference,
+        })
+      : null;
   const result = await withStore(input.storeId, async (tx: Tx) => {
     const existing = await tx.billingEvent.findUnique({
       where: { idempotencyKey: key, storeId: input.storeId },
@@ -1241,6 +1266,9 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       periodEnd,
       approvedReceiptIds,
     };
+  }).catch(async err => {
+    await preclaim?.release();
+    throw err;
   });
 
   if (!result.duplicate) {
@@ -1294,6 +1322,14 @@ export interface ManualRefundInput {
   newPeriodEnd?: Date | null;
   screenshot?: Buffer | null;
   actorId: string;
+  /**
+   * INSTAPAY-AUTO-1 ("not received" revert): when this void takes back the period the store is currently on and that leaves it overdue,
+   * the store goes `past_due` with `nextRetryAt = graceUntil` (the cycle suspends it then if unpaid) instead of the default grace.
+   * Omitted = unchanged behaviour.
+   */
+  graceUntil?: Date | null;
+  /** INSTAPAY-AUTO-1: a void that keeps the claim's payer reference (it stays burned, never reusable). Omitted = the reference is freed. */
+  keepReference?: boolean;
   now?: Date;
 }
 
@@ -1409,9 +1445,10 @@ async function recordManualRefundInner(input: ManualRefundInput) {
           ? {
               currentPeriodEnd: target,
               status: 'past_due',
-              nextRetryAt: new Date(
-                Math.max(now.getTime(), addDays(target, INSTAPAY_GRACE_DAYS).getTime())
-              ),
+              nextRetryAt: input.graceUntil
+                ? input.graceUntil
+                : new Date(Math.max(now.getTime(), addDays(target, INSTAPAY_GRACE_DAYS).getTime())),
+              ...(input.graceUntil ? { dunningAttempts: 0 } : {}),
             }
           : { currentPeriodEnd: target },
       });
@@ -1464,11 +1501,15 @@ async function recordManualRefundInner(input: ManualRefundInput) {
         await tx.manualPaymentClaim.update({
           where: { id: c.id, storeId },
           data: {
-            payerReference: freedReference(c.payerReference, c.id, 'voided'),
+            ...(input.keepReference
+              ? {}
+              : { payerReference: freedReference(c.payerReference, c.id, 'voided') }),
             reviewNote: `voided: ${note}`.slice(0, 500),
           },
         });
-        await InstapayReceiptService.voidByClaim(storeId, c.id, note, input.actorId);
+        await InstapayReceiptService.voidByClaim(storeId, c.id, note, input.actorId, {
+          keepReference: input.keepReference === true,
+        });
       }
     }
     return {
@@ -1491,10 +1532,21 @@ async function recordManualRefundInner(input: ManualRefundInput) {
 }
 
 // The D1 reference claims these free (Ruling INSTAPAY-DO-1) are released only after the transaction commits.
-export const rejectClaim = (args: Parameters<typeof rejectClaimInner>[0]) =>
-  withClaimReleases(() => rejectClaimInner(args));
+export const rejectClaim = async (args: Parameters<typeof rejectClaimInner>[0]) => {
+  const out = await withClaimReleases(() => rejectClaimInner(args));
+  // INSTAPAY-AUTO-1: a rejected claim frees the global dedupe entries its waiting decision held (never an auto-confirmed one).
+  const { releaseDedupeAfterReject } = await import('./instapay-auto-confirm.service.js');
+  await releaseDedupeAfterReject(args.storeId, args.claimId).catch(() => undefined);
+  return out;
+};
 export const recordManualRefund = (input: Parameters<typeof recordManualRefundInner>[0]) =>
   withClaimReleases(() => recordManualRefundInner(input));
-export const submitSubscriptionReceipt = (
+export const submitSubscriptionReceipt = async (
   args: Parameters<typeof submitSubscriptionReceiptInner>[0]
-) => withClaimReleases(() => submitSubscriptionReceiptInner(args));
+) => {
+  const out = await withClaimReleases(() => submitSubscriptionReceiptInner(args));
+  // INSTAPAY-AUTO-1: ask the auto-confirm job to decide, AFTER the claim committed. Never throws (fail-fast inside) and never blocks the merchant.
+  const { enqueueAutoConfirm } = await import('./instapay-auto-confirm.service.js');
+  await enqueueAutoConfirm(args.storeId, out.claim.id).catch(() => undefined);
+  return out;
+};

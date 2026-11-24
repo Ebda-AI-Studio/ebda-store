@@ -47,6 +47,8 @@ import { goldRateStalenessWatchCron } from './gold-rate-staleness-watch';
 import { accountingProfitAnomalyCron } from './accounting-profit-anomaly';
 import { accountingExpenseOcrProcess } from './accounting-expense-ocr-process';
 import { instapayReceiptExtract } from './instapay-receipt-extract';
+import { instapayAutoConfirm } from './instapay-auto-confirm';
+import { instapayAutoDigest } from './instapay-auto-digest';
 import { analyticsDailyRollupCron, analyticsRollupOnDemand } from './analytics-daily-rollup';
 import { analyticsFunnelBackfill } from './analytics-funnel-backfill';
 import { analyticsRefundCorrection } from './analytics-refund-correction';
@@ -158,6 +160,8 @@ const allInngestFunctions: JobDef[] = [
   accountingProfitAnomalyCron,
   accountingExpenseOcrProcess,
   instapayReceiptExtract,
+  instapayAutoConfirm,
+  instapayAutoDigest,
   analyticsDailyRollupCron,
   analyticsRefundCorrection,
   analyticsFunnelBackfill,

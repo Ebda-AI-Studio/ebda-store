@@ -52,7 +52,12 @@ import { inngest } from '../../lib/inngest/client';
 import { isP2002 } from '../../lib/prisma-errors';
 import { withSavepoint } from '../../lib/savepoint';
 import { StorageService } from '../storage.service';
-import { readInstapayReceipt } from '../../lib/ai/instapay-receipt-reader';
+import {
+  readInstapayReceipt,
+  readReceiptForAutoConfirm,
+} from '../../lib/ai/instapay-receipt-reader';
+import type { ParsedExtraction } from '@ebda/shared';
+import { getAutoMode } from '../billing/instapay-auto-settings';
 import { instapayHandle } from '../billing/manual-config';
 
 export type ReceiptKind = 'subscription' | 'order';
@@ -220,13 +225,26 @@ export function receiptFromDo(r: DoReceipt): ReceiptRow {
   } as unknown as ReceiptRow;
 }
 
+/** The auto-confirm read (`extracted.auto`, INSTAPAY-AUTO-1) is decision input for the API only: never part of a view. */
+function withoutAutoRead(extracted: unknown): InstapayReceiptExtraction | null {
+  if (!extracted || typeof extracted !== 'object') return null;
+  const { auto: _auto, ...rest } = extracted as Record<string, unknown>;
+  return rest as unknown as InstapayReceiptExtraction;
+}
+
+/** The auto-confirm read stored on a subscription receipt, or null when none was attempted. */
+export function autoReadOf(extracted: unknown): { read: ParsedExtraction | null } | null {
+  const a = (extracted as { auto?: { read?: ParsedExtraction | null } } | null)?.auto;
+  return a ? { read: a.read ?? null } : null;
+}
+
 export function toReceiptView(r: ReceiptRow): InstapayReceiptView {
   return {
     id: r.id,
     kind: r.kind as ReceiptKind,
     status: r.status as InstapayReceiptView['status'],
     extractionStatus: r.extractionStatus as InstapayReceiptView['extractionStatus'],
-    extracted: (r.extracted as unknown as InstapayReceiptExtraction | null) ?? null,
+    extracted: withoutAutoRead(r.extracted),
     confidence: r.confidence,
     fields: {
       amountMinor: r.amountMinor,
@@ -488,6 +506,60 @@ export class InstapayReceiptService {
       await this.markExtractionFailed(storeId, receiptId, String(code));
       return 'failed';
     }
+  }
+
+  /**
+   * INSTAPAY-AUTO-1 (S3): the typed auto-confirm read of a SUBSCRIPTION receipt, stored on the receipt row beside the legacy extraction
+   * (`extracted.auto`, never shown in a view). Runs only while the global mode is not `off` (no extra AI spend with the switch off),
+   * once per receipt, and a failed read is stored as `read: null` so the decision can tell "tried, unreadable" from "not tried yet".
+   * Order receipts never come through here (M-003).
+   */
+  static async runAutoExtraction(
+    storeId: string,
+    receiptId: string
+  ): Promise<'done' | 'skipped' | 'unreadable'> {
+    const row = await withStore(storeId, tx =>
+      tx.instapayReceipt.findUnique({ where: { id: receiptId, storeId } })
+    );
+    if (!row || row.kind !== 'subscription') return 'skipped';
+    if (autoReadOf(row.extracted)) return 'skipped';
+    if ((await getAutoMode()) === 'off') return 'skipped';
+    let read: ParsedExtraction | null = null;
+    try {
+      const { body } = await StorageService.getPrivate(row.storageKey);
+      read = await readReceiptForAutoConfirm({ bytes: body, mime: row.mimeType }, { storeId });
+    } catch (err) {
+      logger.warn({ err, storeId, receiptId }, '[instapay-receipt] auto read failed');
+    }
+    const base = (
+      row.extracted && typeof row.extracted === 'object' ? row.extracted : {}
+    ) as object;
+    await withStore(storeId, tx =>
+      tx.instapayReceipt.updateMany({
+        where: { id: receiptId, storeId },
+        data: {
+          extracted: {
+            ...base,
+            auto: { read, at: new Date().toISOString() },
+          } as unknown as Prisma.InputJsonValue,
+        },
+      })
+    );
+    return read?.extract ? 'done' : 'unreadable';
+  }
+
+  /** A claim submitted before the typed read landed is decided once the read is stored (the stuck sweep covers a lost event). */
+  static async enqueueIfClaimed(
+    storeId: string,
+    receiptId: string
+  ): Promise<'queued' | 'skipped' | 'failed'> {
+    const row = await withStore(storeId, tx =>
+      tx.instapayReceipt.findUnique({ where: { id: receiptId, storeId } })
+    );
+    if (!row?.claimId || row.kind !== 'subscription' || row.status !== 'submitted')
+      return 'skipped';
+    const { enqueueAutoConfirm } = await import('../billing/instapay-auto-confirm.service.js');
+    return enqueueAutoConfirm(storeId, row.claimId);
   }
 
   private static async runExtractionOnDo(
@@ -1030,16 +1102,25 @@ export class InstapayReceiptService {
   }
 
   /** Free a (approved) receipt's reference after its payment was VOIDED (recorded in error). */
-  static async voidByClaim(storeId: string, claimId: string, note: string, actorId: string) {
-    const freed = await prisma.instapayReceipt.findMany({
-      where: { storeId, claimId, referenceKey: { not: null } },
-      select: { id: true, referenceKey: true },
-    });
+  static async voidByClaim(
+    storeId: string,
+    claimId: string,
+    note: string,
+    actorId: string,
+    opts: { keepReference?: boolean } = {}
+  ) {
+    const freed = opts.keepReference
+      ? []
+      : await prisma.instapayReceipt.findMany({
+          where: { storeId, claimId, referenceKey: { not: null } },
+          select: { id: true, referenceKey: true },
+        });
     const res = await prisma.instapayReceipt.updateMany({
       where: { storeId, claimId },
       data: {
         status: 'voided',
-        referenceKey: null,
+        // INSTAPAY-AUTO-1: a "not received" receipt keeps its reference (and its D1 claim) so it can never be submitted again
+        ...(opts.keepReference ? {} : { referenceKey: null }),
         reviewNote: note.slice(0, 500),
         reviewedBy: actorId,
         reviewedAt: new Date(),

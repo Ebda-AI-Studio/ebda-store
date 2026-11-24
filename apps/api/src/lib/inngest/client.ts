@@ -169,6 +169,12 @@ type InstapayReceiptExtractEvent = EventPayload & {
   data: { storeId: string; receiptId: string };
 };
 
+/** InstaPay auto-confirm (Ruling INSTAPAY-AUTO-1): decide and, when everything matches, activate one subscription claim. */
+type InstapayAutoConfirmRequestedEvent = EventPayload & {
+  name: 'instapay/auto-confirm.requested';
+  data: { storeId: string; claimId: string };
+};
+
 type AccountingExpenseOcrProcessEvent = EventPayload & {
   name: 'accounting/expense-ocr-process';
   data: {
@@ -437,6 +443,7 @@ export type AppEvent =
   | WarehouseReconcileRequestedEvent
   | AccountingExpenseOcrProcessEvent
   | InstapayReceiptExtractEvent
+  | InstapayAutoConfirmRequestedEvent
   | InsightsRollupRequestedEvent
   | InsightsFunnelBackfillRequestedEvent
   | PaymentWebhookReceivedEvent

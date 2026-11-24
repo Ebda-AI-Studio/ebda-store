@@ -30,6 +30,7 @@ import { requireRole } from './middleware/rbac';
 import routes from './routes';
 import webhookRoutes from './routes/webhook.routes';
 import billingWebhookRoutes from './routes/billing-webhook.routes';
+import internalInstapayRoutes from './routes/internal-instapay.routes';
 import { assertBillingConfigAtBoot, billingProviderUnsetWarning } from './services/billing';
 import alertWebhookRoutes from './routes/alert-webhooks.routes';
 import { setupSwagger } from './docs/swagger';
@@ -455,6 +456,13 @@ app.use(
   '/api/v1/webhooks/billing',
   express.raw({ type: () => true, limit: '1mb' }),
   billingWebhookRoutes
+);
+
+// InstaPay auto-confirm: the brain's signed one-tap "not received" (INSTAPAY-AUTO-1). Raw body for the HMAC, before the JSON parser.
+app.use(
+  '/internal/instapay',
+  express.raw({ type: () => true, limit: '16kb' }),
+  internalInstapayRoutes
 );
 
 // Webhook routes need raw body parsing (must be before json middleware)

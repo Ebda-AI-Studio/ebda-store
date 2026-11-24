@@ -1607,6 +1607,18 @@
           "to": ["store_id"],
           "toProps": ["storeId"]
         },
+        "instapayAutoConfirmations": {
+          "kind": "relation",
+          "type": "InstapayAutoConfirmation",
+          "list": true,
+          "optional": false,
+          "external": false,
+          "owner": false,
+          "from": ["id"],
+          "fromProps": ["id"],
+          "to": ["store_id"],
+          "toProps": ["storeId"]
+        },
         "instapayReceipts": {
           "kind": "relation",
           "type": "InstapayReceipt",
@@ -20083,6 +20095,179 @@
           "kind": "scalar",
           "type": "String",
           "column": "billing_event_id",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "updated_at",
+          "list": false,
+          "optional": false,
+          "updatedAt": true
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": false,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "InstapayAutoConfirmation": {
+      "table": "instapay_auto_confirmations",
+      "db": "d1",
+      "pk": ["id"],
+      "uniques": [["claimId"], ["idempotencyKey"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "claimId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "claim_id",
+          "list": false,
+          "optional": false
+        },
+        "receiptId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "receipt_id",
+          "list": false,
+          "optional": false
+        },
+        "state": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "state",
+          "list": false,
+          "optional": false,
+          "default": "\"pending_decision\""
+        },
+        "verdict": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "verdict",
+          "list": false,
+          "optional": true
+        },
+        "reasons": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "reasons",
+          "list": true,
+          "optional": false
+        },
+        "amountMinor": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "amount_minor",
+          "list": false,
+          "optional": true
+        },
+        "expectedAmountMinor": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "expected_amount_minor",
+          "list": false,
+          "optional": false
+        },
+        "isFirstPayment": {
+          "kind": "scalar",
+          "type": "Boolean",
+          "column": "is_first_payment",
+          "list": false,
+          "optional": false
+        },
+        "extractedMasked": {
+          "kind": "scalar",
+          "type": "Json",
+          "column": "extracted_masked",
+          "list": false,
+          "optional": true
+        },
+        "idempotencyKey": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "idempotency_key",
+          "list": false,
+          "optional": false
+        },
+        "billingEventId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "billing_event_id",
+          "list": false,
+          "optional": true
+        },
+        "confirmedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "confirmed_at",
+          "list": false,
+          "optional": true
+        },
+        "digestSentAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "digest_sent_at",
+          "list": false,
+          "optional": true
+        },
+        "revertedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "reverted_at",
+          "list": false,
+          "optional": true
+        },
+        "revertedBy": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "reverted_by",
+          "list": false,
+          "optional": true
+        },
+        "revertReason": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "revert_reason",
+          "list": false,
+          "optional": true
+        },
+        "graceUntil": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "grace_until",
           "list": false,
           "optional": true
         },

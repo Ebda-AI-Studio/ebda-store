@@ -189,6 +189,37 @@ export const entityIndex = sqliteTable(
   t => [primaryKey({ columns: [t.kind, t.id] })]
 );
 
+export const instapayAutoConfirmations = sqliteTable('instapay_auto_confirmations', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  claimId: text('claim_id').notNull(),
+  receiptId: text('receipt_id').notNull(),
+  state: text('state').notNull().default('pending_decision'),
+  verdict: text('verdict'),
+  reasons: text('reasons', { mode: 'json' }).$type<string[]>().notNull(),
+  amountMinor: integer('amount_minor'),
+  expectedAmountMinor: integer('expected_amount_minor').notNull(),
+  isFirstPayment: integer('is_first_payment', { mode: 'boolean' }).notNull(),
+  extractedMasked: text('extracted_masked', { mode: 'json' }).$type<unknown>(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  billingEventId: text('billing_event_id'),
+  confirmedAt: integer('confirmed_at', { mode: 'timestamp_ms' }),
+  digestSentAt: integer('digest_sent_at', { mode: 'timestamp_ms' }),
+  revertedAt: integer('reverted_at', { mode: 'timestamp_ms' }),
+  revertedBy: text('reverted_by'),
+  revertReason: text('revert_reason'),
+  graceUntil: integer('grace_until', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const instapayReceipts = sqliteTable('instapay_receipts', {
   id: text('id')
     .primaryKey()

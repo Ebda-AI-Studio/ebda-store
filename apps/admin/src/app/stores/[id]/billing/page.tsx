@@ -32,6 +32,7 @@ import { useT } from '../../../../i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
 import { DataTable } from '@/components/mobile/DataTable';
 import { InstapayPanel } from '../../../../components/billing/InstapayPanel';
+import { AutoConfirmStatus } from '../../../../components/billing/AutoConfirmStatus';
 import { SupportLink } from '../../../../components/billing/SupportLink';
 import { InstapayReceiptForm } from '../../../../components/instapay/InstapayReceiptForm';
 import {
@@ -1024,6 +1025,17 @@ export default function StoreBillingPage() {
                           {formatMoney(c.amountMinor, locale, { fixedDecimals: true })} ·{' '}
                           {fmtBillingDate(c.createdAt, locale)}
                         </p>
+                        <AutoConfirmStatus
+                          claim={c}
+                          onPayByCard={
+                            info?.cardBilling === false
+                              ? undefined
+                              : () => void subscribe(c.planCode)
+                          }
+                          onUpload={() =>
+                            document.getElementById('instapay-upload')?.scrollIntoView()
+                          }
+                        />
                         {c.reviewNote && <p className="mt-1">{c.reviewNote}</p>}
                         {c.status === 'rejected' && instapayChosen && (
                           <a

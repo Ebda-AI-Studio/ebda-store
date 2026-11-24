@@ -501,6 +501,7 @@ model Store {
   subscription               StoreSubscription?
   billingEvents              BillingEvent[]
   manualPaymentClaims        ManualPaymentClaim[]
+  instapayAutoConfirmations  InstapayAutoConfirmation[]
   instapayReceipts           InstapayReceipt[]
   billingReminders           BillingReminder[]
   lifecycleEmails            StoreLifecycleEmail[]
@@ -5447,6 +5448,43 @@ model ManualPaymentClaim {
   @@index([storeId, createdAt(sort: Desc)])
   @@index([status])
   @@map("manual_payment_claims")
+}
+
+/// One row per InstaPay receipt the auto-confirm path looked at (Ruling INSTAPAY-AUTO-1): the typed decision, every reason code, the
+/// lifecycle state (foundation `instapay-state`), the revert trail. Kept with the financial record; `extractedMasked` holds
+/// amount, reference, date and handle only (no payer PII, never the image). RLS: strict store policy.
+model InstapayAutoConfirmation {
+  id                  String    @id @default(uuid())
+  storeId             String    @map("store_id")
+  claimId             String    @unique @map("claim_id")
+  receiptId           String    @map("receipt_id")
+  /// pending_decision | auto_confirmed | needs_human | reverted | failed
+  state               String    @default("pending_decision")
+  /// auto_confirm | needs_human: the decision (kept for a shadow row, whose state is needs_human)
+  verdict             String?
+  reasons             String[]
+  /// what the receipt showed (null when unreadable); piastres
+  amountMinor         Int?      @map("amount_minor")
+  expectedAmountMinor Int       @map("expected_amount_minor")
+  isFirstPayment      Boolean   @map("is_first_payment")
+  extractedMasked     Json?     @map("extracted_masked")
+  idempotencyKey      String    @unique @map("idempotency_key")
+  billingEventId      String?   @map("billing_event_id")
+  confirmedAt         DateTime? @map("confirmed_at")
+  /// set ONLY when the brain answered `sent:true` for a digest that listed this payment (INSTAPAY-CLEAN-1)
+  digestSentAt        DateTime? @map("digest_sent_at")
+  revertedAt          DateTime? @map("reverted_at")
+  revertedBy          String?   @map("reverted_by")
+  revertReason        String?   @map("revert_reason")
+  graceUntil          DateTime? @map("grace_until")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt(sort: Desc)])
+  @@index([state, digestSentAt])
+  @@map("instapay_auto_confirmations")
 }
 
 /// One reminder per (subscription, due date, kind): the daily job's idempotency

@@ -9,7 +9,8 @@ export type SubscriptionBillingNoticeKind =
   | 'store_suspended'
   | 'payment_confirmed'
   | 'payment_rejected'
-  | 'store_restored';
+  | 'store_restored'
+  | 'instapay_not_received';
 
 export interface SubscriptionBillingNoticeData {
   kind: SubscriptionBillingNoticeKind;
@@ -20,6 +21,8 @@ export interface SubscriptionBillingNoticeData {
   paidUntil?: string;
   /** payment_rejected: the reviewer's reason. */
   reason?: string;
+  /** instapay_not_received: the end of the 48 h grace (ISO date text). */
+  graceUntil?: string;
   /** payment_failed: when the next automatic retry happens (ISO date text). */
   retryOn?: string;
   billingUrl: string;
@@ -107,6 +110,14 @@ function dueText(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): string {
     : `${amount} for the <strong>${plan}</strong> plan is due on ${on}.`;
 }
 
+/** The one plain sentence of the "not received" revert (INSTAPAY-AUTO-1), shared by the email and the in-app banner copy. */
+export function notReceivedText(graceUntil: string | undefined, lang: 'en' | 'ar'): string {
+  const date = graceUntil ?? '';
+  return lang === 'ar'
+    ? `الدفع ما وصلش. ارفع إيصال صح أو ادفع بالكارت قبل ${date} عشان الخدمات المدفوعة ما تقفش.`
+    : `The payment did not arrive. Upload a correct receipt or pay by card before ${date} so paid features do not pause.`;
+}
+
 /** Money batch A notices: the review outcome of an InstaPay payment, and the store coming back. */
 function reviewNotice(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): string | null {
   const store = escapeHtml(d.storeName);
@@ -123,6 +134,12 @@ function reviewNotice(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): stri
     <p dir="rtl">فريق ${BRAND.company.shortNameAr} راجع الإيصال الخاص بمتجر <strong>${store}</strong> ولم يقبله. السبب: ${escapeHtml(d.reason ?? '')}</p>
     <p dir="rtl">افتح صفحة الاشتراك وارفع إيصال التحويل الصحيح، أو كلّمنا.</p>
     <p dir="rtl"><a href="${link}">افتح صفحة الاشتراك</a></p>
+    ${whatsappLine(d, 'ar')}`;
+    if (d.kind === 'instapay_not_received')
+      return `
+    <h2 dir="rtl">الدفع ما وصلش</h2>
+    <p dir="rtl">${escapeHtml(notReceivedText(d.graceUntil, 'ar'))}</p>
+    <p dir="rtl"><a href="${link}">ارفع إيصال</a> · <a href="${link}">ادفع بالكارت</a></p>
     ${whatsappLine(d, 'ar')}`;
     if (d.kind === 'store_restored')
       return `
@@ -143,6 +160,12 @@ function reviewNotice(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): stri
     <p>Open billing and upload the right transfer receipt, or contact us.</p>
     <p><a href="${link}">Open billing</a></p>
     ${whatsappLine(d, 'en')}`;
+  if (d.kind === 'instapay_not_received')
+    return `
+    <h2>Your payment did not arrive</h2>
+    <p>${escapeHtml(notReceivedText(d.graceUntil, 'en'))}</p>
+    <p><a href="${link}">Upload a receipt</a> · <a href="${link}">Pay by card</a></p>
+    ${whatsappLine(d, 'en')}`;
   if (d.kind === 'store_restored')
     return `
     <h2>Your store is back</h2>
@@ -160,11 +183,15 @@ const reviewSubject = (d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): str
       ? lang === 'ar'
         ? `${d.storeName}: لم نقبل إيصال التحويل`
         : `${d.storeName}: we could not accept your transfer receipt`
-      : d.kind === 'store_restored'
+      : d.kind === 'instapay_not_received'
         ? lang === 'ar'
-          ? `${d.storeName}: متجرك رجع يشتغل`
-          : `${d.storeName}: your store is back`
-        : null;
+          ? `${d.storeName}: الدفع ما وصلش`
+          : `${d.storeName}: your payment did not arrive`
+        : d.kind === 'store_restored'
+          ? lang === 'ar'
+            ? `${d.storeName}: متجرك رجع يشتغل`
+            : `${d.storeName}: your store is back`
+          : null;
 
 /**
  * Merchant notices from the subscription dunning cycle (SP5 task 3): a failed

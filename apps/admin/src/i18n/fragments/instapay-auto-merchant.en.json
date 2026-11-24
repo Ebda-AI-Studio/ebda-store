@@ -1,0 +1,15 @@
+{
+  "billing": {
+    "autoConfirm": {
+      "checking": "Checking",
+      "confirmed": "Confirmed automatically",
+      "waiting": "Waiting for review",
+      "revertedTitle": "The payment did not arrive",
+      "revertedBody": "The payment did not arrive. Upload a correct receipt or pay by card before {date} so paid features do not pause.",
+      "countdown": "{hours}h {minutes}m left",
+      "graceOver": "The grace period is over.",
+      "uploadReceipt": "Upload a receipt",
+      "payByCard": "Pay by card"
+    }
+  }
+}

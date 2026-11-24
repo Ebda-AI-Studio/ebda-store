@@ -26,6 +26,7 @@ const TENANT_TABLES = [
   'trust_requests',
   'instapay_receipts',
   'manual_payment_claims',
+  'instapay_auto_confirmations',
   'store_usage_snapshots',
   'onesignal_subscriptions',
 ];
@@ -40,6 +41,7 @@ const TENANT_MODELS = [
   'trustRequest',
   'instapayReceipt',
   'manualPaymentClaim',
+  'instapayAutoConfirmation',
   'storeUsageSnapshot',
   'oneSignalSubscription',
 ];
@@ -63,6 +65,10 @@ const EXEMPT_CALLS: Record<string, string> = {
     "same `where` as the list above: built from the caller's storeId",
   'services/billing/account.service.ts::manualPaymentClaim.findMany':
     "super_admin claim queue (oldest 200 by status), reached only from the payments-confirm route's role gate",
+  'services/billing/instapay-auto-confirm.service.ts::instapayAutoConfirmation.findUnique':
+    'idempotency-key lookups inside withStore(storeId, ...): the key embeds the receipt id, which belongs to that store (the store scope is the filter on D1 and RLS on Postgres)',
+  'services/billing/instapay-auto-confirm.service.ts::instapayAutoConfirmation.findMany':
+    'listAutoConfirmationsForAdmin: super_admin queue across stores, behind requireRole(super_admin)',
   'services/legal-notice.service.ts::legalAcceptance.count':
     'super_admin legal-notice progress: acceptances of one document version across stores (platform-wide count, no row leaves)',
   'services/onesignal.service.ts::oneSignalSubscription.findMany':
