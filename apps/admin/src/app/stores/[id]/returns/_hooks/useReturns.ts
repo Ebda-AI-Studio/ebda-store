@@ -66,6 +66,8 @@ export const COMPLETE_ERROR_CODES = new Set([
   'MANUAL_PROVIDER_REFUND',
   // A merchant-opened return that covers every line cannot skip a restock (STORE-QA-76): refused at the claim, before money moves.
   'FULL_RETURN_RESTOCK_ALL',
+  // REFUND-GATE-1: restock needs the `returns` plan feature; the money refund itself is never plan-gated.
+  'RETURNS_FEATURE_REQUIRED_FOR_RESTOCK',
 ]);
 
 /**
