@@ -43,7 +43,7 @@ export function GoldRateBanner({ storeId }: { storeId: string }) {
   return (
     <div
       role="alert"
-      className="mb-6 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm"
+      className="mb-6 rounded-md border border-warning/40 bg-warning/10 p-4 text-sm"
     >
       <p className="font-medium">
         {state.disagreement ? t('disagree') : stale ? t('stale') : t('pending')}

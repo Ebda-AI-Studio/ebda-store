@@ -15,7 +15,7 @@ export function GscNotConnected({ setup }: { setup?: GscDashboard['setup'] }) {
   const t = useT('answerEngine.gsc');
 
   return (
-    <div className="bg-card rounded-xl border border-dashed border-border p-6 text-center">
+    <div className="bg-card rounded-md border border-dashed border-border p-6 text-center">
       <p className="text-sm font-medium text-foreground" dir="auto">
         {t(
           setup === 'verifying'

@@ -985,6 +985,16 @@
     "feature": "staff_accounts"
   },
   {
+    "id": "page:/activity",
+    "kind": "page",
+    "route": "/activity",
+    "access": "owner",
+    "en": "Store activity",
+    "ar": "نشاط المتجر",
+    "synEn": "audit log history who changed activity",
+    "synAr": "سجل نشاط مين غيّر تاريخ"
+  },
+  {
     "id": "page:/features",
     "kind": "page",
     "route": "/features",
@@ -1310,6 +1320,18 @@
     "ar": "معدلات الضريبة",
     "synEn": "vat rate 14% add tax rate percentage",
     "synAr": "معدل الضريبة نسبة 14 اضافة ضريبة",
+    "pageEn": "Tax & VAT",
+    "pageAr": "الضريبة"
+  },
+  {
+    "id": "tax.change-request",
+    "kind": "setting",
+    "route": "/tax",
+    "access": "owner",
+    "en": "Change your VAT registration details",
+    "ar": "غيّر بيانات التسجيل الضريبي",
+    "synEn": "change tax number legal name vat registration verified update trn",
+    "synAr": "تغيير الرقم الضريبي الاسم القانوني التسجيل الضريبي تحديث",
     "pageEn": "Tax & VAT",
     "pageAr": "الضريبة"
   },
