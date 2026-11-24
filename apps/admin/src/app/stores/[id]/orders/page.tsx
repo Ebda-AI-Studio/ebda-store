@@ -7,6 +7,7 @@ import { useToast } from '@ebda/ui';
 import { buttonVariants } from '@/components/ui/Button';
 import { RowActions } from '../../../../components/RowActions';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { PlanLimitNotice } from '@/components/billing/PlanLimitNotice';
 import { DateRangePicker } from '../../../../components/DateRangePicker';
 import { apiGet, apiPut, apiPost, apiFetch } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
@@ -443,6 +444,8 @@ export default function StoreOrdersPage() {
         </div>
       }
     >
+      <PlanLimitNotice storeId={storeId} keys={['maxOrdersPerMonth']} />
+
       <DateRangePicker
         period={period}
         custom={customRange}

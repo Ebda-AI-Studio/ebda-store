@@ -4,6 +4,7 @@
  * worker.ts), never over HTTP. Token contract: business/ebda/plans/2026-10-24-ebda-identity-token-contract.md.
  */
 import { prisma, withUser } from '@ebda/database';
+import { BRAND } from '@ebda/shared';
 import { liveStoreIdsD1, onAccessD1 } from '../services/platform/access-d1';
 import { config } from '../config';
 import { lookupStore, ownedStoreIds } from './definer';
@@ -12,6 +13,8 @@ import {
   sendStaffInviteEmail,
   sendFactorEnrolCodeEmail,
   sendFactorAddedNoticeEmail,
+  sendRecoveryCodesChangedNoticeEmail,
+  sendChatMemberAddedEmail,
   sendMerchantVerificationEmail,
 } from '../services/platform-mailer';
 
@@ -79,7 +82,7 @@ export async function storeActive(storeId: string): Promise<boolean> {
 
 export interface CodeMail {
   to: string;
-  kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol';
+  kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol' | 'chat_invite';
   code: string;
   language: 'en' | 'ar';
   firstName: string;
@@ -109,6 +112,17 @@ export async function sendCodeMail(m: CodeMail): Promise<void> {
       m.language,
       true
     );
+  } else if (m.kind === 'chat_invite') {
+    await sendChatMemberAddedEmail(
+      {
+        email: m.to,
+        name: m.firstName,
+        workspaceName: m.storeName ?? 'Ebda Chat',
+        chatUrl: `https://${BRAND.domains.whatsappApp}/`,
+        setPasswordUrl: `${config.adminUrl}/reset-password?${q}`,
+      },
+      m.language
+    );
   } else if (m.kind === 'staff_invite') {
     await sendStaffInviteEmail(
       {
@@ -136,16 +150,34 @@ export async function sendCodeMail(m: CodeMail): Promise<void> {
   }
 }
 
-export interface NoticeMail {
+export type NoticeMail = {
   to: string;
-  kind: 'factor_added';
-  factor: 'totp' | 'passkey';
   language: 'en' | 'ar';
   firstName: string;
-}
+} & (
+  | { kind: 'factor_added'; factor: 'totp' | 'passkey' }
+  | { kind: 'chat_member_added'; workspaceName: string }
+  | { kind: 'recovery_codes_changed' }
+);
 
 /** Security notices from the identity service that carry no code. */
 export async function sendNoticeMail(m: NoticeMail): Promise<void> {
+  if (m.kind === 'recovery_codes_changed') {
+    await sendRecoveryCodesChangedNoticeEmail({ email: m.to, name: m.firstName }, m.language, true);
+    return;
+  }
+  if (m.kind === 'chat_member_added') {
+    await sendChatMemberAddedEmail(
+      {
+        email: m.to,
+        name: m.firstName,
+        workspaceName: m.workspaceName,
+        chatUrl: `https://${BRAND.domains.whatsappApp}/`,
+      },
+      m.language
+    );
+    return;
+  }
   if (m.kind !== 'factor_added') throw new Error('sendNoticeMail: unknown kind');
   await sendFactorAddedNoticeEmail(
     { email: m.to, name: m.firstName, factor: m.factor },

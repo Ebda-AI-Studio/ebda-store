@@ -13,6 +13,16 @@ const card = (status: string, extra: Record<string, unknown> = {}) => ({
 });
 
 describe('orderActionVisibility', () => {
+  it('a refunded COD order does not offer mark-paid again', () => {
+    const v = orderActionVisibility({
+      status: 'refunded',
+      paymentStatus: 'refunded',
+      payments: [{ provider: 'cod', status: 'refunded' }],
+    });
+    expect(v.showMarkPaid).toBe(false);
+    expect(v.showManualMarkPaid).toBe(false);
+  });
+
   it('unpaid COD order: manual mark-paid is offered', () => {
     const v = orderActionVisibility({
       status: 'pending',

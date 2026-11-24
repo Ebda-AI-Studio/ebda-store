@@ -25,6 +25,7 @@ import { doStoreIdList } from '../lib/store-backend';
 import { runBackupSweep, type SweepEnv } from './ops/backup-sweep';
 import { allJobCronStrings, runScheduledJobs } from '../lib/jobs/schedule';
 import { syncStoreSchedules } from '../lib/jobs/store-schedule';
+import { runRequestBudgetAlert } from '../lib/request-budget-alert';
 import { runEntityIndexHealthCron } from '../lib/entity-index-health';
 import { reconcileStoreDirectory } from '../lib/store-directory-reconcile';
 import { checkSuperAdminInvariant } from '../lib/super-admin-invariant';
@@ -48,6 +49,8 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
     { name: 'store-directory-reconcile', run: () => reconcileStoreDirectory() },
     // Issue 458: StoreDO entity-index dead-letter rows -> one P1 per row per day (the DO cannot call sendAlert).
     { name: 'entity-index-health', run: () => runEntityIndexHealthCron() },
+    // FOLD-COUNTERS: p95 / 5xx over budget per route from the ebda_request_budget dataset (needs CF_ANALYTICS_* secrets, else skipped).
+    { name: 'request-budget-alert', run: () => runRequestBudgetAlert() },
     // The assistant's help index: re-embed the bundled help corpus when its hash changed (a KV read when nothing changed; never throws into the cron).
     {
       name: 'assistant-help-index',
