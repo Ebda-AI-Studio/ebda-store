@@ -14,6 +14,7 @@ import { z } from 'zod/v3';
 import { verifyBridge } from '@ebda/shared';
 import logger from '../lib/logger';
 import { AppError } from '../middleware/error-handler';
+import { internalBridgeLimiter } from '../middleware/security';
 import { revertAutoConfirmed } from '../services/billing/instapay-auto-confirm.service';
 
 const router = Router();
@@ -43,6 +44,7 @@ const body = z.object({
 
 router.post(
   '/auto-confirm/not-received',
+  internalBridgeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (
