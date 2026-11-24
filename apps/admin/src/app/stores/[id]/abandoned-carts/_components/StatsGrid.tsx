@@ -15,7 +15,7 @@ interface StatCardProps {
 
 function StatCard({ label, value, sub, muted }: StatCardProps) {
   return (
-    <div className="bg-card rounded-xl border border-border p-5">
+    <div className="bg-card rounded-md border border-border p-5">
       <p className="text-sm text-muted-foreground">{label}</p>
       <p
         className={
@@ -56,7 +56,7 @@ export function StatsGrid({ stats, guestCheckout }: StatsGridProps) {
           <StatCard label={t('recoveryRate')} value="—" muted />
           <StatCard label={t('recoveredRevenue')} value="—" muted />
         </div>
-        <p className="text-xs text-muted-foreground">{tGuest('abandonedExplainer')}</p>
+        <p className="text-sm text-muted-foreground">{tGuest('abandonedExplainer')}</p>
       </div>
     );
   }

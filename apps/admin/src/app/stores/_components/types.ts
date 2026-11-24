@@ -29,9 +29,9 @@ export interface Pagination {
 export const statusConfig = {
   active: {
     variant: 'default' as const,
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-700',
-    dot: 'bg-emerald-500',
+    bg: 'bg-success/10',
+    text: 'text-success-ink',
+    dot: 'bg-success',
   },
   inactive: {
     variant: 'secondary' as const,
@@ -50,7 +50,7 @@ export const statusConfig = {
 export const planConfig = {
   free: { bg: 'bg-muted', text: 'text-foreground', icon: '🆓' },
   starter: { bg: 'bg-info/5', text: 'text-info-ink', icon: '🚀' },
-  professional: { bg: 'bg-violet-50', text: 'text-violet-700', icon: '💼' },
+  professional: { bg: 'bg-primary/10', text: 'text-primary-ink', icon: '💼' },
   enterprise: { bg: 'bg-warning/10', text: 'text-warning-ink', icon: '👑' },
 };
 

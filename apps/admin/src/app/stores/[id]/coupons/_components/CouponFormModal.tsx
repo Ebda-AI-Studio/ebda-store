@@ -6,6 +6,7 @@ import { BottomSheet } from '@/components/mobile/BottomSheet';
 import { ScopePicker } from '../../_components/ScopePicker';
 import type { CouponFormData, CouponType } from './types';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface CustomerGroupOption {
   id: string;
@@ -102,7 +103,7 @@ export function CouponFormModal({
               value={formData.code}
               onChange={e => onChange({ ...formData, code: e.target.value.toUpperCase() })}
               placeholder={tForm('codePlaceholder')}
-              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono uppercase"
+              className={`${FIELD_CLASSES} font-mono uppercase`}
             />
           </div>
           <div>
@@ -115,7 +116,7 @@ export function CouponFormModal({
               value={formData.name}
               onChange={e => onChange({ ...formData, name: e.target.value })}
               placeholder={tForm('namePlaceholder')}
-              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
         </div>
@@ -132,7 +133,7 @@ export function CouponFormModal({
               value={formData.nameAr}
               onChange={e => onChange({ ...formData, nameAr: e.target.value })}
               placeholder={tForm('nameArPlaceholder')}
-              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
           <div>
@@ -144,7 +145,7 @@ export function CouponFormModal({
               value={formData.description}
               onChange={e => onChange({ ...formData, description: e.target.value })}
               placeholder={tForm('descriptionPlaceholder')}
-              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
         </div>
@@ -160,7 +161,7 @@ export function CouponFormModal({
             value={formData.descriptionAr}
             onChange={e => onChange({ ...formData, descriptionAr: e.target.value })}
             placeholder={tForm('descriptionArPlaceholder')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className={FIELD_CLASSES}
           />
         </div>
 
@@ -173,7 +174,7 @@ export function CouponFormModal({
             <select
               value={formData.type}
               onChange={e => onChange({ ...formData, type: e.target.value as CouponType })}
-              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className={FIELD_CLASSES}
             >
               <option value="percentage">{tType('percentage')}</option>
               <option value="fixed">{tType('fixed')}</option>
@@ -200,7 +201,7 @@ export function CouponFormModal({
                 aria-describedby={valueError ? 'coupon-value-error' : undefined}
                 value={formData.value}
                 onChange={e => onChange({ ...formData, value: e.target.value })}
-                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary aria-[invalid=true]:border-destructive-ink"
+                className={FIELD_CLASSES}
               />
               {valueError && (
                 <p
@@ -228,7 +229,7 @@ export function CouponFormModal({
               value={formData.minOrderAmount}
               onChange={e => onChange({ ...formData, minOrderAmount: e.target.value })}
               placeholder={tForm('minOrderPlaceholder')}
-              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
           {formData.type === 'percentage' && (
@@ -243,7 +244,7 @@ export function CouponFormModal({
                 value={formData.maxDiscount}
                 onChange={e => onChange({ ...formData, maxDiscount: e.target.value })}
                 placeholder={tForm('maxDiscountPlaceholder')}
-                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className={FIELD_CLASSES}
               />
             </div>
           )}
@@ -260,7 +261,7 @@ export function CouponFormModal({
               value={formData.usageLimit}
               onChange={e => onChange({ ...formData, usageLimit: e.target.value })}
               placeholder={tForm('usageLimitPlaceholder')}
-              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
           <div>
@@ -273,7 +274,7 @@ export function CouponFormModal({
               value={formData.usageLimitPerUser}
               onChange={e => onChange({ ...formData, usageLimitPerUser: e.target.value })}
               placeholder={tForm('usageLimitPerUserPlaceholder')}
-              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
         </div>
@@ -288,7 +289,7 @@ export function CouponFormModal({
               type="datetime-local"
               value={formData.startsAt}
               onChange={e => onChange({ ...formData, startsAt: e.target.value })}
-              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
           <div>
@@ -299,7 +300,7 @@ export function CouponFormModal({
               type="datetime-local"
               value={formData.expiresAt}
               onChange={e => onChange({ ...formData, expiresAt: e.target.value })}
-              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
         </div>
@@ -311,7 +312,7 @@ export function CouponFormModal({
             id="isActive"
             checked={formData.isActive}
             onChange={e => onChange({ ...formData, isActive: e.target.checked })}
-            className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
+            className="w-5 h-5 text-primary border-border rounded-md focus:ring-primary"
           />
           <label htmlFor="isActive" className="text-sm font-medium text-foreground">
             {tForm('isActiveLabel')}
@@ -332,7 +333,7 @@ export function CouponFormModal({
               <select
                 value={formData.customerGroupId}
                 onChange={e => onChange({ ...formData, customerGroupId: e.target.value })}
-                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className={FIELD_CLASSES}
               >
                 <option value="">{tTargeting('allCustomers')}</option>
                 {customerGroups.map(g => (
@@ -352,7 +353,7 @@ export function CouponFormModal({
                 value={formData.minQuantity}
                 onChange={e => onChange({ ...formData, minQuantity: e.target.value })}
                 placeholder={tTargeting('minQuantityPlaceholder')}
-                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className={FIELD_CLASSES}
               />
             </div>
           </div>
@@ -363,7 +364,7 @@ export function CouponFormModal({
               id="firstOrderOnly"
               checked={formData.firstOrderOnly}
               onChange={e => onChange({ ...formData, firstOrderOnly: e.target.checked })}
-              className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
+              className="w-5 h-5 text-primary border-border rounded-md focus:ring-primary"
             />
             <span className="text-sm font-medium text-foreground">
               {tTargeting('firstOrderOnlyLabel')}

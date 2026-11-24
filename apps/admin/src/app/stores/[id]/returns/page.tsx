@@ -189,6 +189,7 @@ export default function ReturnsPage() {
         onConfirm={handleRefundConfirm}
         onClose={handleRefundCancel}
         walletEnabled={walletEnabled}
+        guestReturn={returns.find(r => r.id === refundReturnId)?.customer?.isGuest === true}
       />
     </AdminLayout>
   );

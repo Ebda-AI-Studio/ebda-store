@@ -9,6 +9,7 @@ export function Toggle({
   onChange,
   disabled,
   id,
+  label,
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledby,
   'aria-describedby': ariaDescribedby,
@@ -17,6 +18,8 @@ export function Toggle({
   onChange: (val: boolean) => void;
   disabled?: boolean;
   id?: string;
+  /** Accessible name (WCAG 4.1.2), shorthand for `aria-label`: what the switch turns on, in the page's words. */
+  label?: string;
   'aria-label'?: string;
   'aria-labelledby'?: string;
   'aria-describedby'?: string;
@@ -27,7 +30,7 @@ export function Toggle({
       role="switch"
       id={id}
       aria-checked={checked}
-      aria-label={ariaLabel}
+      aria-label={label ?? ariaLabel}
       aria-labelledby={ariaLabelledby}
       aria-describedby={ariaDescribedby}
       onClick={() => !disabled && onChange(!checked)}
