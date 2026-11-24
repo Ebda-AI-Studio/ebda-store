@@ -484,7 +484,7 @@ export async function activateForStore(
 // Self-service activation (A7)
 // ---------------------------------------------------------------------------
 
-/** The activation ledger lives in `provider_verification_events` (append-only for these ops: migration 20261117000100). */
+/** The activation ledger lives in `provider_verification_events` (append-only for these ops: migration 20261124120000). */
 const ACTIVATION_LEDGER_PREFIX = 'activation.';
 type ActivationLedgerAction = 'activated_self' | 'activated_admin' | 'deactivated' | 'unblocked';
 const ACTIVATE_TOOL = 'provider.activate';

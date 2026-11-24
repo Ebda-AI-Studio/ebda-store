@@ -578,7 +578,7 @@ describe('guards around the feature', () => {
     const sql = readFileSync(
       join(
         __dirname,
-        '../../packages/database/prisma/migrations/20261117000100_provider_activation_ledger_append_only/migration.sql'
+        '../../packages/database/prisma/migrations/20261124120000_provider_activation_ledger_append_only/migration.sql'
       ),
       'utf8'
     );
