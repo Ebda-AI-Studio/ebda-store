@@ -775,6 +775,11 @@ export function signInEntryUrl(product: string | undefined, ret: string | undefi
   return url.toString();
 }
 
+/** Ebda Chat sign-up is open only when the deploy var says so (mirror of Chat's STANDALONE_WORKSPACES != off). Fails closed. */
+function chatSignupOpen(env: { CHAT_SIGNUP_OPEN?: string }): boolean {
+  return env.CHAT_SIGNUP_OPEN === 'true';
+}
+
 export function createApp() {
   const app = new Hono<{ Bindings: Env }>();
 
@@ -909,7 +914,7 @@ export function createApp() {
             lang,
             product,
             returnTo,
-            showChatSignup: c.env.CHAT_SIGNUP_LINK === 'true',
+            showChatSignup: chatSignupOpen(c.env),
           }),
       { status: 200, headers: SIGN_IN_PAGE_HEADERS }
     );
@@ -918,6 +923,8 @@ export function createApp() {
   app.get('/signup', c => {
     if (signInProduct(c.req.query('product')) !== 'chat')
       return c.redirect('https://store.ebda.app/signup', 302);
+    // Closed (Chat's STANDALONE_WORKSPACES is off): nothing to sign up for, so no page and no form.
+    if (!chatSignupOpen(c.env)) return c.text('Not found', 404, { 'Cache-Control': 'no-store' });
     const lang = pickStudioLang(c.req.header('accept-language'), c.req.query('lang'));
     const returnTo = signupReturn(c.req.query('return') ?? c.req.query('return_to'));
     return new Response(c.req.method === 'HEAD' ? null : renderSignupPage({ lang, returnTo }), {
@@ -1178,6 +1185,9 @@ export function createApp() {
   });
 
   app.post('/signup', async c => {
+    // Server-side gate, not just a hidden form: this endpoint's only HTTP caller is the Chat sign-up page (the Store signs up
+    // through the api's `createUser` RPC), so while Chat sign-up is closed no identity can be registered here.
+    if (!chatSignupOpen(c.env)) throw err(404, 'NOT_FOUND');
     const body = await json(c, signupBody);
     if (!(await hit(c.env.DB, 'all', clientIp(c), PER_IP_ONLY('signup', 10))).ok)
       throw err(429, 'TOO_MANY_ATTEMPTS');

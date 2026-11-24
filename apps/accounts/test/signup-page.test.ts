@@ -131,8 +131,13 @@ describe('Chat sign-in page: the sign-up link', () => {
   const base = { lang: 'ar' as const, returnTo: 'https://store.ebda.app/' };
   it('is hidden by default and when the flag is off', async () => {
     expect(renderSignInPage({ ...base, product: 'chat' })).not.toContain('/signup');
-    const html = await (await call('/login?product=chat')).text();
-    expect(html).not.toContain('/signup');
+    fakes.envOverride = { CHAT_SIGNUP_OPEN: 'false' } as never;
+    try {
+      const html = await (await call('/login?product=chat')).text();
+      expect(html).not.toContain('/signup');
+    } finally {
+      fakes.envOverride = {};
+    }
   });
 
   it('shows the Chat sign-up link when the flag allows, carrying a validated return', () => {
@@ -147,8 +152,8 @@ describe('Chat sign-in page: the sign-up link', () => {
     expect(html).not.toContain('store.ebda.app/signup');
   });
 
-  it('the live /login page shows the link when CHAT_SIGNUP_LINK is "true"', async () => {
-    fakes.envOverride = { CHAT_SIGNUP_LINK: 'true' } as never;
+  it('the live /login page shows the link when CHAT_SIGNUP_OPEN is "true"', async () => {
+    fakes.envOverride = { CHAT_SIGNUP_OPEN: 'true' } as never;
     try {
       const html = await (await call('/login?product=chat')).text();
       expect(html).toContain('/signup?product=chat');
@@ -162,5 +167,56 @@ describe('Chat sign-in page: the sign-up link', () => {
       const html = renderSignInPage({ ...base, product: 'store', showChatSignup });
       expect(html).toContain('href="https://store.ebda.app/signup"');
     }
+  });
+});
+
+describe('Chat sign-up closed (STANDALONE_WORKSPACES off): fail closed on the server', () => {
+  const closed = async (v: string | undefined, run: () => Promise<void>) => {
+    fakes.envOverride = { CHAT_SIGNUP_OPEN: v } as never;
+    try {
+      await run();
+    } finally {
+      fakes.envOverride = {};
+    }
+  };
+
+  it.each([['false'], [undefined], ['1'], ['TRUE']])(
+    'GET /signup?product=chat is 404 with no form when CHAT_SIGNUP_OPEN=%s',
+    async v =>
+      closed(v, async () => {
+        const r = await call('/signup?product=chat');
+        expect(r.status).toBe(404);
+        expect(await r.text()).not.toContain('<form');
+      })
+  );
+
+  it.each([['false'], [undefined]])(
+    'POST /signup is refused (404) and creates no identity, no mail, when CHAT_SIGNUP_OPEN=%s',
+    async v =>
+      closed(v, async () => {
+        const email = fresh();
+        const r = await call('/signup', { json: { email, password: PW, firstName: 'A' } });
+        expect(r.status).toBe(404);
+        expect(await userCount(email)).toBe(0);
+        expect(fakes.mails).toHaveLength(0);
+      })
+  );
+
+  it('the Store redirect still works while closed (only the Chat page is gated)', async () => {
+    await closed('false', async () => {
+      const r = await call('/signup?product=store');
+      expect(r.status).toBe(302);
+    });
+  });
+
+  it('open: the page serves and POST /signup registers', async () => {
+    await closed('true', async () => {
+      expect((await call('/signup?product=chat')).status).toBe(200);
+      const email = fresh();
+      expect(
+        (await call('/signup', { json: { email, password: PW, firstName: 'A' } })).status
+      ).toBe(202);
+      expect(await userCount(email)).toBe(1);
+    });
   });
 });
