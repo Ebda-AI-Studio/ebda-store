@@ -870,7 +870,10 @@
         "searchTermsDropped": "Words that will not be saved (over the limit): {count}",
         "searchTermsAtLimit": "Limit reached",
         "searchTermsNearLimit": "Almost at the limit",
-        "priceMinError": "The price must be more than zero."
+        "priceMinError": "The price must be more than zero.",
+        "slug": "Link (slug)",
+        "slugHint": "Part of the product's web address. Changing it keeps the old link working: visitors are redirected to the new one.",
+        "slugInvalid": "Use lowercase letters, numbers, Arabic letters and hyphens only."
       },
       "statusOptions": {
         "draft": "Draft",
@@ -984,7 +987,8 @@
       "createdBanner": "Product added. Next step: add sizes or colours if it has any.",
       "addVariants": "Add variants",
       "toast": {
-        "saved": "Product saved"
+        "saved": "Product saved",
+        "savedSlugChanged": "Product saved. That link was already taken, so it is now: {slug}"
       },
       "tabs": {
         "label": "Product page sections",
@@ -3784,7 +3788,8 @@
       },
       "empty": {
         "title": "No Affiliates Yet",
-        "description": "Affiliates will appear here when they sign up or are invited."
+        "description": "Affiliates will appear here when they sign up or are invited.",
+        "invite": "Invite an affiliate"
       },
       "pagination": {
         "summary": "Page {page} of {totalPages} ({total} total)",
@@ -6084,7 +6089,8 @@
       "aiSaveResponseBody": "Your owner response has been saved to the review.",
       "aiSaveResponseFailed": "Failed to save response. Please try again.",
       "saving": "Saving...",
-      "searchPlaceholder": "Search reviews…"
+      "searchPlaceholder": "Search reviews…",
+      "emptyAction": "View your products"
     },
     "spam": "Spam"
   },
@@ -8776,7 +8782,8 @@
       "dateFrom": "From",
       "dateTo": "To",
       "dateApply": "Apply",
-      "guest": "Guest"
+      "guest": "Guest",
+      "emptyAction": "Check payment settings"
     }
   },
   "activity": {
