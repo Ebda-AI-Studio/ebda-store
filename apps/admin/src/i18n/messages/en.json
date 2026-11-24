@@ -3788,7 +3788,8 @@
       },
       "empty": {
         "title": "No Affiliates Yet",
-        "description": "Affiliates will appear here when they sign up or are invited."
+        "description": "Affiliates will appear here when they sign up or are invited.",
+        "invite": "Invite an affiliate"
       },
       "pagination": {
         "summary": "Page {page} of {totalPages} ({total} total)",
@@ -6088,7 +6089,8 @@
       "aiSaveResponseBody": "Your owner response has been saved to the review.",
       "aiSaveResponseFailed": "Failed to save response. Please try again.",
       "saving": "Saving...",
-      "searchPlaceholder": "Search reviews…"
+      "searchPlaceholder": "Search reviews…",
+      "emptyAction": "View your products"
     },
     "spam": "Spam"
   },
@@ -8783,7 +8785,8 @@
       "dateFrom": "From",
       "dateTo": "To",
       "dateApply": "Apply",
-      "guest": "Guest"
+      "guest": "Guest",
+      "emptyAction": "Check payment settings"
     }
   },
   "activity": {
