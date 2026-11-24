@@ -7,6 +7,9 @@
 # (about 1 s, 58 MB) so a dirty tree or untracked files cannot change the verdict, then runs the BASE's guard code against the head, exactly as CI does.
 # Prints the guard's own messages (the same text CI gives) and exits 1 on any new violation. A missing base ref skips with a note (CI is the gate).
 set -euo pipefail
+# A pre-push hook runs with GIT_DIR (and friends) exported. The merge-base step below runs mutating git (update-ref) inside a throwaway clone; with GIT_DIR
+# inherited it would write into THIS repo instead (it moved a worktree's HEAD and a shared ref on its first real push). Run in the cwd's own repo only.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
 BASE_REF="${1:?usage: pre-push-slop.sh <base-ref> [head-ref]}"; HEAD_REF="${2:-HEAD}"
 git rev-parse -q --verify "$BASE_REF^{commit}" >/dev/null || { echo "! slop guard skipped: no $BASE_REF locally; CI runs it"; exit 0; }
 MB="$(git merge-base "$BASE_REF" "$HEAD_REF" 2>/dev/null || true)"

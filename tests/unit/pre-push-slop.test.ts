@@ -142,6 +142,19 @@ describe('pre-push slop guard (same check as CI "Slop baselines")', () => {
     expect(r.stderr).toContain('apps/x/src/testOnly.ts');
   });
 
+  it('does not move HEAD or write refs/pr/head in the repo named by an inherited GIT_DIR (a pre-push hook exports it)', () => {
+    const before = git('for-each-ref').trim() + git('symbolic-ref', 'HEAD').trim();
+    spawnSync('bash', [SCRIPT, 'origin/main', 'HEAD'], {
+      cwd: dir,
+      encoding: 'utf8',
+      // exactly what husky gives a hook: only GIT_DIR, exported
+      env: { ...process.env, GIT_DIR: path.join(dir, '.git'), GIT_WORK_TREE: undefined },
+    });
+    expect(git('symbolic-ref', 'HEAD').trim()).toBe('refs/heads/feature');
+    expect(git('for-each-ref', 'refs/pr/').trim()).toBe('');
+    expect(git('for-each-ref').trim() + git('symbolic-ref', 'HEAD').trim()).toBe(before);
+  });
+
   it('skips with a note, never fails, when the base ref is missing (CI is the gate)', () => {
     const r = spawnSync('bash', [SCRIPT, 'origin/nope', 'HEAD'], {
       cwd: dir,
