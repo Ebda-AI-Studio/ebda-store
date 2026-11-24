@@ -34,6 +34,7 @@ function isInteractive(target: EventTarget | null): boolean {
 import { formatDate, formatPrice } from '@/lib/format';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 /**
  * Build a compact, single-line item summary for the orders list row, e.g.
  * "2x Mastic, 1x Caraway +2 more". Shows the first two DISPLAY ROWS with
@@ -91,7 +92,7 @@ export function OrdersTable({
     return (
       <div className="space-y-3">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div key={i} className="rounded-md border border-border bg-card p-4 shadow-sm">
             <div className="space-y-2">
               <div className="h-4 w-32 force-skeleton" />
               <div className="h-3 w-48 force-skeleton" />
@@ -194,7 +195,7 @@ export function OrdersTable({
             {agentBadge}
             <select
               aria-label={t('actions.updateStatusLabel')}
-              className="rounded-lg border border-border px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={FIELD_CLASSES}
               disabled={isUpdating}
               defaultValue=""
               onChange={e => {
@@ -249,7 +250,7 @@ export function OrdersTable({
                   })}
                   checked={selectedOrders.has(order.id)}
                   onChange={e => onToggleSelected(order.id, e.target.checked)}
-                  className="h-5 w-5 rounded border-border text-primary focus:ring-primary"
+                  className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
                 />
                 <Button
                   type="button"

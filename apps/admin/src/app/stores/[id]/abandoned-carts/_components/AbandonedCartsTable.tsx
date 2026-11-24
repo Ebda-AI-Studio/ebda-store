@@ -9,6 +9,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { CART_STATUS_KEYS } from './types';
 import type { AbandonedCartRecord, ListMeta } from './types';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 import { EmptyState } from '@/components/EmptyState';
 
 /** Best-effort display string for the customer column. */
@@ -107,7 +108,7 @@ export function AbandonedCartsTable({
 
   return (
     <div className="space-y-4">
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-md border border-border overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
@@ -119,7 +120,7 @@ export function AbandonedCartsTable({
             value={statusFilter}
             onChange={e => onStatusFilterChange(e.target.value)}
             aria-label={t('filterAriaLabel')}
-            className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
           >
             <option value="all">{t('allStatuses')}</option>
             {CART_STATUS_KEYS.map(key => (
@@ -140,7 +141,7 @@ export function AbandonedCartsTable({
       />
 
       {records.length > 0 && meta.totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-4 py-3 rounded-xl border border-border bg-card">
+        <div className="flex items-center justify-between mt-4 px-4 py-3 rounded-md border border-border bg-card">
           <p className="text-sm text-muted-foreground">
             {t('pagination', {
               page: meta.page,

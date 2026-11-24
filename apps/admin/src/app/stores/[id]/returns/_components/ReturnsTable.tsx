@@ -9,6 +9,7 @@ import type { ListMeta, ReturnRecord } from './types';
 import { formatDate } from '@/lib/format';
 
 import { formatPrice } from '@/lib/format';
+import { formatPhoneDisplay, normalizePhone } from '@ebda/shared/contact-enquiry';
 function formatCurrency(amount: number) {
   return formatPrice(amount);
 }
@@ -29,6 +30,12 @@ interface ReturnsTableProps {
  * Paginated list of return requests with inline action buttons keyed off the
  * return's current status. Row click opens the details drawer via `onSelect`.
  */
+/** "+201012345683" -> "+20 101 234 5683" (the site's phone format); anything that is not a recognisable number is shown as typed. */
+const displayPhone = (raw: string): string => {
+  const e164 = normalizePhone(raw);
+  return e164 ? formatPhoneDisplay(e164) : raw;
+};
+
 export function ReturnsTable({
   returns,
   meta,
@@ -44,7 +51,7 @@ export function ReturnsTable({
   const tType = useT('returns.type');
 
   return (
-    <div className="rounded-xl border bg-card shadow-sm">
+    <div className="rounded-md border bg-card shadow-sm">
       {isLoading ? (
         <div className="p-8 text-center text-muted-foreground">{t('loading')}</div>
       ) : returns.length === 0 ? (
@@ -71,9 +78,12 @@ export function ReturnsTable({
                       ? `${ret.customer.firstName} ${ret.customer.lastName}`.trim()
                       : '-'}
                     {ret.customer?.phone ? (
-                      <span dir="ltr" className="ms-2">
-                        {ret.customer.phone}
-                      </span>
+                      <>
+                        {' · '}
+                        <bdi dir="ltr" className="whitespace-nowrap">
+                          {displayPhone(ret.customer.phone)}
+                        </bdi>
+                      </>
                     ) : null}
                   </p>
                   <p className="text-sm text-muted-foreground">

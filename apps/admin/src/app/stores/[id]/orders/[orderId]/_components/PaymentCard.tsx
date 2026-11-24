@@ -53,7 +53,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
   })();
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section className="rounded-lg border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
           {t('payment')}
@@ -128,7 +128,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
               empty section. */}
           {order.status === 'awaiting_payment_confirmation' && (
             <div
-              className="mt-4 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm text-primary-ink"
+              className="mt-4 rounded-md border border-primary/30 bg-primary/10 p-4 text-sm text-primary-ink"
               data-testid="instapay-panel"
             >
               <p className="font-semibold">{tInstapay('title')}</p>
@@ -153,20 +153,20 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
               <dl className="mt-3 space-y-1.5">
                 {order.instapay?.handle && (
                   <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                    <dt className="text-primary-ink/80">{tInstapay('payTo')}</dt>
+                    <dt className="text-primary-ink">{tInstapay('payTo')}</dt>
                     <dd className="font-medium" dir="ltr">
                       {order.instapay.handle}
                     </dd>
                   </div>
                 )}
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                  <dt className="text-primary-ink/80">{tInstapay('orderRef')}</dt>
-                  <dd className="font-mono text-xs" dir="ltr">
+                  <dt className="text-primary-ink">{tInstapay('orderRef')}</dt>
+                  <dd className="font-mono text-sm" dir="ltr">
                     {order.orderNumber}
                   </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                  <dt className="text-primary-ink/80">{tInstapay('customerReference')}</dt>
+                  <dt className="text-primary-ink">{tInstapay('customerReference')}</dt>
                   <dd className="font-medium" dir="ltr">
                     {order.instapay?.customerReference ?? (
                       <span className="text-xs font-normal">{tInstapay('noReference')}</span>
@@ -186,7 +186,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
               {detailPayment?.transactionId && (
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
                   <dt className="text-muted-foreground">{t('paymentTransactionId')}</dt>
-                  <dd className="font-mono text-xs text-foreground break-all text-end">
+                  <dd className="font-mono text-sm text-foreground break-all text-end">
                     {detailPayment.transactionId}
                   </dd>
                 </div>

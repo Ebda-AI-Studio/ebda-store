@@ -183,7 +183,7 @@ export function AiSuggestionsPanel({
   };
 
   return (
-    <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-4">
+    <div className="rounded-md border border-dashed border-primary/40 bg-primary/5 p-4">
       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
         <h3 className="text-sm font-semibold text-foreground">{t('heading')}</h3>
         <div className="flex items-center gap-2 flex-wrap">
@@ -264,10 +264,10 @@ export function AiSuggestionsPanel({
                     width={44}
                     height={44}
                     unoptimized
-                    className="rounded object-cover"
+                    className="rounded-md object-cover"
                   />
                 ) : (
-                  <div className="h-11 w-11 rounded bg-muted" />
+                  <div className="h-11 w-11 rounded-md bg-muted" />
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{tp.name}</p>

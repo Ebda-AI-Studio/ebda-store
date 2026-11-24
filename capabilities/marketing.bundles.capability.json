@@ -18,7 +18,7 @@
   },
   "helpArticle": "coupons-bundles-and-recommendations",
   "questions": {
-    "ar": ["اعمل باقة منتجات بسعر مخفض"],
+    "ar": ["اعمل باقة منتجات بسعر مخفض", "ازاي اعدل سعر الباقة؟", "فين صفحة الباقات؟"],
     "en": ["Create a bundle"]
   },
   "steps": ["Bundles page."],

@@ -11,6 +11,7 @@ import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { LegalAcceptancesPanel } from '../../../components/legal/LegalAcceptancesPanel';
 import { intlLocaleForUi } from '@/lib/format';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface UserDetail {
   id: string;
@@ -168,8 +169,8 @@ export default function UserDetailPage() {
     return (
       <AdminLayout title={t('loadingTitle')} subtitle={t('loadingSubtitle')}>
         <div className="animate-pulse space-y-6">
-          <div className="h-40 bg-muted rounded-xl" />
-          <div className="h-64 bg-muted rounded-xl" />
+          <div className="h-40 bg-muted rounded-md" />
+          <div className="h-64 bg-muted rounded-md" />
         </div>
       </AdminLayout>
     );
@@ -178,7 +179,7 @@ export default function UserDetailPage() {
   if (error || !user) {
     return (
       <AdminLayout title={t('notFoundTitle')} subtitle={t('notFoundSubtitle')}>
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-6 text-center">
           <p className="text-destructive-ink">{error || t('notFoundMessage')}</p>
           <Link href="/users" className="mt-4 inline-block text-primary hover:underline">
             {t('backToUsers')}
@@ -212,7 +213,7 @@ export default function UserDetailPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* User Profile Card */}
         <div className="lg:col-span-1">
-          <div className="rounded-xl border bg-card shadow-sm">
+          <div className="rounded-md border bg-card shadow-sm">
             <div className="border-b p-4">
               <h2 className="font-semibold text-foreground">{t('profile')}</h2>
             </div>
@@ -257,7 +258,7 @@ export default function UserDetailPage() {
 
           {/* Stores */}
           {user.stores && user.stores.length > 0 && (
-            <div className="mt-6 rounded-xl border bg-card shadow-sm">
+            <div className="mt-6 rounded-md border bg-card shadow-sm">
               <div className="border-b p-4">
                 <h2 className="font-semibold text-foreground">
                   {t('storesCount', { count: user.stores.length })}
@@ -289,7 +290,7 @@ export default function UserDetailPage() {
 
         {/* Edit Form */}
         <div className="lg:col-span-2">
-          <div className="rounded-xl border bg-card shadow-sm">
+          <div className="rounded-md border bg-card shadow-sm">
             <div className="border-b p-4">
               <h2 className="font-semibold text-foreground">{t('editUser')}</h2>
             </div>
@@ -306,7 +307,7 @@ export default function UserDetailPage() {
                     type="text"
                     value={editFirstName}
                     onChange={e => setEditFirstName(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   />
                 </div>
                 <div>
@@ -317,7 +318,7 @@ export default function UserDetailPage() {
                     type="text"
                     value={editLastName}
                     onChange={e => setEditLastName(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   />
                 </div>
               </div>
@@ -330,14 +331,14 @@ export default function UserDetailPage() {
                   type="email"
                   value={editEmail}
                   onChange={e => setEditEmail(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className={FIELD_CLASSES}
                 />
               </div>
 
               {/* Set new password — admin-side reset path. Empty
                   fields = leave existing password alone. Doesn't
                   surface the existing hash. */}
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-4 space-y-3">
+              <div className="rounded-md border border-border/60 bg-muted/30 p-4 space-y-3">
                 <p className="text-sm font-medium text-foreground">
                   {t('newPasswordSectionTitle')}
                 </p>
@@ -349,7 +350,7 @@ export default function UserDetailPage() {
                     autoComplete="new-password"
                     value={editPassword}
                     onChange={e => setEditPassword(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   />
                   <input
                     type="password"
@@ -357,7 +358,7 @@ export default function UserDetailPage() {
                     autoComplete="new-password"
                     value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   />
                 </div>
                 {editPassword && editPassword !== confirmPassword && (
@@ -373,7 +374,7 @@ export default function UserDetailPage() {
                 <select
                   value={editRole}
                   onChange={e => setEditRole(e.target.value)}
-                  className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className={FIELD_CLASSES}
                 >
                   <option value="customer">{t('roleOptions.customer')}</option>
                   <option value="store_admin">{t('roleOptions.store_admin')}</option>
@@ -389,7 +390,7 @@ export default function UserDetailPage() {
                 <select
                   value={editStatus}
                   onChange={e => setEditStatus(e.target.value)}
-                  className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className={FIELD_CLASSES}
                 >
                   <option value="active">{t('statusActiveOption')}</option>
                   <option value="inactive">{t('statusInactiveOption')}</option>
@@ -398,7 +399,7 @@ export default function UserDetailPage() {
               </div>
 
               {/* Status toggle as toggle switch for quick active/inactive */}
-              <div className="rounded-xl border border-border bg-muted p-4">
+              <div className="rounded-md border border-border bg-muted p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium text-foreground">{t('activeStatus')}</p>
@@ -421,7 +422,7 @@ export default function UserDetailPage() {
                 <div
                   className={`rounded-lg p-4 text-sm ${
                     saveMessage.type === 'success'
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                      ? 'bg-success/10 text-success-ink'
                       : 'bg-destructive/5 text-destructive-ink dark:bg-destructive/20 dark:text-destructive-ink'
                   }`}
                 >
@@ -445,7 +446,7 @@ export default function UserDetailPage() {
                   for self-deletes, the last super_admin, and store-
                   admins who still own stores; the toast will surface
                   the reason. */}
-              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="font-medium text-destructive-ink">{t('dangerZoneTitle')}</p>
@@ -474,7 +475,7 @@ export default function UserDetailPage() {
           onClick={() => !isDeleting && setShowDeleteConfirm(false)}
         >
           <div
-            className="w-full max-w-sm rounded-xl bg-card p-6 shadow-xl"
+            className="w-full max-w-sm rounded-md bg-card p-6 shadow-xl"
             onClick={e => e.stopPropagation()}
           >
             <h2 className="text-lg font-semibold text-foreground">{t('deleteConfirmTitle')}</h2>

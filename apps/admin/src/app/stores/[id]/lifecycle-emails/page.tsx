@@ -53,9 +53,9 @@ export default function LifecycleEmailsPage() {
       ) : (
         <div className="space-y-4">
           {log.optedOut && (
-            <p className="rounded-xl border border-border bg-card p-4 text-sm">{t('optedOut')}</p>
+            <p className="rounded-md border border-border bg-card p-4 text-sm">{t('optedOut')}</p>
           )}
-          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto rounded-md border border-border bg-card">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-start text-muted-foreground">

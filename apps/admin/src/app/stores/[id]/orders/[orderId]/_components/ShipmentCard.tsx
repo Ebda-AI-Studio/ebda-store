@@ -11,6 +11,7 @@ import { OrderStatusBadge } from '../../../../../../components/OrderStatusBadge'
 import { CourierHint } from './CourierHint';
 import { formatMoney } from './format';
 import { ShipmentPickupPanel } from './ShipmentPickupPanel';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface HistoryEntry {
   status: string;
@@ -206,7 +207,7 @@ export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: Ship
 
   return (
     <section
-      className="rounded-2xl border border-border bg-card p-5"
+      className="rounded-lg border border-border bg-card p-5"
       aria-labelledby="shipment-card-title"
     >
       <h2
@@ -309,7 +310,7 @@ export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: Ship
                       );
                     }
                   }}
-                  className="px-3 py-1.5 text-sm border border-border rounded-lg"
+                  className={FIELD_CLASSES}
                 >
                   <option value="">{t('chooseStatus')}</option>
                   {MANUAL_STATUSES.map(s => (
@@ -330,7 +331,7 @@ export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: Ship
           )}
 
           <div>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
               {t('timeline')}
             </h3>
             {shipment.statusHistory.length === 0 ? (
@@ -388,7 +389,7 @@ export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: Ship
                 <select
                   value={carrier}
                   onChange={e => setCarrier(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border border-border rounded-lg text-sm"
+                  className={`${FIELD_CLASSES} mt-1`}
                 >
                   {carriers.map(c => (
                     <option key={c.code} value={c.code}>
@@ -413,7 +414,7 @@ export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: Ship
                     onChange={e => setManualName(e.target.value)}
                     placeholder={t('manualName')}
                     aria-label={t('manualName')}
-                    className="px-3 py-2 border border-border rounded-lg text-sm"
+                    className={FIELD_CLASSES}
                   />
                   <input
                     type="text"
@@ -421,7 +422,7 @@ export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: Ship
                     onChange={e => setManualTracking(e.target.value)}
                     placeholder={t('manualTracking')}
                     aria-label={t('manualTracking')}
-                    className="px-3 py-2 border border-border rounded-lg text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </div>
               )}
@@ -454,7 +455,7 @@ export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: Ship
             type="checkbox"
             checked={restock}
             onChange={e => setRestock(e.target.checked)}
-            className="h-4 w-4"
+            className="h-5 w-5"
           />
           {t('restockLabel')}
         </label>

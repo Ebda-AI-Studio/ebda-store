@@ -39,6 +39,7 @@ import { useRequireFeature } from '../../../../../hooks/useRequireFeature';
 import { CAMPAIGN_ERROR_KEYS } from '../_components/campaignErrorKeys';
 import { ConfirmDialog } from '../_components/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed';
 
@@ -472,7 +473,7 @@ export default function CampaignDetailPage() {
                 value={form.name}
                 maxLength={CAMPAIGN_NAME_MAX}
                 onChange={e => setForm(f => (f ? { ...f, name: e.target.value } : f))}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className={FIELD_CLASSES}
               />
             </label>
 
@@ -493,7 +494,7 @@ export default function CampaignDetailPage() {
                       maxLength={500}
                       rows={3}
                       placeholder={t('aiDraftPlaceholder')}
-                      className="w-full rounded-md border px-3 py-2 text-sm resize-y"
+                      className={`${TEXTAREA_CLASSES} resize-y`}
                     />
                   </label>
                   {aiError && <p className="text-xs text-destructive-ink">{aiError}</p>}
@@ -538,7 +539,7 @@ export default function CampaignDetailPage() {
                   value={form.subject}
                   maxLength={CAMPAIGN_SUBJECT_MAX}
                   onChange={e => setForm(f => (f ? { ...f, subject: e.target.value } : f))}
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className={FIELD_CLASSES}
                 />
               </label>
               <label className="block">
@@ -550,7 +551,7 @@ export default function CampaignDetailPage() {
                   maxLength={CAMPAIGN_BODY_MAX}
                   onChange={e => setForm(f => (f ? { ...f, bodyHtml: e.target.value } : f))}
                   rows={8}
-                  className="w-full rounded-md border px-3 py-2 text-sm font-mono resize-y"
+                  className={`${TEXTAREA_CLASSES} font-mono resize-y`}
                 />
               </label>
               {form.bodyHtml.trim() && (
@@ -589,7 +590,7 @@ export default function CampaignDetailPage() {
                   dir="rtl"
                   maxLength={CAMPAIGN_SUBJECT_MAX}
                   onChange={e => setForm(f => (f ? { ...f, subjectAr: e.target.value } : f))}
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className={FIELD_CLASSES}
                 />
               </label>
               <label className="block">
@@ -602,7 +603,7 @@ export default function CampaignDetailPage() {
                   maxLength={CAMPAIGN_BODY_MAX}
                   onChange={e => setForm(f => (f ? { ...f, bodyHtmlAr: e.target.value } : f))}
                   rows={8}
-                  className="w-full rounded-md border px-3 py-2 text-sm font-mono resize-y"
+                  className={`${TEXTAREA_CLASSES} font-mono resize-y`}
                 />
               </label>
               {form.bodyHtmlAr.trim() && (
@@ -640,7 +641,7 @@ export default function CampaignDetailPage() {
                     f ? { ...f, localeStrategy: e.target.value as CampaignLocaleStrategy } : f
                   )
                 }
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className={FIELD_CLASSES}
               >
                 <option value="subscriber">{t('localeStrategySubscriber')}</option>
                 <option value="en">{t('localeStrategyEn')}</option>
@@ -699,7 +700,7 @@ export default function CampaignDetailPage() {
             </div>
 
             {testResult && (
-              <p className="text-sm text-emerald-700">
+              <p className="text-sm text-success-ink">
                 {t('testSentTo', {
                   email: testResult.sentTo,
                   locales: testResult.locales.join(', '),
@@ -724,7 +725,7 @@ export default function CampaignDetailPage() {
                   type="datetime-local"
                   value={scheduleInput}
                   onChange={e => setScheduleInput(e.target.value)}
-                  className="rounded-md border px-3 py-2 text-sm"
+                  className={FIELD_CLASSES}
                 />
                 <Button
                   variant="outline"
@@ -818,7 +819,7 @@ export default function CampaignDetailPage() {
                   onChange={e =>
                     setStatusFilter(e.target.value as '' | CampaignRecipientStatusValue)
                   }
-                  className="rounded-md border px-2 py-1 text-xs"
+                  className={FIELD_CLASSES}
                 >
                   <option value="">{tD('allStatuses')}</option>
                   {CAMPAIGN_RECIPIENT_STATUSES.map(s => (
@@ -850,7 +851,7 @@ export default function CampaignDetailPage() {
                     <tbody>
                       {recipients.map(r => (
                         <tr key={r.id} className="border-t">
-                          <td className="px-3 py-2 font-mono text-xs">{r.email}</td>
+                          <td className="px-3 py-2 font-mono text-sm">{r.email}</td>
                           <td className="px-3 py-2 uppercase">{r.locale}</td>
                           <td className="px-3 py-2">
                             <OrderStatusBadge status={r.status} family="campaignRecipient" />
@@ -862,7 +863,7 @@ export default function CampaignDetailPage() {
                                 })
                               : formatDateTime(r.sentAt)}
                           </td>
-                          <td className="px-3 py-2 text-xs text-destructive-ink">
+                          <td className="px-3 py-2 text-sm text-destructive-ink">
                             {r.error || '—'}
                           </td>
                         </tr>

@@ -12,6 +12,7 @@ import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { ShippingTabs } from '../shipping/_components/ShippingTabs';
 import { formatMoney } from '../orders/[orderId]/_components/format';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 type ReconStatus = 'awaiting' | 'partial' | 'settled' | 'over_remitted' | 'mismatch';
 
@@ -155,7 +156,7 @@ export default function CodReconciliationPage() {
   const pages = Math.max(1, Math.ceil((report?.total ?? 0) / PAGE_SIZE));
 
   const stat = (label: string, value: number, tone?: 'warn' | 'bad') => (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="rounded-md border border-border bg-card p-4">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p
         className={`mt-1 text-lg font-semibold ${
@@ -190,7 +191,7 @@ export default function CodReconciliationPage() {
                 {stat(t('outstanding'), s.outstanding, s.outstanding > 0 ? 'warn' : undefined)}
                 {stat(t('over'), s.over, s.over > 0 ? 'bad' : undefined)}
                 {stat(t('unmatched'), s.unmatchedGross, s.unmatchedGross > 0 ? 'warn' : undefined)}
-                <div className="rounded-xl border border-border bg-card p-4">
+                <div className="rounded-md border border-border bg-card p-4">
                   <p className="text-xs text-muted-foreground">{t('flagged')}</p>
                   <p className="mt-1 text-lg font-semibold text-foreground">{s.flaggedShipments}</p>
                 </div>
@@ -199,7 +200,7 @@ export default function CodReconciliationPage() {
             </section>
           )}
 
-          <section className="rounded-xl border border-border bg-card p-5">
+          <section className="rounded-md border border-border bg-card p-5">
             <h2 className="text-base font-semibold text-foreground">{t('importTitle')}</h2>
             <p className="text-sm text-muted-foreground mt-1">{t('importHelp')}</p>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -208,7 +209,7 @@ export default function CodReconciliationPage() {
                 <select
                   value={importCarrier}
                   onChange={e => setImportCarrier(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border border-input rounded-lg text-sm"
+                  className={`${FIELD_CLASSES} mt-1`}
                 >
                   {CARRIERS.map(c => (
                     <option key={c} value={c}>
@@ -233,7 +234,7 @@ export default function CodReconciliationPage() {
               rows={4}
               placeholder={t('pastePlaceholder')}
               aria-label={t('paste')}
-              className="mt-3 w-full px-3 py-2 border border-input rounded-lg text-xs font-mono"
+              className={`${TEXTAREA_CLASSES} mt-3 font-mono`}
             />
             <Button
               variant="default"
@@ -276,7 +277,7 @@ export default function CodReconciliationPage() {
                   setPage(1);
                 }}
                 aria-label={t('filterStatus')}
-                className="px-3 py-1.5 text-sm border border-input rounded-lg"
+                className={FIELD_CLASSES}
               >
                 <option value="">{t('allStatuses')}</option>
                 <option value="flagged">{t('statuses.flagged')}</option>
@@ -295,7 +296,7 @@ export default function CodReconciliationPage() {
                   setPage(1);
                 }}
                 aria-label={t('filterCarrier')}
-                className="px-3 py-1.5 text-sm border border-input rounded-lg"
+                className={FIELD_CLASSES}
               >
                 <option value="">{t('allCarriers')}</option>
                 {CARRIERS.map(c => (
@@ -306,7 +307,7 @@ export default function CodReconciliationPage() {
               </select>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <div className="overflow-x-auto rounded-md border border-border bg-card">
               <table className="w-full text-sm">
                 <caption className="sr-only">{t('tableLabel')}</caption>
                 <thead className="text-xs text-muted-foreground">
@@ -340,7 +341,7 @@ export default function CodReconciliationPage() {
                     <tr key={r.shipmentId} className="border-t border-border align-top">
                       <td className="px-3 py-2 font-medium">{r.orderNumber}</td>
                       <td className="px-3 py-2">{carrierName(r)}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{r.trackingNumber ?? '—'}</td>
+                      <td className="px-3 py-2 font-mono text-sm">{r.trackingNumber ?? '—'}</td>
                       <td className="px-3 py-2">{formatMoney(r.result.owed)}</td>
                       <td className="px-3 py-2">
                         {formatMoney(r.result.gross)}
@@ -395,7 +396,7 @@ export default function CodReconciliationPage() {
             <section>
               <h2 className="text-base font-semibold text-foreground">{t('unmatchedTitle')}</h2>
               <p className="text-sm text-muted-foreground mt-1">{t('unmatchedHelp')}</p>
-              <div className="mt-3 overflow-x-auto rounded-xl border border-border bg-card">
+              <div className="mt-3 overflow-x-auto rounded-md border border-border bg-card">
                 <table className="w-full text-sm">
                   <caption className="sr-only">{t('unmatchedTitle')}</caption>
                   <thead className="text-xs text-muted-foreground">
@@ -411,7 +412,7 @@ export default function CodReconciliationPage() {
                     {report.unmatched.map(u => (
                       <tr key={u.id} className="border-t border-border">
                         <td className="px-3 py-2">{tStatus(`carrierNames.${u.carrier}`)}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{u.trackingNumber}</td>
+                        <td className="px-3 py-2 font-mono text-sm">{u.trackingNumber}</td>
                         <td className="px-3 py-2">{formatMoney(u.grossAmount)}</td>
                         <td className="px-3 py-2">{formatMoney(u.feeAmount)}</td>
                         <td className="px-3 py-2">{formatMoney(u.netAmount)}</td>

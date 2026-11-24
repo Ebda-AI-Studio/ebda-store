@@ -15,6 +15,7 @@ import { PageState } from '@/components/PageState';
 import { useConfirm } from '@/hooks/useConfirm';
 
 import { minorToDecimalString } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface POItem {
@@ -191,7 +192,7 @@ export default function PurchaseOrderDetailPage() {
       header: tDetail('qtyReceived'),
       alignEnd: true,
       className: 'w-24',
-      cell: item => <span className="font-mono text-xs text-green-700">{item.qtyReceived}</span>,
+      cell: item => <span className="font-mono text-xs text-success-ink">{item.qtyReceived}</span>,
     },
     {
       header: tDetail('qtyRemaining'),
@@ -239,7 +240,7 @@ export default function PurchaseOrderDetailPage() {
                   step="1"
                   value={receiptQtys[item.id] ?? ''}
                   onChange={e => setReceiptQtys(cur => ({ ...cur, [item.id]: e.target.value }))}
-                  className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+                  className={`${FIELD_CLASSES} text-end font-mono`}
                 />
               );
             },
@@ -312,7 +313,7 @@ export default function PurchaseOrderDetailPage() {
               />
               {/* DataTable has no footer concept, so the total is a summary bar
               right below the table — visible on both layouts. */}
-              <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
+              <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
                 <span>{tDetail('totalLabel')}</span>
                 <span className="font-mono font-semibold">{formatPrice(po.totalCost)}</span>
               </div>

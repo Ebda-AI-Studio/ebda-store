@@ -8,6 +8,7 @@ import { BottomSheet } from '@/components/mobile/BottomSheet';
 import { apiPost } from '@/lib/api';
 import { formatPrice, majorToMinor } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 interface WalletAdjustModalProps {
   open: boolean;
@@ -159,7 +160,7 @@ export function WalletAdjustModal({
             value={amount}
             onChange={e => setAmount(e.target.value)}
             placeholder={t('amountPlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
             required
           />
           {preview !== null && piastres !== null && piastres > 0 && (
@@ -185,7 +186,7 @@ export function WalletAdjustModal({
             maxLength={500}
             rows={3}
             placeholder={t('notePlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={TEXTAREA_CLASSES}
             required
           />
         </div>
