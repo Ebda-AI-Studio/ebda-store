@@ -26,8 +26,8 @@ export function WarehouseCard({ order }: WarehouseCardProps) {
   const isSplit = grouped.some(l => l.parts.length > 1);
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
-      <h3 className="text-xs font-medium text-muted-foreground">{t('fulfilledFrom')}</h3>
+    <section className="rounded-lg border border-border bg-card p-5 space-y-3">
+      <h3 className="text-sm font-medium text-muted-foreground">{t('fulfilledFrom')}</h3>
       <ul className="space-y-1.5 text-sm">
         {grouped.map((l, i) => (
           <li key={i} className="flex items-center justify-between gap-3">
@@ -38,7 +38,7 @@ export function WarehouseCard({ order }: WarehouseCardProps) {
           </li>
         ))}
       </ul>
-      {isSplit && <p className="text-xs text-muted-foreground">{t('splitHint')}</p>}
+      {isSplit && <p className="text-sm text-muted-foreground">{t('splitHint')}</p>}
     </section>
   );
 }

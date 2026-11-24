@@ -850,10 +850,10 @@ export default function NewOrderPage() {
           {stockShort && (
             <div
               role="alert"
-              className="mt-3 flex flex-col gap-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm"
+              className="mt-3 flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm"
             >
               <p className="font-medium text-foreground">{t('stockSection.shortHeading')}</p>
-              <p className="text-xs text-muted-foreground">{t('stockSection.shortBody')}</p>
+              <p className="text-sm text-muted-foreground">{t('stockSection.shortBody')}</p>
               {canOverrideCoupon && (
                 <>
                   <label className="flex items-start gap-2 text-sm">
@@ -861,7 +861,7 @@ export default function NewOrderPage() {
                       type="checkbox"
                       checked={overrideStock}
                       onChange={e => setOverrideStock(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 rounded-md border-border"
+                      className="mt-0.5 rounded-md border-border"
                     />
                     <span>
                       <span className="font-medium text-foreground">
