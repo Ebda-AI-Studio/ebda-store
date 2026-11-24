@@ -90,7 +90,8 @@ export interface AnswerEngineTrendPoint {
   weekStart: string;
   totalChecks: number;
   citedCount: number;
-  citedRate: number;
+  /** `null` for a week with no checks: unknown, not 0%. */
+  citedRate: number | null;
 }
 
 export interface AnswerEngineSummaryPrompt {
@@ -217,7 +218,7 @@ export function aggregateAnswerEngineChecks(checks: CheckRow[]): AnswerEngineSum
       weekStart,
       totalChecks: totals.total,
       citedCount: totals.cited,
-      citedRate: totals.total > 0 ? totals.cited / totals.total : 0,
+      citedRate: totals.total > 0 ? totals.cited / totals.total : null,
     }));
 
   const prompts: AnswerEngineSummaryPrompt[] = latestPerPrompt.map(c => ({

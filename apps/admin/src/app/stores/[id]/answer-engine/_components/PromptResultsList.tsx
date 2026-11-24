@@ -22,9 +22,8 @@ interface PromptResultsListProps {
 export function PromptResultsList({ storeId, prompts }: PromptResultsListProps) {
   const t = useT('answerEngine.page');
 
-  if (prompts.length === 0) {
-    return <p className="text-sm text-muted-foreground">{t('noData')}</p>;
-  }
+  // The page shows ONE empty state for the whole citations area, not one per panel.
+  if (prompts.length === 0) return null;
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">

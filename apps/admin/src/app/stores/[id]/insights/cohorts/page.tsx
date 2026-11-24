@@ -1,5 +1,6 @@
 'use client';
 
+import { ratioOrNull } from '@/lib/ratio';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -127,8 +128,9 @@ export default function InsightsCohortsPage() {
         const totalRevenue = data.cohorts
           .filter(c => c.cohortMonth === month)
           .reduce((sum, c) => sum + c.revenueInPeriod, 0);
-        const ltv = total > 0 ? totalRevenue / total : 0;
-        return <span className="font-mono">{minorToMajor(ltv)}</span>;
+        // A cohort with no customers has no average, not an average of 0.
+        const ltv = ratioOrNull(totalRevenue, total);
+        return <span className="font-mono">{ltv === null ? '—' : minorToMajor(ltv)}</span>;
       },
     },
   ];
@@ -200,7 +202,14 @@ export default function InsightsCohortsPage() {
                                 </td>
                               );
                             }
-                            const rate = total > 0 ? cell.customersActive / total : 0;
+                            const rate = ratioOrNull(cell.customersActive, total);
+                            if (rate === null) {
+                              return (
+                                <td key={o} className="text-end px-3 py-2 text-muted-foreground/40">
+                                  —
+                                </td>
+                              );
+                            }
                             return (
                               <td key={o} className="text-end px-3 py-2">
                                 <span

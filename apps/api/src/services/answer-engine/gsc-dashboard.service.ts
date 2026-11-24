@@ -37,8 +37,9 @@ export interface GscTrendPoint {
   date: string;
   impressions: number;
   clicks: number;
-  ctr: number;
-  position: number;
+  /** `null` when the day had no impressions: a rate and a position over zero are unknown, not 0. */
+  ctr: number | null;
+  position: number | null;
 }
 
 export interface GscTopQuery {
@@ -52,11 +53,12 @@ export interface GscDashboardTotals {
   clicks: number;
   /** Aggregate CTR over the window — clicks/impressions, NOT an average of
    * the per-day ctr values (which would over-weight low-traffic days). */
-  ctr: number;
+  ctr: number | null;
   /** Impression-weighted average position over the window — a day with
    * more impressions counts more toward the average, matching how GSC
-   * itself presents the "Average position" metric over a date range. */
-  avgPosition: number;
+   * itself presents the "Average position" metric over a date range.
+   * `null` when the window had no impressions (no position exists to average). */
+  avgPosition: number | null;
 }
 
 export interface GscDashboard {
@@ -176,8 +178,8 @@ async function computeGscDashboard(storeId: string): Promise<GscDashboard> {
       date: toYmd(r.date),
       impressions: r.impressions,
       clicks: r.clicks,
-      ctr: r.ctr,
-      position: r.position,
+      ctr: r.impressions > 0 ? r.ctr : null,
+      position: r.impressions > 0 ? r.position : null,
     }));
 
   let totalImpressions = 0;
@@ -191,8 +193,9 @@ async function computeGscDashboard(storeId: string): Promise<GscDashboard> {
   const totals: GscDashboardTotals = {
     impressions: totalImpressions,
     clicks: totalClicks,
-    ctr: totalImpressions > 0 ? totalClicks / totalImpressions : 0,
-    avgPosition: totalImpressions > 0 ? positionWeightedSum / totalImpressions : 0,
+    // Unknown over zero impressions, never a 0% CTR or a #0 position (every consumer reads this: UI, tools, exports).
+    ctr: totalImpressions > 0 ? totalClicks / totalImpressions : null,
+    avgPosition: totalImpressions > 0 ? positionWeightedSum / totalImpressions : null,
   };
 
   const latest = rows[0];

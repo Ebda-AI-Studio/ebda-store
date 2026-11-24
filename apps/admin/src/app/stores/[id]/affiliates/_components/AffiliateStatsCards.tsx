@@ -26,7 +26,9 @@ export function AffiliateStatsCards({ stats }: AffiliateStatsCardsProps) {
       </div>
       <div className="bg-card rounded-xl border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('conversionRate')}</p>
-        <p className="text-2xl font-bold text-info-ink">{stats.conversionRate}%</p>
+        <p className="text-2xl font-bold text-info-ink">
+          {stats.totalReferrals > 0 ? `${stats.conversionRate}%` : '—'}
+        </p>
       </div>
       <div className="bg-card rounded-xl border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('totalPaid')}</p>

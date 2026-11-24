@@ -225,3 +225,12 @@ describe('aggregateAnswerEngineChecks — ungrounded rows are not citations (iss
     expect(summary.trend).toEqual([]);
   });
 });
+
+describe('aggregateAnswerEngineChecks: a week with no counted checks is unknown', () => {
+  it('trend citedRate is null (not 0%) when every check that week was ungrounded', () => {
+    const summary = aggregateAnswerEngineChecks([
+      row({ engine: 'gemini', groundingUnavailableReason: 'http_429' }),
+    ]);
+    expect(summary.trend.every(p => p.totalChecks === 0 && p.citedRate === null)).toBe(true);
+  });
+});
