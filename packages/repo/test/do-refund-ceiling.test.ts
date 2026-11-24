@@ -179,6 +179,20 @@ describe('refundableBalance: one ceiling, every channel (#624)', () => {
     );
   });
 
+  it('a completed EXCHANGE does not lower what is still refundable (it moves no money)', () => {
+    const f = fixture();
+    f.x(
+      `INSERT INTO returns (id, store_id, order_id, customer_id, return_number, type, status, reason, refund_method, refund_amount, refunded_at, created_at, updated_at)
+       VALUES ('ex1', 's1', 'o1', 'cust', 'RET-EX', 'exchange', 'completed', 'swap', 'cash', 5000, ?, ?, ?)`,
+      Date.now(),
+      Date.now(),
+      Date.now()
+    );
+    const b = refundableBalance(f.db, 's1', 'o1');
+    expect(b.byChannel.manualReturn).toBe(0);
+    expect(b.refundable).toBe(TOTAL);
+  });
+
   it('a return on an order already refunded is refused at the claim', () => {
     const f = fixture();
     const r = f.returnFor(ALL);
