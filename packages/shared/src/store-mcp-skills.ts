@@ -14,7 +14,7 @@
  * merchant to install.
  */
 
-export interface StoreMcpToolSkill {
+interface StoreMcpToolSkill {
   name: string;
   kind: 'read' | 'write';
   summary: string;

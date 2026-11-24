@@ -31,7 +31,7 @@ export const notFoundResponse = () =>
     headers: { 'Content-Type': 'application/json' },
   });
 
-export interface DiscoveryCtx {
+interface DiscoveryCtx {
   store: AgentStore;
   base: string;
   mcpUrl: string;
