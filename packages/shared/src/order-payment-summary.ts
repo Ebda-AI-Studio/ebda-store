@@ -25,9 +25,10 @@ interface OrderPaymentSummaryInput extends OrderPaymentStateInput {
   refundedTotal?: number | null;
 }
 
-type OrderPaymentState = 'paid' | 'refunded' | 'disputed' | 'unpaid';
+export type OrderPaymentState = 'paid' | 'partially_refunded' | 'refunded' | 'disputed' | 'unpaid';
 
 interface OrderPaymentSummary {
+  /** `partially_refunded` / `refunded` also follow the RECORDED money, not only the status columns (a returns-path refund keeps `paymentStatus` paid). */
   state: OrderPaymentState;
   /** Piastres handed back so far (0 when none or unknown). */
   refunded: number;
@@ -37,19 +38,27 @@ interface OrderPaymentSummary {
 
 const CAPTURED = ['paid', 'refunded', 'disputed'];
 
-export function orderPaymentState(order: OrderPaymentStateInput): OrderPaymentState {
+/** The status-column state only (what may be marked paid, `orderActionVisibility`): never `partially_refunded`, which needs the amounts. */
+export function orderPaymentState(
+  order: OrderPaymentStateInput
+): Exclude<OrderPaymentState, 'partially_refunded'> {
   if (order.paymentStatus === 'refunded' || order.status === 'refunded') return 'refunded';
   if (order.paymentStatus === 'disputed') return 'disputed';
   return order.paymentStatus === 'paid' ? 'paid' : 'unpaid';
 }
 
 export function orderPaymentSummary(order: OrderPaymentSummaryInput): OrderPaymentSummary {
-  const state = orderPaymentState(order);
   const fromPayments = (order.payments ?? []).reduce(
     (s, p) => s + Math.max(0, p.refundedAmount ?? 0),
     0
   );
   const recorded = Math.max(0, order.refundedTotal ?? fromPayments);
+  let state: OrderPaymentState = orderPaymentState(order);
+  // A refund through a RETURN (or a merchant partial refund) leaves `paymentStatus = paid` and the status delivered: the recorded
+  // money decides. Everything handed back = Refunded; some of it = Partially refunded (live: Amelia ORD-TOZJNY-7Y485, Refunded
+  // EGP 7,300 under a "Paid" header).
+  if (state === 'paid' && order.total > 0 && recorded > 0)
+    state = recorded >= order.total ? 'refunded' : 'partially_refunded';
   if (state === 'refunded') {
     // Recorded money wins. With none recorded, the whole total went back only if it was ever paid.
     const wasPaid = CAPTURED.includes(order.paymentStatus);

@@ -1564,6 +1564,7 @@
       "remain": "Remain {amount}",
       "refunded": "Refunded",
       "refundedAmount": "Refunded {amount}",
+      "partially_refunded": "Partially refunded",
       "disputed": "Disputed",
       "paymentMethod": "Payment method",
       "methodCod": "Cash on delivery",
