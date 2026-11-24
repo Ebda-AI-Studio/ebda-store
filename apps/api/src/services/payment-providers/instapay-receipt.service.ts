@@ -816,12 +816,20 @@ export class InstapayReceiptService {
   static async markReviewed(
     storeId: string,
     receiptId: string,
-    decision: { status: 'approved' } | { status: 'rejected'; note: string },
+    decision:
+      | { status: 'approved' }
+      | {
+          status: 'rejected';
+          note: string;
+          /** a REFUNDED transfer stays used: the reference is NOT freed for re-filing (a held add-on payment resolved as refunded) */
+          keepReference?: boolean;
+        },
     actorId: string | null,
     now: Date = new Date()
   ): Promise<number> {
+    const keep = decision.status === 'rejected' && decision.keepReference === true;
     const freed =
-      decision.status === 'rejected'
+      decision.status === 'rejected' && !keep
         ? await prisma.instapayReceipt.findMany({
             where: { id: receiptId, storeId, status: 'submitted', referenceKey: { not: null } },
             select: { id: true, referenceKey: true },
@@ -834,8 +842,8 @@ export class InstapayReceiptService {
           ? { status: 'approved', reviewedBy: actorId, reviewedAt: now }
           : {
               status: 'rejected',
-              // A rejected receipt frees its reference: the same transfer may be re-filed.
-              referenceKey: null,
+              // A rejected receipt frees its reference: the same transfer may be re-filed (unless it was refunded).
+              ...(keep ? {} : { referenceKey: null }),
               reviewNote: decision.note.slice(0, 500),
               reviewedBy: actorId,
               reviewedAt: now,

@@ -48,6 +48,7 @@ import { clearCfBindings, setCfBindings } from '../../apps/api/src/cf/bindings';
 import { cutoverKey, resetCutoverCache } from '../../apps/api/src/services/platform/cutover';
 import { sendAlert } from '../../apps/api/src/services/alerts.service';
 import { registerPlatformRouter } from '../../apps/api/src/services/platform/router';
+import { InstapayReceiptService } from '../../apps/api/src/services/payment-providers/instapay-receipt.service';
 import { approveAddonClaim } from '../../apps/api/src/services/billing/addon-instapay';
 import { activeAddons } from '../../apps/api/src/services/billing/addon-grant';
 import {
@@ -215,7 +216,12 @@ describe('resolving a held add-on payment closes the merchant claim behind it (f
         'SELECT status s, payer_reference p, review_note n, billing_event_id b FROM manual_payment_claims WHERE id = ?'
       )
       .get(CLAIM) as { s: string; p: string; n: string | null; b: string | null };
+  const receiptCall = () => {
+    const calls = vi.mocked(InstapayReceiptService.markReviewed).mock.calls;
+    return calls[calls.length - 1]?.[2];
+  };
   const heldClaim = async () => {
+    vi.mocked(InstapayReceiptService.markReviewed).mockClear();
     const db = rig();
     seed(db, 5000, 4000);
     await expect(act()).rejects.toMatchObject({ code: 'ADDON_PAYMENT_HELD' });
@@ -223,19 +229,68 @@ describe('resolving a held add-on payment closes the merchant claim behind it (f
     return { db, h };
   };
 
-  it.each(['refunded', 'not_ours'] as const)(
-    '%s: the claim is rejected with the note, its reference is freed and it no longer reads pending',
-    async action => {
-      const { db, h } = await heldClaim();
-      expect(claimRow(db).s).toBe('pending'); // the stuck shape this closes
-      await resolve(h.id, action);
-      const c = claimRow(db);
-      expect(c.s).toBe('rejected');
-      expect(c.n).toBe('checked with the merchant');
-      expect(c.p).toContain('#rejected-'); // the unique transfer reference is free for re-filing
-      expect(await addons()).toHaveLength(0);
-    }
-  );
+  const seedReceipt = (db: DatabaseSync) =>
+    db
+      .prepare(
+        `INSERT INTO instapay_receipts (id, store_id, kind, claim_id, storage_key, mime_type, size_bytes, sha256, reference_key, status)
+         VALUES ('rcpt-1', ?, 'subscription', ?, 'k', 'image/png', 10, 'abc', 'REFKEY-1', 'submitted')`
+      )
+      .run(STORE, CLAIM);
+  const refile = (db: DatabaseSync) =>
+    db
+      .prepare(
+        `INSERT INTO manual_payment_claims (id, store_id, plan_code, billing_interval, amount_minor, method, payment_reference, payer_reference, status)
+         VALUES ('55555555-5555-4555-8555-555555555555', ?, ?, 'monthly', 5000, 'instapay', 'EBD-ADDON02', 'payer-ref-123456', 'pending')`
+      )
+      .run(STORE, planCodeOfSku(SKU));
+
+  it('refunded: the claim is rejected with the note, but the transfer reference stays USED (the refunded transfer cannot be filed again)', async () => {
+    const { db, h } = await heldClaim();
+    seedReceipt(db);
+    expect(claimRow(db).s).toBe('pending'); // the stuck shape this closes
+    await resolve(h.id, 'refunded');
+    const c = claimRow(db);
+    expect(c.s).toBe('rejected');
+    expect(c.n).toBe('checked with the merchant');
+    expect(c.p).toBe('payer-ref-123456'); // NOT freed
+    expect(() => refile(db)).toThrow(/UNIQUE/i); // re-filing the same transfer is refused
+    expect(receiptCall()).toMatchObject({ status: 'rejected', keepReference: true });
+    expect(await addons()).toHaveLength(0);
+  });
+
+  it('not_ours: the claim is rejected with the note and its reference is freed for re-filing', async () => {
+    const { db, h } = await heldClaim();
+    seedReceipt(db);
+    await resolve(h.id, 'not_ours');
+    const c = claimRow(db);
+    expect(c.s).toBe('rejected');
+    expect(c.n).toBe('checked with the merchant');
+    expect(c.p).toContain('#rejected-');
+    expect(() => refile(db)).not.toThrow();
+    expect(receiptCall()).toMatchObject({ status: 'rejected', keepReference: false });
+  });
+
+  it('the receipt service keeps the reference key on a refunded rejection and clears it otherwise (real markReviewed)', async () => {
+    const { db } = await heldClaim();
+    seedReceipt(db);
+    const { InstapayReceiptService: real } = await vi.importActual<
+      typeof import('../../apps/api/src/services/payment-providers/instapay-receipt.service')
+    >('../../apps/api/src/services/payment-providers/instapay-receipt.service');
+    await real.markReviewed(
+      STORE,
+      'rcpt-1',
+      { status: 'rejected', note: 'refunded', keepReference: true },
+      'a'
+    );
+    expect(
+      db
+        .prepare(`SELECT status s, reference_key k FROM instapay_receipts WHERE id = 'rcpt-1'`)
+        .get()
+    ).toEqual({
+      s: 'rejected',
+      k: 'REFKEY-1',
+    });
+  });
 
   it('credited with NO granted add-on: rejected with a note that says so, never confirmed', async () => {
     const { db, h } = await heldClaim();
@@ -248,14 +303,28 @@ describe('resolving a held add-on payment closes the merchant claim behind it (f
   it('credited with the add-on actually granted: confirmed against that term', async () => {
     const { db, h } = await heldClaim();
     db.prepare(
-      `INSERT INTO billing_events (id, store_id, type, plan_code, billing_interval, amount_minor, currency, provider, idempotency_key, status, for_period_end)
-       VALUES ('99999999-9999-4999-8999-999999999999', ?, 'upgrade', ?, 'monthly', 5000, 'EGP', 'manual', 'manual:granted', 'succeeded', ?)`
-    ).run(STORE, planCodeOfSku(SKU), Date.now() + 20 * 86_400_000);
+      `INSERT INTO billing_events (id, store_id, type, plan_code, billing_interval, amount_minor, currency, provider, idempotency_key, status, for_period_end, created_at)
+       VALUES ('99999999-9999-4999-8999-999999999999', ?, 'upgrade', ?, 'monthly', 5000, 'EGP', 'manual', 'manual:granted', 'succeeded', ?, ?)`
+    ).run(STORE, planCodeOfSku(SKU), Date.now() + 20 * 86_400_000, Date.now() + 5000);
     await resolve(h.id, 'credited');
     expect(claimRow(db)).toMatchObject({
       s: 'confirmed',
       b: '99999999-9999-4999-8999-999999999999',
     });
+  });
+
+  it('credited while the merchant ALREADY had a running term of that add-on: rejected, never confirmed against the old term', async () => {
+    const { db, h } = await heldClaim();
+    db.prepare(
+      `INSERT INTO billing_events (id, store_id, type, plan_code, billing_interval, amount_minor, currency, provider, idempotency_key, status, for_period_end, created_at)
+       VALUES ('88888888-8888-4888-8888-888888888888', ?, 'upgrade', ?, 'monthly', 5000, 'EGP', 'kashier', 'card:earlier', 'succeeded', ?, ?)`
+    ).run(STORE, planCodeOfSku(SKU), Date.now() + 20 * 86_400_000, Date.now() - 10 * 86_400_000);
+    expect(await addons()).toHaveLength(1); // the merchant does have a running term from before
+    await resolve(h.id, 'credited');
+    const c = claimRow(db);
+    expect(c.s).toBe('rejected');
+    expect(c.b).toBeNull();
+    expect(c.n).toMatch(/^Credited by hand, but no active add-on of this kind was found/);
   });
 
   it('a failing queue close leaves the claim already closed, and the retry completes without touching it twice', async () => {
@@ -269,7 +338,7 @@ describe('resolving a held add-on payment closes the merchant claim behind it (f
     db.exec('DROP TRIGGER fail_queue_close');
     await resolve(h.id, 'refunded');
     expect(claimRow(db).s).toBe('rejected');
-    expect(claimRow(db).p.match(/#rejected-/g)).toHaveLength(1);
+    expect(claimRow(db).p).toBe('payer-ref-123456'); // refunded keeps the reference, and the retry did not touch it again
     expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(0);
   });
 });
