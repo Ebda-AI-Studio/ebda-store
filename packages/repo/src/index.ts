@@ -53,6 +53,13 @@ export {
 export { runStockOp, ensureStockOpsSchema, STOCK_OP_NAMES, type StockOpName } from './do/stock-ops';
 export { answerStockOp, type StockAnswer } from './rpc/stock';
 export { runMoneyOp, ensureMoneyOpsSchema, MONEY_OP_NAMES, type MoneyOpName } from './do/money-ops';
+export {
+  DO_METRICS,
+  DO_METRIC_NAMES,
+  runDoMetric,
+  type DoMetricName,
+  type DoMetricDef,
+} from './do/do-metrics';
 export { answerMoneyOp, type MoneyAnswer } from './rpc/money';
 export { answerAuthOp, AUTH_OP_NAMES, type AuthAnswer } from './rpc/customer-auth';
 export {

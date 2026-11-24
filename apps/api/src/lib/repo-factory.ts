@@ -1003,6 +1003,7 @@ export interface MoneyClient {
       isSale: boolean;
     }>
   >;
+  doMetric(a: { name: string }): Promise<{ n: number }>;
   analyticsLowStock(a: { threshold: number }): Promise<
     Array<{
       id: string;
@@ -1650,6 +1651,7 @@ export function makeMoneyClient(
     analyticsCustomers: a => call('analyticsCustomers', a),
     analyticsBuyerIdentities: a => call('analyticsBuyerIdentities', a),
     analyticsLowStock: a => call('analyticsLowStock', a),
+    doMetric: a => call('doMetric', a),
     analyticsStock: a => call('analyticsStock', a),
     analyticsCashflow: a => call('analyticsCashflow', a),
     taxReportLines: a => call('taxReportLines', a),
