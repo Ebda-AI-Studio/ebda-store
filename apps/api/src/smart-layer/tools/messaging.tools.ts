@@ -7,7 +7,7 @@
  *                         campaign.service (createCampaignDraft / requestCampaignSend / cancelCampaign, extracted from the route). A send mails real
  *                         subscribers: confirm, `messagesCustomers`, irreversible; the card carries the audience size and the exact text.
  *   marketing.newsletter  newsletter_broadcast (routes/newsletter.routes.ts POST /broadcast; newsletter-broadcast.service, extracted).
- *   marketing.push-web    push_broadcast (routes/onesignal.routes.ts POST /broadcast, `requireFeature('push_notifications')`; OneSignalService).
+ *   marketing.push-web    push_broadcast (routes/onesignal.routes.ts POST /broadcast, `requireFeature('push_notifications')`; push service).
  *   notify.whatsapp-link  whatsapp_consent_revoke (routes/whatsapp-link.routes.ts POST /consent/revoke; WhatsAppConsentService). NOT built: connect /
  *                         disconnect (route-inline event fan-out behind `requireMfaEnrolled`, which runAsMerchant cannot honour).
  *   marketing.pixels      pixels_set (routes/store.routes.ts PUT /:id/marketing-pixels; StoreService.updateMarketingPixels). Public pixel ids only: an
@@ -40,11 +40,7 @@ import {
   broadcastNewsletter,
   newsletterAudienceSize,
 } from '../../services/newsletter-broadcast.service';
-import {
-  OneSignalNotConfiguredError,
-  OneSignalRequestError,
-  OneSignalService,
-} from '../../services/onesignal.service';
+import { pushService } from '../../services/push.service';
 import { WhatsAppConsentService } from '../../lib/wa/consent';
 import { whatsAppLinkState } from '../../lib/wa/link';
 import { StoreService } from '../../services/store.service';
@@ -402,10 +398,10 @@ const pushBroadcast = change<PushArgs>({
   // routes/onesignal.routes.ts POST /admin/stores/:storeId/push/broadcast: authorize(store_admin, super_admin) + requireFeature('push_notifications')
   gate: { ...OWNER, feature: 'push_notifications' },
   audit: { action: 'push.broadcast.sent', resourceType: 'store', resourceId: () => undefined },
-  state: async () => ({ configured: OneSignalService.isConfigured() }),
+  state: async () => ({ configured: pushService.isConfigured() }),
   describe: (_ctx, a, st): Described => {
     if (!(st as { configured: boolean }).configured)
-      throw new Error('Push notifications are not set up on the server yet.');
+      throw new Error('Push notifications are not available yet.');
     if (a.url && !/^https:\/\//i.test(a.url)) throw new Error('The link must start with https://');
     return {
       summary: pair(
@@ -414,10 +410,10 @@ const pushBroadcast = change<PushArgs>({
       ),
       rows: [
         row(
-          'هيوصل لمين (العدد مش معروف عندنا)',
+          'هيوصل لمين',
           'Audience',
           null,
-          'every shopper who allowed notifications; audience size unknown to Ebda Store (only the push provider knows it)'
+          'every shopper who allowed notifications on this store'
         ),
         row('العنوان بالإنجليزي', 'Title (English)', null, a.titleEn),
         row('العنوان بالعربي', 'Title (Arabic)', null, a.titleAr),
@@ -425,20 +421,17 @@ const pushBroadcast = change<PushArgs>({
         row('النص بالعربي', 'Body (Arabic)', null, a.bodyAr),
         row('الرابط', 'Link', null, a.url ?? null),
       ],
-      affectedCount: 1, // one broadcast; the subscriber count is only known to the provider
+      affectedCount: 1, // one broadcast
       restore: null,
     };
   },
   run: async (ctx, a) => {
-    try {
-      return await OneSignalService.broadcastToStore({ storeId: ctx.storeId, ...a });
-    } catch (err) {
-      if (err instanceof OneSignalNotConfiguredError)
-        throw new Error('Push notifications are not set up on the server yet.');
-      if (err instanceof OneSignalRequestError)
-        throw new Error('The push provider could not complete the request. Try again later.');
-      throw err;
-    }
+    const r = await pushService.broadcastToStore(ctx.storeId, a);
+    if (r.skipped === 'not_configured')
+      throw new Error('Push notifications are not available yet.');
+    if (r.skipped === 'channel_disabled')
+      throw new Error('Turn on push notifications for this store first.');
+    return { recipients: r.recipients, delivered: r.delivered };
   },
 });
 
@@ -1046,10 +1039,10 @@ const pushRecent = readTool({
   roles: ['store_admin'],
   feature: 'push_notifications',
   read: async ctx => {
-    if (!OneSignalService.isConfigured()) return { configured: false, broadcasts: [] };
+    if (!pushService.isConfigured()) return { configured: false, broadcasts: [] };
     return {
       configured: true,
-      broadcasts: await OneSignalService.listRecentBroadcasts(ctx.storeId, MAX_ITEMS),
+      broadcasts: await pushService.listRecentBroadcasts(ctx.storeId, MAX_ITEMS),
     };
   },
 });

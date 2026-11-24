@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { PlanLimitNotice } from '@/components/billing/PlanLimitNotice';
 import { useConfirm } from '@/hooks/useConfirm';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { GeoResultsPanel } from './_components/GeoResultsPanel';
@@ -341,6 +342,7 @@ export default function AiToolsPage() {
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       <div className="space-y-4">
+        <PlanLimitNotice storeId={storeId} keys={['ai']} className="" />
         <AiSwitchCard storeId={storeId} onChange={setAiEnabled} />
         {/* AI allowance: visible before any run button. */}
         <AiUsageSummaryCard storeId={storeId} embedded={true} onLoaded={setUsage} />

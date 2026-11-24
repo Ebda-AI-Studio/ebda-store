@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { SearchTermsField } from '@/components/SearchTermsField';
+import { SlugField } from './_components/SlugField';
+import { isValidProductSlug, savedSlugIfChanged, slugForUpdate } from './_components/slug-field';
 import { Badge, Input, Textarea, Select, cn, useToast } from '@ebda/ui';
 import { Button, buttonVariants } from '@/components/ui/Button';
 import { storefrontOrigin } from '@ebda/shared';
@@ -209,6 +211,7 @@ export default function EditProductPage() {
   const [formData, setFormData] = useState({
     name: '',
     nameAr: '',
+    slug: '',
     description: '',
     descriptionAr: '',
     excerpt: '',
@@ -339,6 +342,7 @@ export default function EditProductPage() {
         setFormData({
           name: p.name || '',
           nameAr: p.nameAr || '',
+          slug: p.slug || '',
           description: p.description || '',
           descriptionAr: p.descriptionAr || '',
           excerpt: (p as Product & { excerpt?: string }).excerpt || '',
@@ -624,6 +628,11 @@ export default function EditProductPage() {
         return;
       }
 
+      if (formData.slug.trim() !== '' && !isValidProductSlug(formData.slug)) {
+        setError(tFields('slugInvalid'));
+        return;
+      }
+
       const personal = personalisationPayload(personalisation);
       if ('error' in personal) {
         setError(tPersonal(personal.error));
@@ -632,6 +641,8 @@ export default function EditProductPage() {
 
       const body: Record<string, unknown> = {
         name: formData.name,
+        // Only a real change is sent; the API records the SlugRedirect from the old slug.
+        ...slugForUpdate(formData.slug, product.slug),
         // Clearable free text (nameAr / description / descriptionAr / sku).
         // null clears, undefined leaves alone — same convention as metaTitle
         // below. These MUST send null: `undefined` omits the key, so an
@@ -681,7 +692,7 @@ export default function EditProductPage() {
         body.categories = [];
       }
 
-      const { error: apiError } = await apiPut(
+      const { data: saved, error: apiError } = await apiPut<{ product?: { slug?: string } }>(
         `/api/v1/stores/${storeId}/products/${product.id}`,
         body
       );
@@ -696,7 +707,11 @@ export default function EditProductPage() {
       // `returnTo` (when present and same-store) restores the exact filtered list view. No router.refresh() and no
       // setSaving(false) on success: the bar stays busy until the route changes (UX:PN-1), and the list refetches
       // on mount.
-      queueFlashToast(t('toast.saved'));
+      // A taken slug is saved with `-1` appended: say which link the product really got.
+      const keptSlug = savedSlugIfChanged(body.slug as string | undefined, saved?.product?.slug);
+      queueFlashToast(
+        keptSlug ? t('toast.savedSlugChanged', { slug: keptSlug }) : t('toast.saved')
+      );
       router.push(returnTo);
     } catch {
       setError(t('updateFailed'));
@@ -938,6 +953,7 @@ export default function EditProductPage() {
                     dir="rtl"
                   />
                 </div>
+                <SlugField value={formData.slug} onChange={v => updateField('slug', v)} />
                 <div>
                   <div className="mb-1 flex justify-end">
                     <AiFieldBadge

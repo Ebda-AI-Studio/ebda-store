@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { cfWaitUntil } from '../cf/bindings';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -161,9 +162,11 @@ router.post(
       const { storeId } = req.params;
 
       // Kick off async — don't await so request returns immediately
-      recommendationService.recalculateFBT(storeId).catch(err => {
-        logger.error({ err, storeId }, '[FBT] Manual recalculation failed');
-      });
+      cfWaitUntil(
+        recommendationService.recalculateFBT(storeId).catch(err => {
+          logger.error({ err, storeId }, '[FBT] Manual recalculation failed');
+        })
+      );
 
       res.json({ success: true, data: { message: 'FBT recalculation started' } });
     } catch (error) {
