@@ -30,7 +30,7 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": ["حولت وماتفعلتش"],
+    "ar": ["حولت وماتفعلتش", "ازاي اأكد دفع انستاباي للاشتراك؟", "ازاي ارجع فلوس اشتراك؟"],
     "en": ["I paid by InstaPay but nothing activated"]
   },
   "steps": ["Super-admin console only."],

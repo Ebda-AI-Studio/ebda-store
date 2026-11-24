@@ -105,7 +105,7 @@ export function ReturnDetailsDrawer({
       onClick={onClose}
     >
       <div
-        className="bg-card rounded-xl shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+        className="bg-card rounded-md shadow-md max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b p-4">
@@ -273,10 +273,10 @@ function ReturnItemRow({ item }: { item: ReturnItem }) {
           alt=""
           width={48}
           height={48}
-          className="w-12 h-12 rounded object-cover"
+          className="w-12 h-12 rounded-md object-cover"
         />
       ) : (
-        <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
+        <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center">
           <svg
             className="w-6 h-6 text-muted-foreground"
             fill="none"

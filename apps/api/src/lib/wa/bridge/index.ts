@@ -2,6 +2,7 @@ import { createBridge } from './service';
 import { createDoPort, storefrontUrlFor } from './do-port';
 import { suiteBuyerKeySecret } from '../config';
 import logger from '../../logger';
+import { buyerProofRequired } from './proof-policy';
 import { createOwnerTools, type OrderRowLite } from './owner-tools';
 import { refundedTotalByOrder } from '../../order-refunds';
 import { latestPaymentIsOnline } from '../../revenue-sql';
@@ -19,7 +20,7 @@ export const waBridge = () =>
     port: createDoPort(),
     storefrontUrl: storefrontUrlFor,
     buyerKeySecret: suiteBuyerKeySecret,
-    requireBuyerProof: () => process.env.WA_BRIDGE_REQUIRE_BUYER_PROOF === '1',
+    requireBuyerProof: () => buyerProofRequired(process.env.WA_BRIDGE_REQUIRE_BUYER_PROOF),
     log: (msg, ctx) => logger.error({ storeId: ctx.storeId, err: ctx.err }, msg),
   });
 

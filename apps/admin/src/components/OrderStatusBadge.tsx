@@ -28,18 +28,19 @@ export type StatusStyle = { bg: string; text: string; dot: string } | { classNam
 const DEFAULT_STATUS_STYLES: Record<string, StatusStyle> = {
   pending: { bg: 'bg-warning/10', text: 'text-warning-ink', dot: 'bg-warning' },
   // InstaPay: the money has not been confirmed to have arrived (SP6a).
+  // Money not yet confirmed: the warning (brass) role, distinct from `confirmed` (gold).
   awaiting_payment_confirmation: {
-    bg: 'bg-violet-50',
-    text: 'text-violet-700',
-    dot: 'bg-violet-500',
+    bg: 'bg-warning/10',
+    text: 'text-warning-ink',
+    dot: 'bg-warning',
   },
-  confirmed: { bg: 'bg-cyan-50', text: 'text-cyan-700', dot: 'bg-cyan-500' },
-  processing: { bg: 'bg-info/5', text: 'text-info-ink', dot: 'bg-info' },
-  shipped: { bg: 'bg-violet-50', text: 'text-violet-700', dot: 'bg-violet-500' },
-  delivered: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  cancelled: { bg: 'bg-destructive/5', text: 'text-destructive-ink', dot: 'bg-destructive' },
-  refunded: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
-  paid: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  confirmed: { bg: 'bg-primary/10', text: 'text-primary-ink', dot: 'bg-primary' },
+  processing: { bg: 'bg-info/10', text: 'text-info-ink', dot: 'bg-info' },
+  shipped: { bg: 'bg-info/10', text: 'text-info-ink', dot: 'bg-info' },
+  delivered: { bg: 'bg-success/10', text: 'text-success-ink', dot: 'bg-success' },
+  cancelled: { bg: 'bg-destructive/10', text: 'text-destructive-ink', dot: 'bg-destructive' },
+  refunded: { bg: 'bg-muted', text: 'text-muted-ink', dot: 'bg-muted-foreground' },
+  paid: { bg: 'bg-success/10', text: 'text-success-ink', dot: 'bg-success' },
   unpaid: { bg: 'bg-warning/10', text: 'text-warning-ink', dot: 'bg-warning' },
 };
 
