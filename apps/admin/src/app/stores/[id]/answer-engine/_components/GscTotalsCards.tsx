@@ -20,7 +20,7 @@ export function GscTotalsCards({ totals }: GscTotalsCardsProps) {
     },
     { label: t('clicks'), value: totals.clicks.toLocaleString(undefined, withNumerals()) },
     { label: t('ctr'), value: formatPercent(totals.ctr) },
-    { label: t('avgPosition'), value: formatPosition(totals.avgPosition) },
+    { label: t('avgPosition'), value: formatPosition(totals.avgPosition, totals.impressions) },
   ];
 
   return (

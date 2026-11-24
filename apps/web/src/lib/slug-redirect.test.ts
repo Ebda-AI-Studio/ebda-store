@@ -1,6 +1,15 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { fetchSlugRedirect, storeRedirectUrl } from './slug-redirect';
+import { fetchSlugRedirect, localizedRedirectUrl, storeRedirectUrl } from './slug-redirect';
 import type { ResolvedStore } from './store-resolver';
+
+// the language the middleware asserts on a prefixed storefront page (`x-locale-path`); `throw` = no request context
+let localeHeader: string | null | 'throw' = null;
+vi.mock('next/headers', () => ({
+  headers: async () => {
+    if (localeHeader === 'throw') throw new Error('no request context');
+    return { get: (n: string) => (n === 'x-locale-path' ? localeHeader : null) };
+  },
+}));
 
 describe('fetchSlugRedirect', () => {
   const originalFetch = global.fetch;
@@ -122,5 +131,55 @@ describe('storeRedirectUrl', () => {
     const url = storeRedirectUrl(store, '/products/new-handle');
 
     expect(url).toBe('https://example.com/products/new-handle');
+  });
+});
+
+describe('localizedRedirectUrl: a renamed-slug 308 keeps the language prefix (live: /ar/products/<old> lost /ar)', () => {
+  const store = {
+    id: 'store-1',
+    slug: 'my-store',
+    domain: 'example.com',
+  } as unknown as ResolvedStore;
+  afterEach(() => {
+    localeHeader = null;
+  });
+
+  it('keeps /ar on a product rename', async () => {
+    localeHeader = 'ar';
+    expect(await localizedRedirectUrl(store, '/products/new-handle')).toBe(
+      'https://example.com/ar/products/new-handle'
+    );
+  });
+  it('keeps /en on a blog rename', async () => {
+    localeHeader = 'en';
+    expect(await localizedRedirectUrl(store, '/blog/new-post')).toBe(
+      'https://example.com/en/blog/new-post'
+    );
+  });
+  it('keeps the prefix AND the query on a category rename (/products?category=new)', async () => {
+    localeHeader = 'ar';
+    expect(await localizedRedirectUrl(store, '/products?category=new-cat')).toBe(
+      'https://example.com/ar/products?category=new-cat'
+    );
+  });
+  it('keeps the prefix with an encoded Arabic handle (the Location header stays ASCII)', async () => {
+    localeHeader = 'ar';
+    const url = await localizedRedirectUrl(store, `/products/${encodeURIComponent('خاتم-جديد')}`);
+    expect(url).toBe(`https://example.com/ar/products/${encodeURIComponent('خاتم-جديد')}`);
+    expect(/^[\x20-\x7e]+$/.test(url)).toBe(true);
+  });
+  it('an unprefixed page (no header), an unknown value, or no request context redirects to the unprefixed URL, as before', async () => {
+    for (const v of [null, 'fr', '', 'throw'] as const) {
+      localeHeader = v;
+      expect(await localizedRedirectUrl(store, '/products/new-handle'), String(v)).toBe(
+        'https://example.com/products/new-handle'
+      );
+    }
+  });
+  it('never doubles a prefix and leaves a non-indexable route alone', async () => {
+    localeHeader = 'ar';
+    expect(await localizedRedirectUrl(store, '/ar/products/x')).toBe(
+      'https://example.com/ar/products/x'
+    );
   });
 });
