@@ -80,7 +80,7 @@ class PushService {
   }
 
   /**
-   * Send a web-push notification to all subscribed devices for a store.
+   * Send a web-push notification to ONE shopper's own storefront devices (Ruling PUSH-AUDIENCE-1).
    * Cleans up expired (410 Gone / 404) subscriptions automatically.
    * Logs the result to NotificationLog.
    */
@@ -88,7 +88,36 @@ class PushService {
     storeId: string,
     title: string,
     body: string,
-    data?: Record<string, unknown>,
+    data: Record<string, unknown> | undefined,
+    /** Ruling PUSH-AUDIENCE-1: the ONE shopper this message is for. Required; without it nothing is sent. */
+    recipient: { customerId: string }
+  ): Promise<PushSendResult> {
+    // Fail closed: a shopper message with no addressee is never a store-wide broadcast.
+    if (!recipient?.customerId) {
+      logger.warn({ storeId }, '[PushService] sendToStore refused: no recipient customerId');
+      return { recipients: 0, delivered: 0, failed: 0 };
+    }
+    return this.deliver(
+      storeId,
+      title,
+      body,
+      data,
+      { customerId: recipient.customerId },
+      { audience: 'storefront' }
+    );
+  }
+
+  /**
+   * The one delivery path. `filter.customerId` set = that shopper's devices only (transactional push); absent = every
+   * device of the audience (ONLY the merchant broadcast passes no customer: `broadcastToStore`, which every shopper
+   * opted into by subscribing). Callers never reach this without choosing one of the two.
+   */
+  private async deliver(
+    storeId: string,
+    title: string,
+    body: string,
+    data: Record<string, unknown> | undefined,
+    filter: { customerId?: string },
     options: PushSendOptions = {}
   ): Promise<PushSendResult> {
     // 1. VAPID must be configured platform-wide
@@ -122,7 +151,11 @@ class PushService {
     // proxy threw PostgresRemovedError there on the Worker, so every dispatched push failed (Ruling NZ-D23).
     const subscriptions = await withStoreRw(storeId, tx =>
       tx.pushSubscription.findMany({
-        where: { storeId, ...(options.audience ? { audience: options.audience } : {}) },
+        where: {
+          storeId,
+          ...(filter.customerId ? { customerId: filter.customerId } : {}),
+          ...(options.audience ? { audience: options.audience } : {}),
+        },
         select: { id: true, endpoint: true, p256dh: true, auth: true },
       })
     );
@@ -418,7 +451,9 @@ class PushService {
   ): Promise<PushSendResult> {
     // Ruling SUSPEND-OUT-1: a marketing push to a store's shoppers is refused (423) for a store that is not `active`.
     await assertStoreOperational(storeId);
-    return this.sendToStore(
+    // The merchant broadcast is the ONE store-wide push: every storefront device that subscribed (the shopper's own consent).
+    // It does NOT go through `sendToStore`, whose single-customer addressing (PUSH-AUDIENCE-1) is for transactional push.
+    return this.deliver(
       storeId,
       input.titleAr,
       input.bodyAr,
@@ -429,6 +464,7 @@ class PushService {
           ar: { title: input.titleAr, body: input.bodyAr },
         },
       },
+      {},
       { logEvent: 'push_broadcast', audience: 'storefront' }
     );
   }

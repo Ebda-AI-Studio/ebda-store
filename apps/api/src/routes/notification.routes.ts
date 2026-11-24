@@ -3,7 +3,7 @@ import { analyticsRead } from '../lib/analytics-backend';
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { FeatureKey } from '@ebda/shared';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, optionalAuthenticate, customerUserId } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { refuseDemoStore } from '../middleware/demo-store';
@@ -443,13 +443,16 @@ publicRouter.post(
   '/:storeId/push/subscribe',
   refuseDemoStore,
   requireFeature('push_notifications'),
+  // Ruling PUSH-AUDIENCE-1: bind the device to the logged-in CUSTOMER (a guest stays unbound and so is never addressable
+  // by a per-person push). This route had no auth middleware, so `req.user` was never set and every storefront
+  // subscription carried a null customer id.
+  optionalAuthenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
       const { endpoint, keys, deviceInfo } = pushSubscribeSchema.parse(req.body);
 
-      // Optionally bind to a logged-in customer if token is present
-      const customerId = (req as Request & { user?: { id: string } }).user?.id ?? undefined;
+      const customerId = customerUserId(req);
 
       await pushService.subscribe(
         storeId,
