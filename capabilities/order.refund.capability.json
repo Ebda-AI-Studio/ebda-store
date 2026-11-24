@@ -9,7 +9,9 @@
   "screens": ["/stores/[id]/orders/[orderId]"],
   "api": [
     "POST /payments/refund",
+    "GET /stores/:storeId/orders/:orderId/refund-quote",
     "POST /stores/:storeId/orders/:orderId/refund-via-provider",
+    "POST /stores/:storeId/orders/:orderId/partial-refund",
     "POST .../refund-match-claim",
     "POST .../refresh-refund-status"
   ],

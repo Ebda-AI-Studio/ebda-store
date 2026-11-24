@@ -59,6 +59,7 @@ const COPY = {
     forgot: 'نسيت كلمة السر؟',
     passkey: 'معاك مفتاح مرور؟ ادخل بيه من صفحة ابدأ ستور.',
     noAccount: 'جديد على ابدأ ستور؟ اعمل حساب.',
+    chatNoAccount: 'معاك دعوة؟ اعمل حسابك.',
     mfaTitle: 'اكتب كود التحقق',
     mfaSubtitle: 'اكتب الكود اللي فيه 6 أرقام من تطبيق المصادقة.',
     mfaBackupSubtitle: 'اكتب واحد من أكواد الاحتياط اللي حفظتها.',
@@ -88,6 +89,7 @@ const COPY = {
     forgot: 'Forgot your password?',
     passkey: 'Have a passkey? Use it on the Ebda Store sign-in page.',
     noAccount: 'New to Ebda Store? Create an account.',
+    chatNoAccount: 'Have an invitation? Create your account.',
     mfaTitle: 'Enter your verification code',
     mfaSubtitle: 'Enter the 6-digit code from your authenticator app.',
     mfaBackupSubtitle: 'Enter one of the backup codes you saved.',
@@ -137,6 +139,8 @@ const MESSAGES = {
 
 export interface SignInPageInput {
   lang: SignInLang;
+  /** Show the Chat sign-up link (the flag lives in Chat; accounts learns it from `CHAT_SIGNUP_LINK`). Default hidden. */
+  showChatSignup?: boolean;
   product: SignInProduct;
   /** Already validated by `signInReturn`. */
   returnTo: string;
@@ -155,7 +159,27 @@ function carry(
   return s ? `?${s}` : '';
 }
 
-export function renderSignInPage({ lang, product, returnTo }: SignInPageInput): string {
+/** The sign-up link under the form: Store -> Store sign-up; Chat -> accounts' Chat sign-up, only when the flag allows. */
+function signupLinkHtml(
+  c: (typeof COPY)[SignInLang],
+  product: SignInProduct,
+  returnTo: string,
+  showChatSignup: boolean
+): string {
+  if (product !== 'chat')
+    return `<p class="aside"><a href="${STORE}/signup">${esc(c.noAccount)}</a></p>`;
+  if (!showChatSignup) return '';
+  const q = new URLSearchParams({ product: 'chat' });
+  if (returnTo !== DEFAULT_RETURN) q.set('return', returnTo);
+  return `<p class="aside"><a href="${esc(`/signup?${q}`)}">${esc(c.chatNoAccount)}</a></p>`;
+}
+
+export function renderSignInPage({
+  lang,
+  product,
+  returnTo,
+  showChatSignup = false,
+}: SignInPageInput): string {
   const c = COPY[lang];
   const other: SignInLang = lang === 'ar' ? 'en' : 'ar';
   const company = lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn;
@@ -192,7 +216,7 @@ export function renderSignInPage({ lang, product, returnTo }: SignInPageInput): 
 <button type="submit" data-label="${esc(c.signIn)}">${esc(c.signIn)}</button>
 </form>
 <p class="aside"><a href="${esc(`${STORE}/login${carry(product, returnTo)}`)}">${esc(c.passkey)}</a></p>
-${product !== 'chat' ? `<p class="aside"><a href="${STORE}/signup">${esc(c.noAccount)}</a></p>` : ''}
+${signupLinkHtml(c, product, returnTo, showChatSignup)}
 </section>
 <section id="step-mfa" hidden>
 <h1>${esc(c.mfaTitle)}</h1>
@@ -264,6 +288,7 @@ button[disabled]{opacity:.7;cursor:progress}
 .alert{margin:0 0 16px;padding:12px 14px;border:1px solid #5c2b2b;background:#1f1213;color:var(--bad);border-radius:12px}
 footer{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:.875rem;border-top:1px solid var(--line)}
 [hidden]{display:none!important}
+.hp{position:absolute;inset-inline-start:-9999px;inline-size:1px;block-size:1px;overflow:hidden}
 `;
 
 /**
@@ -302,6 +327,7 @@ export const SIGN_IN_JS = `(function () {
     b.disabled = on;
     b.textContent = on ? msgs[label] : b.getAttribute('data-label');
   }
+  // pq-allow(duplicate-helper): twin of apps/accounts/src/signup-page.ts (a served script cannot share code with another page's script)
   function post(path, body) {
     return fetch(path, {
       method: 'POST',

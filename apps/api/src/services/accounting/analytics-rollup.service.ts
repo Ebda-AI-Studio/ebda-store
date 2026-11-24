@@ -21,7 +21,9 @@ import { prisma } from '@ebda/database';
 import { storeDb, storeWriter } from '../../lib/repo-factory';
 import { RfmSegment } from '@ebda/database';
 import logger from '../../lib/logger';
-import { customerKeyOf, isGuestOrder, rfmKeyFor } from '../../lib/customer-key';
+import { isGuestOrder, rfmKeyFor } from '../../lib/customer-key';
+import type { CustomerGroups } from '../../lib/customer-groups';
+import { loadCustomerGroups } from '../../lib/customer-groups-store';
 // Every snapshot write below is savepointed (issue 2215's class): the daily
 // rollup runs each store inside ONE `runInTenantContext` transaction, and each
 // block swallows its own failure — without a savepoint the first failed write
@@ -151,11 +153,12 @@ function monthDiff(startYm: string, endYm: string): number {
  * phone. Rows in the old format are removed by the stale-row sweep at the end
  * of `runRfmRollup`, so the first nightly run after deploy converges.
  */
-function orderCustomerKey(o: {
-  customerId: string | null;
-  shippingAddress: unknown;
-}): string | null {
-  const key = customerKeyOf(o);
+function orderCustomerKey(
+  o: { customerId: string | null; shippingAddress: unknown },
+  groups: CustomerGroups
+): string | null {
+  // QA98-ALIAS-1: the same group key the Customers list uses, so a segment's members resolve to the rows the merchant sees.
+  const key = groups.keyOf(o);
   return key ? rfmKeyFor(key, isGuestOrder(o)) : null;
 }
 
@@ -376,9 +379,10 @@ export async function runCohortRollup(storeId: string): Promise<number> {
   };
 
   const customerOrders: CustomerOrder[] = [];
+  const groups = await loadCustomerGroups(storeId);
   await forEachPaidOrderPage(db, storeId, page => {
     for (const o of page) {
-      const key = orderCustomerKey(o);
+      const key = orderCustomerKey(o, groups);
       if (!key) continue; // guest with no contact info — skip
       customerOrders.push({ key, createdAt: o.createdAt, total: o.total });
     }
@@ -705,10 +709,11 @@ export async function runRfmRollup(storeId: string): Promise<number> {
   };
 
   const statsMap = new Map<string, CustomerStats>();
+  const groups = await loadCustomerGroups(storeId);
 
   await forEachPaidOrderPage(db, storeId, page => {
     for (const o of page) {
-      const key = orderCustomerKey(o);
+      const key = orderCustomerKey(o, groups);
       if (!key) continue;
 
       const isGuest = !o.customerId;
