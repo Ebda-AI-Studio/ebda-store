@@ -65,7 +65,11 @@ vi.mock('@ebda/database', () => ({
           return { count: ok ? 1 : 0 };
         },
       },
-      billingEvent: { findFirst: async () => h.held },
+      // the resume lookup (idempotency key) answers the held row; the currency read of the claimed row answers EGP
+      billingEvent: {
+        findFirst: async (a: { where?: { idempotencyKey?: string } }) =>
+          a?.where?.idempotencyKey ? h.held : { currency: 'EGP' },
+      },
       storeSubscription: { findUnique: async () => ({ paymentReference: null }) },
       instapayReceipt: { findFirst: async () => ({ id: 'r1' }) },
     }),
@@ -172,6 +176,8 @@ describe('super-admin approval', () => {
     });
     expect(h.settle).toHaveBeenCalledTimes(1);
     expect(h.settle.mock.calls[0][0]).toBe('ev1');
+    // the approval states what the person confirmed (the claim's amount) and the row's currency, or may-settle would hold it
+    expect(h.settle.mock.calls[0][3]).toEqual({ amountMinor: 9900, currency: 'EGP' });
     // 1st write: the atomic take (pending, nobody reviewing); 2nd: the flip to confirmed, still guarded on pending
     expect(h.updated[0].where).toMatchObject({ status: 'pending', reviewedBy: null });
     expect(h.updated[0].data).toMatchObject({ reviewedBy: 'admin1' });

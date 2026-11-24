@@ -111,7 +111,27 @@ export async function approveAddonClaim(a: { storeId: string; claimId: string; a
     if (!held) throw new AppError(409, 'APPROVAL_IN_PROGRESS', 'Try again in a moment');
     eventId = held.id;
   }
-  await settleApprovedPayment(eventId, claim.payerReference, new Date());
+  // the amount the person confirmed (the claim carries the server quote) and the ledger row's own currency: a claim whose
+  // amount differs from the row is held by `maySettle`, never granted
+  const rowCurrency = await withStore(a.storeId, tx =>
+    tx.billingEvent.findFirst({
+      where: { id: eventId, storeId: a.storeId },
+      select: { currency: true },
+    })
+  );
+  if (!rowCurrency) throw new AppError(409, 'APPROVAL_IN_PROGRESS', 'Try again in a moment');
+  const settled = await settleApprovedPayment(eventId, claim.payerReference, new Date(), {
+    amountMinor: claim.amountMinor,
+    currency: rowCurrency.currency,
+  });
+  // held (the amount or currency differs from the ledger row) or refused (an open hold / a person's decision already on it): nothing
+  // was granted, so the claim must NOT read confirmed. It stays taken, the hold waits in the held payments queue, a retry refuses the same way.
+  if (settled?.held || settled?.refused)
+    throw new AppError(
+      409,
+      'ADDON_PAYMENT_HELD',
+      'The payment does not match what was billed, so it is held for review. The add-on is not on. Settle it on the held payments page.'
+    );
   const receiptId = await withStore(a.storeId, async tx => {
     await tx.manualPaymentClaim.updateMany({
       where: { id: claim.id, storeId: a.storeId, status: 'pending' },

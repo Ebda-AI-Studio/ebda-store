@@ -825,8 +825,28 @@ async function settleCharge(eventId: string, o: Outcome, now: Date) {
  * A super admin approved an InstaPay payment for a pending ledger row (add-on purchase): settle it through the SAME
  * guarded pending -> succeeded transition a card webhook uses, so the grant happens exactly once and a replay is a no-op.
  */
-export const settleApprovedPayment = (eventId: string, providerRef: string, now: Date) =>
-  settleDefinitive(eventId, { status: 'succeeded', providerRef }, now);
+export const settleApprovedPayment = (
+  eventId: string,
+  providerRef: string,
+  now: Date,
+  /**
+   * What the person confirmed was received. It is the gateway-style statement `maySettle` needs (#627): a success that
+   * states no amount is held, and one that states an amount or currency different from the ledger row is held too, so a
+   * tampered or mismatched claim never grants.
+   */
+  confirmed: { amountMinor: number; currency: string }
+) =>
+  settleDefinitive(
+    eventId,
+    {
+      status: 'succeeded',
+      providerRef,
+      amountSource: 'gateway',
+      amountMinor: confirmed.amountMinor,
+      currency: confirmed.currency,
+    },
+    now
+  );
 
 /** Test seam: the pause between settle retries (ms per attempt). */
 export const settleRetry = { delayMs: 250, attempts: 3 };
