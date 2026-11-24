@@ -54,6 +54,7 @@ export * from './legal';
 export * from './whatsapp';
 export * from './builder';
 export * from './providers/catalog';
+export * from './providers/logos';
 export * from './providers/credential-fields';
 export * from './providers/connection-check';
 export * from './model3d';
