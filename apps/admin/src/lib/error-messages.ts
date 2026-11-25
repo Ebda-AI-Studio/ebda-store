@@ -24,6 +24,8 @@ export const ERROR_AR: Record<string, string> = {
   REQUEST_FAILED: 'الطلب ما اتمّش. جرّب تاني، ولو المشكلة فضلت كلّمنا.',
   UNAUTHORIZED: 'الجلسة خلصت. سجّل دخول تاني وكمّل.',
   CONFLICT: 'فيه حاجة تانية بنفس البيانات دي. غيّر اللي كتبته وجرّب تاني.',
+  BARCODE_IN_USE: 'الباركود ده مستخدم في منتج أو نوع تاني في متجرك. اكتب باركود مختلف.',
+  BARCODE_INVALID: 'الباركود مش صحيح. اكتب EAN-13 أو UPC-A صحيح، أو كود حروف وأرقام لحد 100 خانة.',
 };
 
 export const ERROR_EN: Record<string, string> = {
@@ -40,6 +42,10 @@ export const ERROR_EN: Record<string, string> = {
   REQUEST_FAILED: 'That did not go through. Try again, and contact us if it keeps happening.',
   UNAUTHORIZED: 'Your session ended. Sign in again to continue.',
   CONFLICT: 'Something with these details already exists. Change them and try again.',
+  BARCODE_IN_USE:
+    'This barcode already belongs to another product or variant in your store. Use a different one.',
+  BARCODE_INVALID:
+    'That barcode is not valid. Use a correct EAN-13 or UPC-A, or a Code 128 text of up to 100 characters.',
 };
 
 const ARABIC_LETTERS = /[؀-ۿ]/;

@@ -59,3 +59,21 @@ export function productTextFields(
     searchTerms: textFieldValue(form.searchTerms.trim(), intent),
   };
 }
+
+/**
+ * The barcode slice of a product or variant payload (BARCODE-1). Not part of `productTextFields` on purpose:
+ * omitted must mean "leave alone", because the API auto-generates a barcode and a form loaded before that
+ * would otherwise clear it on save.
+ *   create: typed -> sent, empty -> omitted (the API generates one when `inventory.barcode` is on).
+ *   update: unchanged -> omitted, emptied -> null (clears), changed -> the new text (the API validates + checks uniqueness).
+ */
+export function barcodeField(
+  typed: string,
+  loaded: string | null | undefined,
+  intent: 'create' | 'update'
+): { barcode?: string | null } {
+  const value = typed.trim();
+  if (intent === 'create') return value ? { barcode: value } : {};
+  if (value === (loaded ?? '')) return {};
+  return { barcode: value || null };
+}
