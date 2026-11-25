@@ -25,9 +25,10 @@
     "ar": [
       "وصلت للحد اليومي للذكاء الاصطناعي",
       "ازاي ازوّد طلبات الذكاء الاصطناعي؟",
-      "عايز اشتري طلبات ذكاء اصطناعي زيادة"
+      "عايز طلبات ذكاء اصطناعي زيادة",
+      "الذكاء الاصطناعي وقف عندي النهارده"
     ],
-    "en": ["I hit the daily AI limit", "How do I get more AI requests?"]
+    "en": ["I hit the daily AI limit", "How do I get more AI requests?", "Buy an AI request pack"]
   },
   "steps": [
     "Open Billing, then Add-ons, then More AI requests (or press Get more requests on AI usage)",

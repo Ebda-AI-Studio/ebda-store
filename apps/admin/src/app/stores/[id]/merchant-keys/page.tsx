@@ -12,6 +12,7 @@ import { useLocale } from 'next-intl';
 import { planNamesJoined } from '@/lib/plan-labels';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { withNumerals } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Merchant screen for the MCP merchant-admin keys — issue, review, revoke.
@@ -237,7 +238,7 @@ export default function MerchantKeysPage() {
           {row.scopes.map(s => (
             <span
               key={s}
-              className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground"
+              className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground"
               dir="ltr"
             >
               {s.replace('merchant:', '')}
@@ -269,8 +270,8 @@ export default function MerchantKeysPage() {
         <span
           className={
             row.active
-              ? 'rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
-              : 'rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground'
+              ? 'rounded-md bg-success/10 px-1.5 py-0.5 text-xs font-medium text-success-ink'
+              : 'rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground'
           }
           dir="auto"
         >
@@ -341,7 +342,7 @@ export default function MerchantKeysPage() {
           {data ? (
             <p className="mt-2 text-xs text-muted-foreground" dir="auto">
               {t('intro.headerLabel')}:{' '}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono" dir="ltr">
+              <code className="rounded-md bg-muted px-1 py-0.5 font-mono" dir="ltr">
                 {data.header}
               </code>
               {' · '}
@@ -370,10 +371,10 @@ export default function MerchantKeysPage() {
       {/* ── Create ──────────────────────────────────────────────────────── */}
       <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title={t('create.title')}>
         <div className="space-y-3">
-          <label className="block text-xs font-medium text-foreground" dir="auto">
+          <label className="block text-sm font-medium text-foreground" dir="auto">
             {t('create.nameLabel')}
             <input
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className={`${FIELD_CLASSES} mt-1`}
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder={t('create.namePlaceholder')}
@@ -383,14 +384,14 @@ export default function MerchantKeysPage() {
           </label>
 
           <fieldset className="space-y-1">
-            <legend className="text-xs font-medium text-foreground" dir="auto">
+            <legend className="text-sm font-medium text-foreground" dir="auto">
               {t('create.scopesLabel')}
             </legend>
             <p className="text-xs leading-relaxed text-muted-foreground" dir="auto">
               {t('create.scopesHelp')}
             </p>
             {SCOPE_ORDER.map(scope => (
-              <label key={scope} className="flex items-start gap-2 text-xs" dir="auto">
+              <label key={scope} className="flex items-start gap-2 text-sm" dir="auto">
                 <input
                   type="checkbox"
                   className="mt-0.5"
@@ -409,10 +410,10 @@ export default function MerchantKeysPage() {
             ))}
           </fieldset>
 
-          <label className="block text-xs font-medium text-foreground" dir="auto">
+          <label className="block text-sm font-medium text-foreground" dir="auto">
             {t('create.expiryLabel')}
             <input
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className={`${FIELD_CLASSES} mt-1`}
               value={expiresInDays}
               onChange={e => setExpiresInDays(e.target.value.replace(/[^0-9]/g, ''))}
               placeholder={t('create.expiryPlaceholder')}

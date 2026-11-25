@@ -111,7 +111,7 @@ export default function AddonsPage() {
     <li key={a.sku} className="flex flex-wrap items-center justify-between gap-3 py-3">
       <div className="min-w-0">
         <p className="text-sm font-medium">{name(a)}</p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {a.includedInPlan
             ? t('includedInPlan')
             : a.active
@@ -171,7 +171,7 @@ export default function AddonsPage() {
             <section
               role="alertdialog"
               aria-labelledby="addon-confirm-title"
-              className="rounded-xl border border-border bg-card p-4"
+              className="rounded-lg border border-border bg-card p-4"
               data-testid="addon-confirm"
             >
               <h2 id="addon-confirm-title" className="text-sm font-semibold">
@@ -193,7 +193,7 @@ export default function AddonsPage() {
                 </p>
               )}
               {preview.vatMinor > 0 && (
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   {t('confirmVat', { vat: money(preview.vatMinor) })}
                 </p>
               )}
@@ -207,17 +207,17 @@ export default function AddonsPage() {
               </div>
             </section>
           )}
-          <section className="rounded-xl border border-border bg-card p-4">
+          <section className="rounded-lg border border-border bg-card p-4">
             <h2 className="text-sm font-semibold">{t('featuresHeading')}</h2>
             <ul className="divide-y divide-border">{group('feature').map(row)}</ul>
           </section>
-          <section className="rounded-xl border border-border bg-card p-4" id="ai">
+          <section className="rounded-lg border border-border bg-card p-4" id="ai">
             <h2 className="text-sm font-semibold">{t('aiHeading')}</h2>
             <p className="mt-1 text-sm">
               {t('aiToday', { used: data.ai.used, cap: data.ai.cap, remaining: data.ai.remaining })}
               {data.ai.extra > 0 && ` ${t('aiExtra', { extra: data.ai.extra })}`}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {t('aiBuyHint', { days: data.termDays })}
             </p>
             <ul className="divide-y divide-border">{group('ai_topup').map(row)}</ul>

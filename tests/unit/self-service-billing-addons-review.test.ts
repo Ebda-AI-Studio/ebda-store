@@ -2,7 +2,7 @@
  * Independent review of store#775 (money): renewal consent, admin override, renewal guards, refund cache, append-only cancel.
  * Each describe is one finding; every guard here was removed once to see its test go red (see the PR comment).
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
   claimEvent: vi.fn(),
@@ -187,7 +187,10 @@ vi.mock('@ebda/database', () => ({
   storeDirectory: vi.fn(),
 }));
 
+afterEach(() => vi.useRealTimers());
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'], now: NOW });
   vi.clearAllMocks();
   h.events = [];
   h.effects = [];

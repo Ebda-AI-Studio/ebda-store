@@ -125,21 +125,37 @@ const ENTERPRISE_ADDITIONS: FeatureKey[] = [
   'floating_widget',
   // High-intent retargeting (2026-06-22)
   'payment_abandonment',
+  // Business = EVERY feature (Ahmad 2026-11-15, Ruling BIZ-ALL-1): no feature is sold separately any more, so the keys that
+  // used to be per-store override / plan-flag only are entitled here too. Hidden ones stay hidden (unfinished) but entitled.
+  // `remove_branding`, `b2b.wholesale`, `merchant_mcp`, `merchant_mcp_write` are ALSO decided by the plan limits in
+  // `FeatureService.rowsToMap` (the flag wins both ways); listing them keeps registry, baseline and enforcement in agreement.
+  'inventory', // legacy parent flag: nothing reads it (routes use `inventory.*`), declared so the registry has no un-entitled key
+  'bundles',
+  'customer_intelligence',
+  'eta_ereceipt',
+  'remove_branding',
+  'b2b.wholesale',
+  'merchant_mcp',
+  'merchant_mcp_write',
 ];
 
-// 'agent_checkout_open_writes' (2026-09-09, Ruling M2) is deliberately in NO
-// baseline either, and for the OPPOSITE reason to every other absent key: it
-// is an escape hatch, not a capability. Absent = MCP write tools require the
-// store's agent credential (the protection is ON). A super-admin
-// StoreFeature override turns it on to DISABLE that requirement for one
-// store. Adding it to a baseline would silently reopen the unauthenticated
-// write hole on every store on that plan — do NOT add it below.
+/**
+ * The ONLY registry keys that are in NO baseline, each for a reason that is not "sold separately" (Ruling BIZ-ALL-1).
+ * `plan-baselines.test.ts` enumerates the registry and fails if a key is in neither the Business baseline nor this map.
+ */
+// pq-allow(unused-export): the single source of the registry-completeness invariant, read by plan-baselines.test.ts and the Business resolution test
+export const BUSINESS_BASELINE_EXCLUSIONS = {
+  // INVERSE flag: ON switches the MCP write-credential requirement OFF (an unauthenticated write hole). Putting it in a
+  // baseline would reopen the hole on every Business store, so it stays a super-admin per-store escape hatch (Ruling M2).
+  agent_checkout_open_writes:
+    'escape hatch: enabled = protection off; per-store super-admin override only',
+  // The key gates the separate Ebda Chat product (Ruling WHATSAPP-OFF-1 / WA-LEGACY-1): nothing in Store reads it any more,
+  // and Business already includes Ebda Chat through the plan limit `whatsappAutomation` + the server-owned link (WA-PKG-1).
+  whatsapp:
+    'Ebda Chat is billed and linked through the plan limit + store_whatsapp_links, not this key',
+} as const satisfies Partial<Record<FeatureKey, string>>;
 
-// 'bundles' (2026-09-06) is deliberately in NO baseline — not starter, not
-// professional, not enterprise. It is sold per store and enabled via a
-// super-admin StoreFeature override, so every existing merchant (on every
-// plan) is unaffected until they are explicitly opted in. Do NOT add it to
-// STARTER_CORE/PROFESSIONAL_ADDITIONS/ENTERPRISE_ADDITIONS above.
+// 'agent_checkout_open_writes' and 'whatsapp' are the only keys in no baseline: see BUSINESS_BASELINE_EXCLUSIONS above.
 
 /**
  * Features that resolve to ENABLED for a store on this plan by default.
@@ -207,6 +223,10 @@ export function publicPlanForStorePlan(
  */
 const PUBLIC_PLAN_OVERRIDE_FOR_FEATURE: Partial<Record<FeatureKey, StorePlan>> = {
   email_campaigns: 'professional',
+  // Sold from Growth by the plan limits (brandingRemoval / mcpAccess), though the Business baseline lists them too.
+  remove_branding: 'professional',
+  merchant_mcp: 'professional',
+  merchant_mcp_write: 'professional',
 };
 
 export function publicPlanLabelForFeature(
@@ -230,6 +250,8 @@ export function upgradeTargetForDisabledFeature(
     t => STORE_PLAN_TO_PLAN_CODE[t] === planCode
   );
   if (!tier || isInBaseline(tier, key)) return null;
+  // No plan unlocks an excluded key (an escape hatch / the Ebda Chat key): never promise one in an upgrade prompt.
+  if (key in BUSINESS_BASELINE_EXCLUSIONS) return null;
   const target = publicPlanLabelForFeature(key);
   if (!target) return null;
   const targetTier = PUBLIC_PLAN_OVERRIDE_FOR_FEATURE[key] ?? lowestPlanForFeature(key);
@@ -247,6 +269,7 @@ export function isInBaseline(plan: StorePlan, key: FeatureKey): boolean {
  * they show up in proposals, contracts, and the merchant-facing
  * "Current plan: X" badge.
  */
+// pq-allow(unused-export): test seam, imported by tests/__tests__/plan-baselines.test.ts (the admin feature matrix now reads the plan name from billing)
 export const PLAN_LABELS: Record<StorePlan, { en: string; ar: string }> = {
   free: { en: 'Free', ar: 'مجاني' },
   starter: { en: 'Starter', ar: 'المبدئية' },
