@@ -39,7 +39,12 @@ import {
 } from './payments';
 import { cancelSaleDocument, issueRefundDocument } from './fiscal';
 import { changeOrderStatus } from './order-status';
-import { postOrderSaleJournal, postRefundJournal } from './ledger';
+import {
+  countStaleMissingSaleJournals,
+  postOrderSaleJournal,
+  postRefundJournal,
+  repairMissingSaleJournals,
+} from './ledger';
 import { applyWalletEntry, type WalletEntryType } from './refund';
 import {
   applyGoldRates,
@@ -213,6 +218,8 @@ export type MoneyOpName =
   | 'refundBook'
   | 'journalSale'
   | 'journalRefund'
+  | 'journalRepairSales'
+  | 'journalStaleCount'
   | 'goldApplyRates'
   | 'goldDecidePending'
   | 'goldUpdateSettings'
@@ -358,6 +365,8 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'refundBook',
   'journalSale',
   'journalRefund',
+  'journalRepairSales',
+  'journalStaleCount',
   'goldApplyRates',
   'goldDecidePending',
   'goldUpdateSettings',
@@ -470,6 +479,13 @@ export const ensureMoneyOpsSchema = (db: SyncSql): void => {
   // the saved scope of a shopper erasure (Ruling CF-R6A-3); the registry classifies it, so it must exist before any customer subject
   db.run(ERASURE_LEDGER_DDL, []);
 };
+
+const ms = (v: unknown, what: string): number =>
+  typeof v === 'number' && Number.isSafeInteger(v) && v >= 0
+    ? v
+    : (() => {
+        throw new MoneyError('BAD_ARGS', what, 400);
+      })();
 
 const id = (v: unknown, what: string): string =>
   typeof v === 'string' && v.length > 0 && v.length <= 128
@@ -919,6 +935,32 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
     }),
   journalSale: (db, storeId, a) =>
     postOrderSaleJournal(db, { storeId, orderId: id(a.orderId, 'orderId') }),
+  /** Lost post-payment fan-out reconcile (Ruling JOURNAL-RECONCILE-1): post the missing sale entries of paid orders. */
+  journalRepairSales: (db, storeId, a) =>
+    repairMissingSaleJournals(db, {
+      storeId,
+      paidAfterMs: ms(a.paidAfterMs, 'paidAfterMs'),
+      paidBeforeMs: ms(a.paidBeforeMs, 'paidBeforeMs'),
+      take: typeof a.take === 'number' ? Math.min(Math.max(1, a.take), 500) : 200,
+    }),
+  /**
+   * Daily detection past the repair window (JOURNAL-RECONCILE-1): paid orders with no sale entry, paid before the UTC `day`'s
+   * start minus `maxAgeHours`. Args are day-stable so the caller keys it per day: a replay the same day returns the stored
+   * count with its original `countedAt`, which is how the sweep alerts once a day.
+   */
+  journalStaleCount: (db, storeId, a) => {
+    const day = typeof a.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.day) ? a.day : '';
+    const dayStart = Date.parse(`${day}T00:00:00Z`);
+    if (!day || Number.isNaN(dayStart)) throw new MoneyError('BAD_ARGS', 'day', 400);
+    const maxAgeHours = ms(a.maxAgeHours, 'maxAgeHours');
+    return {
+      missing: countStaleMissingSaleJournals(db, {
+        storeId,
+        paidBeforeMs: dayStart - maxAgeHours * 3_600_000,
+      }),
+      countedAt: Date.now(),
+    };
+  },
   journalRefund: (db, storeId, a) =>
     postRefundJournal(db, {
       storeId,

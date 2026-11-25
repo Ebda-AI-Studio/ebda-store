@@ -360,6 +360,101 @@ export function postOrderSaleJournal(
   });
 }
 
+/**
+ * Reconcile for a lost post-payment fan-out (the `order/created` enqueue is best-effort at every paid path: card webhook,
+ * Mark paid, COD paid on delivery, COD paid by courier statement). Finds the store's orders that were PAID inside
+ * `[paidAfterMs, paidBeforeMs)` and still have NO sale entry, and posts it with `postOrderSaleJournal` (idempotent on
+ * `(store_id, source, source_id)`, so a fan-out that lands at the same time posts nothing twice).
+ *
+ * "Paid at" is the latest completed payment's `paid_at` (COD is paid days after the order is created); an order paid with
+ * no payment row (store credit only) uses its `created_at`. Zero-total orders book nothing, so they are never candidates
+ * (else they would be "repaired" every tick). Cancelled / refunded orders and stores without accounting are skipped, as
+ * `postOrderSaleJournal` would skip them. Each order posts in its own transaction: one failing order (a missing system
+ * account) is reported and never blocks the rest.
+ */
+export function repairMissingSaleJournals(
+  db: SyncSql,
+  a: { storeId: string; paidAfterMs: number; paidBeforeMs: number; take: number; now?: number }
+): {
+  repaired: Array<{ orderId: string; orderNumber: string; entries: number }>;
+  failed: Array<{ orderId: string; orderNumber: string; error: string }>;
+} {
+  const repaired: Array<{ orderId: string; orderNumber: string; entries: number }> = [];
+  const failed: Array<{ orderId: string; orderNumber: string; error: string }> = [];
+  const cfg = db.all('SELECT accounting_enabled FROM store_config WHERE store_id = ?', [
+    a.storeId,
+  ])[0];
+  if (!cfg || !cfg.accounting_enabled) return { repaired, failed };
+  const candidates = db.all(
+    `WITH cand AS (
+        SELECT order_id AS id FROM payments
+         WHERE status = 'completed' AND paid_at >= ?2 AND paid_at < ?3
+        UNION
+        SELECT id FROM orders WHERE store_id = ?1 AND created_at >= ?2 AND created_at < ?3
+     )
+     SELECT o.id, o.order_number,
+            COALESCE((SELECT MAX(p.paid_at) FROM payments p WHERE p.order_id = o.id AND p.status = 'completed'),
+                     o.created_at) AS paid_at
+       FROM cand JOIN orders o ON o.id = cand.id
+      WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.payment_status = 'paid'
+        AND o.status NOT IN ('cancelled', 'refunded') AND o.total > 0
+        AND NOT EXISTS (SELECT 1 FROM journal_entries e
+                         WHERE e.store_id = o.store_id AND e.source = 'order' AND e.source_id = o.id)
+        AND COALESCE((SELECT MAX(p.paid_at) FROM payments p WHERE p.order_id = o.id AND p.status = 'completed'),
+                     o.created_at) < ?3
+      ORDER BY paid_at, o.id
+      LIMIT ?4`,
+    [a.storeId, a.paidAfterMs, a.paidBeforeMs, a.take]
+  );
+  for (const c of candidates) {
+    const orderId = c.id as string;
+    const orderNumber = c.order_number as string;
+    try {
+      const r = postOrderSaleJournal(db, { storeId: a.storeId, orderId, now: a.now });
+      if (r.posted && r.entries > 0) repaired.push({ orderId, orderNumber, entries: r.entries });
+    } catch (err) {
+      failed.push({
+        orderId,
+        orderNumber,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return { repaired, failed };
+}
+
+/**
+ * Detection past the repair window (Ruling JOURNAL-RECONCILE-1): how many paid orders, paid before `paidBeforeMs`, still
+ * have no sale entry. Same candidate rules as `repairMissingSaleJournals`. Counted only from the store's first journal
+ * entry on: orders paid before the books started (accounting turned on later) are not "missing", so they never page.
+ * A store with accounting off, or no entry at all, counts 0.
+ */
+export function countStaleMissingSaleJournals(
+  db: SyncSql,
+  a: { storeId: string; paidBeforeMs: number }
+): number {
+  const cfg = db.all('SELECT accounting_enabled FROM store_config WHERE store_id = ?', [
+    a.storeId,
+  ])[0];
+  if (!cfg || !cfg.accounting_enabled) return 0;
+  const row = db.all(
+    `SELECT COUNT(*) AS n FROM (
+       SELECT o.id,
+              COALESCE((SELECT MAX(p.paid_at) FROM payments p WHERE p.order_id = o.id AND p.status = 'completed'),
+                       o.created_at) AS paid_at
+         FROM orders o
+        WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.payment_status = 'paid'
+          AND o.status NOT IN ('cancelled', 'refunded') AND o.total > 0
+          AND NOT EXISTS (SELECT 1 FROM journal_entries e
+                           WHERE e.store_id = o.store_id AND e.source = 'order' AND e.source_id = o.id)
+     ) t
+     WHERE t.paid_at < ?2
+       AND t.paid_at >= (SELECT MIN(created_at) FROM journal_entries WHERE store_id = ?1)`,
+    [a.storeId, a.paidBeforeMs]
+  )[0];
+  return Number(row?.n ?? 0);
+}
+
 /** Reverse the sale, the COGS and any partial-return adjustment entries of an order (postRefundJournal). Idempotent. */
 export function postRefundJournal(
   db: SyncSql,

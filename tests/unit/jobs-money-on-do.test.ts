@@ -44,6 +44,13 @@ const h = vi.hoisted(() => ({
     trialBalance: vi.fn(async () => ({ debit: 100, credit: 100 })),
     periodGlCredits: vi.fn(async () => ({ total: 50 })),
     journalSale: vi.fn(async () => ({ posted: true, entries: 2 })),
+    journalRepairSales: vi.fn(
+      async (): Promise<{
+        repaired: Array<{ orderId: string; orderNumber: string; entries: number }>;
+        failed: Array<{ orderId: string; orderNumber: string; error: string }>;
+      }> => ({ repaired: [], failed: [] })
+    ),
+    journalStaleCount: vi.fn(async () => ({ missing: 0, countedAt: Date.now() })),
     journalRefund: vi.fn(async () => ({ reversed: 2 })),
     orderNotifyClaim: vi.fn(async () => ({ claimed: true })),
     statusFanoutClaim: vi.fn(async () => ({ claimed: true })),
@@ -259,6 +266,77 @@ describe('order-created-stuck-sweep on a DO store', () => {
         data: expect.objectContaining({ storeId: DO_STORE }),
       })
     );
+  });
+});
+
+describe('order-created-stuck-sweep: journal reconcile (Ruling JOURNAL-RECONCILE-1)', () => {
+  it('a DO store tick posts the missing sale entries over paid 10 min .. 72 h ago and reports the repair (info)', async () => {
+    h.doDb.order.findMany.mockResolvedValue([]);
+    h.money.journalRepairSales.mockResolvedValueOnce({
+      repaired: [{ orderId: 'o1', orderNumber: 'ORD-1', entries: 2 }],
+      failed: [],
+    });
+    const before = Date.now();
+    const r = await handleOrderCreatedStuckSweep(step, alarm);
+    expect(r.journalsRepaired).toBe(1);
+    const arg = h.money.journalRepairSales.mock.calls[0]![0] as unknown as {
+      paidAfterMs: number;
+      paidBeforeMs: number;
+    };
+    expect(arg.paidBeforeMs).toBeLessThanOrEqual(before - 10 * 60_000 + 5_000);
+    expect(arg.paidBeforeMs - arg.paidAfterMs).toBe(72 * 3_600_000 - 10 * 60_000);
+    expect(h.sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        source: 'journal.reconcile.repaired',
+        store: expect.objectContaining({ id: DO_STORE }),
+      })
+    );
+  });
+  it('an order that cannot be posted pages P1', async () => {
+    h.doDb.order.findMany.mockResolvedValue([]);
+    h.money.journalRepairSales.mockResolvedValueOnce({
+      repaired: [],
+      failed: [{ orderId: 'o2', orderNumber: 'ORD-2', error: 'ACCOUNT_NOT_FOUND' }],
+    });
+    await handleOrderCreatedStuckSweep(step, alarm);
+    expect(h.sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'p1', source: 'journal.reconcile.failed' })
+    );
+  });
+  it('paid orders past the window with no entry page P1 journal.reconcile.stale once a day (keyed per UTC day)', async () => {
+    h.doDb.order.findMany.mockResolvedValue([]);
+    h.money.journalStaleCount.mockResolvedValueOnce({ missing: 3, countedAt: Date.now() });
+    await handleOrderCreatedStuckSweep(step, alarm);
+    const day = new Date().toISOString().slice(0, 10);
+    expect(h.money.journalStaleCount).toHaveBeenCalledWith(
+      { day, maxAgeHours: 72 },
+      `journal-stale:${day}`
+    );
+    expect(h.sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'p1',
+        source: 'journal.reconcile.stale',
+        context: expect.objectContaining({ count: 3 }),
+      })
+    );
+    // a later tick the same day gets the keyed replay (old countedAt): no second page
+    h.sendAlert.mockClear();
+    h.money.journalStaleCount.mockResolvedValueOnce({
+      missing: 3,
+      countedAt: Date.now() - 60 * 60_000,
+    });
+    await handleOrderCreatedStuckSweep(step, alarm);
+    expect(h.sendAlert).not.toHaveBeenCalled();
+  });
+  it('nothing missing: no alert; the platform cron tick (no store) never calls the DO', async () => {
+    h.doDb.order.findMany.mockResolvedValue([]);
+    await handleOrderCreatedStuckSweep(step, alarm);
+    expect(h.money.journalRepairSales).toHaveBeenCalledTimes(1);
+    expect(h.sendAlert).not.toHaveBeenCalled();
+    h.money.journalRepairSales.mockClear();
+    await handleOrderCreatedStuckSweep(step, { data: {} }).catch(() => undefined);
+    expect(h.money.journalRepairSales).not.toHaveBeenCalled();
   });
 });
 

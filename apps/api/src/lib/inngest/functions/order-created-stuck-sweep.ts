@@ -2,8 +2,10 @@ import type { JobDef } from '../../jobs/types';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
-import { sweepStoresDb } from '../../jobs/store-db';
+import { storeNameOf, sweepStoresDb } from '../../jobs/store-db';
 import { stepRunUnlessEmpty } from '../empty-exit';
+import { alarmStoreId } from '../../jobs/store-scope';
+import { storeMoney } from '../../repo-factory';
 
 /**
  * Stuck order-created sweep — scheduled safety net (hourly, Ruling INNGEST-BUDGET-1).
@@ -28,8 +30,20 @@ import { stepRunUnlessEmpty } from '../empty-exit';
  * `order_created_notified_at` (`order-created.ts`), so a re-sent event for an
  * order whose fanout is merely slow/in-flight matches 0 rows on the claim and
  * skips — no double email/push. COD orders (which are `unpaid` until delivery)
- * are intentionally out of scope here; their send-failure is lower-impact
- * (no books/paid-order reconciliation) and covered by the enqueue-site log.
+ * are intentionally out of scope of the re-send; a COD order's later
+ * payment (paid on delivery, paid by courier statement) is covered by the
+ * journal reconcile below.
+ *
+ * Journal reconcile (Ruling JOURNAL-RECONCILE-1): every paid path enqueues the
+ * same `order/created` for the books (card webhook, Mark paid, COD paid on
+ * delivery, COD paid by statement), and each enqueue only LOGS a failure. The
+ * re-send above cannot see a COD order (notified at creation, paid days later),
+ * so a lost enqueue there was a paid order with no journal entry, forever. On a
+ * Durable Object store's tick this posts the missing sale entry of every order
+ * PAID 10 min .. JOURNAL_REPAIR_MAX_AGE_HOURS ago that has none (idempotent on
+ * the entry's source id), reports each repair (info) and each failure (P1).
+ * Past the window it only DETECTS: once a UTC day it counts paid orders older
+ * than the window with no entry and pages P1 `journal.reconcile.stale`.
  */
 interface StuckOrder {
   id: string;
@@ -48,6 +62,11 @@ const STUCK_ORDER_NOTIFY_MINUTES = Number(process.env.STUCK_ORDER_NOTIFY_MINUTES
 // within minutes; 12h is a generous ceiling that safely excludes old orders.
 const STUCK_ORDER_MAX_AGE_MINUTES = Number(process.env.STUCK_ORDER_MAX_AGE_MINUTES) || 720;
 const SWEEP_TAKE = 200;
+// The journal reconcile looks back further than the re-send: a missing books entry is silent for the shopper, so an
+// outage over a weekend must still be repaired. Bounded so a store that turns accounting on never back-posts its history.
+const JOURNAL_REPAIR_MAX_AGE_HOURS = Number(process.env.JOURNAL_REPAIR_MAX_AGE_HOURS) || 72;
+// A stale count whose countedAt is older than this came from an earlier tick today (a keyed replay): already reported.
+const STALE_COUNT_FRESH_MS = 10 * 60_000;
 
 /** Minimal shape of the Inngest `step` this handler uses (kept for unit tests). */
 interface SweepStep {
@@ -61,7 +80,8 @@ interface SweepStep {
 export async function handleOrderCreatedStuckSweep(
   step: SweepStep,
   event?: { data?: unknown }
-): Promise<{ swept: number; resent: number; alerted: number }> {
+): Promise<{ swept: number; resent: number; alerted: number; journalsRepaired: number }> {
+  const journalsRepaired = await repairMissingJournals(step, event);
   const cutoff = new Date(Date.now() - STUCK_ORDER_NOTIFY_MINUTES * 60_000);
   const floorCutoff = new Date(Date.now() - STUCK_ORDER_MAX_AGE_MINUTES * 60_000);
 
@@ -89,7 +109,7 @@ export async function handleOrderCreatedStuckSweep(
     })
   );
 
-  if (stuck.length === 0) return { swept: 0, resent: 0, alerted: 0 };
+  if (stuck.length === 0) return { swept: 0, resent: 0, alerted: 0, journalsRepaired };
 
   let resent = 0;
   await step.run('resend-order-created', async () => {
@@ -149,7 +169,98 @@ export async function handleOrderCreatedStuckSweep(
     );
   }
 
-  return { swept: stuck.length, resent, alerted: veryStale.length };
+  return { swept: stuck.length, resent, alerted: veryStale.length, journalsRepaired };
+}
+
+/**
+ * Ruling JOURNAL-RECONCILE-1: post the missing sale entry of each recently paid order on a Durable Object store's tick.
+ * Only an alarm run of one store does work (the books live in that store's DO); the platform cron tick opens no step, so
+ * an empty tick still costs one execution (Ruling INNGEST-BUDGET-1). Returns how many orders were repaired.
+ */
+async function repairMissingJournals(
+  step: SweepStep,
+  event: { data?: unknown } | undefined
+): Promise<number> {
+  const storeId = alarmStoreId(event);
+  if (!storeId) return 0;
+  const r = await step.run('repair-missing-journals', async () => {
+    const money = await storeMoney(storeId);
+    if (!money) return { repaired: [], failed: [], staleMissing: 0 };
+    const now = Date.now();
+    const fixed = await money.journalRepairSales({
+      paidAfterMs: now - JOURNAL_REPAIR_MAX_AGE_HOURS * 3_600_000,
+      paidBeforeMs: now - STUCK_ORDER_NOTIFY_MINUTES * 60_000,
+      take: SWEEP_TAKE,
+    });
+    // Detection past the window: counted once per UTC day (keyed op; a same-day replay returns the stored count with its
+    // original countedAt), so the P1 below fires once a day per store, not every hour.
+    const day = new Date(now).toISOString().slice(0, 10);
+    const stale = await money.journalStaleCount(
+      { day, maxAgeHours: JOURNAL_REPAIR_MAX_AGE_HOURS },
+      `journal-stale:${day}`
+    );
+    const freshCount = now - stale.countedAt < STALE_COUNT_FRESH_MS;
+    return { ...fixed, staleMissing: freshCount ? stale.missing : 0 };
+  });
+  if (r.repaired.length === 0 && r.failed.length === 0 && r.staleMissing === 0) return 0;
+  await step.run('alert-journal-repairs', async () => {
+    const store = { id: storeId, name: await storeNameOf(storeId) };
+    if (r.repaired.length > 0) {
+      logger.warn(
+        { storeId, orders: r.repaired.map(o => o.orderId) },
+        '[order-created-stuck-sweep] posted missing sale journals for paid orders'
+      );
+      await sendAlert({
+        level: 'info',
+        scope: 'store',
+        store,
+        source: 'journal.reconcile.repaired',
+        title: 'Books repaired: paid orders had no sale entry',
+        body:
+          `${r.repaired.length} paid order(s) had no sale journal entry ` +
+          `${STUCK_ORDER_NOTIFY_MINUTES}+ min after payment (the post-payment fan-out was lost) and ` +
+          `were posted now. Find why the enqueue failed (Worker logs: fan-out enqueue failed).`,
+        context: { storeId, orders: r.repaired.slice(0, 20).map(o => o.orderNumber) },
+      }).catch(() => undefined);
+    }
+    if (r.staleMissing > 0) {
+      logger.error(
+        { storeId, count: r.staleMissing },
+        '[order-created-stuck-sweep] paid orders older than the repair window have no sale journal'
+      );
+      await sendAlert({
+        level: 'p1',
+        scope: 'store',
+        store,
+        source: 'journal.reconcile.stale',
+        title: 'Books: paid orders older than the repair window have no sale entry',
+        body:
+          `${r.staleMissing} paid order(s) paid more than ${JOURNAL_REPAIR_MAX_AGE_HOURS} h ago have no sale journal ` +
+          `entry. The hourly repair only reaches ${JOURNAL_REPAIR_MAX_AGE_HOURS} h back, so these stay missing until ` +
+          `booked by hand (or the window is widened for one run). Reported once a day.`,
+        context: { storeId, count: r.staleMissing },
+      }).catch(() => undefined);
+    }
+    if (r.failed.length > 0) {
+      logger.error(
+        { storeId, failed: r.failed },
+        '[order-created-stuck-sweep] could not post missing sale journals'
+      );
+      await sendAlert({
+        level: 'p1',
+        scope: 'store',
+        store,
+        source: 'journal.reconcile.failed',
+        title: 'Books: paid orders have no sale entry and could not be posted',
+        body:
+          `${r.failed.length} paid order(s) have no sale journal entry and posting ` +
+          `it failed (first error: ${r.failed[0]?.error ?? 'unknown'}). The ledger is short by these sales ` +
+          `until fixed; the next hourly tick retries.`,
+        context: { storeId, orders: r.failed.slice(0, 20).map(o => o.orderNumber) },
+      }).catch(() => undefined);
+    }
+  });
+  return r.repaired.length;
 }
 
 export const orderCreatedStuckSweep: JobDef = inngest.createFunction(
