@@ -88,5 +88,6 @@ Ebda Store is a newer platform than Zid or Shopify, with fewer integrations.
 - Shipping: Bosta, ShipBlu, Mylerz and Aramex, or the merchant's own delivery.
 - Also: VAT for registered merchants, a dashboard installable on the phone with order notifications, analytics, wa.me WhatsApp order buttons.
 - Founder: Ahmad Sharaf (https://mypovonai.com).
+- Profiles: Instagram https://www.instagram.com/ebdaai.studio/, Facebook https://www.facebook.com/ebdaaistudio, TikTok https://www.tiktok.com/@ebdaaistudio, LinkedIn https://www.linkedin.com/company/ebda-ai-studio/, YouTube https://www.youtube.com/@EbdaAIStudio
 - Sign up: https://store.ebda.app/signup
 - Contact: ahlan@ebda.app, WhatsApp +20 151 419 1411 (https://wa.me/201514191411); privacy and data-protection requests: privacy@ebda.app; security reports: security@ebda.app
