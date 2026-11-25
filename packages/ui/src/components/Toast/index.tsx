@@ -14,13 +14,17 @@ export interface Toast {
   title: string;
   message?: string;
   duration?: number;
-  /** One inline action (e.g. "Undo" after removing a cart line). Runs, then closes the toast. */
-  action?: { label: string; onClick: () => void };
+  /**
+   * One inline action: a button (e.g. "Undo" after removing a cart line; runs, then closes the toast) or, with
+   * `href`, a real link (e.g. "View cart" after an add; navigates, the toast closes).
+   */
+  action?: { label: string; onClick?: () => void; href?: string };
 }
 
 interface ToastContextValue {
   toasts: Toast[];
-  addToast: (toast: Omit<Toast, 'id'>) => void;
+  /** Returns the toast's id, so a caller can retract it (an optimistic confirmation that the server then refused). */
+  addToast: (toast: Omit<Toast, 'id'>) => string;
   removeToast: (id: string) => void;
   success: (title: string, message?: string) => void;
   error: (title: string, message?: string) => void;
@@ -52,7 +56,7 @@ export function ToastProvider({
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  const addToast = useCallback((toast: Omit<Toast, 'id'>) => {
+  const addToast = useCallback((toast: Omit<Toast, 'id'>): string => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newToast: Toast = {
       ...toast,
@@ -60,6 +64,7 @@ export function ToastProvider({
       duration: toast.duration ?? 5000,
     };
     setToasts(prev => [...prev, newToast]);
+    return id;
   }, []);
 
   const success = useCallback(
@@ -112,7 +117,7 @@ function ToastContainer({
     <div
       // Hook for the storefront's sticky-bar lift (apps/web globals.css, UI rule 6).
       data-toast-region
-      className="fixed bottom-[calc(72px+env(safe-area-inset-bottom))] md:bottom-4 right-4 z-50 flex flex-col gap-2 w-auto max-w-[280px] sm:max-w-sm pointer-events-none"
+      className="fixed bottom-[calc(72px+env(safe-area-inset-bottom))] md:bottom-4 end-4 z-50 flex flex-col gap-2 w-auto max-w-[280px] sm:max-w-sm pointer-events-none"
       aria-live="polite"
       aria-relevant="additions removals"
     >
@@ -241,7 +246,8 @@ function ToastItem({
         flex items-start gap-2.5 p-3 sm:gap-3 sm:p-4
         animate-toast-in
       `}
-      role="alert"
+      // A confirmation is a status the screen reader says politely; only a failure interrupts (role alert).
+      role={toast.type === 'error' || toast.type === 'warning' ? 'alert' : 'status'}
     >
       {/* Icon */}
       <div className={`flex-shrink-0 rounded-full p-1 ${s.icon}`}>{icons[toast.type]}</div>
@@ -263,18 +269,30 @@ function ToastItem({
         )}
       </div>
 
-      {toast.action && (
-        <button
-          type="button"
-          onClick={() => {
-            toast.action?.onClick();
-            onClose();
-          }}
-          className="flex-shrink-0 min-h-11 px-2 text-sm font-semibold text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {toast.action.label}
-        </button>
-      )}
+      {toast.action &&
+        (toast.action.href ? (
+          <a
+            href={toast.action.href}
+            onClick={() => {
+              toast.action?.onClick?.();
+              onClose();
+            }}
+            className="flex-shrink-0 inline-flex items-center min-h-11 px-2 text-sm font-semibold text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {toast.action.label}
+          </a>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              toast.action?.onClick?.();
+              onClose();
+            }}
+            className="flex-shrink-0 min-h-11 px-2 text-sm font-semibold text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {toast.action.label}
+          </button>
+        ))}
 
       {/* Close button */}
       <button
@@ -297,7 +315,7 @@ function ToastItem({
       {/* Auto-dismiss progress bar */}
       {duration > 0 && (
         <div
-          className={`absolute bottom-0 left-0 h-0.5 ${s.progress} opacity-60`}
+          className={`absolute bottom-0 start-0 h-0.5 ${s.progress} opacity-60`}
           style={{
             animation: `toast-progress ${duration}ms linear forwards`,
           }}

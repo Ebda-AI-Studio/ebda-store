@@ -306,6 +306,22 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         ];
       });
 
+      // QA-CART-UX-1: confirm AT ONCE, the same moment the header badge moves (the server answer can take seconds,
+      // and a shopper with no sign of success taps again). The toast links to the cart and reads as a status. If
+      // the server then refuses, it is retracted below, the error shown and the badge restored from the server cart.
+      const localizedName = language === 'ar' && item.nameAr ? item.nameAr : item.name;
+      const cartPath =
+        typeof window === 'undefined'
+          ? '/cart'
+          : localizeHref('/cart', splitLocalePrefix(window.location.pathname)?.locale ?? null);
+      const confirmId = toast.addToast({
+        type: 'success',
+        title: t('Added to cart ✓', 'اتضاف للسلة ✓'),
+        message: localizedName,
+        duration: 4000,
+        action: { label: t('Continue to checkout', 'كمّل الشراء'), href: cartPath },
+      });
+
       try {
         const res = await api.addToCart(
           productId,
@@ -327,6 +343,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           // cart API refuses a bare variant parent, C-01): both are chosen on
           // the PDP, so send the shopper there instead of a dead-end error toast.
           await refetchCart().catch(() => {});
+          toast.removeToast(confirmId); // nothing was added: the options step is next
           if (res.error?.code === 'VARIANT_REQUIRED') {
             toast.info(
               t('Choose your options first', 'اختار المواصفات الأول'),
@@ -354,15 +371,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           await refetchCart();
           throw new Error(res.error?.message || 'Failed to add item to cart');
         }
-        // Toast feedback for user-initiated adds. The guest auto-merge path
-        // calls `api.addToCart` directly (see hydrate()) and bypasses this
-        // function entirely, so it stays silent. The cart page only uses
-        // updateQuantity/removeItem, never addItem, so quantity bumps from
-        // the cart drawer/page never reach this branch.
-        const localizedName = language === 'ar' && item.nameAr ? item.nameAr : item.name;
-        toast.success(t('Added to cart', 'اتضاف للسلة'), localizedName);
+        // The confirmation was shown up front (confirmId). The guest auto-merge path calls `api.addToCart` directly
+        // (see hydrate()) and bypasses this function entirely, so it stays silent. The cart page only uses
+        // updateQuantity/removeItem, never addItem, so quantity bumps from the cart drawer/page never reach here.
         return true;
       } catch {
+        toast.removeToast(confirmId); // the optimistic "added" was wrong: retract it before the error
         await refetchCart().catch(() => {});
         // Centralized failure feedback: every storefront add-to-cart call site is
         // fire-and-forget, so a silent throw meant the user got NO signal an add
