@@ -10,11 +10,38 @@ import { BRAND, storeHost, storefrontOrigin } from '@ebda/shared';
 /** The suffix the free store address ends with, e.g. `.ebda.app`. */
 export const STORE_HOST_SUFFIX: string = BRAND.domains.storeSuffix;
 
-type StoreUrlInput = { slug: string; domain?: string | null };
+type StoreUrlInput = { slug: string; domain?: string | null; domainStatus?: string | null };
+
+/**
+ * The custom domain only when it is LIVE (STORE-QA-23). A claim that is 'pending' or 'failed' resolves to nothing yet, so a
+ * link, a copied store URL or a printed QR built from it is dead until DNS verifies; those fall back to `<slug>.ebda.app`.
+ * `domainStatus` null/undefined = a legacy verified domain (kept live).
+ */
+export function liveDomain(store: {
+  domain?: string | null;
+  domainStatus?: string | null;
+}): string | null {
+  if (!store.domain) return null;
+  return store.domainStatus === 'pending' || store.domainStatus === 'failed' ? null : store.domain;
+}
 
 /** Display host for a store: its custom domain, else `<slug>.ebda.app`. */
 export function getStoreDisplayUrl(store: StoreUrlInput): string {
-  return store.domain || storeHost(store.slug);
+  return liveDomain(store) || storeHost(store.slug);
+}
+
+/**
+ * Host a visitor really lands on, for previews: the custom domain once it is
+ * verified, otherwise the free `<slug>.ebda.app` address. `domainVerifiedAt`
+ * explicitly `null` means the domain is not live yet; absent means the payload
+ * does not carry it, so the stored domain is trusted.
+ */
+export function getStorePublicHost(
+  store: StoreUrlInput & { domainVerifiedAt?: string | null }
+): string {
+  const domain = store.domain?.trim().toLowerCase();
+  if (domain && store.domainVerifiedAt !== null) return domain;
+  return storeHost(store.slug);
 }
 
 /** The free `<slug>.ebda.app` host for a slug (display form, no scheme). */
@@ -24,7 +51,7 @@ export function getPlatformStoreUrl(slug: string): string {
 
 /** Absolute storefront URL: `https://<custom-domain>` or `https://<slug>.ebda.app`. */
 export function getStoreHref(store: StoreUrlInput): string {
-  return storefrontOrigin(store);
+  return storefrontOrigin({ slug: store.slug, domain: liveDomain(store) });
 }
 
 /**

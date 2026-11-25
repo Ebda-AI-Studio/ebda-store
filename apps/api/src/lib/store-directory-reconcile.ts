@@ -16,12 +16,13 @@
  *       re-opened by a repair), record it as `keptRestrictive` and alert for a human to rule on
  * Every correction and every kept-restrictive case is logged and alerted.
  *
- * NEON-ZERO (Ruling NZ-C-10): with no Postgres (no Hyperdrive binding, or the directory read fails) the Postgres side is SKIPPED, never
+ * NEON-ZERO (Ruling NZ-C-10): with no Postgres (no Postgres binding, or the directory read fails) the Postgres side is SKIPPED, never
  * thrown: the tick reconciles D1 against each `do` store's own StoreDO instead (slug and status of the DO record vs the D1 row). The
  * same restrictive rule applies: a DO that is stricter than D1 closes the D1 row (status only), anything else is alert-only. A DO
  * that cannot be read is alert-only. The report says `postgresSkipped`. Cost if wrong: a Postgres outage silences the Postgres
  * drift repair for that tick (it runs again the next hour).
  */
+import { tombstoneStoreDirectoryRow } from './store-directory-tombstone';
 import { storeDirectory, withStore } from '@ebda/database';
 import { hasStoresOnBackend } from './store-backend';
 import logger from './logger';
@@ -425,7 +426,7 @@ export async function reconcileStoreDirectory(
       });
       continue;
     }
-    await d1.prepare('DELETE FROM "stores" WHERE "id" = ?').bind(id).run();
+    await tombstoneStoreDirectoryRow(d1, id); // never DELETE: Ebda's billing rows cascade from the stores row
     report.corrected.push({ id, why: 'in D1, gone from Postgres' });
   }
 

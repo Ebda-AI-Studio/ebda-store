@@ -5,9 +5,8 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
-import { formatPrice } from '@/lib/format';
+import { formatPrice, formatDate } from '@/lib/format';
 import { useRequireFeature } from '@/hooks/useRequireFeature';
-import { withNumerals } from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -49,13 +48,13 @@ type AckFilter = 'all' | 'false' | 'true';
 function SeverityBadge({ severity, t }: { severity: AnomalySeverity; t: (k: string) => string }) {
   if (severity === 'p0') {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-ink">
         {t('severity.p0')}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-warning/10 text-warning-ink">
+    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-ink">
       {t('severity.warning')}
     </span>
   );
@@ -91,7 +90,7 @@ function AnomalyRow({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+    <div className="rounded-md border border-border bg-card p-4 space-y-3">
       {/* Top row: metric + scope + severity + timestamp */}
       <div className="flex items-start justify-between gap-2 flex-wrap">
         <div className="space-y-0.5">
@@ -99,14 +98,12 @@ function AnomalyRow({
             <span className="font-medium text-sm">{t(metricKey)}</span>
             <span className="text-xs text-muted-foreground capitalize">{item.scope}</span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            {new Date(item.detectedAt).toLocaleDateString(undefined, withNumerals())}
-          </p>
+          <p className="text-xs text-muted-foreground">{formatDate(item.detectedAt)}</p>
         </div>
         <div className="flex items-center gap-2">
           <SeverityBadge severity={item.severity} t={t} />
           {item.acknowledged && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground">
               {t('acknowledged')}
             </span>
           )}
@@ -135,7 +132,7 @@ function AnomalyRow({
           <p className="text-muted-foreground">{t('delta')}</p>
           <p
             className={`font-mono font-medium ${
-              item.deltaPercent < 0 ? 'text-red-600' : 'text-green-700'
+              item.deltaPercent < 0 ? 'text-destructive-ink' : 'text-success-ink'
             }`}
           >
             {deltaSign}
@@ -266,14 +263,14 @@ export default function AnomaliesPage() {
         </div>
 
         {/* Error */}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-destructive-ink">{error}</p>}
 
         {/* Loading */}
         {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
 
         {/* Empty state */}
         {!loading && !error && items.length === 0 && (
-          <div className="rounded-xl border border-border bg-muted/10 p-6 text-center">
+          <div className="rounded-md border border-border bg-muted/10 p-6 text-center">
             <p className="text-sm text-muted-foreground">{t('empty')}</p>
           </div>
         )}

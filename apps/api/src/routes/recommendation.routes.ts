@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { cfWaitUntil } from '../cf/bindings';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -161,9 +162,11 @@ router.post(
       const { storeId } = req.params;
 
       // Kick off async — don't await so request returns immediately
-      recommendationService.recalculateFBT(storeId).catch(err => {
-        logger.error({ err, storeId }, '[FBT] Manual recalculation failed');
-      });
+      cfWaitUntil(
+        recommendationService.recalculateFBT(storeId).catch(err => {
+          logger.error({ err, storeId }, '[FBT] Manual recalculation failed');
+        })
+      );
 
       res.json({ success: true, data: { message: 'FBT recalculation started' } });
     } catch (error) {
@@ -280,8 +283,8 @@ router.get(
 // CRUD). The customer-facing related products feed has three layers:
 //   1. Manual cross-sell relations  (admin curates)
 //   2. AI recommendations           (bulk-ai-recommendations sweep)
-//   3. Same-category fallback       (basic catalog UX, no addon)
-// Gating layers 2 + 3 behind the addon defeats the point of running
+//   3. Same-category fallback       (basic catalog UX, no feature gate)
+// Gating layers 2 + 3 behind the feature gate defeats the point of running
 // the AI sweep and breaks the "you might also like" baseline UX. The
 // service itself layers manual > AI > FBT > same-category, so if a
 // merchant doesn't have manual relations the storefront still gets
