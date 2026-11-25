@@ -624,7 +624,8 @@ const SESSION_PROBE_KEY = 'authProbe';
 
 function claimSessionProbe(endpoint: string, options: RequestInit): boolean {
   if (typeof window === 'undefined') return false;
-  if (endpoint !== '/auth/me' || (options.method || 'GET').toUpperCase() !== 'GET') return false;
+  if (endpoint.split('?')[0] !== '/auth/me' || (options.method || 'GET').toUpperCase() !== 'GET')
+    return false;
   try {
     const ss = window.sessionStorage;
     if (!ss || ss.getItem(SESSION_PROBE_KEY) !== null) return false;
@@ -1186,11 +1187,14 @@ class ApiClient {
   }
 
   async getProfile() {
-    const result = await this.request<{ user: User }>('/auth/me');
+    // `?probe=guest`: a request carrying NO auth cookie and no bearer is answered 200 `{ user: null }` instead of a
+    // 401 that the browser logs as a red console error on every guest visit. Any request that carries a cookie
+    // takes the normal path (401 -> refresh -> retry), so the Safari-ITP heal (#2164) is unchanged.
+    const result = await this.request<{ user: User | null }>('/auth/me?probe=guest');
     // A 200 here is the other proof a session lives in this browser — it covers
     // sessions established before the marker existed, and it re-arms one whose
-    // localStorage was cleared while the cookies survived.
-    if (result.success && result.data) {
+    // localStorage was cleared while the cookies survived. `user: null` is the guest answer, not a session.
+    if (result.success && result.data?.user) {
       markSessionEstablished();
     }
     return result;

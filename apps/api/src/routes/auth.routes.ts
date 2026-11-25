@@ -12,6 +12,7 @@ import {
   rejectImpersonated,
   isCrossSiteAdminRequest,
 } from '../middleware/auth';
+import { guestProbe } from '../middleware/guest-probe';
 import { isAccountsToken, verifyAccountsToken } from '../lib/accounts-token';
 import {
   customerTokenMatchesRequestStore,
@@ -944,6 +945,7 @@ router.post(
 // GET /auth/me
 router.get(
   '/me',
+  guestProbe,
   authenticate,
   rejectAdminOnMerchantOrigin,
   async (req: Request, res: Response, next: NextFunction) => {
