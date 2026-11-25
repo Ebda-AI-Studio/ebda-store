@@ -27,6 +27,7 @@ import { apiGet, apiPost } from '@/lib/api';
 import { orderLineVariantTitle, searchQueryHeaders, withNumerals } from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 import { cameraScanAvailable, createScanDetector, type ScanDetector } from '@/lib/barcode-scanner';
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -219,7 +220,7 @@ function CameraScanner({ onDetected, onStop, onError }: CameraScannerProps) {
   }, []);
 
   return (
-    <div className="relative w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-border bg-black aspect-[4/3]">
+    <div className="relative w-full max-w-sm mx-auto rounded-md overflow-hidden border border-border bg-black aspect-[4/3]">
       <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
       {!engineReady && (
         <div
@@ -287,7 +288,7 @@ function BarcodeInput({
             }
           }}
           placeholder={placeholder}
-          className="flex-1 min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          className={`${FIELD_CLASSES} flex-1`}
           disabled={disabled}
           autoComplete="off"
           autoCorrect="off"
@@ -326,7 +327,7 @@ function BarcodeInput({
         <p className="text-xs text-destructive-ink">{t('cameraPermission')}</p>
       )}
       {cameraError === 'camera-engine' && (
-        <p className="text-xs text-destructive-ink">{t('cameraEngineFailed')}</p>
+        <p className="text-sm text-destructive-ink">{t('cameraEngineFailed')}</p>
       )}
     </div>
   );
@@ -429,7 +430,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
       )}
 
       {lookup && (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <div className="rounded-md border border-border bg-card p-4 space-y-3">
           {lookup.ambiguous && <p className="text-xs text-warning-ink">{t('ambiguousWarning')}</p>}
           <div>
             <p className="font-semibold text-sm">{lookup.productName}</p>
@@ -451,7 +452,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
               min={1}
               value={qty}
               onChange={e => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
-              className="w-24 min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className={`${FIELD_CLASSES} w-24`}
             />
           </div>
           <Button
@@ -468,13 +469,13 @@ function ReceiveMode({ storeId }: { storeId: string }) {
       )}
 
       {result && (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+        <div className="rounded-md border border-success/30 bg-success/10 p-4 text-sm text-success-ink">
           {t('receiving.success', {
             qty: String(result.qtyReceived),
             name: '',
             newQty: String(result.newInventory),
           })}
-          <p className="text-xs mt-1 text-green-700">
+          <p className="text-xs mt-1 text-success-ink">
             {result.previousInventory} → {result.newInventory}
           </p>
         </div>
@@ -585,7 +586,7 @@ function PickMode({ storeId }: { storeId: string }) {
               onChange={e => setOrderInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && loadOrder()}
               placeholder={t('orderNumberPlaceholder')}
-              className="flex-1 min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className={`${FIELD_CLASSES} flex-1`}
               autoComplete="off"
             />
             <Button type="button" onClick={loadOrder} disabled={orderLoading} variant="default">
@@ -606,7 +607,7 @@ function PickMode({ storeId }: { storeId: string }) {
             </div>
             <div className="flex items-center gap-2">
               {order.fullyPicked && (
-                <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-ink">
                   {t('picking.orderComplete')}
                 </span>
               )}
@@ -660,7 +661,7 @@ function PickMode({ storeId }: { storeId: string }) {
                   const done = item.pickedQty >= item.quantity;
                   return (
                     <span className={`font-mono text-xs ${done ? 'opacity-60' : ''}`}>
-                      <span className={done ? 'text-green-700 font-semibold' : ''}>
+                      <span className={done ? 'text-success-ink font-semibold' : ''}>
                         {item.pickedQty}/{item.quantity}
                       </span>
                       {done && ' ✓'}
@@ -706,7 +707,7 @@ function PickMode({ storeId }: { storeId: string }) {
               {picking && <p className="text-xs text-muted-foreground">…</p>}
 
               {pickResult && (
-                <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-2 text-sm text-green-800">
+                <div className="rounded-lg bg-success/10 border border-success/30 px-4 py-2 text-sm text-success-ink">
                   {t('picking.success', {
                     qty: String(pickResult.pickedQtyAfter - pickResult.pickedQtyBefore),
                     name: pickResult.productName,
@@ -925,7 +926,7 @@ function CountMode({ storeId }: { storeId: string }) {
             value={newNote}
             onChange={e => setNewNote(e.target.value)}
             placeholder={t('counting.sessionNote')}
-            className="w-full min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className={FIELD_CLASSES}
           />
           <Button
             type="button"
@@ -946,7 +947,7 @@ function CountMode({ storeId }: { storeId: string }) {
   return (
     <div className="space-y-4">
       {/* Session header */}
-      <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center justify-between rounded-md border border-border bg-card p-4">
         <div>
           <p className="text-sm font-medium">{activeSession.note || t('countSession')}</p>
           <p className="text-xs text-muted-foreground">
@@ -1000,7 +1001,7 @@ function CountMode({ storeId }: { storeId: string }) {
           {lineErr && <p className="text-sm text-destructive-ink">{lineErr}</p>}
 
           {lookupResult && (
-            <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+            <div className="rounded-md border border-border bg-card p-4 space-y-3">
               <div>
                 <p className="font-semibold text-sm">{lookupResult.productName}</p>
                 {lookupResult.variantTitle && (
@@ -1019,7 +1020,7 @@ function CountMode({ storeId }: { storeId: string }) {
                   min={0}
                   value={countQty}
                   onChange={e => setCountQty(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  className="w-24 min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className={`${FIELD_CLASSES} w-24`}
                 />
               </div>
               <Button
@@ -1075,9 +1076,9 @@ function CountMode({ storeId }: { storeId: string }) {
                 <span
                   className={`font-mono text-xs font-semibold ${
                     line.variance > 0
-                      ? 'text-green-700'
+                      ? 'text-success-ink'
                       : line.variance < 0
-                        ? 'text-red-600'
+                        ? 'text-destructive-ink'
                         : 'text-muted-foreground'
                   }`}
                 >
@@ -1116,11 +1117,11 @@ function CountMode({ storeId }: { storeId: string }) {
       {reconcileErr && <p className="text-sm text-destructive-ink">{reconcileErr}</p>}
 
       {reconcileResult && (
-        <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
+        <div className="rounded-lg bg-success/10 border border-success/30 px-4 py-3 text-sm text-success-ink">
           {reconcileResult.adjustmentId
             ? t('counting.reconciled', { id: reconcileResult.adjustmentId.slice(0, 8) + '…' })
             : t('counting.noVariances')}
-          <p className="text-xs mt-1 text-green-700">
+          <p className="text-xs mt-1 text-success-ink">
             {t('linesAdjusted', { count: reconcileResult.linesReconciled })}
           </p>
         </div>
@@ -1169,21 +1170,21 @@ export default function BarcodeScanPage() {
     <AdminLayout title={t('title')} subtitle={t('description')}>
       {featuresLoading ? (
         <div className="max-w-lg mx-auto space-y-3" data-testid="scan-features-skeleton">
-          <div className="h-12 animate-pulse rounded-xl bg-muted/40" />
-          <div className="h-32 animate-pulse rounded-xl bg-muted/30" />
+          <div className="h-12 animate-pulse rounded-md bg-muted/40" />
+          <div className="h-32 animate-pulse rounded-md bg-muted/30" />
         </div>
       ) : !barcodeEnabled ? (
         <div
           role="status"
           data-testid="scan-feature-off"
-          className="max-w-lg mx-auto rounded-xl border border-border bg-muted/20 p-5 text-sm leading-relaxed text-foreground"
+          className="max-w-lg mx-auto rounded-md border border-border bg-muted/20 p-5 text-sm leading-relaxed text-foreground"
         >
           {t('featureNotOnPlan')}
         </div>
       ) : (
         <div className="max-w-lg mx-auto space-y-5">
           {/* Mode selector */}
-          <div className="flex rounded-xl border border-border bg-muted/20 p-1 gap-1">
+          <div className="flex rounded-md border border-border bg-muted/20 p-1 gap-1">
             {modes.map(m => (
               <Button
                 key={m.key}
@@ -1198,7 +1199,7 @@ export default function BarcodeScanPage() {
           </div>
 
           {/* What this page does — bilingual explainer of the 3 modes */}
-          <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground space-y-1.5">
+          <div className="rounded-md border border-border bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground space-y-1.5">
             <p className="font-semibold text-foreground">{t('helpTitle')}</p>
             <p>
               <span className="font-medium text-foreground">{t('modeReceive')}:</span>{' '}

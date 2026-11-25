@@ -139,7 +139,7 @@ const MESSAGES = {
 
 export interface SignInPageInput {
   lang: SignInLang;
-  /** Show the Chat sign-up link (the flag lives in Chat; accounts learns it from `CHAT_SIGNUP_LINK`). Default hidden. */
+  /** Show the Chat sign-up link (the flag lives in Chat; accounts learns it from `CHAT_SIGNUP_OPEN`). Default hidden. */
   showChatSignup?: boolean;
   product: SignInProduct;
   /** Already validated by `signInReturn`. */

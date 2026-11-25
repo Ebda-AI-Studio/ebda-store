@@ -12,6 +12,7 @@ import {
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../lib/api';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Global ⌘K / Ctrl+K command palette for the admin. Searches EVERY admin
@@ -273,7 +274,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
       aria-label={t('title')}
     >
       <div
-        className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
+        className="w-full max-w-lg overflow-hidden rounded-lg border border-border bg-background shadow-xl"
         onClick={e => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >
@@ -297,10 +298,10 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder={t('placeholder')}
-            className="h-12 w-full bg-transparent text-sm text-foreground outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground"
+            className={FIELD_CLASSES}
             aria-label={t('placeholder')}
           />
-          <kbd className="shrink-0 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
+          <kbd className="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
             {/* i18n-gate-allow: keyboard keycap */}
             ESC
           </kbd>
@@ -323,7 +324,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
                   type="button"
                   onClick={() => go(item.href)}
                   onMouseEnter={() => setActive(idx)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start text-sm transition-colors ${
+                  className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-start text-sm transition-colors ${
                     idx === active
                       ? 'bg-primary/10 text-primary-ink'
                       : 'text-foreground hover:bg-muted/70'
@@ -356,12 +357,12 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
             ))
           )}
           {rows.length > 0 && failureText && (
-            <li role="alert" className="px-3 py-2 text-center text-xs text-destructive-ink">
+            <li role="alert" className="px-3 py-2 text-center text-sm text-destructive-ink">
               {failureText}
             </li>
           )}
           {rows.length > 0 && searching && (
-            <li className="px-3 py-2 text-center text-xs text-muted-foreground">
+            <li className="px-3 py-2 text-center text-sm text-muted-foreground">
               {t('searching')}
             </li>
           )}

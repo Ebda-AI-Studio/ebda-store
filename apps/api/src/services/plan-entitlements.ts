@@ -93,6 +93,32 @@ function isLapsedManualSubscription(
   );
 }
 
+/**
+ * The plan a subscription is ENTITLED to: the free fallback for a `canceled` row or a lapsed manual one, else what it subscribed to
+ * (or the plan derived from `stores.plan` when there is no row). ONE function for `getEntitlements` and the row-based batched path
+ * (`automationFlagsFromRows`), so a lapsed InstaPay store cannot keep paid flags in a batched sweep while the per-store read
+ * already downgrades it (security review of #723).
+ */
+function effectivePlanCode(
+  legacyPlan: keyof typeof STORE_PLAN_TO_PLAN_CODE,
+  sub:
+    | {
+        planCode: string;
+        status: string;
+        billingMethod?: string | null;
+        nextRetryAt?: Date | null;
+      }
+    | null
+    | undefined
+): { subscribedPlanCode: string; effectiveCode: string } {
+  const subscribedPlanCode = sub?.planCode ?? STORE_PLAN_TO_PLAN_CODE[legacyPlan];
+  const effectiveCode =
+    sub?.status === 'canceled' || isLapsedManualSubscription(sub)
+      ? FALLBACK_PLAN_CODE
+      : subscribedPlanCode;
+  return { subscribedPlanCode, effectiveCode };
+}
+
 function seedFor(code: string) {
   return (
     DEFAULT_PLAN_SEEDS.find(p => p.code === code) ??
@@ -152,12 +178,8 @@ export async function getEntitlements(
         if (sub) fromD1 = platform;
       }
     }
-    const subscribedPlanCode = sub?.planCode ?? STORE_PLAN_TO_PLAN_CODE[plan0.plan];
+    const { subscribedPlanCode, effectiveCode } = effectivePlanCode(plan0.plan, sub);
     const status: SubscriptionStatus | 'none' = sub?.status ?? 'none';
-    const effectiveCode =
-      status === 'canceled' || isLapsedManualSubscription(sub)
-        ? FALLBACK_PLAN_CODE
-        : subscribedPlanCode;
 
     const plan = fromD1
       ? await fromD1.plan.findUnique({ where: { code: effectiveCode } })
@@ -183,6 +205,42 @@ export async function getEntitlements(
     };
   };
   return tx ? run(tx) : withStore(storeId, run);
+}
+
+/**
+ * `getAutomationFlags` from rows a batched read already holds (one `store_subscriptions` row or none, the `plans` row of the
+ * effective code or none) - the same resolution as `getEntitlements`, no query. Used by FeatureService's batched prefetch.
+ */
+export function automationFlagsFromRows(
+  legacyPlan: keyof typeof STORE_PLAN_TO_PLAN_CODE,
+  sub:
+    | {
+        planCode: string;
+        status: string;
+        billingMethod?: string | null;
+        nextRetryAt?: Date | null;
+      }
+    | null
+    | undefined,
+  planRows: ReadonlyMap<string, { code: string; limits: unknown; featureTier?: string }>
+) {
+  const { effectiveCode } = effectivePlanCode(legacyPlan, sub);
+  const plan = planRows.get(effectiveCode);
+  const seed = seedFor(effectiveCode);
+  const limits = plan ? parseLimits(plan.limits, effectiveCode) : seed.limits;
+  return {
+    effectiveCode,
+    flags: {
+      abandonedCartAutomation: limits.abandonedCartAutomation,
+      whatsappAutomation: limits.whatsappAutomation,
+      brandingRemoval: limits.brandingRemoval,
+      apiAccess: limits.apiAccess,
+      wholesalePricing: limits.wholesalePricing,
+      mcpAccess: planIncludesMerchantMcp(plan?.code ?? seed.code, limits),
+      // Same as getEntitlements: the baseline tier follows the effective plan, never stores.plan (#835/#850).
+      featureTier: (plan?.featureTier ?? seed.featureTier) as StorePlan,
+    },
+  };
 }
 
 /**

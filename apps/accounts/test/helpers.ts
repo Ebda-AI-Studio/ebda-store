@@ -8,7 +8,13 @@ const app = createApp();
 
 export interface Fakes {
   stores: Array<{ id: string; role: 'owner' | 'staff' }>;
-  notices: Array<{ to: string; kind: string; factor?: string; workspaceName?: string }>;
+  notices: Array<{
+    to: string;
+    kind: string;
+    factor?: string;
+    workspaceName?: string;
+    change?: string;
+  }>;
   mails: Array<{ to: string; kind: string; code: string; ttlMinutes?: number; storeName?: string }>;
   directoryDown: boolean;
   /** Store ids the directory reports as deleted. */
@@ -40,6 +46,7 @@ export const fakes: Fakes = {
 export const testEnv = (): Cloudflare.Env =>
   ({
     ...env,
+    CHAT_SIGNUP_OPEN: 'true', // most tests register through POST /signup; the closed state is tested explicitly
     ...fakes.envOverride,
     ISSUER: 'https://accounts.ebda.app',
     PRODUCTS: 'store,whatsapp,crm,erp',
@@ -76,12 +83,14 @@ export const testEnv = (): Cloudflare.Env =>
         kind: string;
         factor?: string;
         workspaceName?: string;
+        change?: string;
       }) => {
         fakes.notices.push({
           to: m.to,
           kind: m.kind,
           factor: m.factor,
           workspaceName: m.workspaceName,
+          ...(m.change ? { change: m.change } : {}),
         });
       },
       sendCode: async (m: {
