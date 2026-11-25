@@ -1,0 +1,151 @@
+import { beforeAll, describe, expect, it } from 'vitest';
+import { env, applyD1Migrations } from 'cloudflare:test';
+import { setCfBindings, type CfBindings } from '../src/cf/bindings';
+import { requirePlatformDb } from '../src/lib/platform-db';
+import { applyAddonGrant } from '../src/services/billing/addon-grant';
+import { setTermEndOnceD1 } from '../src/services/platform/billing-d1';
+
+// Follow-up to #775 (D1 review): on the platform D1 the prisma-lite `updateMany` / `createMany` are NOT atomic claims (SELECT
+// then write per key), so the add-on grant must not count on them. These run the REAL grant against the REAL platform schema
+// on workerd with every claim racing: one term per payment, and two payments of one add-on never overlap.
+const e = env as unknown as { PLATFORM_DB: D1Database; TEST_PLATFORM_MIGRATIONS: unknown[] };
+const NOW = new Date('2027-03-01T10:00:00.000Z');
+const DAY = 86_400_000;
+let seq = 0;
+const uid = (l: string) => `${l}-${++seq}`;
+const PLAN = 'addon:feature:floating_widget';
+
+async function store() {
+  const id = uid('store');
+  await e.PLATFORM_DB.prepare(
+    'INSERT INTO stores (id, name, slug, owner_id) VALUES (?1, ?1, ?1, ?2)'
+  )
+    .bind(id, uid('owner'))
+    .run();
+  return id;
+}
+async function paid(storeId: string) {
+  const id = uid('ev');
+  await e.PLATFORM_DB.prepare(
+    `INSERT INTO billing_events (id, store_id, type, plan_code, amount_minor, provider, idempotency_key, status)
+     VALUES (?1, ?2, 'upgrade', ?3, 9900, 'kashier', ?4, 'succeeded')`
+  )
+    .bind(id, storeId, PLAN, `k-${id}`)
+    .run();
+  return { id, storeId, planCode: PLAN };
+}
+const endOf = async (id: string) =>
+  (
+    (await e.PLATFORM_DB.prepare('SELECT for_period_end AS t FROM billing_events WHERE id = ?1')
+      .bind(id)
+      .first()) as { t: number | null }
+  ).t;
+const markers = async (storeId: string) =>
+  (
+    (await e.PLATFORM_DB.prepare(
+      "SELECT COUNT(*) AS n FROM billing_events WHERE store_id = ?1 AND plan_code LIKE 'addon-grant:%'"
+    )
+      .bind(storeId)
+      .first()) as { n: number }
+  ).n;
+
+describe('add-on grant on the platform D1: once per payment, never overlapping', () => {
+  let tx: any;
+  beforeAll(async () => {
+    setCfBindings(e as unknown as CfBindings);
+    await applyD1Migrations(e.PLATFORM_DB, e.TEST_PLATFORM_MIGRATIONS as never);
+    const d1 = await requirePlatformDb();
+    // store_features lives in the StoreDO, not on this D1: only the billing ledger is under test here.
+    tx = { billingEvent: d1.billingEvent, storeFeature: { findFirst: async () => null } };
+  });
+
+  it('eight concurrent settles of ONE payment leave exactly one term and one marker', async () => {
+    const s = await store();
+    const row = await paid(s);
+    const effects: unknown[] = [];
+    await Promise.all(
+      Array.from({ length: 8 }, () => applyAddonGrant(tx, row, NOW, effects as never))
+    );
+    expect(await endOf(row.id)).toBe(NOW.getTime() + 30 * DAY);
+    expect(await markers(s)).toBe(1);
+  });
+
+  it('two DIFFERENT payments of one add-on racing do not overlap: the second starts where the first ends', async () => {
+    const s = await store();
+    const a = await paid(s);
+    const b = await paid(s);
+    await Promise.all([
+      applyAddonGrant(tx, a, NOW, [] as never),
+      applyAddonGrant(tx, b, NOW, [] as never),
+    ]);
+    const ends = [await endOf(a.id), await endOf(b.id)].sort();
+    expect(ends).toEqual([NOW.getTime() + 30 * DAY, NOW.getTime() + 60 * DAY]);
+    expect(await markers(s)).toBe(2);
+  });
+
+  it('a REPLAY of the first payment after the second was chained changes nothing (no stray marker, same end)', async () => {
+    const s = await store();
+    const a = await paid(s);
+    await applyAddonGrant(tx, a, NOW, [] as never);
+    const b = await paid(s);
+    await applyAddonGrant(tx, b, NOW, [] as never);
+    const before = [await endOf(a.id), await endOf(b.id), await markers(s)];
+    await applyAddonGrant(tx, a, NOW, [] as never);
+    expect([await endOf(a.id), await endOf(b.id), await markers(s)]).toEqual(before);
+  });
+
+  it('the term end is written ONCE: a second write with another end loses', async () => {
+    const s = await store();
+    const a = await paid(s);
+    expect(await setTermEndOnceD1(a.id, s, NOW.getTime() + DAY)).toBe(true);
+    expect(await setTermEndOnceD1(a.id, s, NOW.getTime() + 2 * DAY)).toBe(false);
+    expect(await endOf(a.id)).toBe(NOW.getTime() + DAY);
+  });
+
+  it('a later payment after the term expired starts from now, not from the old end', async () => {
+    const s = await store();
+    const a = await paid(s);
+    await applyAddonGrant(tx, a, NOW, [] as never);
+    const later = new Date(NOW.getTime() + 90 * DAY);
+    const b = await paid(s);
+    await applyAddonGrant(tx, b, later, [] as never);
+    expect(await endOf(b.id)).toBe(later.getTime() + 30 * DAY);
+  });
+});
+
+describe('renewal claim on the platform D1 (claimEvent = createMany + skipDuplicates)', () => {
+  it('eight racing claims of one idempotency key: one row, and at most ONE caller sees count 1', async () => {
+    const tx = await requirePlatformDb();
+    const s = await store();
+    const key = uid('addon-renew');
+    const counts = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        tx.billingEvent.createMany({
+          data: [
+            {
+              id: crypto.randomUUID(),
+              storeId: s,
+              type: 'upgrade',
+              planCode: PLAN,
+              amountMinor: 9900,
+              currency: 'EGP',
+              provider: 'kashier',
+              idempotencyKey: key,
+              status: 'pending',
+            },
+          ],
+          skipDuplicates: true,
+        })
+      )
+    );
+    const rows = (
+      (await e.PLATFORM_DB.prepare(
+        'SELECT COUNT(*) AS n FROM billing_events WHERE idempotency_key = ?1'
+      )
+        .bind(key)
+        .first()) as { n: number }
+    ).n;
+    expect(rows).toBe(1);
+    expect(counts.filter((c: { count: number }) => c.count === 1).length).toBeLessThanOrEqual(1);
+  });
+});

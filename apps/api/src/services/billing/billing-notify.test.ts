@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { notifyStore, sendNotice } = vi.hoisted(() => ({
+const { notifyStore, sendNotice, invalidateCache, bustStoreCaches } = vi.hoisted(() => ({
   notifyStore: vi.fn(),
   sendNotice: vi.fn(),
+  invalidateCache: vi.fn(),
+  bustStoreCaches: vi.fn(),
 }));
 
 vi.mock('@ebda/database', () => ({
@@ -28,8 +30,8 @@ vi.mock('../email.service', () => ({
   EmailService: { sendSubscriptionBillingNotice: sendNotice },
 }));
 vi.mock('../socket.service', () => ({ socketService: { notifyStore } }));
-vi.mock('../feature.service', () => ({ featureService: { invalidateCache: vi.fn() } }));
-vi.mock('../store.service', () => ({ bustStoreCaches: vi.fn() }));
+vi.mock('../feature.service', () => ({ featureService: { invalidateCache } }));
+vi.mock('../store.service', () => ({ bustStoreCaches }));
 vi.mock('./account.service', () => ({ reconcileStoreAccess: vi.fn(), instapayDetails: vi.fn() }));
 vi.mock('./grants.service', () => ({ awardGrantsAfterPayment: vi.fn() }));
 vi.mock('./manual-config', () => ({
@@ -72,5 +74,13 @@ describe('merchant billing notices (S2-1/2, S2-11)', () => {
     expect(note.message).toContain('مش هيستقبل طلبات جديدة');
     expect(note.message).not.toMatch(/Free|المجانية/);
     expect(sendNotice).not.toHaveBeenCalled();
+  });
+});
+
+describe('add-on grant / refund drops EVERY entitlement layer (review of #775)', () => {
+  it('addon_granted clears the feature map AND the public store payload at once', async () => {
+    await runBillingEffects([{ kind: 'addon_granted', storeId: 's1' }]);
+    expect(invalidateCache).toHaveBeenCalledWith('s1');
+    expect(bustStoreCaches).toHaveBeenCalledWith('s1', 'shop', null);
   });
 });

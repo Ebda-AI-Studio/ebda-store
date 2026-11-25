@@ -12,6 +12,8 @@ import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
 import { currentSweepScope, forgetSweepMemo, seedSweepMemo } from '../lib/sweep-scope';
 import { readStorePlan } from '../lib/store-plan';
 import { storeRepo, storeUpdate } from '../lib/repo-factory';
+import { activeAddons } from './billing/addon-grant';
+import { ADDON_CATALOG, ADDON_PLAN_PREFIX } from './billing/addon-catalog';
 
 // Versioned namespace (2026-09-25, customer wallet D1). The release that wired
 // behaviour to the previously hidden `customer_wallet` key also resets a stale
@@ -59,6 +61,13 @@ function isConnectionFailure(err: unknown): boolean {
   return [e.code, e.errorCode].some(
     c => typeof c === 'string' && CONNECTION_FAILURE_CODES.includes(c)
   );
+}
+
+function addonFeatureKeys(running: Array<{ sku: string }>): string[] {
+  return running.flatMap(r => {
+    const k = ADDON_CATALOG[r.sku]?.featureKey;
+    return k ? [k] : [];
+  });
 }
 
 class FeatureService {
@@ -143,7 +152,8 @@ class FeatureService {
       wholesalePricing: boolean;
       mcpAccess: boolean;
       featureTier: StorePlan;
-    } | null
+    } | null,
+    addonKeys: readonly string[] = []
   ): Record<FeatureKey, boolean> {
     // Start with all false.
     const map = Object.fromEntries(FEATURE_KEYS_ARRAY.map(key => [key, false])) as Record<
@@ -182,7 +192,11 @@ class FeatureService {
       // (mcp/merchant-write.ts); a StoreFeature override still wins both ways.
       map.merchant_mcp_write = flags.mcpAccess;
     }
-    // Layer 2: per-store overrides on top.
+    // Layer 1.7: running paid add-ons (SELF-SERVICE A8): a purchase turns the feature ON. Staleness class BOUNDED:
+    // a grant busts this cache (`addon_granted`), and an expiry is time-based so the cached map may keep the feature
+    // for at most CACHE_TTL (5 min) past the paid term's end, which only ever errs in the merchant's favour.
+    for (const key of addonKeys) map[key as FeatureKey] = true;
+    // Layer 2: per-store overrides on top (a super-admin "off" still beats a purchase: goodwill/abuse override).
     for (const row of rows) {
       if (FEATURE_KEYS_ARRAY.includes(row.featureKey as FeatureKey)) {
         map[row.featureKey as FeatureKey] = row.enabled;
@@ -191,27 +205,32 @@ class FeatureService {
     return map;
   }
 
-  private async readFromDb(storeId: string): Promise<Record<FeatureKey, boolean>> {
+  private async readFromDb(
+    storeId: string,
+    withAddons = true
+  ): Promise<Record<FeatureKey, boolean>> {
     // store_features is under FORCE ROW LEVEL SECURITY. This map is read from
     // BOTH request handlers (with tenant context) AND background fan-out
     // (order-created / abandoned-cart Inngest jobs) which have no tenant GUC —
     // and without it the per-store override rows return empty, so a feature
     // enabled/disabled by override would be mis-resolved (and the wrong value
     // Redis-cached). Everything is read inside one store-scope tx.
-    const [store, rows, flags] = await withStore(storeId, async tx => {
-      const [storeRow, featureRows] = await Promise.all([
+    const [store, rows, flags, addonKeys] = await withStore(storeId, async tx => {
+      const [storeRow, featureRows, running] = await Promise.all([
         readStorePlan(tx, storeId),
         tx.storeFeature.findMany({
           where: { storeId },
           select: { featureKey: true, enabled: true },
         }),
+        activeAddons(tx, storeId, new Date()),
       ]);
+      const addonKeys = withAddons ? addonFeatureKeys(running) : [];
       // The plans engine's automation flags, read in the SAME store-scope tx (one
       // connection; a transient failure retries and fails closed together).
       const planFlags = storeRow
         ? await getAutomationFlags(storeId, tx, { legacyPlan: storeRow.plan })
         : null;
-      return [storeRow, featureRows, planFlags] as const;
+      return [storeRow, featureRows, planFlags, addonKeys] as const;
     });
     // If the store doesn't exist, return all-false (safe default; callers
     // already handle missing stores at the route level via requireStoreAccess).
@@ -221,7 +240,15 @@ class FeatureService {
         boolean
       >;
     }
-    return this.rowsToMap(store.plan as StorePlan, rows, flags);
+    return this.rowsToMap(store.plan as StorePlan, rows, flags, addonKeys);
+  }
+
+  /**
+   * What the store would have WITHOUT any paid add-on (plan baseline + super-admin overrides). Uncached, read by the
+   * add-on renewal to see that the plan now includes the feature (the merchant must not keep paying for it).
+   */
+  async resolveWithoutAddons(storeId: string): Promise<Record<FeatureKey, boolean>> {
+    return this.readFromDb(storeId, false);
   }
 
   /**
@@ -351,7 +378,7 @@ class FeatureService {
         );
         const known = part.filter(id => legacy.has(id));
         if (known.length === 0) continue;
-        const [featureRows, subs] = await Promise.all([
+        const [featureRows, subs, addonRows] = await Promise.all([
           platform.storeFeature.findMany({
             where: { storeId: { in: known } },
             select: { storeId: true, featureKey: true, enabled: true },
@@ -366,7 +393,20 @@ class FeatureService {
               nextRetryAt: true,
             },
           }),
+          // A store with a running paid add-on is NOT seeded: its feature map includes the add-on's feature, which this batch
+          // does not compute, so it resolves live per store (entitlement stays NEVER-stale).
+          platform.billingEvent.findMany({
+            where: {
+              storeId: { in: known },
+              type: 'upgrade',
+              status: 'succeeded',
+              planCode: { startsWith: ADDON_PLAN_PREFIX },
+              forPeriodEnd: { gt: new Date() },
+            },
+            select: { storeId: true },
+          }),
         ]);
+        const withAddon = new Set((addonRows as Array<{ storeId: string }>).map(r => r.storeId));
         type SubRow = {
           planCode: string;
           status: string;
@@ -400,6 +440,7 @@ class FeatureService {
           featBy.set(r.storeId, list);
         }
         for (const id of known) {
+          if (withAddon.has(id)) continue;
           const { flags } = automationFlagsFromRows(legacy.get(id)!, subBy.get(id), planRows);
           seedSweepMemo(
             this.prefetchKey(id),
@@ -533,7 +574,8 @@ class FeatureService {
           select: { featureKey: true, enabled: true },
         });
         const flags = await getAutomationFlags(storeId, tx, { legacyPlan: store?.plan ?? 'free' });
-        return this.rowsToMap((store?.plan ?? 'free') as StorePlan, rows, flags);
+        const addonKeys = addonFeatureKeys(await activeAddons(tx, storeId, new Date()));
+        return this.rowsToMap((store?.plan ?? 'free') as StorePlan, rows, flags, addonKeys);
       });
     } catch (err) {
       await this.invalidateCache(storeId);
