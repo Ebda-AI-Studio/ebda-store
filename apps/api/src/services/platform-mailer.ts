@@ -27,6 +27,10 @@ import {
   type FactorAddedNoticeData,
 } from './email-templates/factor-added-notice';
 import {
+  credentialChangeNoticeTemplate,
+  type CredentialChangeNoticeData,
+} from './email-templates/credential-change-notice';
+import {
   recoveryCodesChangedNoticeTemplate,
   type RecoveryCodesChangedNoticeData,
 } from './email-templates/recovery-codes-changed-notice';
@@ -314,6 +318,32 @@ export async function sendFactorAddedNoticeEmail(
     subject: factorAddedNoticeTemplate.subject[lang](data),
     html,
     ...(studio ? { fromName: BRAND.name } : {}),
+    replyTo: BRAND.supportEmail,
+  });
+}
+
+/** A recovery-relevant credential changed (MFA off, passkey removed, phone changed; ID-06). Master brand: sent for the identity service. */
+export async function sendCredentialChangeNoticeEmail(
+  data: CredentialChangeNoticeData,
+  language?: Lang
+): Promise<void> {
+  const lang: Lang = language ?? resolveDefaultLanguage(undefined);
+  const html = renderBrandedShell(credentialChangeNoticeTemplate[lang](data), {
+    name: BRAND.name,
+    nameAr: BRAND.nameAr,
+    logo: BRAND_EMAIL_LOGO_URL,
+    theme: null,
+    email: null,
+    phone: null,
+    address: null,
+    defaultLanguage: lang,
+    hidePoweredBy: true,
+  });
+  await deliver({
+    to: data.email,
+    subject: credentialChangeNoticeTemplate.subject[lang](data),
+    html,
+    fromName: BRAND.name,
     replyTo: BRAND.supportEmail,
   });
 }
