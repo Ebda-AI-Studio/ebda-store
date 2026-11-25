@@ -7,7 +7,7 @@ import { SlugField } from './_components/SlugField';
 import { isValidProductSlug, savedSlugIfChanged, slugForUpdate } from './_components/slug-field';
 import { Badge, Input, Textarea, Select, cn, useToast } from '@ebda/ui';
 import { Button, buttonVariants } from '@/components/ui/Button';
-import { storefrontOrigin } from '@ebda/shared';
+import { ViewInStoreLink } from './_components/ViewInStoreLink';
 import { StickySaveBar } from '@/components/StickySaveBar';
 import { useConfirm } from '@/hooks/useConfirm';
 import { ProductInfoSections, ProductSidebar } from '../_components/ProductInfoSections';
@@ -788,16 +788,12 @@ export default function EditProductPage() {
         product ? (
           // Rule 2: the save lives in the sticky bar; the header holds one outline link + the "..." menu.
           <div className="flex flex-wrap items-center gap-2">
-            {storeHost && (
-              <a
-                href={`${storefrontOrigin(storeHost)}/products/${product.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={buttonVariants({ variant: 'outline' })}
-              >
-                {t('viewInStore')}
-              </a>
-            )}
+            <ViewInStoreLink
+              storeHost={storeHost}
+              slug={product.slug}
+              status={product.status}
+              label={t('viewInStore')}
+            />
             <RowActions
               menuLabel={t('moreMenu')}
               items={[
