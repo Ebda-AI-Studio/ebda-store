@@ -97,6 +97,13 @@ import {
 import { sortOwnerStores } from './billing/billing-parent';
 import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { startSignupTrial } from './billing/trial';
+import {
+  claimOwnerTrial,
+  ownerEmailOf,
+  ownerHasUsedTrial,
+  releaseOwnerTrial,
+} from './billing/trial-eligibility';
+import { netRevenue } from './revenue.service';
 
 /**
  * Bust every public-cache entry that depends on a store record. The
@@ -656,14 +663,55 @@ export class StoreService {
     // rides the owner's Business plan — the same shapes as self-serve onboarding.
     // The platform operator keeps the old behaviour (active, default plan).
     // N-18 (Ruling NZ-D11): a store created on D1 + its Durable Object has no Postgres row.
-    const onDo = storeCreateOnDo();
+    // R-TRIAL-ONCE-1: the FIRST store of an owner who never had a signup trial (deleted stores included).
+    const ownerLookup = !opts.platformOperator ? await ownerEmailOf(ownerId) : undefined;
+    const ownerEmail = ownerLookup?.email;
+    // `isFirst` (no live store) and `trialEligible` (isFirst AND no earlier trial) are SEPARATE facts: a trial-used owner
+    // who recreates is still a first store but must get neither the trial nor a paid tier (R-TRIAL-ONCE-1).
     const merchantCreate = !opts.platformOperator
-      ? {
-          firstStore:
+      ? await (async () => {
+          const isFirst =
             (await countOwnerStores(ownerId, () =>
               withUser(ownerId, tx => tx.store.count({ where: { ownerId, deletedAt: null } }))
-            )) === 0,
-        }
+            )) === 0;
+          const trialEligible =
+            isFirst &&
+            !ownerLookup?.unknown &&
+            !(ownerEmail && (await ownerHasUsedTrial(ownerEmail)));
+          return { isFirst, trialEligible };
+        })()
+      : null;
+    // R-TRIAL-ONCE-1 (race): the marker is claimed by ONE atomic insert-or-skip BEFORE the store is created, and only the request
+    // that created it grants the trial. A store create that fails afterwards gives the marker back.
+    let claimedMarker = false;
+    if (merchantCreate?.trialEligible && ownerEmail) {
+      const claim = await claimOwnerTrial(ownerEmail);
+      merchantCreate.trialEligible = claim.grant;
+      claimedMarker = claim.owned;
+    }
+    try {
+      return await StoreService.createStore(ownerId, data, opts, merchantCreate);
+    } catch (err) {
+      if (claimedMarker && ownerEmail) await releaseOwnerTrial(ownerEmail);
+      throw err;
+    }
+  }
+
+  private static async createStore(
+    ownerId: string,
+    data: CreateStoreData,
+    opts: { allowProtectedSlug?: boolean; platformOperator?: boolean },
+    merchantCreate: { isFirst: boolean; trialEligible: boolean } | null
+  ) {
+    const onDo = storeCreateOnDo();
+    // Legacy tier of a merchant-created store: trial -> Growth; first store without a trial -> `starter` (unpaid, go-live
+    // needs payment); an additional store -> Business (only reachable when the owner's plan allows it, covered by the parent).
+    const merchantPlan = merchantCreate
+      ? merchantCreate.trialEligible
+        ? ('professional' as const)
+        : merchantCreate.isFirst
+          ? ('starter' as const)
+          : ('enterprise' as const)
       : null;
 
     // Same class as the product-slug defect: an empty slugify result made the
@@ -719,11 +767,7 @@ export class StoreService {
     const newTheme = { frameChromeDedup: true, oosRibbonColor: '#6b7280' };
 
     if (onDo) {
-      const plan = merchantCreate
-        ? merchantCreate.firstStore
-          ? ('professional' as const)
-          : ('enterprise' as const)
-        : NEW_STORE_LEGACY_PLAN;
+      const plan = merchantPlan ?? NEW_STORE_LEGACY_PLAN;
       const id = await insertDoStore({
         name: data.name,
         slug,
@@ -735,7 +779,7 @@ export class StoreService {
         theme: newTheme,
         layoutSettings: NEW_STORE_LAYOUT_SETTINGS as Record<string, unknown>,
         vatRateHundredths: REGION.defaultVatBps,
-        trial: merchantCreate?.firstStore ? {} : undefined,
+        trial: merchantCreate?.trialEligible ? {} : undefined,
         // atomic plan gate, fails closed (the Redis creation lock fails open): the insert itself refuses past the allowance
         maxOwnedStores: opts.platformOperator
           ? null
@@ -768,9 +812,7 @@ export class StoreService {
           ...(merchantCreate
             ? {
                 status: 'inactive' as const,
-                plan: merchantCreate.firstStore
-                  ? ('professional' as const)
-                  : ('enterprise' as const),
+                plan: merchantPlan!,
               }
             : {}),
           settings: newSettings,
@@ -799,7 +841,7 @@ export class StoreService {
     // verifies its VAT registration; the charge is gated on that verification.
     await withStore(store.id, async tx => {
       await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
-      if (merchantCreate?.firstStore) await startSignupTrial(tx, store.id);
+      if (merchantCreate?.trialEligible) await startSignupTrial(tx, store.id);
       await tx.taxRate.create({
         data: {
           storeId: store.id,
@@ -1376,16 +1418,10 @@ export class StoreService {
         db.product.count({ where: { storeId, status: 'active' } }),
         db.order.count({ where: { storeId } }),
         db.customer.count({ where: { storeId } }),
-        db.order.aggregate({
-          where: {
-            storeId,
-            OR: [
-              { status: { in: ['confirmed', 'processing', 'shipped', 'delivered'] } },
-              { paymentStatus: 'paid' },
-            ],
-          },
-          _sum: { total: true },
-        }),
+        // The ONE revenue definition (services/revenue.service.ts, STORE-QA-7): refunded / cancelled / failed-payment orders
+        // drop out and partial refunds are netted. (Was: status confirmed..delivered OR paid, which counted a delivered +
+        // refunded order as sales.)
+        netRevenue(storeId),
         // No `include: { customer }`: on a DO store the order is in the StoreDO and the customer is not
         // (prisma-lite: "Order.customer lives in another database"), so the five customers are read in one query below.
         db.order.findMany({
@@ -1425,7 +1461,7 @@ export class StoreService {
       productCount,
       orderCount,
       customerCount,
-      totalRevenue: totalRevenue._sum.total || 0,
+      totalRevenue: totalRevenue.revenue,
       recentOrders,
     };
   }

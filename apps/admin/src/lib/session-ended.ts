@@ -52,6 +52,30 @@ export function handleSessionEnded(
   loc.assign(buildSessionEndedUrl(`${loc.pathname}${loc.search}`));
 }
 
+/**
+ * TEN-4: a credential-class change (keys, staff, provider credentials) answered 403 STEP_UP_REQUIRED because the sign-in is
+ * older than 30 minutes. End the session at the identity service (best effort) and send the person to /login with the page as
+ * `returnTo`; a fresh sign-in is the step-up. Idempotent, no-op on public pages.
+ */
+export async function handleStepUpRequired(
+  signOut: () => Promise<unknown>,
+  loc: EndedLocation | undefined = typeof window === 'undefined'
+    ? undefined
+    : {
+        pathname: window.location.pathname,
+        search: window.location.search,
+        assign: u => window.location.assign(u),
+      }
+): Promise<void> {
+  if (!loc || redirecting) return;
+  const path = loc.pathname.replace(/\/+$/, '') || '/';
+  if (PUBLIC_PATHS.includes(path)) return;
+  redirecting = true;
+  await signOut().catch(() => undefined);
+  const safe = safeReturnPath(`${loc.pathname}${loc.search}`);
+  loc.assign(safe ? `/login?returnTo=${encodeURIComponent(safe)}&stepup=1` : '/login?stepup=1');
+}
+
 /** Read-once flag the login page uses to show the "session ended" note. */
 export function consumeSessionEnded(): boolean {
   try {

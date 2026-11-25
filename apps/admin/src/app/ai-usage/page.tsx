@@ -26,6 +26,7 @@ import { PageState } from '@/components/PageState';
 import { formatSpend } from '@/lib/ai-spend';
 import { withNumerals } from '@ebda/shared';
 import { intlLocaleForUi } from '@/lib/format';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ function planLabel(plan: string): string {
 
 const PLAN_COLORS: Record<string, string> = {
   free: 'bg-muted text-muted-foreground',
-  starter: 'bg-blue-100 text-blue-700',
+  starter: 'bg-info/10 text-info-ink',
   professional: 'bg-primary/10 text-primary-ink',
   enterprise: 'bg-warning/10 text-warning-ink',
 };
@@ -130,7 +131,7 @@ function StatCard({
   accent?: boolean;
 }) {
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm">
+    <div className="rounded-md border bg-card p-4 shadow-sm">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p
         className={`mt-1 text-2xl font-bold tabular-nums ${accent ? 'text-primary' : 'text-foreground'}`}
@@ -314,7 +315,7 @@ function PlatformAiUsagePageInner() {
         <div className="mb-6 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-ink">
           <strong>{t('noRatesConfiguredTitle')}</strong>{' '}
           {t.rich('noRatesConfiguredBody', {
-            code: chunks => <code className="mx-1 rounded bg-warning/10 px-1">{chunks}</code>,
+            code: chunks => <code className="mx-1 rounded-md bg-warning/10 px-1">{chunks}</code>,
           })}
         </div>
       ) : platform.monthUnpricedCalls > 0 ? (
@@ -325,7 +326,7 @@ function PlatformAiUsagePageInner() {
             })}
           </strong>{' '}
           {t.rich('unpricedCallsBody', {
-            code: chunks => <code className="rounded bg-warning/10 px-1">{chunks}</code>,
+            code: chunks => <code className="rounded-md bg-warning/10 px-1">{chunks}</code>,
           })}
         </div>
       ) : null}
@@ -333,14 +334,14 @@ function PlatformAiUsagePageInner() {
       {/* ── Filters ─────────────────────────────────────────────────── */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-muted-foreground" htmlFor="plan-filter">
+          <label className="text-sm font-medium text-muted-foreground" htmlFor="plan-filter">
             {t('filters.planLabel')}:
           </label>
           <select
             id="plan-filter"
             value={planFilter}
             onChange={e => setPlanFilter(e.target.value)}
-            className="rounded-lg border bg-card px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className={FIELD_CLASSES}
             aria-label={t('filters.filterByPlan')}
           >
             <option value="all">{t('filters.allPlans')}</option>
@@ -353,14 +354,14 @@ function PlatformAiUsagePageInner() {
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-muted-foreground" htmlFor="feature-filter">
+          <label className="text-sm font-medium text-muted-foreground" htmlFor="feature-filter">
             {t('filters.featureLabel')}:
           </label>
           <select
             id="feature-filter"
             value={featureFilter}
             onChange={e => setFeatureFilter(e.target.value)}
-            className="rounded-lg border bg-card px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className={FIELD_CLASSES}
             aria-label={t('filters.filterByFeature')}
           >
             <option value="all">{t('filters.allFeatures')}</option>
@@ -389,7 +390,7 @@ function PlatformAiUsagePageInner() {
       </div>
 
       {/* ── Per-store breakdown table ────────────────────────────────── */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-md border bg-card shadow-sm overflow-hidden">
         <div className="flex items-center justify-between border-b px-6 py-4">
           <h2 className="text-base font-semibold text-foreground">{t('perStoreBreakdown')}</h2>
           <span className="text-xs text-muted-foreground">

@@ -25,7 +25,7 @@
     "Contact tab for per-page WhatsApp buttons; Floating widget page for the floating one."
   ],
   "edgeCases": [
-    "floating_widget is Business/Enterprise add-on; super-admin enables",
+    "floating_widget is included in the Business plan; a Basic/Growth store sees the upgrade card",
     "Number format with country code +20",
     "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
     "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",

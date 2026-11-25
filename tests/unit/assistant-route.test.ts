@@ -340,12 +340,14 @@ describe('assistant route: status (does the panel appear)', () => {
     expect((await request(app).get(`/stores/${A}/assistant/status`)).body.data).toEqual({
       enabled: false,
       mode: 'off',
+      reason: 'store_mode_off',
     });
     configureAssistant({ controls: mode('answer-only') } as never);
     h.user = { userId: 'u-staff', role: 'staff', storeId: A };
     expect((await request(app).get(`/stores/${A}/assistant/status`)).body.data).toEqual({
       enabled: true,
       mode: 'answer-only',
+      reason: null,
     });
     configureAssistant({
       controls: {
@@ -356,6 +358,7 @@ describe('assistant route: status (does the panel appear)', () => {
     expect((await request(app).get(`/stores/${A}/assistant/status`)).body.data).toEqual({
       enabled: false,
       mode: 'off',
+      reason: 'global_kill',
     });
     expect((await request(app).get(`/stores/${B}/assistant/status`)).status).toBe(403);
   });
@@ -486,7 +489,7 @@ describe('assistant rollout switches (super admin only)', () => {
     const url = `/admin/assistant/stores/${A}/mode`;
     h.audit = [];
     let r = await request(app).get(url);
-    expect(r.body.data).toEqual({ mode: 'off', lastChange: null });
+    expect(r.body.data).toMatchObject({ mode: 'off', lastChange: null });
     h.settings = { assistantMode: 'suggest' };
     h.audit = [
       { action: 'assistant.login', createdAt: '2026-11-15T00:00:00.000Z', user: null },
@@ -497,7 +500,7 @@ describe('assistant rollout switches (super admin only)', () => {
       },
     ];
     r = await request(app).get(url);
-    expect(r.body.data).toEqual({
+    expect(r.body.data).toMatchObject({
       mode: 'suggest',
       lastChange: { by: 'Ada Root', at: '2026-11-14T10:00:00.000Z' },
     });
@@ -505,6 +508,39 @@ describe('assistant rollout switches (super admin only)', () => {
     expect((await request(app).get(url)).body.data.mode).toBe('off');
     h.settings = {};
     h.audit = [];
+  });
+
+  it('QA-112: the super-admin read and the merchant /status come from ONE decision and both carry the reason', async () => {
+    h.user = { userId: 'u-root', role: 'super_admin', storeId: '' };
+    h.settings = { assistantMode: 'answer-only' };
+    h.audit = [];
+    const capOff = {
+      flags: async () => ({ global: {}, product: {}, killedTools: [] }),
+      mode: async () => 'answer-only' as const,
+      aiOn: async () => true,
+    };
+    configureAssistant({ controls: capOff } as never);
+    const url = `/admin/assistant/stores/${A}/mode`;
+    let r = await request(app).get(url);
+    expect(r.body.data.mode).toBe('answer-only');
+    expect(r.body.data.effective).toEqual({ mode: 'off', reason: 'platform_cap_off' });
+    h.user = { userId: 'u-owner', role: 'store_admin', storeId: A };
+    expect((await request(app).get(`/stores/${A}/assistant/status`)).body.data).toEqual({
+      enabled: false,
+      mode: 'off',
+      reason: 'platform_cap_off',
+    });
+    // the merchant's own AI switch is its own reason
+    configureAssistant({ controls: { ...mode('answer-only'), aiOn: async () => false } } as never);
+    expect((await request(app).get(`/stores/${A}/assistant/status`)).body.data.reason).toBe(
+      'store_ai_off'
+    );
+    // when everything allows it, effective equals the saved mode
+    configureAssistant({ controls: mode('answer-only') } as never);
+    h.user = { userId: 'u-root', role: 'super_admin', storeId: '' };
+    r = await request(app).get(url);
+    expect(r.body.data.effective).toEqual({ mode: 'answer-only', reason: null });
+    h.settings = {};
   });
 
   it('a super admin sets the platform switches and a store mode; unknown modes and fields are refused', async () => {
