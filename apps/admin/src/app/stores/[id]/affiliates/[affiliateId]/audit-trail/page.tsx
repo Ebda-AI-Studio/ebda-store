@@ -216,14 +216,14 @@ export default function AffiliateAuditTrailPage() {
 
         {/* Affiliate info card */}
         {affiliate && (
-          <div className="mb-6 rounded-2xl border border-border bg-card p-5">
+          <div className="mb-6 rounded-lg border border-border bg-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="font-semibold text-foreground">{affiliate.name}</p>
                 <p className="text-sm text-muted-foreground">{affiliate.email}</p>
               </div>
               <div className="flex items-center gap-3">
-                <code className="rounded bg-muted px-2 py-1 text-sm font-mono">
+                <code className="rounded-md bg-muted px-2 py-1 text-sm font-mono">
                   {affiliate.referralCode}
                 </code>
                 <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-foreground capitalize">
@@ -245,7 +245,7 @@ export default function AffiliateAuditTrailPage() {
           <h2 className="text-base font-semibold text-foreground">{t('title')}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {t.rich('description', {
-              code: chunks => <code className="text-xs bg-muted px-1 rounded">{chunks}</code>,
+              code: chunks => <code className="text-xs bg-muted px-1 rounded-md">{chunks}</code>,
             })}
           </p>
         </div>
@@ -257,7 +257,7 @@ export default function AffiliateAuditTrailPage() {
         )}
 
         {error && !loading && (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center">
             <p className="text-sm text-destructive-ink">{error}</p>
             <Button
               variant="outline"
@@ -272,14 +272,14 @@ export default function AffiliateAuditTrailPage() {
         )}
 
         {!loading && !error && events.length === 0 && (
-          <div className="rounded-2xl border border-border bg-card p-12 text-center">
+          <div className="rounded-lg border border-border bg-card p-12 text-center">
             <p className="text-muted-foreground">{t('noEvents')}</p>
             <p className="mt-2 text-xs text-muted-foreground">{t('noEventsHint')}</p>
           </div>
         )}
 
         {!loading && !error && events.length > 0 && (
-          <div className="rounded-2xl border border-border bg-card">
+          <div className="rounded-lg border border-border bg-card">
             <div className="border-b border-border px-5 py-3 flex items-center justify-between">
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
                 {t('title')}

@@ -147,6 +147,9 @@ export class StubBillingProvider implements BillingProvider {
         chargeId,
         ...(this.timeoutCharged ? {} : { failureReason: 'stub: declined (answer lost)' }),
         raw: { stub: true, state: 'answer_lost' },
+        // the later status lookup states what was charged, like a gateway's transaction details
+        amountMinor: req.amountMinor,
+        currency: req.currency,
       });
       throw new BillingProviderError('stub: timeout', false);
     }
@@ -162,7 +165,13 @@ export class StubBillingProvider implements BillingProvider {
         raw: { stub: true, state: 'declined' },
       };
     } else {
-      result = { status: 'succeeded', chargeId, raw: { stub: true, state: 'paid' } };
+      result = {
+        status: 'succeeded',
+        chargeId,
+        raw: { stub: true, state: 'paid' },
+        amountMinor: req.amountMinor,
+        currency: req.currency,
+      };
     }
     this.charges.set(req.idempotencyKey, result);
     return result;
