@@ -1,3 +1,4 @@
+import { readStorePlan } from '../../store-plan';
 import type { JobDef } from '../../jobs/types';
 import { withStoreDb } from '../../jobs/store-db';
 import { storeDirectory } from '@ebda/database';
@@ -110,9 +111,7 @@ export const stockDeadstockScanOnDemand: JobDef = inngest.createFunction(
     // One step for both gates: on a Workflow only step bodies hold a database connection.
     const { enabled, store } = await step.run('gates', async () => ({
       enabled: await featureService.isFeatureEnabled(storeId, 'inventory.basic'),
-      store: await withStoreDb(storeId, db =>
-        db.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-      ),
+      store: await withStoreDb(storeId, db => readStorePlan(db as never, storeId)),
     }));
     if (!enabled) {
       logger.info(
