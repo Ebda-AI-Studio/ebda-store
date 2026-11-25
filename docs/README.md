@@ -18,6 +18,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [CHANGELOG-2026-11-04-admin-fix-pass-t6.md](CHANGELOG-2026-11-04-admin-fix-pass-t6.md) - Admin fix pass, T6 stock / finance / insights / platform / onboarding (2026-11-04)
 - [CHANGELOG-2026-11-09-admin-audit-closure-ux.md](CHANGELOG-2026-11-09-admin-audit-closure-ux.md) - Admin audit closure, UX rows (2026-11-09)
 - [CHANGELOG-2026-11-16-studio-social-links.md](CHANGELOG-2026-11-16-studio-social-links.md) - Ebda AI Studio social links on the marketing site (2026-11-16)
+- [CHANGELOG-2026-11-12-session-role-lifecycle.md](CHANGELOG-2026-11-12-session-role-lifecycle.md) - Session and role lifecycle fixes (ID-02/05/06/07/08, TEN-2/3/4)
 - [admin-routes-triage-2026-11-11.md](admin-routes-triage-2026-11-11.md) - Triage of the 89 routes with no admin caller (F-9-prune)
 - [CHANGELOG-2026-11-09-admin-audit-closure-p2-api-web.md](CHANGELOG-2026-11-09-admin-audit-closure-p2-api-web.md) - Admin audit closure, API and storefront rows (2026-11-09)
 - [CHANGELOG-2026-11-09-admin-audit-closure-p2-store-do.md](CHANGELOG-2026-11-09-admin-audit-closure-p2-store-do.md) - Atomic StoreDO settings patch (2026-11-09)

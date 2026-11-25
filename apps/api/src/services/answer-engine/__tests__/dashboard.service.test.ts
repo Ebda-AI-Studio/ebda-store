@@ -4,7 +4,7 @@ import { aggregateAnswerEngineChecks } from '../dashboard.service';
 // `aggregateAnswerEngineChecks` is the pure function `dashboard.service.ts`
 // splits out specifically so it's unit-testable without a DB (see its own
 // docstring) — the integration test at
-// tests/integration/answer-engine/dashboard.test.ts exercises the full
+// apps/api/workers-test/answer-engine-dashboard.test.ts exercises the full
 // route; these tests cover the aggregation logic itself, in particular the
 // new `groundingUnavailable` signal from issue #929.
 
