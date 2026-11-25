@@ -2,6 +2,7 @@ import type { JobDef } from '../../jobs/types';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { stepRunUnlessEmpty } from '../empty-exit';
+import { logSweepRun } from '../sweep-run-log';
 import { sendAlert } from '../../../services/alerts.service';
 import { redis } from '../../../services/redis.service';
 import { sweepStoresDb } from '../../jobs/store-db';
@@ -345,5 +346,9 @@ export const orderStatusFanoutStuckSweep: JobDef = inngest.createFunction(
     // Revisit at launch, when real orders exist (docs/RULINGS.md, docs/ENVIRONMENT.md).
     triggers: [{ cron: '7 * * * *' }],
   },
-  async ({ step, event }) => handleOrderStatusFanoutStuckSweep(step, event)
+  async ({ step, event }) =>
+    logSweepRun(
+      'order-status-fanout-stuck-sweep',
+      await handleOrderStatusFanoutStuckSweep(step, event)
+    )
 );
