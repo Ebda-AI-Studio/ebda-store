@@ -14,6 +14,7 @@ import { useLatestRequest } from '../../hooks/useLatestRequest';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { intlLocaleForUi } from '@/lib/format';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface User {
   id: string;
@@ -295,7 +296,7 @@ export default function UsersPage() {
               placeholder={t('searchPlaceholder')}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full rounded-lg border py-2 ps-10 pe-4 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={FIELD_CLASSES}
             />
           </div>
           <Button type="submit" variant="outline" size="sm">
@@ -314,7 +315,7 @@ export default function UsersPage() {
               setPagination(prev => ({ ...prev, page: 1 }));
             }}
             aria-label={t('filterRoleLabel')}
-            className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           >
             <option value="all">{t('allRoles')}</option>
             <option value="super_admin">{t('roleSuperAdmins')}</option>
@@ -339,12 +340,12 @@ export default function UsersPage() {
           {isLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                <div key={i} className="rounded-md border border-border bg-card p-4 shadow-sm">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 bg-muted rounded-full animate-pulse" />
                     <div className="flex-1 space-y-2">
-                      <div className="h-4 w-32 bg-muted rounded animate-pulse" />
-                      <div className="h-3 w-40 bg-muted rounded animate-pulse" />
+                      <div className="h-4 w-32 bg-muted rounded-md animate-pulse" />
+                      <div className="h-3 w-40 bg-muted rounded-md animate-pulse" />
                     </div>
                   </div>
                 </div>
@@ -357,7 +358,7 @@ export default function UsersPage() {
               rows={users}
               rowKey={user => user.id}
               emptyState={
-                <div className="rounded-xl border bg-card shadow-sm px-6 py-12 text-center">
+                <div className="rounded-md border bg-card shadow-sm px-6 py-12 text-center">
                   <div className="flex flex-col items-center">
                     <svg
                       className="h-12 w-12 text-muted-foreground"
@@ -381,7 +382,7 @@ export default function UsersPage() {
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between rounded-xl border bg-card px-6 py-3 shadow-sm">
+            <div className="mt-4 flex items-center justify-between rounded-md border bg-card px-6 py-3 shadow-sm">
               <p className="text-sm text-muted-foreground">
                 {t('paginationShowing', {
                   from: (pagination.page - 1) * pagination.limit + 1,
@@ -472,7 +473,7 @@ export default function UsersPage() {
               <Label htmlFor="invite-role">{t('roleLabel')}</Label>
               <select
                 id="invite-role"
-                className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className={`${FIELD_CLASSES} block`}
                 value={inviteForm.role}
                 aria-describedby="invite-role-help"
                 onChange={() => setInviteForm({ ...inviteForm, role: 'store_admin' })}

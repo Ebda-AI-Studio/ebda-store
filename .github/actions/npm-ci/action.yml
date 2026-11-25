@@ -9,3 +9,8 @@ runs:
         # Composite actions cannot read the `vars` context; the runner type is the same fact (EBDA_RUNS_ON set <=> Umbra self-hosted).
         EBDA_RUNS_ON: ${{ runner.environment == 'self-hosted' && '1' || '' }}
       run: bash scripts/ci/npm-ci-reuse.sh
+    # Build-time assets (docs/plans/2026-11-24-help-corpus-build-time.md): the assistant's help corpus module + capability registry are git-ignored outputs.
+    # Every job that installs may typecheck, lint, test or bundle the API, so they are generated once here (writes only what changed).
+    - name: Generate build-time assistant assets
+      shell: bash
+      run: node apps/api/scripts/build-help-corpus.mjs
