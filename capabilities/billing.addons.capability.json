@@ -4,32 +4,47 @@
   "area": "billing",
   "version": 1,
   "versionDate": "2026-11-14",
-  "titleAr": "فعل ميزة اضافية خارج باقتي",
-  "titleEn": "Buy or enable an add-on outside my plan",
-  "screens": ["/stores/[id]/features"],
-  "api": ["GET /stores/:storeId/my-features"],
+  "titleAr": "اشتري إضافة أو فعّل ميزة خارج باقتي",
+  "titleEn": "Buy an add-on outside my plan",
+  "screens": ["/stores/[id]/billing/addons"],
+  "api": [
+    "GET /stores/:storeId/my-features",
+    "GET /stores/:storeId/billing/addons",
+    "POST /stores/:storeId/billing/addons/preview",
+    "POST /stores/:storeId/billing/addons/checkout",
+    "POST /stores/:storeId/billing/addons/:sku/cancel",
+    "POST /stores/:storeId/billing/addons/:sku/resume"
+  ],
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "super_admin"],
-  "policy": "free",
+  "policy": "confirm",
   "undo": {
-    "class": "none",
-    "note": "n/a"
+    "class": "irreversible",
+    "note": "a payment is not refunded automatically; cancel stops the renewal and the add-on stays on until the paid term ends"
   },
-  "helpArticle": "my-features-and-add-ons",
+  "helpArticle": "buy-an-add-on",
   "questions": {
-    "ar": ["عايز افعل الزر العائم", "ازاي افعل محفظة العميل؟", "الميزة دي مقفولة ليه؟"],
-    "en": [
-      "How do I enable a feature that says super admin must enable?",
-      "Why is a feature locked on my store?"
-    ]
+    "ar": ["عايز افعّل الزر العائم", "ازاي اشتري إضافة؟", "الميزة دي مقفولة ليه؟"],
+    "en": ["How do I turn on a feature that is not in my plan?", "How do I buy an add-on?"]
   },
-  "steps": ["Features page lists what is on; locked items say a super admin must enable."],
-  "edgeCases": [
-    "Feature off by plan vs off by override vs merchant switch: 403 FEATURE_DISABLED with upgrade target only when the plan is the cause",
-    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
-    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  "steps": [
+    "Open Billing, then Add-ons",
+    "Press Buy on the add-on and read the exact total",
+    "Press Yes, charge and pay by card on the hosted page",
+    "The add-on turns on by itself when the payment is confirmed"
   ],
-  "gaps": ["No add-on purchase flow; super-admin enables only (audit gap 6, High)"],
+  "edgeCases": [
+    "Owner only: staff are refused; the store id comes from the path",
+    "One payment grants one 30 day term, exactly once, even if the payment confirmation arrives twice",
+    "A declined or abandoned payment grants nothing and charges nothing",
+    "The preview and the confirm state the renewal (amount, every 30 days, how to stop it); an email goes out before each renewal",
+    "Cancel stops the renewal; access stays until the paid term ends; cancel and resume are appended as ledger rows",
+    "A renewal is NOT charged, and the owner is told, when the price changed, the plan now includes the feature, support switched it off, or there is no saved card",
+    "A feature that support switched off cannot be bought",
+    "A feature the plan already includes is not sold again",
+    "A super admin can still switch any feature on or off for goodwill; that override wins over a purchase"
+  ],
+  "gaps": ["Refunding the earlier of two stacked terms does not pull the later term forward"],
   "assistantNote": "assistant says plan/override cause and links billing; cannot enable"
 }

@@ -357,7 +357,13 @@ export async function applyPendingGrants(tx: Tx, storeId: string, now: Date): Pr
     sub?.status === 'trialing' ? (sub.trialEndsAt ?? sub.currentPeriodEnd) : sub?.currentPeriodEnd;
   if (!sub || !base || !['active', 'trialing'].includes(sub.status)) return 0;
   const inFlight = await tx.billingEvent.count({
-    where: { storeId, status: 'pending', type: { in: ['renewal', 'upgrade', 'checkout'] } },
+    where: {
+      storeId,
+      status: 'pending',
+      type: { in: ['renewal', 'upgrade', 'checkout'] },
+      // a pending add-on payment does not move the subscription period, so it must not hold a free month back
+      OR: [{ planCode: null }, { NOT: { planCode: { startsWith: 'addon:' } } }],
+    },
   });
   if (inFlight > 0) return 0;
   if (await onD1()) {

@@ -48,8 +48,12 @@ import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { getUsageSummary } from '../services/plan-limit.service';
 import { planService } from '../services/plan.service';
+import addonsRoutes from './addons.routes';
 
 const router = Router({ mergeParams: true });
+
+// Add-ons + AI packs (SELF-SERVICE A8/A9): the same card flow, its own router.
+router.use('/addons', addonsRoutes);
 
 router.get(
   '/',
