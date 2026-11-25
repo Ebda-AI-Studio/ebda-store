@@ -37,7 +37,13 @@ import { gateOf } from '../smart-layer/tools/kit';
 import { getAuthUser } from '../utils/store-helpers';
 import { StoreService } from '../services/store.service';
 import { storeAdapter, type StoreAdapterDeps } from '../smart-layer/adapter';
-import { FLAG, readPlatformFlags, setPlatformFlag, storeControls } from '../smart-layer/controls';
+import {
+  FLAG,
+  assistantState,
+  readPlatformFlags,
+  setPlatformFlag,
+  storeControls,
+} from '../smart-layer/controls';
 
 const turnBody = z
   .object({
@@ -176,9 +182,12 @@ assistantRoutes.use(
 // AI switch included). A fail-closed read is simply false.
 assistantRoutes.get('/status', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const c = await storeControls(req.params.storeId!, override.controls);
+    const st = await assistantState(req.params.storeId!, override.controls);
     res.setHeader('Cache-Control', 'private, no-store');
-    res.json({ success: true, data: { enabled: c.mode !== 'off', mode: c.mode } });
+    res.json({
+      success: true,
+      data: { enabled: st.enabled, mode: st.controls.mode, reason: st.reason },
+    });
   } catch (err) {
     next(err);
   }
@@ -535,10 +544,13 @@ assistantAdminRoutes.get(
         ? [last.user.firstName, last.user.lastName].filter(Boolean).join(' ')
         : '';
       res.setHeader('Cache-Control', 'private, no-store');
+      // QA-112: `mode` is the flag the super admin set; `effective` is what the merchant actually gets (same source as /status).
+      const st = await assistantState(storeId, override.controls);
       res.json({
         success: true,
         data: {
           mode,
+          effective: { mode: st.controls.mode, reason: st.reason },
           lastChange: last ? { by: by || null, at: last.createdAt } : null,
         },
       });

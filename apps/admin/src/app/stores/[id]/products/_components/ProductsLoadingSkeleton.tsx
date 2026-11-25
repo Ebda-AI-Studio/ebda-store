@@ -33,7 +33,7 @@ export function ProductsLoadingSkeleton() {
         </div>
 
         {/* Desktop table — hidden below md, matches DataTable's breakpoint */}
-        <div className="hidden md:block rounded-xl border bg-card overflow-hidden overflow-x-auto">
+        <div className="hidden md:block rounded-md border bg-card overflow-hidden overflow-x-auto">
           <table className="w-full" aria-label={t('table.loadingLabel')}>
             <thead className="bg-muted border-b">
               <tr>
@@ -52,7 +52,7 @@ export function ProductsLoadingSkeleton() {
               {Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
                   <td className="px-4 py-3">
-                    <div className="h-4 w-4 force-skeleton rounded" />
+                    <div className="h-4 w-4 force-skeleton rounded-md" />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -91,7 +91,7 @@ export function ProductsLoadingSkeleton() {
             card shape: title+badge row, label/value rows, action toolbar. */}
         <div className="space-y-3 md:hidden" aria-hidden="true">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div key={i} className="rounded-md border border-border bg-card p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <div className="h-10 w-10 shrink-0 rounded-lg force-skeleton" />
