@@ -13,7 +13,7 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
+    "class": "compensating",
     "note": "limited: transitions only forward (shipped -> processing allowed)"
   },
   "helpArticle": "orders-and-cod",

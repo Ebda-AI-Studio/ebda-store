@@ -7,7 +7,7 @@
   "titleAr": "محفظة العميل (مقال مكرر)",
   "titleEn": "Customer wallet and store credit (help duplicate article)",
   "screens": ["/stores/[id]/wallet"],
-  "api": ["(see marketing.wallet)"],
+  "api": [],
   "mcpTool": null,
   "planGate": "customer_wallet",
   "roles": ["owner", "super_admin"],

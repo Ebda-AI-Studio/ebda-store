@@ -8,7 +8,7 @@
   "titleAr": "منتجات ابدأ القادمة",
   "titleEn": "Ebda CRM, ERP, Invites, Ads, Quote Studio",
   "screens": ["n/a"],
-  "api": ["n/a"],
+  "api": [],
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "staff"],

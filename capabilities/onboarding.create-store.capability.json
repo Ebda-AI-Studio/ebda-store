@@ -11,7 +11,7 @@
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "staff"],
-  "policy": "preview",
+  "policy": "confirm",
   "undo": {
     "class": "irreversible",
     "note": "no: slug can change later only via support/redirect; store can be edited"

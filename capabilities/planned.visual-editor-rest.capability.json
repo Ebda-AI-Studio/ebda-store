@@ -8,7 +8,7 @@
   "titleAr": "تكملة المحرر البصري",
   "titleEn": "Visual editor remaining tasks, launch polish, templates match mock-ups",
   "screens": ["/stores/[id]/builder"],
-  "api": ["(plans)"],
+  "api": [],
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "staff", "super_admin"],

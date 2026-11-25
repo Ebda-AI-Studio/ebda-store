@@ -19,8 +19,8 @@
   "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "delete yes recreate"
+    "class": "compensating",
+    "note": "delete: recreate the endpoint (new secret)"
   },
   "helpArticle": "webhooks-send-events-to-your-system",
   "questions": {

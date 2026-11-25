@@ -13,7 +13,7 @@
   "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
+    "class": "compensating",
     "note": "disconnect"
   },
   "helpArticle": "whatsapp/connect-your-own-number",

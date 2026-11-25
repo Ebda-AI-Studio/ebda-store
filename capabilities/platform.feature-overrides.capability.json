@@ -17,7 +17,7 @@
     "note": "n/a"
   },
   "operatorReason": {
-    "code": null,
+    "code": "platform-config",
     "text": "commercial exception / add-on grant",
     "validUnderRule": false
   },

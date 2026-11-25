@@ -8,7 +8,7 @@
   "titleAr": "سرعة تحميل المتجر",
   "titleEn": "Storefront cold-render speed target 2.5 s",
   "screens": ["storefront"],
-  "api": ["(plan)"],
+  "api": [],
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "super_admin"],

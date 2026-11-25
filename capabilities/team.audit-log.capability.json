@@ -39,5 +39,10 @@
     "Platform staff can read any store's log (support override)",
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing"
   ],
-  "gaps": []
+  "gaps": [],
+  "operatorReason": {
+    "code": "legal",
+    "text": "security/compliance: the platform audit log is read by super-admin only; no merchant surface exists",
+    "validUnderRule": true
+  }
 }

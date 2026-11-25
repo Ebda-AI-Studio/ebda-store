@@ -17,7 +17,7 @@
     "note": "n/a"
   },
   "operatorReason": {
-    "code": null,
+    "code": "legal",
     "text": "security/compliance",
     "validUnderRule": true
   },

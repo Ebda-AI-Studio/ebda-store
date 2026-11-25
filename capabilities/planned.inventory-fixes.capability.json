@@ -8,7 +8,7 @@
   "titleAr": "تصحيحات المخزون",
   "titleEn": "Inventory correctness (stale writes, failed-payment hold release, COD-aware reorder)",
   "screens": ["/stores/[id]/stock/*"],
-  "api": ["(PR)"],
+  "api": [],
   "mcpTool": null,
   "planGate": "inventory.*",
   "roles": ["owner", "staff", "super_admin"],

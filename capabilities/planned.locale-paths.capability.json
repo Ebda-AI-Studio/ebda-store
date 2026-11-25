@@ -8,7 +8,7 @@
   "titleAr": "لينكات العربي والانجليزي لكل الصفحات",
   "titleEn": "Storefront /ar /en for cart, checkout, account, search",
   "screens": ["/stores/[id]/language"],
-  "api": ["(PR)"],
+  "api": [],
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "super_admin"],

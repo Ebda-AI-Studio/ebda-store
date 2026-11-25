@@ -8,7 +8,7 @@
   "titleAr": "اشعارات فترة السماح والايقاف",
   "titleEn": "Grace-period and suspension notices to merchants at each stage; suspended store read-only",
   "screens": ["/stores/[id]/billing"],
-  "api": ["(PRs)"],
+  "api": [],
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "super_admin"],
