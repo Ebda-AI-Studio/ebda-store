@@ -3,7 +3,7 @@ import { storeDb, storeWriter } from '../lib/repo-factory';
 import { z } from 'zod/v3';
 import { prisma, Prisma } from '@ebda/database';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
-import { requireMfaEnrolled } from '../middleware/require-mfa';
+import { requireMfaEnrolled, requireRecentLogin } from '../middleware/require-mfa';
 import { requirePermission } from '../middleware/rbac';
 import { requireStoreAccess } from '../middleware/store-access';
 import { encryption } from '../services/encryption.service';
@@ -274,6 +274,7 @@ router.post(
   authenticate,
   requireMfaEnrolled,
   rejectImpersonated,
+  requireRecentLogin, // TEN-4: credential-class change needs a recent sign-in
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),
@@ -760,6 +761,7 @@ router.put(
   authenticate,
   requireMfaEnrolled,
   rejectImpersonated,
+  requireRecentLogin, // TEN-4: credential-class change needs a recent sign-in
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requirePermission('store:settings'),

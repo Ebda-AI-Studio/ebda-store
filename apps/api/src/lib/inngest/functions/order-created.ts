@@ -236,6 +236,7 @@ export const orderCreated: JobDef = inngest.createFunction(
         await notificationDispatcher.dispatch(storeId, 'order_confirmed', {
           customerName,
           customerPhone: guestPhone || undefined,
+          customerId: order.customerId ?? undefined,
           orderNumber: order.orderNumber,
           total: order.total,
           storeId,

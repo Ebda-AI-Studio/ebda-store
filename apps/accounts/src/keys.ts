@@ -3,6 +3,7 @@
  * The private key is a Worker secret (a JWK JSON string carrying its `kid`); it is never stored in D1 or logged.
  * The public JWKS is derived from it plus the retired public keys that stay published for 24 h after a rotation.
  */
+import { logEvent } from './audit-log';
 import { importJWK, type JWK, type CryptoKey as JoseKey } from 'jose';
 
 export interface SigningKey {
@@ -32,6 +33,25 @@ export async function signingKey(raw: string | undefined): Promise<SigningKey> {
   return key;
 }
 
+/** A retired key is published for at most this long from now, whatever its `exp` says (a typo'd far-future exp must not keep it alive). */
+const RETIRED_KEY_MAX_AHEAD_SECONDS = 30 * 24 * 3600;
+
+/** Kids of retired keys that are NOT published: no numeric `exp`, or an `exp` more than 30 days ahead (ID-08). Surfaced on /health. */
+export function retiredKeysWithoutExp(env: { JWT_PREVIOUS_PUBLIC_JWKS?: string }): string[] {
+  if (!env.JWT_PREVIOUS_PUBLIC_JWKS) return [];
+  try {
+    return (JSON.parse(env.JWT_PREVIOUS_PUBLIC_JWKS) as Array<{ kid?: string; exp?: unknown }>)
+      .filter(
+        k =>
+          typeof k.exp !== 'number' ||
+          k.exp > Math.floor(Date.now() / 1000) + RETIRED_KEY_MAX_AHEAD_SECONDS
+      )
+      .map(k => k.kid ?? '(no kid)');
+  } catch {
+    return ['(unparseable JWT_PREVIOUS_PUBLIC_JWKS)'];
+  }
+}
+
 /** The published key set: current + retired public keys. Rejects anything carrying a private member. */
 export async function jwks(env: {
   JWT_PRIVATE_JWK: string;
@@ -44,5 +64,27 @@ export async function jwks(env: {
   for (const k of previous) {
     if (k.d || !k.kid) throw new Error('JWT_PREVIOUS_PUBLIC_JWKS must hold public keys with a kid');
   }
-  return { keys: [current, ...previous.filter(k => k.kid !== current.kid)] };
+  // ID-08: a retired key is published only until ITS OWN `exp` (unix seconds, set when it was retired; rotation runbook: now +
+  // 24 h). Without an `exp` the key is not published at all (fail closed: a retired signing key must never verify forever); with
+  // one in the past it is dropped. `exp` is our bookkeeping, not a JWK member, so it is stripped from the published set.
+  const nowS = Math.floor(Date.now() / 1000);
+  const live = previous
+    .filter(k => {
+      const exp = (k as JWK & { exp?: unknown }).exp;
+      if (typeof exp !== 'number') {
+        logEvent('retired_jwk_without_exp_not_published', { kid: k.kid ?? '' }, 'error');
+        return false;
+      }
+      if (exp > nowS + RETIRED_KEY_MAX_AHEAD_SECONDS) {
+        logEvent('retired_jwk_exp_too_far_not_published', { kid: k.kid ?? '' }, 'error');
+        return false;
+      }
+      return exp > nowS;
+    })
+    .map(k => {
+      const { exp: _exp, ...rest } = k as JWK & { exp?: number };
+      void _exp;
+      return rest as JWK;
+    });
+  return { keys: [current, ...live.filter(k => k.kid !== current.kid)] };
 }

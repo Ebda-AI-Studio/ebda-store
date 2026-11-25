@@ -98,11 +98,11 @@ export default function WalletPage() {
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       {loading ? (
         <div className="space-y-4">
-          <div className="h-24 animate-pulse rounded-xl bg-muted" />
-          <div className="h-48 animate-pulse rounded-xl bg-muted" />
+          <div className="h-24 animate-pulse rounded-md bg-muted" />
+          <div className="h-48 animate-pulse rounded-md bg-muted" />
         </div>
       ) : error || !data ? (
-        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive-ink">
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive-ink">
           {error}
           <button type="button" className="ms-4 font-medium underline" onClick={load}>
             {t('retry')}
@@ -111,7 +111,7 @@ export default function WalletPage() {
       ) : (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border bg-card p-4">
+            <div className="rounded-md border bg-card p-4">
               <p className="text-xs uppercase tracking-wider text-muted-foreground">
                 {t('outstanding')}
               </p>
@@ -120,7 +120,7 @@ export default function WalletPage() {
               </p>
               <p className="mt-1 text-xs text-muted-foreground">{t('outstandingHint')}</p>
             </div>
-            <div className="rounded-xl border bg-card p-4">
+            <div className="rounded-md border bg-card p-4">
               <p className="text-xs uppercase tracking-wider text-muted-foreground">
                 {t('walletsWithBalance')}
               </p>
@@ -128,7 +128,7 @@ export default function WalletPage() {
                 {data.summary.walletsWithBalance}
               </p>
             </div>
-            <div className="rounded-xl border bg-card p-4">
+            <div className="rounded-md border bg-card p-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">
                   {t('checkoutTitle')}
@@ -147,7 +147,7 @@ export default function WalletPage() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+          <div className="overflow-hidden rounded-md border bg-card shadow-sm">
             {rows.length === 0 ? (
               <div className="flex flex-col items-start gap-3 p-6">
                 <p className="text-sm text-muted-foreground">{t('empty')}</p>
