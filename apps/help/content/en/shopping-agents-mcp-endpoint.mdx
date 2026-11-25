@@ -1,0 +1,28 @@
+---
+title: Let AI shopping agents buy from your store
+description: What a shopping agent can do on your store's agent address, and why there is no screen for it except the agent key.
+section: AI
+order: 32
+appPath: /stores
+keywords: mcp shopping agent ai assistant buy cart order agent key checkout search
+capabilities:
+  - integrations.shopper-mcp@1
+---
+
+Your store has an address built for AI shopping assistants. There is nothing to configure in the dashboard apart from the agent key. The address is `/api/v1/mcp/<your-store-slug>`.
+
+## What an agent can do
+
+- **Read, with no key:** get store info, search products, read a product, view a cart and check an order's status.
+- **Write, with the key:** add to a cart and place an order. The agent sends your key in the `x-agent-key` header.
+- Cash on delivery orders complete on their own. For online payment the agent gets a payment link that a person must open and pay.
+
+## Where you manage it
+
+Open **Settings**, then **For developers**, then **AI agent key**. There you issue, rotate or revoke the key. It is shown once, and the page explains how to hand it to your agent. A revoked or rotated key stops working on the next request.
+
+## Good to know
+
+- If the feature is off for your store, the address answers "not found".
+- Without a key, an agent can browse but cannot add to a cart or order.
+- This is for shoppers' agents. To run your own store from an assistant, see [Merchant MCP write tools](/en/merchant-mcp-write-tools/).
