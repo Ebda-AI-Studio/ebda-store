@@ -135,6 +135,10 @@ export function FiscalDocumentViewer({ endpoint, backHref }: FiscalDocumentViewe
             ref={iframeRef}
             title={t('title')}
             srcDoc={html}
+            // The document is inert markup: NO allow-scripts, so nothing in it can execute. `allow-same-origin` lets the
+            // parent call contentWindow.print() (cross-origin print() throws); it is safe because scripts stay off.
+            // `allow-modals` is what the browser requires for print() inside a sandboxed frame. Nothing else is granted.
+            sandbox="allow-same-origin allow-modals"
             className="w-full"
             style={{ height: '85vh', border: 0 }}
           />
