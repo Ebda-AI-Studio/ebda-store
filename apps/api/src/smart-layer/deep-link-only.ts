@@ -7,6 +7,14 @@
 export const DEEP_LINK_ONLY: Record<string, { secret: string }> = {
   'account.password': { secret: 'password' },
   'account.mfa': { secret: 'MFA secret and recovery codes' },
+  'account.mfa-recovery-codes': {
+    secret:
+      'password plus a live authenticator code (step-up), and the new recovery codes are shown once and never repeated in chat',
+  },
+  'team.audit-log': {
+    secret:
+      'owner-only screen (the store owner check, super-admin override); the assistant also runs for staff, so it only points at it',
+  },
   'account.passkeys': { secret: 'passkey ceremony' },
   'account.login': { secret: 'password / one-time code' },
   'account.verify-email': { secret: 'one-time link or code' },
@@ -15,6 +23,10 @@ export const DEEP_LINK_ONLY: Record<string, { secret: string }> = {
   'billing.pay-card': { secret: 'card details' },
   'billing.addons': { secret: 'card details on the hosted checkout' },
   'billing.ai-topup': { secret: 'card details on the hosted checkout' },
+  'tax.change-request': {
+    secret:
+      'the tax card / certificate FILE upload and a single-use confirm token (a document is never attached in chat)',
+  },
   'payment.card-providers': { secret: 'provider API keys' },
   'payment.instapay-merchant': { secret: 'provider credentials' },
   'onboarding.slug-claim': {

@@ -77,7 +77,7 @@ export type BillingEffect =
   | {
       kind: 'downgraded';
       storeId: string;
-      reason: 'dunning' | 'canceled' | 'no_payment_method' | 'trial_ended';
+      reason: 'dunning' | 'canceled' | 'no_payment_method' | 'trial_ended' | 'payment_reversed';
     };
 
 async function storeContext(storeId: string) {

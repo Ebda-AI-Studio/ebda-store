@@ -331,7 +331,7 @@ export async function commitManualPaymentD1(
             ON CONFLICT (store_id) DO UPDATE SET
               plan_code = excluded.plan_code, status = 'active', billing_interval = excluded.billing_interval,
               current_period_start = excluded.current_period_start, current_period_end = excluded.current_period_end,
-              billing_anchor_day = excluded.billing_anchor_day, trial_ends_at = NULL, pending_plan_code = NULL,
+              billing_anchor_day = excluded.billing_anchor_day, trial_ends_at = NULL, pending_plan_code = NULL, pending_billing_interval = NULL,
               cancel_at_period_end = 0, dunning_attempts = 0, next_retry_at = NULL,
               billing_method = excluded.billing_method, updated_at = excluded.updated_at`,
       params: [
