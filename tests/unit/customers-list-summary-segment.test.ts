@@ -22,6 +22,10 @@ const h = vi.hoisted(() => ({
   caller: { role: 'store_admin' as string, userId: 'admin-a' },
 }));
 
+vi.mock('@api/lib/customer-groups-store', async () => {
+  const { CustomerGroups } = await import('@api/lib/customer-groups');
+  return { loadCustomerGroups: async () => new CustomerGroups([]) };
+});
 vi.mock('@ebda/database', async importOriginal => {
   const actual = await importOriginal<typeof import('@ebda/database')>();
   return {
@@ -43,6 +47,9 @@ vi.mock('@api/lib/repo-factory', () => ({
     order: { findMany: h.orderFindMany },
     smsMarketingConsent: { findMany: vi.fn().mockResolvedValue([]) },
     store: { findUnique: vi.fn() },
+    // spend is netted of refunds already given (REVENUE-DEF-1, lib/order-refunds.ts): none in these fixtures
+    return: { groupBy: vi.fn().mockResolvedValue([]) },
+    payment: { groupBy: vi.fn().mockResolvedValue([]) },
   }),
   storeRepo: async () => ({ backend: 'pg' }),
 }));

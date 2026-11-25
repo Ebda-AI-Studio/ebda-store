@@ -93,6 +93,24 @@ async function patchGuide(
   });
 }
 
+/**
+ * Launch-chip goal ("first 5 orders paid or delivered", Ahmad 2026-11-23): an order counts when its payment is `paid`, OR it is a
+ * cash-on-delivery order that was delivered (the courier collected the cash even if the merchant has not marked it paid yet).
+ * Cancelled / refunded orders never count, and neither does a fully refunded payment.
+ */
+// pq-allow(unused-export): the clause is unit-tested directly (tests/unit/setup-guide-write.test.ts)
+export function paidOrDeliveredCodWhere(storeId: string) {
+  return {
+    storeId,
+    status: { notIn: ['cancelled', 'refunded'] as ('cancelled' | 'refunded')[] },
+    paymentStatus: { not: 'refunded' as const },
+    OR: [
+      { paymentStatus: 'paid' as const },
+      { status: 'delivered' as const, payments: { some: { provider: 'cod' } } },
+    ],
+  };
+}
+
 export class SetupGuideService {
   static async get(storeId: string): Promise<SetupGuideState> {
     const store = await storeDb(storeId).then(db =>
@@ -105,11 +123,12 @@ export class SetupGuideService {
 
     // the catalogue, zones, orders and gateways live in the store's backend (Durable Object or Postgres)
     const db = await storeDb(storeId);
-    const [products, zones, areaRates, orders, otherMethods] = await Promise.all([
+    const [products, zones, areaRates, orders, paidOrders, otherMethods] = await Promise.all([
       db.product.count({ where: { storeId, deletedAt: null } }),
       db.shippingZone.count({ where: { storeId, isActive: true } }),
       db.shippingAreaRate.count({ where: { storeId, isActive: true } }),
       db.order.count({ where: { storeId } }),
+      db.order.count({ where: paidOrDeliveredCodWhere(storeId) }),
       db.paymentConfig.count({ where: { storeId, isEnabled: true, provider: { not: 'cod' } } }),
     ]);
 
@@ -150,6 +169,7 @@ export class SetupGuideService {
       requiredDone: required.filter(i => i.done).length,
       requiredTotal: required.length,
       dismissed: stored.dismissed === true,
+      paidOrders,
     };
   }
 

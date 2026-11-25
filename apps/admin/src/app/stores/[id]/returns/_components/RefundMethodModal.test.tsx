@@ -52,10 +52,11 @@ const GATEWAY_OK: Gateway = {
   unavailableReason: null,
 };
 
-function renderModal(onConfirm = vi.fn()) {
+function renderModal(onConfirm = vi.fn(), guestReturn = false) {
   render(
     <RefundMethodModal
       open
+      guestReturn={guestReturn}
       storeId="store-1"
       returnId="ret-1"
       onConfirm={onConfirm}
@@ -308,5 +309,20 @@ describe('RefundMethodModal: tier adjustment (B2B Task 8b)', () => {
     expect(onConfirm).toHaveBeenCalledWith('bank_transfer', {
       'ri-1': { amountMinor: 710000, reason: 'goodwill' },
     });
+  });
+
+  it('a guest return: store credit is disabled with the reason, the other methods stay open', async () => {
+    previewWith(GATEWAY_OK);
+    renderModal(vi.fn(), true);
+    await waitFor(() => expect(radio('original')?.disabled).toBe(false));
+    expect(radio('store_credit')?.disabled).toBe(true);
+    expect(screen.getByText('storeCreditNeedsAccount')).toBeTruthy();
+  });
+
+  it('an account return keeps store credit selectable', async () => {
+    previewWith(GATEWAY_OK);
+    renderModal();
+    await waitFor(() => expect(radio('store_credit')?.disabled).toBe(false));
+    expect(screen.queryByText('storeCreditNeedsAccount')).toBeNull();
   });
 });

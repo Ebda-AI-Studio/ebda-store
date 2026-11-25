@@ -18,7 +18,7 @@ This project runs two complementary gates:
 
 **Test gate scope (local):** lint + 3x typecheck + 497 unit tests (~4s)
 
-To run the full gate manually: `bash scripts/safe-deploy.sh`
+To run the full gate manually: `npm run lint`, then `npm run typecheck` and `npm run test:unit` (scripts/safe-deploy.sh was removed in NEON-ZERO: it targeted the retired Railway deploy).
 
 **AI-output eval harness** (branch `feat/ai-output-eval-harness`, not yet merged to `main` as of this writing — currently in CI): `apps/api/src/lib/ai/eval/` adds a QA layer across all 21 distinct AI generator output types (product FAQs/excerpts/alt-text/category+tag suggestions, translation, SEO meta, section copy, description balancing, AEO/GEO content, product recommendations, review tools). Deterministic checks (`tests/unit/ai-eval-*.test.ts` — schema validity, bilingual field presence, length bounds, script correctness, near-duplication, numeric-spec-invention guard) run on every push as part of the normal unit-test job. A separate model-as-judge layer (`.github/workflows/ai-eval-nightly.yml`, real Gemini calls scoring grounding/relevance/duplication/tone) runs nightly at 2:30am UTC (or on-demand via `workflow_dispatch`) — deliberately kept off the per-push gate since it costs Gemini quota and is non-deterministic. Internal QA tooling, not merchant-facing.
 

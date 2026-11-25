@@ -58,6 +58,36 @@ interface ProductForJsonLd {
     ratingValue: number;
     reviewCount: number;
   };
+  /** The public 3D model (the API already drops it when `product_3d` is off for the store). */
+  model3d?: { modelUrl?: string | null; usdzUrl?: string | null } | null;
+}
+
+/**
+ * schema.org `3DModel` nodes for a product's models: the GLB always, the USDZ only when the
+ * merchant uploaded one. Empty when there is no model URL (never a node without `contentUrl`).
+ */
+function model3dJsonLd(
+  model: ProductForJsonLd['model3d'],
+  name: string
+): Array<Record<string, string>> {
+  if (!model?.modelUrl) return [];
+  const nodes = [
+    {
+      '@type': '3DModel',
+      name,
+      encodingFormat: 'model/gltf-binary',
+      contentUrl: model.modelUrl,
+    },
+  ];
+  if (model.usdzUrl) {
+    nodes.push({
+      '@type': '3DModel',
+      name,
+      encodingFormat: 'model/vnd.usdz+zip',
+      contentUrl: model.usdzUrl,
+    });
+  }
+  return nodes;
 }
 
 /**
@@ -244,6 +274,14 @@ export function productJsonLd(
         return sd ? { shippingDetails: sd } : {};
       })(),
     },
+    // 3D model (Phase 2): `subjectOf` a 3DModel, only when the product has one.
+    ...(() => {
+      const models = model3dJsonLd(
+        product.model3d,
+        `${localizedField(product.name, product.nameAr, locale)} (3D)`
+      );
+      return models.length ? { subjectOf: models.length === 1 ? models[0] : models } : {};
+    })(),
     // Emit aggregateRating only when there are real verified reviews.
     ...(product.aggregateRating && product.aggregateRating.reviewCount > 0
       ? { aggregateRating: aggregateRatingJsonLd(product.aggregateRating) }

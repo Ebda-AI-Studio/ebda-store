@@ -20,6 +20,7 @@ import { GeminiFailoverClient } from './gemini-keys';
 import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
 import { recordUsage } from '../../services/ai.service';
+import { assertAiQuota } from '../ai-quota';
 import { EGYPTIAN_ARABIC_REGISTER } from './arabic-register';
 
 export type MetaAeoKind = 'store' | 'product' | 'category';
@@ -84,6 +85,8 @@ export interface GenerateProductMetaAeoInput {
     name: string;
     description?: string | null;
   };
+  /** A background sweep: budgeted against the bulk ceiling (keeps the interactive reserve). */
+  bulk?: boolean;
 }
 
 /**
@@ -105,6 +108,8 @@ export async function generateProductMetaAeo(
   apiKey: string,
   modelName: string
 ): Promise<GeneratedMetaAeo> {
+  // The budget lives HERE, not in the callers (#838): POST /ai/product-meta-aeo reached Gemini with no quota check.
+  await assertAiQuota({ storeId: input.storeId, bulk: input.bulk === true });
   const genai = new GeminiFailoverClient(apiKey);
   const model = genai.getGenerativeModel({
     model: modelName,

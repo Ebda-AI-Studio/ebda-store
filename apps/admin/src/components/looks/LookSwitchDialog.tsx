@@ -66,7 +66,7 @@ export function LookSwitchDialog({ lookName, saving, onCancel, onConfirm }: Look
         aria-labelledby={`${uid}-title`}
         aria-describedby={`${uid}-desc`}
         onKeyDown={onKeyDown}
-        className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl"
+        className="w-full max-w-md rounded-md bg-card p-6 shadow-xl"
       >
         <h2 id={`${uid}-title`} className="mb-2 text-lg font-semibold text-foreground">
           {t('title', { lookName })}
