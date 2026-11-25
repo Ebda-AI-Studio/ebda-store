@@ -9,7 +9,7 @@ import { PageState } from '@/components/PageState';
 import { useT } from '@/i18n/useT';
 import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
-import { minorToMajor } from '@/lib/format';
+import { minorToMajor, formatPrice } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,13 +29,13 @@ interface SegmentsData {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const SEGMENT_COLORS: Record<string, string> = {
-  vip: 'bg-purple-100 text-purple-900 border-purple-200',
-  loyal: 'bg-blue-100 text-blue-900 border-blue-200',
-  potential: 'bg-cyan-100 text-cyan-900 border-cyan-200',
-  new_customer: 'bg-green-100 text-green-900 border-green-200',
+  vip: 'bg-primary/10 text-primary-ink border-primary/30',
+  loyal: 'bg-info/10 text-info-ink border-info/30',
+  potential: 'bg-info/10 text-info-ink border-info/30',
+  new_customer: 'bg-success/10 text-success-ink border-success/30',
   at_risk: 'bg-warning/10 text-warning-ink border-warning/30',
-  hibernating: 'bg-yellow-100 text-yellow-900 border-yellow-200',
-  lost: 'bg-red-100 text-red-900 border-red-200',
+  hibernating: 'bg-warning/10 text-warning-ink border-warning/30',
+  lost: 'bg-destructive/10 text-destructive-ink border-destructive/30',
 };
 
 const SEGMENT_ICONS: Record<string, string> = {
@@ -104,7 +104,7 @@ export default function InsightsSegmentsPage() {
       <div className="max-w-5xl space-y-6">
         {/* AI narration callout */}
         {narration && (
-          <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm italic text-muted-foreground">
+          <div className="rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-sm italic text-muted-foreground">
             <span className="not-italic font-semibold text-primary">{t('aiLabel')}</span>{' '}
             {narration}
           </div>
@@ -113,17 +113,17 @@ export default function InsightsSegmentsPage() {
         {/* Summary */}
         {totalCustomers > 0 && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-border p-4 space-y-1">
+            <div className="rounded-md border border-border p-4 space-y-1">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">
                 {t('totalSegmentedCustomers')}
               </p>
               <p className="text-2xl font-semibold font-mono">{totalCustomers}</p>
             </div>
-            <div className="rounded-xl border border-border p-4 space-y-1">
+            <div className="rounded-md border border-border p-4 space-y-1">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">
                 {t('totalMonetaryValue')}
               </p>
-              <p className="text-2xl font-semibold font-mono text-green-700">
+              <p className="text-2xl font-semibold font-mono text-success-ink">
                 {minorToMajor(totalRevenue)}
               </p>
               <p className="text-xs text-muted-foreground">{tc('egp')}</p>
@@ -132,7 +132,7 @@ export default function InsightsSegmentsPage() {
         )}
 
         {sorted.length === 0 ? (
-          <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
+          <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
             {t('noSegmentData')}
           </div>
         ) : (
@@ -158,7 +158,7 @@ export default function InsightsSegmentsPage() {
                   key={seg.segment}
                   href={`/stores/${storeId}/customers?segment=${encodeURIComponent(seg.segment)}`}
                   aria-label={t('viewSegmentCustomers', { segment: t(`segment.${seg.segment}`) })}
-                  className={`block rounded-xl border p-4 space-y-3 transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${colorClass}`}
+                  className={`block rounded-md border p-4 space-y-3 transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${colorClass}`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-bold">{icon}</span>
@@ -183,7 +183,7 @@ export default function InsightsSegmentsPage() {
                     <div>
                       <p className="text-xs opacity-70">{t('revenue')}</p>
                       <p className="font-mono font-semibold">
-                        {minorToMajor(seg.totalMonetaryFils)} {tc('egp')}
+                        {formatPrice(seg.totalMonetaryFils)}
                       </p>
                       <p className="text-xs opacity-60">
                         {t('shareOfTotal', { pct: revSharePct })}

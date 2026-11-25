@@ -75,6 +75,7 @@ vi.mock('@ebda/database', () => ({
 
 vi.mock('@api/middleware/require-mfa', () => ({
   requireMfaEnrolled: (_q: any, _s: any, n: any) => n(),
+  requireRecentLogin: (_q: any, _s: any, n: any) => n(),
 }));
 vi.mock('@api/middleware/auth', () => ({
   rejectImpersonated: (_q: any, _s: any, n: any) => n(),

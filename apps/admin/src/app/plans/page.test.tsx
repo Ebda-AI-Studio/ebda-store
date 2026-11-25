@@ -26,8 +26,21 @@ vi.mock('@ebda/ui', () => ({
   Input: ({ label, ...p }: { label?: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
     <input aria-label={label} {...p} />
   ),
-  Modal: ({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) =>
-    isOpen ? <div role="dialog">{children}</div> : null,
+  Modal: ({
+    isOpen,
+    title,
+    children,
+  }: {
+    isOpen: boolean;
+    title?: string;
+    children: React.ReactNode;
+  }) =>
+    isOpen ? (
+      <div role="dialog">
+        <h2>{title}</h2>
+        {children}
+      </div>
+    ) : null,
   ModalBody: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ModalFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   useToast: () => ({ success: vi.fn(), error: vi.fn() }),
@@ -147,6 +160,20 @@ describe('super-admin plans page', () => {
     expect(body.limits.codPlatformFeeBps).toBe(0);
     expect(body.priceMonthlyMinor).toBe(29900);
     expect(body.priceYearlyMinor).toBeNull();
+  });
+
+  it('titles the edit dialog with the plan name, not its slug', async () => {
+    await openFree();
+    const title = screen.getByRole('heading', { level: 2 }).textContent ?? '';
+    expect(title).toContain('"name"');
+    expect(title).not.toContain('"free"');
+  });
+
+  it('keeps the % unit and the input in one direction wrapper (RTL overlap)', async () => {
+    await openFree();
+    const fee = screen.getByLabelText('limits.platformFeeBps');
+    expect(fee.getAttribute('dir')).toBeNull();
+    expect(fee.parentElement?.getAttribute('dir')).toBe('ltr');
   });
 
   it('keeps save disabled for an invalid fee', async () => {

@@ -32,6 +32,7 @@
  * models. The types `StoreReads`/`StoreWrites` offer only what prisma-lite answers on the DO, and the DO re-checks the
  * allow-list, so a service that compiles against them cannot reach a money path on either backend.
  */
+import { invalidateStoreRevenueCaches, moneyOpMayChangeRevenue } from './revenue-cache';
 import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextFunction, Request, Response } from 'express';
@@ -922,13 +923,17 @@ export interface MoneyClient {
   analyticsPeriod(a: { startMs: number; endMs: number; nonRevenue: string[] }): Promise<{
     revenue: number;
     orders: number;
-    customers: number;
     profit: number | null;
     costedLines: number;
     missingLines: number;
     missingRevenue: number;
   }>;
   /** The ONE revenue definition's net total + order count (see packages/repo/src/revenue.ts); optional window, optional paid-only. */
+  /** STORE-QA-76: remaining refundable + per-line remaining quantity (+ an estimate for `items`) for the admin dialogs. A read. */
+  analyticsRefundQuote(a: {
+    orderId: string;
+    items?: Array<{ orderItemId: string; quantity: number }>;
+  }): Promise<import('@ebda-src/repo').OrderRefundQuote>;
   analyticsNetRevenue(a: {
     startMs?: number;
     endMs?: number;
@@ -971,8 +976,12 @@ export interface MoneyClient {
     returningCustomers: number;
     top: Array<{ customerId: string | null; total: number; count: number }>;
   }>;
-  /** Paid orders since `sinceMs` grouped by the dashboard buyer key (insights repeat-purchase rate). */
-  analyticsRepeatBuyers(a: { sinceMs: number }): Promise<{ repeat: number; buyers: number }>;
+  /** Buyer identity rows (customer id, email, phone, order count) for the grouping-aware customer counts (QA98-ALIAS-1). */
+  analyticsBuyerIdentities(
+    a: { mode: 'all'; startMs: number; endMs: number } | { mode: 'paid'; sinceMs: number }
+  ): Promise<
+    Array<{ customerId: string | null; email: string | null; phone: string | null; n: number }>
+  >;
   analyticsStock(a: Record<string, never>): Promise<{
     stockValue: number;
     backorderCount: number;
@@ -1208,7 +1217,10 @@ export interface MoneyClient {
   returnCreate(
     a: {
       orderId: string;
-      customerId: string;
+      /** required for a shopper-opened account return; a merchant-opened one (`byMerchant`) uses the order's own customer, a `guest` one the order's marker */
+      customerId?: string;
+      /** a shopper-opened return on a GUEST order (Ruling GUEST-RETURN-MARKER-1): never a null customerId */
+      guest?: boolean;
       type: string;
       reason: string;
       reasonDetail?: string;
@@ -1220,8 +1232,12 @@ export interface MoneyClient {
         quantity: number;
         reason?: string;
         condition?: string;
+        /** merchant-opened only: false = the goods are not restocked */
+        restock?: boolean;
       }>;
       bundleGroupIds?: string[];
+      /** STORE-QA-76: opened by the merchant from the admin (see `ReturnCreateArgs.byMerchant`) */
+      byMerchant?: boolean;
     },
     key?: string
   ): Promise<{ returnId: string }>;
@@ -1461,9 +1477,33 @@ type RequestLike = Pick<Request, 'headers'>;
 interface Scope {
   req: RequestLike;
   repos: Map<string, Promise<StoreRepo>>;
+  /** Per-request memo of the entitlement plan (see `requestPlanMemo`). */
+  plans?: Map<string, Promise<unknown>>;
 }
 const scopes = new AsyncLocalStorage<Scope>();
 const NO_REQUEST: RequestLike = { headers: {} };
+
+/**
+ * Memoise `fn` for the life of ONE request (Ruling BIZ-ALL-5): the entitlement plan is read from D1 at most once per request and
+ * store, however many gates and quota checks ask. Outside a request (job, cron, test) nothing is memoised. A plan write in the same
+ * request drops the entry (`forgetRequestPlan`, called by every entitlement write), so a request never reads its own stale plan.
+ */
+export function requestPlanMemo<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+  const scope = scopes.getStore();
+  if (!scope) return fn();
+  const plans = (scope.plans ??= new Map());
+  let hit = plans.get(storeId) as Promise<T> | undefined;
+  if (!hit) {
+    hit = fn();
+    plans.set(storeId, hit);
+    hit.catch(() => plans.delete(storeId));
+  }
+  return hit;
+}
+
+function forgetRequestPlan(storeId: string): void {
+  scopes.getStore()?.plans?.delete(storeId);
+}
 
 /** The StoreDO stub's read entry point (lib/store-backend.ts types the rest of the stub). */
 interface QueryStub {
@@ -1626,12 +1666,13 @@ export function makeMoneyClient(
     analyticsImportFinish: a => call('analyticsImportFinish', a),
     analyticsPeriod: a => call('analyticsPeriod', a),
     analyticsNetRevenue: a => call('analyticsNetRevenue', a),
+    analyticsRefundQuote: a => call('analyticsRefundQuote', a),
     analyticsNetRevenueDays: a => call('analyticsNetRevenueDays', a),
     analyticsSales: a => call('analyticsSales', a),
     analyticsItems: a => call('analyticsItems', a),
     analyticsOrdersBy: a => call('analyticsOrdersBy', a),
     analyticsCustomers: a => call('analyticsCustomers', a),
-    analyticsRepeatBuyers: a => call('analyticsRepeatBuyers', a),
+    analyticsBuyerIdentities: a => call('analyticsBuyerIdentities', a),
     analyticsLowStock: a => call('analyticsLowStock', a),
     analyticsStock: a => call('analyticsStock', a),
     analyticsCashflow: a => call('analyticsCashflow', a),
@@ -1869,11 +1910,16 @@ async function doClients(storeId: string): Promise<{
   const call = async (op: string, args: unknown, key?: string) => {
     const r = await stub.stockOp(storeId, op, encodeRpc(args), key);
     if (!r.ok) throw new AppError(r.status, r.code, r.message);
+    // a courier statement import can mark COD orders paid (S3-O7): the revenue caches must not keep the old figures (STORE-QA-74)
+    if (op === 'importCodRemittances') await invalidateStoreRevenueCaches(storeId);
     return decodeRpc<any>(r.json);
   };
   const callMoney = async (op: string, args: unknown, key?: string) => {
     const r = await stub.moneyOp(storeId, op, encodeRpc(args), key);
     if (!r.ok) throw new AppError(r.status, r.code, r.message, r.meta);
+    // STORE-QA-74: every committed order / payment / refund / return / status write drops the cached revenue figures BEFORE the
+    // caller answers, so the next read (finance Net sales, analytics, customers spend) sees it.
+    if (moneyOpMayChangeRevenue(op)) await invalidateStoreRevenueCaches(storeId);
     const out = decodeRpc<unknown>(r.json);
     const alerts = (out as { moneyAlerts?: unknown } | null)?.moneyAlerts;
     if (Array.isArray(alerts) && alerts.length > 0)
@@ -2214,6 +2260,7 @@ export async function storeUpdateOnDo(
         `Store.${k}: update operators and relation writes are not served by the DO`
       );
   }
+  if (touchesEntitlement(data)) forgetRequestPlan(storeId);
   await mirrorEntitlementToPg(storeId, data); // NZ-D21: Postgres sources the entitlement copy-back
   // the ONE D1 Store writer (NZ-D20); no row matched = unknown store: fail closed, never a blind DO write
   if ((await d1StoreWrite({ id: storeId }, d1StorePatch(data))) === 0)
@@ -2340,6 +2387,7 @@ async function applyPostCommit(storeId: string, patch: Record<string, unknown>):
     Object.entries(patch).filter(([k]) => !(ENTITLEMENT_FIELDS as readonly string[]).includes(k))
   );
   if (touchesEntitlement(patch)) {
+    forgetRequestPlan(storeId);
     try {
       await syncStoreEntitlement(storeId);
     } catch (err) {
