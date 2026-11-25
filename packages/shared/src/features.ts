@@ -113,6 +113,23 @@ export const FEATURE_KEYS_ARRAY = [
 
 export type FeatureKey = (typeof FEATURE_KEYS_ARRAY)[number];
 
+/**
+ * The features a lower plan can buy on their own as a paid monthly add-on (Ruling AI-ADDON-1). The API's add-on catalog
+ * (`apps/api/src/services/billing/addon-catalog.ts`) sells exactly these; `tests/unit/addon-feature-keys-match-catalog.test.ts`
+ * fails when the two drift. Admin reads this list to decide whether "Add just this feature" has anywhere to go.
+ */
+export const ADDON_FEATURE_KEYS = [
+  'floating_widget',
+  'customer_wallet_checkout',
+  'loyalty',
+  'upsell_crosssell',
+  'push_notifications',
+  'affiliate',
+] as const satisfies readonly FeatureKey[];
+
+export const isAddonFeature = (key: string): boolean =>
+  (ADDON_FEATURE_KEYS as readonly string[]).includes(key);
+
 export type FeatureCategory = 'commerce' | 'marketing' | 'operations' | 'storefront' | 'engagement';
 
 /**

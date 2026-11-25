@@ -28,8 +28,10 @@ vi.mock('@api/lib/store-ai-switch', () => ({
   assertStoreAiEnabled: async () => undefined,
   requireAiEnabled: (_q: unknown, _s: unknown, next: () => void) => next(),
 }));
+vi.mock('@api/services/billing/addon-grant', () => ({ activeAddons: async () => [] }));
 vi.mock('@ebda/database', () => ({
   prisma: { aiUsage: { count: h.ambientCount } },
+  withStore: async (_id: string, fn: (t: unknown) => unknown) => fn({}),
 }));
 // The two platform counts go through the SECURITY DEFINER `ebda_ai_usage_count` (a single
 // aggregate across stores); `bypassCount` stands for it.

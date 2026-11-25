@@ -220,7 +220,7 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
                   </Link>
                 )}
 
-                {planLabel && (
+                {planLabel && addLink && (
                   /* buy just this one feature without changing plan (flow lives in the add-ons stack) */
                   <Link href={addLink} className="flex-1" data-testid="feature-add-link">
                     <Button type="button" variant="outline" className="w-full">

@@ -21,7 +21,10 @@ vi.mock('../../apps/api/src/lib/ai/gemini-keys', () => ({
     }
   },
 }));
-vi.mock('../../apps/api/src/lib/ai-quota', () => ({ assertAiQuota: vi.fn() }));
+vi.mock('../../apps/api/src/lib/ai-quota', () => ({
+  assertAiQuota: vi.fn(),
+  storeAiCapFactor: async () => 1,
+}));
 vi.mock('../../apps/api/src/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));

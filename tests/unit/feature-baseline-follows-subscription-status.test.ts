@@ -23,6 +23,7 @@ vi.mock('@ebda/database', () => ({
     fn({
       store: { findUnique: async () => ({ plan: h.storePlan }) },
       storeFeature: { findMany: async () => [] },
+      billingEvent: { findMany: async () => [] }, // no running add-on (activeAddons)
       storeSubscription: { findUnique: async () => h.sub },
       // no plans row: the seed for the effective code decides (same as a fresh D1)
       plan: { findUnique: async () => null },
