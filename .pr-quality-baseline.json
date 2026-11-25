@@ -2096,7 +2096,6 @@
     "unused-export|apps/web/src/hooks/useWallet.ts|WalletSummary",
     "unused-export|apps/web/src/lib/accepted-payment-badges.ts|PaymentBadge",
     "unused-export|apps/web/src/lib/accepted-payment-badges.ts|PaymentMethodEntry",
-    "unused-export|apps/web/src/lib/agent-store-resolver.ts|AgentStore",
     "unused-export|apps/web/src/lib/api.ts|CartBundleItem",
     "unused-export|apps/web/src/lib/api.ts|PROFILE_MOUNT_RETRY_DELAYS_MS",
     "unused-export|apps/web/src/lib/api.ts|endpointMayRefresh",

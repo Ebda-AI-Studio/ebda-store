@@ -6,6 +6,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -142,16 +143,6 @@ describe('pre-push slop guard (same check as CI "Slop baselines")', () => {
     expect(r.stderr).toContain('apps/x/src/testOnly.ts');
   });
 
-  it('the BASE export carries the vendored-folder proof (foundation.lock.json + its parity test), or the foundation exemption is OFF on every push', () => {
-    // Without them in the base tree the guard reports "the base branch has no foundation.lock.json to trust" and every vendored export reads as a NEW violation.
-    const src = readFileSync(SCRIPT, 'utf8');
-    const baseExport = src.split('\n').find(l => l.startsWith('export_ref "$BASE_REF"')) ?? '';
-    expect(baseExport).toContain('foundation.lock.json');
-    expect(baseExport).toContain('tests/unit/foundation-parity.test.ts');
-    const headExport = src.split('\n').find(l => l.startsWith('export_ref "$HEAD_REF"')) ?? '';
-    expect(headExport).toContain('foundation.lock.json');
-  });
-
   it('does not move HEAD or write refs/pr/head in the repo named by an inherited GIT_DIR (a pre-push hook exports it)', () => {
     const before = git('for-each-ref').trim() + git('symbolic-ref', 'HEAD').trim();
     spawnSync('bash', [SCRIPT, 'origin/main', 'HEAD'], {
@@ -179,5 +170,105 @@ describe('pre-push slop guard (same check as CI "Slop baselines")', () => {
     const gate = readFileSync(path.join(REPO, 'scripts/ci/pre-push-extra.sh'), 'utf8');
     expect(gate).toContain('bash scripts/ci/pre-push-slop.sh origin/main HEAD');
     expect(gate.indexOf('pre-push-slop.sh')).toBeLessThan(gate.indexOf('Cheap related tests'));
+  });
+});
+
+describe('pre-push slop guard and the vendored-foundation exemption (SLOP-VENDORED-1)', () => {
+  const DIRV = 'packages/shared/src/foundation';
+  const PARITY = 'tests/unit/foundation-parity.test.ts';
+  const sha = (t: string) => createHash('sha256').update(t).digest('hex');
+  let v: string;
+  const vgit = (...a: string[]) =>
+    execFileSync('git', a, {
+      cwd: v,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GIT_DIR: undefined,
+        GIT_WORK_TREE: undefined,
+        GIT_AUTHOR_NAME: 't',
+        GIT_AUTHOR_EMAIL: 't@t',
+        GIT_COMMITTER_NAME: 't',
+        GIT_COMMITTER_EMAIL: 't@t',
+      },
+    });
+  const vwrite = (rel: string, body: string) => {
+    mkdirSync(path.dirname(path.join(v, rel)), { recursive: true });
+    writeFileSync(path.join(v, rel), body);
+  };
+  const vcommit = (m: string) => {
+    vgit('add', '-A');
+    vgit('commit', '-q', '-m', m);
+  };
+  const vrun = () =>
+    spawnSync('bash', [SCRIPT, 'origin/main', 'HEAD'], {
+      cwd: v,
+      encoding: 'utf8',
+      env: { ...process.env, GIT_DIR: undefined, GIT_WORK_TREE: undefined },
+    });
+  const lockFor = (files: Record<string, string>, extra = {}) =>
+    JSON.stringify({
+      tag: 'v1.0.0',
+      commit: 'a'.repeat(40),
+      dir: DIRV,
+      parity: PARITY,
+      files: Object.fromEntries(Object.entries(files).map(([k, t]) => [k, sha(t)])),
+      ...extra,
+    });
+
+  beforeAll(() => {
+    v = mkdtempSync(path.join(tmpdir(), 'slop-prepush-vend-'));
+    vgit('init', '-q', '-b', 'main');
+    mkdirSync(path.join(v, '.github/pr-quality'), { recursive: true });
+    for (const f of ['slop-guard.mjs', 'merge-base-tree.sh'])
+      copyFileSync(path.join(REPO, '.github/pr-quality', f), path.join(v, '.github/pr-quality', f));
+    vwrite(
+      '.pr-quality.json',
+      JSON.stringify({
+        roots: ['apps', 'packages'],
+        baseline: '.pr-quality-baseline.json',
+        ruleExemptions: [
+          {
+            rule: 'unused-export',
+            path: DIRV,
+            reason: 'vendored foundation, byte-pinned by foundation.lock.json and the parity test',
+            requires: PARITY,
+          },
+        ],
+      })
+    );
+    vwrite('.pr-quality-baseline.json', JSON.stringify({ ids: [] }));
+    const vendored = {
+      [`${DIRV}/api.ts`]: 'export const VENDORED_UNUSED = 1;\n',
+      [PARITY]: '// parity\n',
+    };
+    for (const [k, t] of Object.entries(vendored)) vwrite(k, t);
+    vwrite('foundation.lock.json', lockFor(vendored));
+    vwrite('apps/x/src/a.ts', 'export const used = 1;\n');
+    vwrite('apps/x/src/index.ts', "import { used } from './a';\nconsole.warn(used);\n");
+    vcommit('base');
+    vgit('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    vgit('checkout', '-q', '-b', 'feature');
+  });
+  afterAll(() => rmSync(v, { recursive: true, force: true }));
+
+  it('a push that leaves the lock alone keeps the vendored exemption (the base lock is part of the exported base)', () => {
+    vwrite('apps/x/src/b.ts', "import { used } from './a';\nconsole.warn(used);\n");
+    vcommit('a normal ts change');
+    const r = vrun();
+    expect(r.stderr).not.toContain('VENDORED_UNUSED');
+    expect(r.stderr).not.toMatch(/ruleExemptions entry is OFF/);
+    expect(r.status).toBe(0);
+  });
+
+  it('a push that edits the lock and a vendored file together gets no exemption and is blocked (cannot waive its own code)', () => {
+    const evil = 'export const SNEAKED_IN = 1;\n';
+    vwrite(`${DIRV}/api.ts`, evil);
+    vwrite('foundation.lock.json', lockFor({ [`${DIRV}/api.ts`]: evil, [PARITY]: '// parity\n' }));
+    vcommit('edit the vendored file and its lock');
+    const r = vrun();
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/ruleExemptions entry is OFF/);
+    expect(r.stderr).toContain('SNEAKED_IN');
   });
 });
