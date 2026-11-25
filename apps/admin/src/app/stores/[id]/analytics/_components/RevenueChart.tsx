@@ -102,7 +102,7 @@ export function RevenueChart({
   const hasSales = salesData.some(d => d.revenue > 0 || d.orders > 0);
 
   return (
-    <div className="bg-card rounded-xl border p-6 shadow-sm mb-8">
+    <div className="bg-card rounded-md border p-6 shadow-sm mb-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>

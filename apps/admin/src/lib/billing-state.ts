@@ -32,3 +32,17 @@ export function trialDaysLeft(
   if (!Number.isFinite(end) || end <= now) return null;
   return Math.ceil((end - now) / 86_400_000);
 }
+
+/**
+ * The "Renews on" / "Ends on" row. `currentPeriodEnd` is the period a subscription row was created with; it is only a
+ * renewal date once the plan is actually paid or trialing/comped. While payment is awaited (or the plan is none or
+ * canceled) it would promise a renewal that has not been bought (Amelia QA 2026-11-23: "renews 12 Nov 2027" on an unpaid
+ * plan). A scheduled cancel still shows its end date.
+ */
+export function showPeriodEnd(
+  displayStatus: SubscriptionStatus | 'awaiting_payment',
+  cancelAtPeriodEnd: boolean
+): boolean {
+  if (cancelAtPeriodEnd) return displayStatus === 'active' || displayStatus === 'past_due';
+  return displayStatus === 'active' || displayStatus === 'trialing' || displayStatus === 'comped';
+}

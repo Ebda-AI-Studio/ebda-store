@@ -159,8 +159,10 @@ describe('wrangler.jsonc and the Worker entry', () => {
     expect(main.max_retries).toBeGreaterThanOrEqual(3);
     expect(q.consumers.some((c: any) => c.queue === CI_EVENTS_DLQ)).toBe(true);
     expect(cfg.r2_buckets).toContainEqual({ binding: 'CI_BUCKET', bucket_name: 'ebda-ci' });
+    // CI_OUTCOMES stays commerce-only; REQUEST_BUDGET is the separate per-route counter dataset (NEON-ZERO 9.2).
     expect(cfg.analytics_engine_datasets).toEqual([
       { binding: 'CI_OUTCOMES', dataset: 'ebda_commerce_outcomes' },
+      { binding: 'REQUEST_BUDGET', dataset: 'ebda_request_budget' },
     ]);
   });
 

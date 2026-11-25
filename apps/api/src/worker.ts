@@ -64,7 +64,7 @@ import {
   sendNoticeMail,
   type StoreClaim,
 } from './lib/identity-directory';
-import { waBridge } from './lib/wa/bridge';
+import { waBridge, ownerTools } from './lib/wa/bridge';
 import { listStoreMembers, memberRole } from './lib/store-members';
 import { isPlatformOrigin } from './lib/cors-cache';
 import { config } from './config';
@@ -561,6 +561,24 @@ export class WhatsAppBridge extends WorkerEntrypoint<CfBindings> {
   }
   listCustomerOrders(storeId: string, buyerKey: string, limit: number, phoneE164?: string) {
     return this.bridge(b => b.listCustomerOrders(storeId, buyerKey, limit, phoneE164));
+  }
+  /** Owner assistant (Chat Smart Layer): best sellers for a period. Owner or active staff, authorised live by `asUserId`. */
+  getTopProducts(storeId: string, asUserId: string, req: unknown) {
+    return withWorkerContext(this.env, this.ctx as Ctx, () =>
+      ownerTools().getTopProducts(storeId, asUserId, req)
+    );
+  }
+  /** Owner assistant: order count, collected sales, refunds and average order value for a Cairo-day period (owner only, cached 60 s per store + period). */
+  getOrdersSummary(storeId: string, asUserId: string, req: unknown) {
+    return withWorkerContext(this.env, this.ctx as Ctx, () =>
+      ownerTools().getOrdersSummary(storeId, asUserId, req)
+    );
+  }
+  /** Owner assistant: create a percentage / fixed coupon. OWNER ONLY (live), replay-safe; Chat only calls it after the merchant's confirm press. */
+  createCoupon(storeId: string, asUserId: string, req: unknown) {
+    return withWorkerContext(this.env, this.ctx as Ctx, () =>
+      ownerTools().createCoupon(storeId, asUserId, req)
+    );
   }
   /** Revocation (v1.4): the live role of a user on a store, or null once removed. WhatsApp calls it on each staff request. */
   async memberRole(storeId: string, userId: string) {

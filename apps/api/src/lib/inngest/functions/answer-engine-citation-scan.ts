@@ -20,6 +20,7 @@
  *
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
+import { readStorePlan } from '../../store-plan';
 import type { JobDef } from '../../jobs/types';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { allStoresDirectory, withStoreDb } from '../../jobs/store-db';
@@ -168,7 +169,21 @@ const answerEngineCitationScanCronFn = inngest.createFunction(
     // resumes past the rows its crashed attempt already wrote (#910).
     const runStartedAt = new Date(await step.run('run-started-at', () => dbNowIso()));
 
-    const batches = chunk(stores, BULK_AI_BATCH_SIZE);
+    // Stores to visit: entitlement read in one batched prefetch per run (selection only). The per-store gate below stays a
+    // LIVE read, so a downgrade mid-run is still honoured before any paid action (entitlements are NEVER-stale).
+    const enabledIds = new Set(
+      await step.run('select-enabled-stores', () =>
+        featureService.selectEnabled(
+          stores.map(s => s.id),
+          'answer_engine_insights'
+        )
+      )
+    );
+
+    const batches = chunk(
+      stores.filter(s => enabledIds.has(s.id)),
+      BULK_AI_BATCH_SIZE
+    );
 
     let scannedStores = 0;
     let skippedStores = 0;
@@ -268,9 +283,7 @@ export const answerEngineScanOnDemand: JobDef = inngest.createFunction(
     // One step for both gates: on a Workflow only step bodies hold a database connection.
     const { enabled, store } = await step.run('gates', async () => ({
       enabled: await featureService.isFeatureEnabled(storeId, 'answer_engine_insights'),
-      store: await withStoreDb(storeId, db =>
-        db.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-      ),
+      store: await withStoreDb(storeId, db => readStorePlan(db as never, storeId)),
     }));
     if (!enabled) {
       logger.info(
