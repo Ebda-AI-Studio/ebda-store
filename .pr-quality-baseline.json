@@ -538,7 +538,6 @@
     "unused-export|apps/admin/src/lib/setting-highlight.ts|highlightElement",
     "unused-export|apps/admin/src/lib/setting-highlight.ts|revealAncestors",
     "unused-export|apps/admin/src/lib/settings-groups.ts|SettingsGroup",
-    "unused-export|apps/admin/src/lib/settings-groups.ts|SettingsGroupItem",
     "unused-export|apps/admin/src/lib/settings-index-build.ts|buildSearchIndex",
     "unused-export|apps/admin/src/lib/settings-index-build.ts|messageAt",
     "unused-export|apps/admin/src/lib/settings-registry.ts|PageEntry",
