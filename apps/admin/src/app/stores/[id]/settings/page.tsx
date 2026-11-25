@@ -13,6 +13,9 @@ import { apiGet, apiPatch } from '../../../../lib/api';
 import { SubscriptionPlanRow } from '../../../../components/billing/SubscriptionPlanRow';
 import { SettingsSearch } from '../../../../components/SettingsSearch';
 import { SETTINGS_GROUPS } from '../../../../lib/settings-groups';
+import { useAttention } from '../../../../hooks/useAttention';
+import { AttentionBadge } from '../../../../components/attention/AttentionBadge';
+import { NeedsAttentionList } from '../../../../components/attention/NeedsAttentionList';
 import { ConnectChatCard } from './ConnectChatCard';
 
 /**
@@ -115,6 +118,7 @@ export default function StoreSettingsPage() {
   const storeId = params?.id as string;
   const { isEnabled, isLoading } = useFeatures();
   const { user } = useAuth();
+  const { bySection, hasInfoBySection } = useAttention(storeId);
   const isSuperAdmin = user?.role === 'super_admin';
   const t = useT('settings');
   const tCards = useT('settings.cards');
@@ -526,6 +530,7 @@ export default function StoreSettingsPage() {
     <AdminLayout title={t('page.title')} subtitle={t('page.subtitle')}>
       <SettingsSearch />
       <div className="space-y-8">
+        <NeedsAttentionList storeId={storeId} />
         <ConnectChatCard storeId={storeId} />
         {isLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -562,9 +567,13 @@ export default function StoreSettingsPage() {
                     >
                       {card.icon}
                     </div>
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="flex items-center gap-2 font-semibold text-foreground group-hover:text-primary transition-colors">
                         {tCards(`${card.key}.title`)}
+                        <AttentionBadge
+                          count={bySection[card.href.split('/').pop() ?? ''] ?? 0}
+                          quiet={!!hasInfoBySection[card.href.split('/').pop() ?? '']}
+                        />
                       </h3>
                       <p className="mt-1 text-sm text-muted-foreground leading-snug">
                         {tCards(`${card.key}.description`)}

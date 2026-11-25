@@ -155,6 +155,13 @@ export interface BillingProvider {
     chargeId: string | null;
   }): Promise<ChargeResult | null>;
   refund(req: RefundRequest): Promise<RefundResult>;
+  /**
+   * What the gateway's own record says was taken BACK from a succeeded charge (refunds made outside Ebda, e.g. from
+   * the gateway dashboard, reversals, chargebacks). Read by the daily reversal reconcile (#837), because a gateway may
+   * not deliver every reversal as a webhook. Optional: a provider without it is skipped. Throws when the gateway
+   * cannot answer clearly (the reconcile then alerts and retries tomorrow; it never guesses "nothing happened").
+   */
+  listReversals?(req: { chargeId: string; merchantOrderId: string }): Promise<GatewayReversals>;
   verifyWebhook(rawBody: Buffer | string, headers: HeaderBag): BillingWebhookEvent;
   /** False when the credentials this provider needs are missing (its webhooks then answer 503). */
   isConfigured?(): boolean;
@@ -165,6 +172,13 @@ export interface BillingProvider {
    */
   confirmWebhookEvent?(event: BillingWebhookEvent): Promise<BillingWebhookConfirmation>;
   parseReturn(query: Record<string, unknown>): ParsedReturn;
+}
+
+export interface GatewayReversals {
+  /** Successful take-backs on the charge, each with the gateway's own transaction id. Amount null = not stated. */
+  reversals: Array<{ ref: string; operation: string; amountMinor: number | null }>;
+  /** Operations on the charge's record this code does not know: never ignored, they page a person. */
+  unknownOperations: string[];
 }
 
 export interface BillingWebhookConfirmation {

@@ -36,6 +36,8 @@ vi.mock('@ebda/database', () => ({
 }));
 vi.mock('@api/lib/platform-db', () => ({
   platformDb: async () => ({
+    // D1 `stores.plan` is the authoritative plan of a DO store (NZ-D20): readStorePlan reads it here
+    store: { findUnique: async () => ({ plan: 'free' }) },
     storeFeature: {
       findMany: async () => {
         calls.n.feature++;
@@ -66,6 +68,8 @@ vi.mock('@api/lib/repo-factory', () => ({
     };
   },
   storeUpdate: vi.fn(),
+  // readStorePlan reads a DO store's plan once per request through this memo (NZ-D20); no request scope here, so just run it
+  requestPlanMemo: (_id: string, fn: () => Promise<unknown>) => fn(),
 }));
 
 import { featureService } from '@api/services/feature.service';

@@ -1,5 +1,13 @@
 {
   "common": {
+    "dndA11y": {
+      "instructions": "To pick up an item, press the space bar. While dragging, use the arrow keys to move it. Press space again to drop it, or Escape to cancel.",
+      "pickedUp": "Picked up the item.",
+      "movedOver": "The item is over position {position}.",
+      "dropped": "Dropped the item at position {position}.",
+      "droppedBack": "Dropped the item. It is back where it was.",
+      "cancelled": "Cancelled. The item is back where it was."
+    },
     "save": "Save",
     "cancel": "Cancel",
     "storeNotOperational": "This store is suspended, so Ebda AI Studio has paused messages to customers and payouts. Contact support to get it reactivated.",
@@ -362,16 +370,19 @@
         },
         "salesLabel": "Sales",
         "vsPrevious": "vs the previous period",
+        "newBadge": "New",
         "deltaSr": {
           "up": "Up {percent}%",
           "down": "Down {percent}%",
-          "flat": "No change"
+          "flat": "No change",
+          "new": "New: no sales in the previous period"
         },
         "sentence": {
-          "up": "Up {percent}% on the previous period, from {orders} orders.",
-          "down": "Down {percent}% on the previous period, from {orders} orders.",
-          "flat": "Same as the previous period, from {orders} orders.",
-          "unknown": "From {orders} orders."
+          "up": "Up {percent}% on the previous period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "down": "Down {percent}% on the previous period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "new": "First sales in this period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "flat": "Same as the previous period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "unknown": "From {ordersN, plural, one {{orders} order} other {{orders} orders}}."
         },
         "sparkLabel": "Sales per day across this period, latest day highlighted",
         "emptyBody": "No sales in this period yet. Share your store link with your customers to get the first order.",
@@ -444,6 +455,7 @@
     "list": {
       "title": "Stores",
       "subtitleCount": "{count} stores on the platform",
+      "subtitleFiltered": "{count} stores ({status})",
       "createStore": "Create Store",
       "searchPlaceholder": "Search by name, slug, or owner…",
       "search": "Search",
@@ -618,7 +630,11 @@
         "draft": "Draft",
         "archived": "Archived",
         "allCategories": "All categories",
-        "categoryAriaLabel": "Filter products by category"
+        "categoryAriaLabel": "Filter products by category",
+        "model3dAriaLabel": "Filter products by 3D model",
+        "model3dAny": "Any 3D model",
+        "model3dWith": "With a 3D model",
+        "model3dWithout": "Without a 3D model"
       },
       "status": {
         "active": "Active",
@@ -2210,6 +2226,7 @@
       "totalCustomers": "Total Customers",
       "avgOrderValue": "Avg Order Value",
       "vsLastPeriod": "vs last period",
+      "newVsPrevious": "New",
       "profitUnknown": "Unknown",
       "profitMissingCost": "Profit unknown — cost price missing on {count} sold items",
       "profitPartial": "Excludes {count} sold items with no cost price ({amount} in sales)",
@@ -4178,11 +4195,11 @@
         "AI_STORE_BILLING_SUSPENDED": "Smart tools are paused until your subscription is paid. Pay from the Billing page to turn them back on.",
         "AI_RATE_LIMITED": "Busy right now. Try this file again in a minute.",
         "AI_NOT_CONFIGURED": "Smart tools are not available right now.",
-        "AI_UPSTREAM_ERROR": "Could not read this file. Try again.",
-        "AI_BAD_RESPONSE": "Could not read this file. Try again.",
-        "BAD_RESPONSE": "Could not read this file. Try again.",
-        "FILE_UNREADABLE": "This file could not be opened.",
-        "EXTRACTION_FAILED": "Could not read this file. Try again.",
+        "AI_UPSTREAM_ERROR": "The reading service is busy right now. Try again in a minute (no pages were counted).",
+        "AI_BAD_RESPONSE": "We could not understand this file's content. Try a clearer photo (no pages were counted).",
+        "BAD_RESPONSE": "We could not understand this file's content. Try a clearer photo (its pages were counted).",
+        "FILE_UNREADABLE": "This file itself could not be opened. It may be damaged or in an unsupported format: try another file.",
+        "EXTRACTION_FAILED": "Reading this file failed. Try again (no pages were counted).",
         "TOO_MANY_RETRIES": "This file was tried too many times. Upload it again.",
         "DRAFTS_FAILED": "Some drafts could not be created. Check the items and try again.",
         "NETWORK": "No connection. Try again.",
@@ -6374,7 +6391,8 @@
       "markAllRead": "Mark all read",
       "clear": "Clear",
       "empty": "No notifications yet",
-      "reconnecting": "Reconnecting to notification server…"
+      "reconnecting": "Reconnecting to notification server…",
+      "needsAttention": "Needs your attention"
     },
     "connectionStatus": {
       "testing": "Testing…",
@@ -8150,6 +8168,9 @@
     "seePlansCta": "See plans",
     "contactCta": "Talk to us",
     "requiresFeature": "Requires the “{feature}” feature.",
+    "availableOnOrBuyOne": "Available on the {plan} plan. Upgrade, or add just this feature.",
+    "addJustThisCta": "Add just this feature",
+    "businessOffBody": "“{feature}” is part of your {plan} plan, but it is switched off for this store right now. Contact us and we will turn it on.",
     "alsoIncluded": "Also included in this plan",
     "noSoldPlan": "This feature is not part of a plan you can buy. Our team switches it on for a single store, so get in touch if you need it.",
     "contactOnlyCta": "Talk to our team"
@@ -9247,9 +9268,6 @@
     "common": {
       "loading": "Loading…"
     },
-    "premiumSubtitle": "Extra feature",
-    "featureNotEnabledTitle": "Feature not enabled",
-    "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Ebda Store to request access.",
     "mainSubtitle": "Fixed buttons your customer sees on every page, like WhatsApp and call",
     "showWidgetLabel": "Show widget on storefront",
     "showWidgetHint": "When off, no widget renders even though the feature is enabled.",
@@ -9487,7 +9505,7 @@
     "loading": "Loading plans…",
     "loadError": "Failed to load plans.",
     "edit": "Edit",
-    "editTitle": "Edit plan {code}",
+    "editTitle": "Edit plan {name}",
     "public": "Public",
     "hidden": "Hidden",
     "unlimited": "Unlimited",
@@ -12593,6 +12611,16 @@
         "error": "I could not apply it. Nothing was changed, try again."
       }
     }
+  },
+  "attention": {
+    "title": "Needs your attention",
+    "subtitle": "Fix these so your store keeps selling.",
+    "info": "For your information",
+    "fix": "Fix now",
+    "view": "Open",
+    "badge": "{count, plural, =1 {{count, number, latn} thing needs your attention} other {{count, number, latn} things need your attention}}",
+    "infoDot": "Has a note for you",
+    "section": "Section needing attention"
   },
   "refundLines": {
     "legend": "Choose what is being refunded or returned",
