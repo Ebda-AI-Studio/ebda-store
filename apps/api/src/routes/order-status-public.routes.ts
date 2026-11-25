@@ -44,6 +44,8 @@ export function orderStatusPublicRouter(limiter = orderStatusLimiter()): Router 
           items: {
             select: { productName: true, variantName: true, variantNameAr: true, quantity: true },
           },
+          // G54: an InstaPay order still waiting for its transfer can be paid from this page (the link opens its flow)
+          payments: { where: { provider: 'instapay' }, select: { id: true }, take: 1 },
         },
       });
       if (!order) return void notFound();
@@ -63,6 +65,9 @@ export function orderStatusPublicRouter(limiter = orderStatusLimiter()): Router 
           createdAt: order.createdAt,
           locale: ar ? 'ar' : 'en',
           area: area ?? null,
+          /** G54: true while an InstaPay order waits for the shopper's transfer; the page then shows the upload. */
+          instapayPayable:
+            order.status === 'awaiting_payment_confirmation' && (order.payments?.length ?? 0) > 0,
           items: order.items.map(i => ({
             name: i.productName,
             variant: (ar ? i.variantNameAr : null) ?? i.variantName ?? null,
