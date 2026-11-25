@@ -630,7 +630,11 @@
         "draft": "Draft",
         "archived": "Archived",
         "allCategories": "All categories",
-        "categoryAriaLabel": "Filter products by category"
+        "categoryAriaLabel": "Filter products by category",
+        "model3dAriaLabel": "Filter products by 3D model",
+        "model3dAny": "Any 3D model",
+        "model3dWith": "With a 3D model",
+        "model3dWithout": "Without a 3D model"
       },
       "status": {
         "active": "Active",
