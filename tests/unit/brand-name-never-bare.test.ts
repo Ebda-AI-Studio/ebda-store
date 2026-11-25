@@ -62,9 +62,17 @@ const AR_CTX = [
   // fused to a one-letter preposition: لابدأ, بابدأ, كابدأ (never و/ف: وابدأ متجرك is the verb)
   new RegExp(`(?:^|[\\s«"'(])[لبك]ـ?${AR_BRAND}${AR_END}${AR_NEXT_OK}`),
   new RegExp(`"forceBrandPrefix": "${AR_BRAND}"`),
+  // «فريق إبدا» / «لفريق ابدأ»: "the X team" is always the brand, never the verb (PM1, live QA 2026-11-17)
+  new RegExp(`(?:^|[\\s«"'(])ل?فريق\\s+${AR_BRAND}${AR_END}${AR_NEXT_OK}`),
+  // «إبدا» (alef with hamza below, no final hamza) is a misspelling of the brand; the verb is always «ابدأ»
+  new RegExp(`(?:^|[^\\u0621-\\u064A])إبدا${AR_END}`),
 ];
 /** Arabic lines allowed to match (verbs the heuristic cannot tell apart). */
-const AR_ALLOW: RegExp[] = [/ابدأ\s+(?:بـ|بإنشاء|بمنتج|بالدفع|بالقراءة|من\s)/];
+const AR_ALLOW: RegExp[] = [
+  /ابدأ\s+(?:بـ|بإنشاء|بمنتج|بالدفع|بالقراءة|من\s)/,
+  // the foundation's own bare-brand regex source (vendored, hash-locked): a pattern, not copy
+  /export const BARE_AR = \/.*\//,
+];
 
 function* files(dir: string): Generator<string> {
   for (const name of readdirSync(dir)) {
@@ -138,6 +146,10 @@ describe('BRAND-NAME-1: the brand is never written alone', () => {
     expect(probe('Contact Ebda AI Studio')).toBe(false);
     expect(probe('مدعوم من ابدأ')).toBe(true);
     expect(probe('مدعوم من ابدأ ستور')).toBe(false);
+    expect(probe('لو فيه أي مشكلة فريق إبدا بيشوفها')).toBe(true);
+    expect(probe('كل اللي التجار بيبعتوه لفريق ابدأ: طلبات الدعم')).toBe(true);
+    expect(probe('فريق ابدأ ستور بيتابعها')).toBe(false);
+    expect(probe('وفريق إبدا اتبلغ.')).toBe(true);
     // pre-QA 2026-11-09 finding 5: «منتجات ابدأ» in the Acceptable Use Policy passed the scan
     expect(probe('عبر أي منتج من منتجات ابدأ، ومنها ابدأ ستور وابدأ شات')).toBe(true);
     expect(probe('عبر أي منتج من منتجات ابدأ ستوديو للذكاء الاصطناعي، ومنها ابدأ ستور')).toBe(

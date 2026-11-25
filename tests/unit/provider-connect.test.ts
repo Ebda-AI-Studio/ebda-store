@@ -76,15 +76,22 @@ describe('provider catalog', () => {
     expect([...GATEWAY_WEBHOOK_PROVIDERS].sort()).toEqual(gateways.map(g => g.code).sort());
   });
 
-  it('verified=true only with recorded sandbox evidence (PROVIDERS-2)', () => {
+  it('GW-VERIFIED-1: an API provider is verified only with an evidence reference (date AND run id/link)', () => {
     for (const p of PROVIDER_CATALOG.filter(e => !e.manual)) {
-      if (p.verified)
-        expect(p.verification.sandboxVerifiedAt, p.code).toMatch(/^\d{4}-\d{2}-\d{2}/);
+      if (!p.verified) continue;
+      const ev = p.verification.evidence;
+      expect(ev, `${p.code}: verified with no evidence`).not.toBeNull();
+      expect(ev!.runAt, p.code).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(
+        ev!.runRef.trim().length,
+        `${p.code}: evidence needs a run id or link`
+      ).toBeGreaterThan(3);
     }
-    // Kashier ran end to end against a real test account on 2026-10-08; nothing else has yet.
-    expect(PROVIDER_CATALOG.filter(p => !p.manual && p.verified).map(p => p.code)).toEqual([
-      'kashier',
-    ]);
+    // No API provider has a recorded full run yet (Kashier's 2026-10-08 claim had no record).
+    expect(PROVIDER_CATALOG.filter(p => !p.manual && p.verified).map(p => p.code)).toEqual([]);
+    // The verification shape carries no bare date field any more.
+    for (const p of PROVIDER_CATALOG)
+      expect(Object.keys(p.verification).sort(), p.code).toEqual(['evidence', 'note']);
   });
 
   it('every field is bilingual, binds to a real slot, and links only to official pages', () => {

@@ -175,8 +175,8 @@ describe('recordProviderOperation', () => {
     expect(h.alerts).toHaveLength(0);
   });
 
-  it('ignores catalog-verified (kashier), manual (cod) and unknown providers entirely', async () => {
-    for (const provider of ['kashier', 'cod', 'instapay', 'nope']) {
+  it('ignores manual (cod, instapay) and unknown providers entirely', async () => {
+    for (const provider of ['cod', 'instapay', 'nope']) {
       await recordProviderOperation(op({ provider }));
     }
     expect(h.alerts).toHaveLength(0);
@@ -191,7 +191,8 @@ describe('recordProviderOperation', () => {
 
 describe('isProviderVerified', () => {
   it('catalog-verified and manual are verified; unverified is not until confirmed', async () => {
-    expect(await isProviderVerified('kashier')).toBe(true);
+    // GW-VERIFIED-1: kashier is no longer catalog-verified (its run had no record)
+    expect(await isProviderVerified('kashier')).toBe(false);
     expect(await isProviderVerified('cod')).toBe(true);
     expect(await isProviderVerified('paymob')).toBe(false);
     resetProviderVerificationCache();
@@ -240,15 +241,12 @@ describe('confirmProviderVerification (super admin only sets verified_at)', () =
       code: 'NOT_READY',
     });
   });
-  it('refuses unknown, manual and catalog-verified providers', async () => {
+  it('refuses unknown and manual providers', async () => {
     await expect(confirmProviderVerification('nope', 'a')).rejects.toMatchObject({
       statusCode: 404,
     });
     await expect(confirmProviderVerification('cod', 'a')).rejects.toMatchObject({
       statusCode: 404,
-    });
-    await expect(confirmProviderVerification('kashier', 'a')).rejects.toMatchObject({
-      code: 'ALREADY_VERIFIED',
     });
   });
 });
@@ -266,8 +264,8 @@ describe('recordPaymentSettled (one evidence call for the confirm AND webhook pa
       ref: 'pay-7',
     });
   });
-  it('is a no-op for a catalog-verified provider', async () => {
-    await recordPaymentSettled({ storeId: 'store-7', provider: 'kashier', paymentId: 'p' });
+  it('is a no-op for a manual method', async () => {
+    await recordPaymentSettled({ storeId: 'store-7', provider: 'cod', paymentId: 'p' });
     expect(h.events).toHaveLength(0);
   });
 });
