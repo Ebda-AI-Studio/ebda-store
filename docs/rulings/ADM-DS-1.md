@@ -13,3 +13,10 @@ Cost if wrong: a tokens change touches every nav item at once, so a bad value sh
 visual script (scripts/visual/admin-button-styles.mjs) are the net, and rollback is reverting one file.
 
 Wave plan and the canonical scale: the audit's "Design system v1" section. Admin Button scale stays as ADM-BTN-1.
+
+Update 2026-11-11 (W2 token sync): the values no longer live in the admin. `apps/admin/src/components/ui/tokens.ts` maps the vendored foundation
+tokens (`@ebda/shared/design`, ebda-foundation design language v1) to Tailwind classes; `globals.css` imports the vendored `tokens.css` and derives
+`--radius` and the motion variables from it; the guard rules G1-G6 are the vendored `guards.ts`. `tests/unit/admin-design-tokens-sync.test.ts`
+fails when a class, an RTL leading or a variable stops equalling the foundation value, when a role colour turns orange, or when a second font
+family is loaded. Ruling ADM-DS-2 - brand.ts stays held at the previously locked copy (`foundation.lock.json` `held`): foundation #40 changed the
+legal names and removed `company.foundedOn`, which marketing reads. Cost if wrong: the Store keeps the old legal-name copy until the separate brand PR lands.

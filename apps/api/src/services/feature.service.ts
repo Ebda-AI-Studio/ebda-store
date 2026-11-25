@@ -6,11 +6,14 @@ import { bustStoreCaches } from './store.service';
 import logger from '../lib/logger';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { syncSubscriptionFromLegacyPlan } from './plan-sync';
-import { getAutomationFlags } from './plan-entitlements';
+import { automationFlagsFromRows, getAutomationFlags } from './plan-entitlements';
+import { platformDb } from '../lib/platform-db';
+import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
+import { currentSweepScope, forgetSweepMemo, seedSweepMemo } from '../lib/sweep-scope';
 import { readStorePlan } from '../lib/store-plan';
-import { storeUpdate } from '../lib/repo-factory';
+import { storeRepo, storeUpdate } from '../lib/repo-factory';
 import { activeAddons } from './billing/addon-grant';
-import { ADDON_CATALOG } from './billing/addon-catalog';
+import { ADDON_CATALOG, ADDON_PLAN_PREFIX } from './billing/addon-catalog';
 
 // Versioned namespace (2026-09-25, customer wallet D1). The release that wired
 // behaviour to the previously hidden `customer_wallet` key also resets a stale
@@ -256,6 +259,7 @@ class FeatureService {
    */
   async invalidateCache(storeId: string): Promise<void> {
     try {
+      forgetSweepMemo(this.prefetchKey(storeId));
       await redis.delete(this.cacheKey(storeId));
       // B2B: the public product payload lists the public price tiers only while `b2b.wholesale` is on, so any change to the
       // resolved feature map (plan change, plan-limit edit, override) must also drop the cached public product payloads.
@@ -303,6 +307,157 @@ class FeatureService {
    * Checks Redis cache first; on miss reads from DB and populates cache.
    */
   async getStoreFeatures(storeId: string): Promise<Record<FeatureKey, boolean>> {
+    // Always live (NEVER-stale entitlements): a paid side effect re-checks through here just before it acts. The prefetched
+    // sweep maps are read ONLY by `selectEnabled`, to decide which stores to scan.
+    return this.resolveStoreFeatures(storeId);
+  }
+
+  private prefetchKey = (storeId: string): string => `features-prefetch:${storeId}`;
+
+  /**
+   * Which of `storeIds` have `featureKey` on, for SELECTING the stores a sweep visits (never as the gate of a paid side effect).
+   * One batched prefetch for the run (`prefetchStoreFeatures`), then a lookup; a store the prefetch could not resolve is checked
+   * live. Entitlements are NEVER-stale, so every paid action (send, charge, AI call, external post) must still call
+   * `isFeatureEnabled` live just before it acts: a downgrade or override revoke landing mid-run is seen there.
+   */
+  async selectEnabled(storeIds: readonly string[], featureKey: FeatureKey): Promise<string[]> {
+    await this.prefetchStoreFeatures(storeIds);
+    const scope = currentSweepScope();
+    const out: string[] = [];
+    for (let i = 0; i < storeIds.length; i += 20) {
+      const part = storeIds.slice(i, i + 20);
+      const flags = await Promise.all(
+        part.map(async id => {
+          const hit = scope?.memo.get(this.prefetchKey(id));
+          if (hit) return ((await hit.p) as Record<FeatureKey, boolean>)[featureKey] ?? false;
+          return this.isFeatureEnabled(id, featureKey).catch(() => false);
+        })
+      );
+      part.forEach((id, j) => {
+        if (flags[j]) out.push(id);
+      });
+    }
+    return out;
+  }
+
+  /**
+   * STALENESS: the prefetch and the maps it seeds live ONLY in the current sweep scope (one cron job run / one queue message)
+   * and are read ONLY by `selectEnabled`; nothing is written to Redis, KV or module state, so there is no cross-request or
+   * cross-run cache. `getStoreFeatures` / `isFeatureEnabled` stay live (entitlements are NEVER-stale).
+   *
+   * One batched read for many stores (instead of `store_features` + `store_subscriptions` + `plans` per store): only inside a
+   * sweep scope on a Worker WITHOUT Postgres (there the platform D1 is the only source `getEntitlements` reads; with Postgres
+   * bound it reads the Postgres row first, so the batch would not be equivalent and is skipped). A store this cannot resolve
+   * exactly (gone, not on its DO) is left out alone and resolves per store as before; the rest of its chunk stays batched.
+   */
+  async prefetchStoreFeatures(storeIds: readonly string[]): Promise<void> {
+    const scope = currentSweepScope();
+    if (!scope || !postgresRemovedOnThisWorker()) return;
+    const platform = await platformDb();
+    if (!platform) return;
+    const CHUNK = 50; // D1: 100 bound parameters per statement
+    const ids = [...new Set(storeIds)].filter(id => !scope.memo.has(this.prefetchKey(id)));
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const part = ids.slice(i, i + CHUNK);
+      try {
+        const legacy = new Map<string, StorePlan>();
+        await Promise.all(
+          part.map(async id => {
+            try {
+              const repo = await storeRepo(id);
+              if (repo.backend !== 'do') return;
+              const row = await (repo.db as unknown as Prisma.TransactionClient).store.findUnique({
+                where: { id },
+                select: { plan: true },
+              });
+              if (row) legacy.set(id, row.plan as StorePlan);
+            } catch {
+              // gone / unreadable store: left out alone, it resolves per store (and 404s there as before)
+            }
+          })
+        );
+        const known = part.filter(id => legacy.has(id));
+        if (known.length === 0) continue;
+        const [featureRows, subs, addonRows] = await Promise.all([
+          platform.storeFeature.findMany({
+            where: { storeId: { in: known } },
+            select: { storeId: true, featureKey: true, enabled: true },
+          }),
+          platform.storeSubscription.findMany({
+            where: { storeId: { in: known } },
+            select: {
+              storeId: true,
+              planCode: true,
+              status: true,
+              billingMethod: true,
+              nextRetryAt: true,
+            },
+          }),
+          // A store with a running paid add-on is NOT seeded: its feature map includes the add-on's feature, which this batch
+          // does not compute, so it resolves live per store (entitlement stays NEVER-stale).
+          platform.billingEvent.findMany({
+            where: {
+              storeId: { in: known },
+              type: 'upgrade',
+              status: 'succeeded',
+              planCode: { startsWith: ADDON_PLAN_PREFIX },
+              forPeriodEnd: { gt: new Date() },
+            },
+            select: { storeId: true },
+          }),
+        ]);
+        const withAddon = new Set((addonRows as Array<{ storeId: string }>).map(r => r.storeId));
+        type SubRow = {
+          planCode: string;
+          status: string;
+          billingMethod: string | null;
+          nextRetryAt: Date | null;
+        };
+        const subBy = new Map<string, SubRow>(
+          (subs as Array<SubRow & { storeId: string }>).map(r => [r.storeId, r])
+        );
+        const codes = [
+          ...new Set(
+            known.map(id => {
+              const sub = subBy.get(id);
+              const r = automationFlagsFromRows(legacy.get(id)!, sub, new Map());
+              return r.effectiveCode;
+            })
+          ),
+        ];
+        const planList = (await platform.plan.findMany({
+          where: { code: { in: codes } },
+        })) as Array<{ code: string; limits: unknown; featureTier?: string }>;
+        const planRows = new Map(planList.map(p => [p.code, p]));
+        const featBy = new Map<string, Array<{ featureKey: string; enabled: boolean }>>();
+        for (const r of featureRows as Array<{
+          storeId: string;
+          featureKey: string;
+          enabled: boolean;
+        }>) {
+          const list = featBy.get(r.storeId) ?? [];
+          list.push(r);
+          featBy.set(r.storeId, list);
+        }
+        for (const id of known) {
+          if (withAddon.has(id)) continue;
+          const { flags } = automationFlagsFromRows(legacy.get(id)!, subBy.get(id), planRows);
+          seedSweepMemo(
+            this.prefetchKey(id),
+            this.rowsToMap(legacy.get(id)!, featBy.get(id) ?? [], flags)
+          );
+        }
+      } catch (err) {
+        // Not fatal: the stores of this chunk resolve one by one, exactly as before.
+        logger.warn(
+          { err },
+          '[FeatureService] batched feature prefetch failed; resolving per store'
+        );
+      }
+    }
+  }
+
+  private async resolveStoreFeatures(storeId: string): Promise<Record<FeatureKey, boolean>> {
     // 1. Try cache
     const cached = await this.readFromCache(storeId);
     if (cached !== null) {

@@ -5,13 +5,13 @@ import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import {
   formatFils,
-  STATUS_COLORS,
   STATUS_FILTERS,
   type Affiliate,
   type AffiliateStatusAction,
   type Meta,
 } from './types';
 import { Button } from '@/components/ui/Button';
+import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { EmptyState } from '@/components/EmptyState';
 
 interface AffiliatesTableProps {
@@ -63,20 +63,12 @@ export function AffiliatesTable({
     {
       header: t('columns.status'),
       mobileBadge: true,
-      cell: affiliate => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            STATUS_COLORS[affiliate.status] ?? 'bg-muted text-foreground'
-          }`}
-        >
-          {t(`status.${affiliate.status}`)}
-        </span>
-      ),
+      cell: affiliate => <OrderStatusBadge family="affiliate" status={affiliate.status} />,
     },
     {
       header: t('columns.referralCode'),
       cell: affiliate => (
-        <code className="text-sm bg-muted px-2 py-1 rounded font-mono">
+        <code className="text-sm bg-muted px-2 py-1 rounded-md font-mono">
           {affiliate.referralCode}
         </code>
       ),
@@ -174,7 +166,7 @@ export function AffiliatesTable({
   );
 
   return (
-    <div className="rounded-xl border border-border overflow-hidden">
+    <div className="rounded-md border border-border overflow-hidden">
       {/* Status filter pills */}
       <div className="flex flex-wrap gap-2 p-4 bg-muted border-b border-border">
         {STATUS_FILTERS.map(s => (

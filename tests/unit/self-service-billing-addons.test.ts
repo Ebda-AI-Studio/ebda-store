@@ -3,7 +3,7 @@
  * entitlement is granted exactly once per payment, a failed payment grants nothing, cancel ends it at the period end,
  * staff are refused, and the confirm step is a single-use token bound to the previewed payload.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 
@@ -130,6 +130,8 @@ const ev = (over: Record<string, any>) => ({
 });
 
 beforeEach(() => {
+  // fixtures are built around NOW; the code under test reads the real clock
+  vi.useFakeTimers({ toFake: ['Date'], now: NOW });
   vi.clearAllMocks();
   h.events = [];
   h.features = {};
@@ -146,6 +148,11 @@ beforeEach(() => {
   tx = fakeTx();
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+  delete process.env.AI_DAILY_REQUEST_CAP;
+});
+
 describe('catalog', () => {
   it('feature add-ons are real, visible add-on-tier registry keys with integer positive prices', async () => {
     const { ADDON_CATALOG } = await import('@api/services/billing/addon-catalog');
@@ -154,7 +161,7 @@ describe('catalog', () => {
       expect(Number.isSafeInteger(a.priceMinor) && a.priceMinor > 0).toBe(true);
       if (a.kind === 'feature') {
         const def = (FEATURE_REGISTRY as any)[a.featureKey!];
-        expect(def?.tier).toBe('addon');
+        expect(def?.tier).toBe('extra'); // renamed from 'addon' by BIZ-ALL-1
         expect(def?.hidden).not.toBe(true);
       }
     }

@@ -68,14 +68,14 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
 
   if (loading) {
     return (
-      <div className="mt-4 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+      <div className="mt-4 rounded-md border border-border bg-card p-4 text-sm text-muted-foreground">
         {t('loading')}
       </div>
     );
   }
   if (error) {
     return (
-      <div className="mt-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive-ink">
+      <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive-ink">
         {error}
       </div>
     );
@@ -87,7 +87,7 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
   const fillPct = Math.round(data.citationCopy.fillRate * 100);
 
   return (
-    <div className="mt-4 rounded-xl border border-border bg-card p-4">
+    <div className="mt-4 rounded-md border border-border bg-card p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-foreground">{t('title')}</h3>
         <Button onClick={load} size="sm" variant="outline">
@@ -102,7 +102,7 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
             <span>
               {t('llmsTxt.label')}{' '}
               {llmsLength > 0 ? (
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 ms-1">
+                <span className="text-xs text-success-ink ms-1">
                   ✓ {llmsLength} {t('llmsTxt.charsSuffix')}
                 </span>
               ) : (
@@ -113,7 +113,7 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
           </summary>
           {data.llmsTxt ? (
             <div className="mt-3">
-              <pre className="whitespace-pre-wrap break-words text-xs bg-muted/40 p-2 rounded max-h-64 overflow-y-auto">
+              <pre className="whitespace-pre-wrap break-words text-xs bg-muted/40 p-2 rounded-md max-h-64 overflow-y-auto">
                 {data.llmsTxt}
               </pre>
               <Button
@@ -138,7 +138,7 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
             <span>
               {t('brandFacts.label')}{' '}
               {factsKeys > 0 ? (
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 ms-1">
+                <span className="text-xs text-success-ink ms-1">
                   ✓ {factsKeys} {t('brandFacts.keysSuffix')}
                 </span>
               ) : (
@@ -149,7 +149,7 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
           </summary>
           {data.brandFacts ? (
             <div className="mt-3">
-              <pre className="whitespace-pre-wrap break-words text-xs bg-muted/40 p-2 rounded max-h-64 overflow-y-auto">
+              <pre className="whitespace-pre-wrap break-words text-xs bg-muted/40 p-2 rounded-md max-h-64 overflow-y-auto">
                 {JSON.stringify(data.brandFacts, null, 2)}
               </pre>
               <Button

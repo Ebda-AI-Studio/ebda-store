@@ -13,6 +13,9 @@ import { apiGet, apiPatch } from '../../../../lib/api';
 import { SubscriptionPlanRow } from '../../../../components/billing/SubscriptionPlanRow';
 import { SettingsSearch } from '../../../../components/SettingsSearch';
 import { SETTINGS_GROUPS } from '../../../../lib/settings-groups';
+import { useAttention } from '../../../../hooks/useAttention';
+import { AttentionBadge } from '../../../../components/attention/AttentionBadge';
+import { NeedsAttentionList } from '../../../../components/attention/NeedsAttentionList';
 import { ConnectChatCard } from './ConnectChatCard';
 
 /**
@@ -115,6 +118,7 @@ export default function StoreSettingsPage() {
   const storeId = params?.id as string;
   const { isEnabled, isLoading } = useFeatures();
   const { user } = useAuth();
+  const { bySection, hasInfoBySection } = useAttention(storeId);
   const isSuperAdmin = user?.role === 'super_admin';
   const t = useT('settings');
   const tCards = useT('settings.cards');
@@ -526,18 +530,19 @@ export default function StoreSettingsPage() {
     <AdminLayout title={t('page.title')} subtitle={t('page.subtitle')}>
       <SettingsSearch />
       <div className="space-y-8">
+        <NeedsAttentionList storeId={storeId} />
         <ConnectChatCard storeId={storeId} />
         {isLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 9 }).map((_, i) => (
               <div
                 key={i}
-                className="flex items-start gap-4 rounded-xl border bg-card p-6 shadow-sm animate-pulse"
+                className="flex items-start gap-4 rounded-md border bg-card p-6 shadow-sm animate-pulse"
               >
-                <div className="h-12 w-12 flex-shrink-0 rounded-xl bg-muted" />
+                <div className="h-12 w-12 flex-shrink-0 rounded-md bg-muted" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-24 rounded bg-muted" />
-                  <div className="h-3 w-full rounded bg-muted" />
+                  <div className="h-4 w-24 rounded-md bg-muted" />
+                  <div className="h-3 w-full rounded-md bg-muted" />
                 </div>
               </div>
             ))}
@@ -555,16 +560,20 @@ export default function StoreSettingsPage() {
                     data-ui="tile"
                     key={card.href}
                     href={card.href}
-                    className="group flex min-h-20 items-start gap-4 rounded-xl border bg-card p-5 shadow-sm transition-all hover:border-primary hover:shadow-md"
+                    className="group flex min-h-20 items-start gap-4 rounded-md border bg-card p-5 shadow-sm transition-all hover:border-primary hover:shadow-md"
                   >
                     <div
-                      className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${card.color} transition-transform group-hover:scale-110`}
+                      className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-md ${card.color} transition-transform group-hover:scale-110`}
                     >
                       {card.icon}
                     </div>
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="flex items-center gap-2 font-semibold text-foreground group-hover:text-primary transition-colors">
                         {tCards(`${card.key}.title`)}
+                        <AttentionBadge
+                          count={bySection[card.href.split('/').pop() ?? ''] ?? 0}
+                          quiet={!!hasInfoBySection[card.href.split('/').pop() ?? '']}
+                        />
                       </h3>
                       <p className="mt-1 text-sm text-muted-foreground leading-snug">
                         {tCards(`${card.key}.description`)}
@@ -609,7 +618,7 @@ export default function StoreSettingsPage() {
             <h2 className="mb-3 font-semibold text-destructive-ink">
               {t('superAdmin.dangerZoneTitle')}
             </h2>
-            <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-5">
+            <div className="rounded-md border-2 border-destructive/40 bg-destructive/5 p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-sm font-medium text-foreground">

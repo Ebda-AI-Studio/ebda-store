@@ -113,6 +113,23 @@ export const FEATURE_KEYS_ARRAY = [
 
 export type FeatureKey = (typeof FEATURE_KEYS_ARRAY)[number];
 
+/**
+ * The features a lower plan can buy on their own as a paid monthly add-on (Ruling AI-ADDON-1). The API's add-on catalog
+ * (`apps/api/src/services/billing/addon-catalog.ts`) sells exactly these; `tests/unit/addon-feature-keys-match-catalog.test.ts`
+ * fails when the two drift. Admin reads this list to decide whether "Add just this feature" has anywhere to go.
+ */
+export const ADDON_FEATURE_KEYS = [
+  'floating_widget',
+  'customer_wallet_checkout',
+  'loyalty',
+  'upsell_crosssell',
+  'push_notifications',
+  'affiliate',
+] as const satisfies readonly FeatureKey[];
+
+export const isAddonFeature = (key: string): boolean =>
+  (ADDON_FEATURE_KEYS as readonly string[]).includes(key);
+
 export type FeatureCategory = 'commerce' | 'marketing' | 'operations' | 'storefront' | 'engagement';
 
 /**
@@ -122,13 +139,16 @@ export type FeatureCategory = 'commerce' | 'marketing' | 'operations' | 'storefr
  * - 'core' — always recommended for active stores. Safe defaults, no
  *   per-tenant config beyond on/off. Super-admin still gates per-store
  *   for billing-plan reasons but most stores get it.
- * - 'addon' — opt-in extra polish or specialized capability. Often
- *   needs per-tenant config (whatsapp WABA credentials, floating
- *   widget button list, etc.). The "premium" cluster going forward.
+ * - 'extra' — extra polish or specialized capability, INCLUDED in the
+ *   Business plan (Ruling BIZ-ALL-1, Ahmad 2026-11-15; it was called
+ *   'addon' before). Often needs per-tenant config (floating widget
+ *   button list, etc.). A lower plan reaches it by upgrading, or by buying
+ *   that one feature as a paid monthly add-on (Ruling AI-ADDON-1, Ahmad
+ *   2026-11-23: add-ons and AI request packs ARE sold by card).
  * - 'experimental' — scaffold only / not customer-visible yet. Most
  *   `hidden: true` features fall here.
  */
-export type FeatureTier = 'core' | 'addon' | 'experimental';
+export type FeatureTier = 'core' | 'extra' | 'experimental';
 
 export interface FeatureDefinition {
   key: FeatureKey;
@@ -193,7 +213,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     description: 'Reward repeat customers with points and redeemable benefits.',
     descriptionAr: 'مكافأة العملاء المتكررين بالنقاط والمزايا القابلة للاسترداد.',
     category: 'commerce',
-    tier: 'addon',
+    tier: 'extra',
   },
   returns: {
     key: 'returns',
@@ -259,7 +279,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'محافظ رصيد المتجر: تُضاف المبالغ المستردة كرصيد متجر إلى محفظة العميل، ويمكن للتاجر تعديل الأرصدة، ويرى العميل رصيده في حسابه.',
     category: 'commerce',
-    tier: 'addon',
+    tier: 'extra',
     // Un-hidden 2026-09-25 (D1). In the Growth + Business baselines since 2026-10-29 (Ruling W-8);
     // a super-admin override still wins both ways.
   },
@@ -272,7 +292,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'يتيح للعملاء المسجلين دفع جزء من الطلب أو كامله من رصيد المحفظة. يتطلب محفظة العميل. غير متاح أثناء تفعيل المحاسبة.',
     category: 'commerce',
-    tier: 'addon',
+    tier: 'extra',
   },
   upsell_crosssell: {
     key: 'upsell_crosssell',
@@ -281,7 +301,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     description: 'Suggest related or upgraded products to increase average order value.',
     descriptionAr: 'اقتراح منتجات ذات صلة أو محسّنة لزيادة متوسط قيمة الطلب.',
     category: 'commerce',
-    tier: 'addon',
+    tier: 'extra',
   },
   whatsapp: {
     key: 'whatsapp',
@@ -292,7 +312,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'إرسال تأكيدات الطلب وتحديثات الشحن والتسليم عبر منصة ابدأ WhatsApp للواتساب التجاري. يربط التاجر حساب الواتساب التجاري الخاص به في صفحة إشعارات الواتساب ويختار قالب Meta معتمد لكل حدث.',
     category: 'marketing',
-    tier: 'addon',
+    tier: 'extra',
     // hidden (case 1: not launched). The key gates the separate Ebda Chat product
     // (wa.ebda.app). The legacy in-Store WhatsApp API bridge was deleted (Ruling
     // WA-LEGACY-1); the key stays for the Store-side contract. In NO plan
@@ -310,7 +330,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'إرسال رسائل قصيرة للمعاملات (تأكيد الطلب، الشحن، التسليم، الإلغاء، الاسترداد) عبر بوابة الرسائل. العملاء الذين يوافقون على استقبال الرسائل عند الدفع يتلقون أيضاً رسائل ترويجية (تذكير بالسلة، إشعار توفر المنتج).',
     category: 'marketing',
-    tier: 'addon',
+    tier: 'extra',
   },
   push_notifications: {
     key: 'push_notifications',
@@ -319,7 +339,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     description: 'Send browser and mobile push notifications to subscribed customers.',
     descriptionAr: 'إرسال إشعارات فورية للمتصفح والهاتف للعملاء المشتركين.',
     category: 'marketing',
-    tier: 'addon',
+    tier: 'extra',
   },
   email_campaigns: {
     key: 'email_campaigns',
@@ -350,7 +370,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     description: 'Let partners earn commissions by referring customers to your store.',
     descriptionAr: 'السماح للشركاء بكسب عمولات من خلال إحالة العملاء إلى متجرك.',
     category: 'marketing',
-    tier: 'addon',
+    tier: 'extra',
   },
   marketing_pixels: {
     key: 'marketing_pixels',
@@ -372,7 +392,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'ينشر خلاصة منتجات قابلة للقراءة آليًا على /feeds/products.json حتى تتمكن مساعدات الذكاء الاصطناعي ووكلاء التسوق (ChatGPT وPerplexity وزواحف الوكلاء) من قراءة منتجات المتجر والاستشهاد بها والتوصية بها. تتبع اصطلاحات حقول خلاصة منتجات OpenAI.',
     category: 'marketing',
-    tier: 'addon',
+    tier: 'extra',
   },
   product_feeds: {
     key: 'product_feeds',
@@ -394,7 +414,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'يوفّر خادم MCP خاصاً بالمتجر لتمكين وكلاء الذكاء الاصطناعي من البحث في المنتجات وإنشاء سلة وإتمام الطلب. الدفع عند الاستلام يكتمل تلقائياً، والدفع الإلكتروني يُعاد كرابط دفع.',
     category: 'marketing',
-    tier: 'addon',
+    tier: 'extra',
   },
   answer_engine_insights: {
     key: 'answer_engine_insights',
@@ -405,7 +425,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'يقيس ما إذا كانت محركات الإجابة بالذكاء الاصطناعي (ChatGPT وPerplexity ونظرة Google العامة بالذكاء الاصطناعي) تعرض المتجر وتستشهد به عندما يسأل المتسوقون عن منتجاته — لتتبع ظهور المتجر في محركات الإجابة إلى جانب البحث التقليدي.',
     category: 'marketing',
-    tier: 'addon',
+    tier: 'extra',
   },
   shipping_carriers: {
     key: 'shipping_carriers',
@@ -464,7 +484,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'مجموعة أزرار ثابتة على المتجر — تتقلص إلى دائرة واحدة، وتتوسع إلى إجراءات يختارها التاجر (واتساب، إنستغرام، هاتف، بريد إلكتروني، موسيقى الخلفية، روابط مخصصة). قابل للتخصيص بدرجة عالية: الموقع، اتجاه التوسع، الألوان والتسميات لكل زر.',
     category: 'engagement',
-    tier: 'addon',
+    tier: 'extra',
   },
   // -------- Inventory sub-features (2026-05-27) --------
   'inventory.basic': {
@@ -486,7 +506,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'Auto-email the merchant when a product drops below its per-product low-stock threshold.',
     descriptionAr: 'إرسال بريد إلكتروني تلقائي للتاجر عند انخفاض منتج عن حد المخزون المحدد له.',
     category: 'operations',
-    tier: 'addon',
+    tier: 'extra',
   },
   'inventory.backorder': {
     key: 'inventory.backorder',
@@ -497,7 +517,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'قبول طلبات العملاء عند نفاد المنتج وحفظها في قائمة انتظار التنفيذ عند توفر المخزون.',
     category: 'operations',
-    tier: 'addon',
+    tier: 'extra',
   },
   'inventory.multi_warehouse': {
     key: 'inventory.multi_warehouse',
@@ -512,7 +532,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'يشمل عرض المخزون لكل مستودع وتعديلات بمسار تدقيق، وواجهة برمجية لتوجيه الطلبات (قاعدة الأولوية أو قاعدة القرب الجغرافي). ' +
       'تظل إجماليات مخزون المنتجات محدّثة تلقائياً — المتاجر ذات المستودع الواحد لا تتأثر عند إيقاف الميزة.',
     category: 'operations',
-    tier: 'addon',
+    tier: 'extra',
   },
   'inventory.barcode': {
     key: 'inventory.barcode',
@@ -522,7 +542,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'Scan barcodes from mobile to receive stock, pick orders, and audit inventory counts.',
     descriptionAr: 'مسح الباركود من الجوال لاستلام المخزون وتجهيز الطلبات ومراجعة الكميات.',
     category: 'operations',
-    tier: 'addon',
+    tier: 'extra',
   },
   'inventory.purchase_orders': {
     key: 'inventory.purchase_orders',
@@ -533,7 +553,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'سير عمل أوامر الشراء من المورّدين مع تسجيل التكلفة والاستلام مقابل الأمر ودفتر المورّد.',
     category: 'operations',
-    tier: 'addon',
+    tier: 'extra',
   },
   'inventory.bulk_adjustments': {
     key: 'inventory.bulk_adjustments',
@@ -549,7 +569,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'ارفع ملف CSV يحتوي على رمز المنتج أو الباركود مع الكمية الجديدة (مطلقة) أو التغيير (موجب/سالب). ' +
       'تُدعم رؤوس الأعمدة العربية. يُحوَّل كل صف إلى تسوية مخزون موحّدة مع قيد دفتر يومية.',
     category: 'operations',
-    tier: 'addon',
+    tier: 'extra',
   },
   // -------- Accounting sub-features (2026-05-27) --------
   'accounting.basic': {
@@ -571,7 +591,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'Categorized expense entry with receipts attachment and monthly summary by category.',
     descriptionAr: 'تسجيل المصروفات مصنّفاً مع إرفاق الفواتير وملخص شهري حسب الفئة.',
     category: 'operations',
-    tier: 'addon',
+    tier: 'extra',
   },
   'accounting.invoicing': {
     key: 'accounting.invoicing',
@@ -582,7 +602,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'إصدار فواتير متوافقة مع متطلبات مصر تتضمّن خانة الضريبة وتصميماً ثنائي اللغة وتصدير PDF.',
     category: 'operations',
-    tier: 'addon',
+    tier: 'extra',
   },
   'accounting.tax_reports': {
     key: 'accounting.tax_reports',
@@ -591,7 +611,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     description: 'VAT/sales-tax export per reporting period with full transaction-level breakdown.',
     descriptionAr: 'تصدير ضريبة القيمة المضافة/المبيعات لكل دورة مع تفصيل كامل على مستوى المعاملة.',
     category: 'operations',
-    tier: 'addon',
+    tier: 'extra',
   },
   'accounting.multi_currency': {
     key: 'accounting.multi_currency',
@@ -602,7 +622,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'تتبع المعاملات بعملات غير الجنيه مع أسعار صرف وتحويل تلقائي إلى الجنيه على مستوى الدفاتر.',
     category: 'operations',
-    tier: 'addon',
+    tier: 'extra',
   },
   'accounting.profit_anomaly': {
     key: 'accounting.profit_anomaly',
@@ -613,7 +633,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'فحص يومي بالذكاء الاصطناعي للهوامش (06:30 بتوقيت القاهرة)؛ ينبّه عند هبوط الهامش أو ارتفاع حجم التكلفة بشكل غير مألوف مقارنةً بمتوسط 28 يومًا.',
     category: 'operations',
-    tier: 'addon',
+    tier: 'extra',
   },
   'accounting.bank_reconcile': {
     key: 'accounting.bank_reconcile',
@@ -624,7 +644,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'استيراد كشف البنك (CSV/OFX) مع مطابقة آلية بدفتر اليومية وإمكانية التصحيح اليدوي.',
     category: 'operations',
-    tier: 'addon',
+    tier: 'extra',
   },
   payment_abandonment: {
     key: 'payment_abandonment',
@@ -638,7 +658,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'تحديد المتسوّقين الذين وصلوا إلى بوابة الدفع لكنهم لم يُكملوا الدفع. ' +
       'تُسجَّل البيانات بشكل تلقائي وتظهر في لوحة إعادة الاستهداف مع بيانات التواصل وقيمة العربة والبوابة المستخدمة.',
     category: 'marketing',
-    tier: 'addon',
+    tier: 'extra',
   },
   agent_checkout_open_writes: {
     key: 'agent_checkout_open_writes',
@@ -655,7 +675,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'تفعيل هذا الخيار يسمح لأي وكيل غير موثّق بالكتابة في هذا المتجر مجدداً — فعّله فقط ' +
       'لإصلاح تكامل قائم ريثما تُصدر بيانات الاعتماد.',
     category: 'marketing',
-    tier: 'addon',
+    tier: 'extra',
   },
   merchant_mcp: {
     key: 'merchant_mcp',
@@ -672,7 +692,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'أو أي عميل MCP بدلاً من لوحة التحكم — قراءة التحليلات وتصفّح المنتجات وتعديلها وإدارة الطلبات. ' +
       'يختلف عن الشراء عبر الوكلاء الموجّه للمشترين: هذا لا يستجيب أبداً بدون مفتاح التاجر.',
     category: 'marketing',
-    tier: 'addon',
+    tier: 'extra',
   },
   merchant_mcp_write: {
     key: 'merchant_mcp_write',
@@ -688,7 +708,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'بدلاً من القراءة فقط. يتطلب تفعيل MCP التاجر أولاً؛ والإجراءات الحاسمة (الإلغاء، الحذف، ' +
       'العمليات الجماعية) تحتاج تأكيداً على دفعتين. مفعّلة حسب الباقة (النمو والأعمال)، ويقدر التاجر يقفلها لكل متجر.',
     category: 'marketing',
-    tier: 'addon',
+    tier: 'extra',
   },
   'b2b.wholesale': {
     key: 'b2b.wholesale',
@@ -702,7 +722,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'خصومات الكميات وأسعار مجموعات العملاء والحد الأدنى للطلب ومنتجات الجملة فقط ' +
       'وطلبات حسابات الجملة التي توافق عليها. مضمّن في باقة الأعمال، ويقدر فريقنا يفعّله لمتجر بعينه.',
     category: 'commerce',
-    tier: 'addon',
+    tier: 'extra',
     // Hidden from the merchant feature list until the merchant + storefront UI ships (Tasks 6-7); a super-admin can
     // still switch it per store in the FeatureMatrix. Task 8 removes both flags.
     hidden: true,
@@ -719,7 +739,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'يخفي عبارة «مدعوم من ابدأ ستور» من تذييل المتجر. مضمّن في باقتي النمو والأعمال، ' +
       'ويقدر فريقنا يفعّله لمتجر بعينه.',
     category: 'storefront',
-    tier: 'addon',
+    tier: 'extra',
   },
   product_3d: {
     key: 'product_3d',
@@ -746,7 +766,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'بيع مجموعة ثابتة من المنتجات كعنصر واحد بسعر واحد. يُخصم المخزون من المنتجات ' +
       'المكوّنة، فلا يُحتسب أي صنف مرتين.',
     category: 'commerce',
-    tier: 'addon',
+    tier: 'extra',
   },
   eta_ereceipt: {
     key: 'eta_ereceipt',
@@ -759,7 +779,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'للتجار المسجّلين في ضريبة القيمة المضافة: إرسال كل طلب مدفوع لمصلحة الضرائب المصرية ' +
       'كإيصال إلكتروني باستخدام بيانات الدخول الخاصة بك.',
     category: 'operations',
-    tier: 'addon',
+    tier: 'extra',
     hidden: true,
     superAdminToggleable: true,
   },
@@ -772,7 +792,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'نصايح من تاريخ توصيل وارتجاع طلباتك: ملاحظة على خطر الدفع عند الاستلام في الطلب، وأنهي شركة شحن وصّلت أحسن لمنطقة معينة، ومتى يبدأ مبلغ الدفع عند الاستلام يرجع أكتر. التلميحات بتنصح بس: عمرها ما بتوقف أو تأجّل أو تلغي طلب، وكل واحد بيوضّح عدد الطلبات اللي اعتمد عليها.',
     category: 'operations',
-    tier: 'addon',
+    tier: 'extra',
   },
 };
 
