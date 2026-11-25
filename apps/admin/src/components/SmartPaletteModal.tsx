@@ -27,6 +27,7 @@ import { SectionPreview } from './SectionPreview';
 import { apiPost } from '../lib/api';
 import { useT } from '../i18n/useT';
 import { useConfirm } from '../hooks/useConfirm';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Brand-color updates the parent should persist to StoreTheme on apply.
@@ -257,7 +258,7 @@ export function SmartPaletteModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-card p-6 shadow-2xl">
+      <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-lg bg-card p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-foreground">{t('title')}</h2>
           <button
@@ -294,8 +295,8 @@ export function SmartPaletteModal({
         </div>
 
         {/* Layer B: Vibe picker */}
-        <div className="mb-4 rounded-xl border border-border bg-muted/30 p-4">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="mb-4 rounded-md border border-border bg-muted/30 p-4">
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {t('vibeSection')}
           </h3>
           <div className="flex flex-wrap gap-2">
@@ -314,12 +315,12 @@ export function SmartPaletteModal({
         </div>
 
         {/* Distribution sub-section: pattern + frame thickness */}
-        <div className="mb-4 rounded-xl border border-border bg-muted/30 p-4">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="mb-4 rounded-md border border-border bg-muted/30 p-4">
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {t('distributionSection')}
           </h3>
           <div className="mb-3">
-            <label className="mb-2 block text-xs font-medium text-muted-foreground">
+            <label className="mb-2 block text-sm font-medium text-muted-foreground">
               {t('patternLabel')}
             </label>
             <div className="grid grid-cols-4 gap-2">
@@ -337,7 +338,7 @@ export function SmartPaletteModal({
             </div>
           </div>
           <div>
-            <label className="mb-2 block text-xs font-medium text-muted-foreground">
+            <label className="mb-2 block text-sm font-medium text-muted-foreground">
               {t('frameThicknessLabel')}
             </label>
             <div className="grid grid-cols-4 gap-2">
@@ -355,7 +356,7 @@ export function SmartPaletteModal({
             </div>
           </div>
           <div className="mt-3">
-            <label className="mb-2 block text-xs font-medium text-muted-foreground">
+            <label className="mb-2 block text-sm font-medium text-muted-foreground">
               {t('frameSizeLabel')}
             </label>
             <div className="grid grid-cols-4 gap-2">
@@ -501,7 +502,7 @@ export function SmartPaletteModal({
                           },
                         }))
                       }
-                      className="rounded border border-border bg-background px-2 py-1 text-sm"
+                      className={FIELD_CLASSES}
                     >
                       <option value="thin">{t('frameThin')}</option>
                       <option value="normal">{t('frameNormal')}</option>

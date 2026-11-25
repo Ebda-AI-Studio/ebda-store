@@ -165,7 +165,7 @@ export function DataTable<T>({
     <>
       {/* Desktop table */}
       {showDesktopTable && (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <div className="overflow-x-auto rounded-md border border-border bg-card">
           <table className="w-full text-sm" aria-label={ariaLabel}>
             <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
@@ -219,7 +219,7 @@ export function DataTable<T>({
             <div
               key={rowKey(row, i)}
               onClick={onRowClick ? () => onRowClick(row, i) : undefined}
-              className={`rounded-xl border border-border bg-card p-4 shadow-sm ${
+              className={`rounded-md border border-border bg-card p-4 shadow-sm ${
                 onRowClick ? 'cursor-pointer active:bg-muted/50 transition-colors' : ''
               }`}
             >
@@ -254,7 +254,7 @@ export function DataTable<T>({
                 >
                   {labelColumns.map((c, ci) => (
                     <div key={ci} className="flex items-baseline gap-3">
-                      <dt className="w-24 shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <dt className="w-24 shrink-0 text-sm font-medium uppercase tracking-wide text-muted-foreground">
                         {c.header}
                       </dt>
                       <dd

@@ -8,7 +8,6 @@ import { useT } from '@/i18n/useT';
 import { useFeatures } from '@/hooks/useFeatures';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { ReturnLifecycleTimeline } from '../../../../../components/return-timeline/ReturnLifecycleTimeline';
-import { RETURN_COLORS } from './types';
 import type { ReturnItem, ReturnRecord } from './types';
 
 import { formatPrice } from '@/lib/format';
@@ -105,7 +104,7 @@ export function ReturnDetailsDrawer({
       onClick={onClose}
     >
       <div
-        className="bg-card rounded-xl shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+        className="bg-card rounded-md shadow-md max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b p-4">
@@ -136,11 +135,7 @@ export function ReturnDetailsDrawer({
         <div className="p-6 space-y-6">
           {/* Status & Type */}
           <div className="flex items-center gap-3">
-            <OrderStatusBadge
-              status={record.status}
-              namespace="returns.status"
-              colorMap={RETURN_COLORS}
-            />
+            <OrderStatusBadge status={record.status} family="return" />
             <Badge variant="outline">{tType(record.type)}</Badge>
           </div>
 
@@ -273,10 +268,10 @@ function ReturnItemRow({ item }: { item: ReturnItem }) {
           alt=""
           width={48}
           height={48}
-          className="w-12 h-12 rounded object-cover"
+          className="w-12 h-12 rounded-md object-cover"
         />
       ) : (
-        <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
+        <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center">
           <svg
             className="w-6 h-6 text-muted-foreground"
             fill="none"

@@ -5,6 +5,7 @@ import { BottomSheet } from '@/components/mobile/BottomSheet';
 import { COMMON_TAX_TYPES, type RateFormData, type TaxRate, type TaxTemplate } from './types';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface TaxRateFormModalProps {
   editingRate: TaxRate | null;
   formData: RateFormData;
@@ -88,7 +89,7 @@ export function TaxRateFormModal({
               value={formData.name}
               onChange={e => onFormChange({ name: e.target.value })}
               placeholder={t('name.placeholder')}
-              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
               required
             />
           </div>
@@ -101,7 +102,7 @@ export function TaxRateFormModal({
               value={formData.nameAr}
               onChange={e => onFormChange({ nameAr: e.target.value })}
               placeholder={t('nameAr.placeholder')}
-              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
               lang="ar"
               dir="rtl"
             />
@@ -121,7 +122,7 @@ export function TaxRateFormModal({
               value={formData.rate}
               onChange={e => onFormChange({ rate: e.target.value })}
               placeholder={t('rate.placeholder')}
-              className="w-32 px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={`${FIELD_CLASSES} w-32`}
               required
             />
             <span className="text-muted-foreground">%</span>
