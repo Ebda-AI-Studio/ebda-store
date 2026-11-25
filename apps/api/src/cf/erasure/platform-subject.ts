@@ -8,6 +8,7 @@
  * engine over the REAL platform schema and fails when a personal-data table is not reachable from it (or not on its allowlist).
  * Money records are never deleted: actor columns are replaced, payer fields are the payments erasure port's job (N-27).
  */
+import { redactedMetaSql } from '../../lib/audit-meta-redact';
 import classification from '../../../../../packages/cf-schema/erasure-classification.json';
 
 export interface D1Like {
@@ -154,6 +155,15 @@ export async function erasePlatformSubject(
         )
         .bind(s.userId)
     );
+  // platform_audit_log.meta is free JSON that can name the person: redact the known personal keys on every row the user acted on or was the
+  // target of, BEFORE the actor id is replaced below (the id is how those rows are found)
+  stmts.push(
+    d1
+      .prepare(
+        `UPDATE "platform_audit_log" SET "meta" = ${redactedMetaSql()} WHERE ("actor_id" = ?1 OR "target_id" = ?1) AND json_valid("meta")`
+      )
+      .bind(s.userId)
+  );
   for (const [table, cols] of Object.entries(plan.actor))
     for (const [col, replacement] of Object.entries(cols))
       stmts.push(

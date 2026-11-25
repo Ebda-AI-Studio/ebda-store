@@ -129,6 +129,10 @@ describe('platform D1: user export + erasure covers every personal table', () =>
 
   // A personal-data table that no user-keyed code path reaches, with the reason it is safe and who owns it instead.
   const USER_ALLOWLIST: Record<string, string> = {
+    billing_events:
+      'store-keyed Ebda invoice record, kept for tax; its gateway raw payload and buyer tax id are cleared by the closed-store tombstone (lib/store-tombstone.ts, Ruling NZ-D15B), not by a user erasure',
+    webhook_events:
+      'store-keyed provider webhook idempotency record; payload, raw body and error text are cleared by the closed-store tombstone (lib/store-tombstone.ts, Ruling NZ-D15B), not by a user erasure',
     stores:
       'retain: owner_id is a pseudonymous id on a billing record that is kept; an owner cannot be erased while they own stores (409 USER_OWNS_STORES), the store delete removes the store (M-024)',
     store_subscriptions:

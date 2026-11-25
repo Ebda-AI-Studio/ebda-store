@@ -190,6 +190,25 @@ describe('no wipe is reachable from merchant erasure; constants', () => {
         /deleteAll\s*\(/
       );
   });
+  it('NZ-D15B: the only physical wipe is closed-store-wipe.ts, called only by StoreDO.purgeClosedStore, never from erasure', () => {
+    const wipe = 'apps/api/src/cf/store-do/closed-store-wipe.ts';
+    expect(stripComments(fs.readFileSync(path.join(ROOT, wipe), 'utf8'))).toMatch(/deleteAll\s*\(/);
+    for (const f of [
+      'apps/api/src/cf/erasure/merchant-anonymise.ts',
+      'apps/api/src/cf/erasure/surfaces.ts',
+      'apps/api/src/cf/erasure/job.ts',
+    ])
+      expect(fs.readFileSync(path.join(ROOT, f), 'utf8'), f).not.toMatch(
+        /closed-store-wipe|wipeClosedStoreStorage/
+      );
+    const doSrc = stripComments(
+      fs.readFileSync(path.join(ROOT, 'apps/api/src/cf/store-do/store-do.ts'), 'utf8')
+    );
+    expect(doSrc.match(/wipeClosedStoreStorage\s*\(/g)).toHaveLength(1);
+    expect(doSrc).toMatch(
+      /purgeClosedStore[\s\S]*?isStoreClosed[\s\S]*?wipeClosedStoreStorage\s*\(/
+    );
+  });
   it('RETENTION-1: 7 years is the one constant the fiscal archive reads; RETENTION-2: 72 h ack, 7 days complete', () => {
     expect(RETENTION_YEARS).toBe(7);
     expect(PDPL_ERASURE_ACK_HOURS).toBe(72);

@@ -504,3 +504,39 @@ export async function sendLegalNoticeEmail(
     replyTo: BRAND.supportEmail,
   });
 }
+
+/**
+ * Notice to the owner of a CLOSED store that its retained records will be permanently deleted on `purgeAt` (Ruling NZ-D15B): the
+ * retention period has ended. One bilingual transactional notice (Arabic first). Throws on a provider error; the caller records
+ * `no_contact` / retries, it never reports a notice as sent that was not.
+ */
+export async function sendClosedStorePurgeNoticeEmail(data: {
+  email: string;
+  storeName: string;
+  purgeAt: Date;
+}): Promise<void> {
+  const when = data.purgeAt.toISOString().slice(0, 10);
+  const esc = (v: string) =>
+    v.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const body =
+    `<p dir="rtl" style="text-align:right">متجرك «${esc(data.storeName)}» مقفول، وانتهت المدة القانونية لحفظ سجلاته. ` +
+    `هنمسح بياناته المحفوظة نهائيًا يوم ${when}. لو محتاج نسخة من أي سجل، كلّمنا قبل التاريخ ده على ${esc(BRAND.supportEmail)}.</p>` +
+    `<hr/><p>Your store "${esc(data.storeName)}" is closed and the legal retention period for its records has ended. ` +
+    `Its retained data will be permanently deleted on ${when}. If you need a copy of any record, contact ${esc(BRAND.supportEmail)} before that date.</p>`;
+  const html = renderBrandedShell(body, {
+    name: BRAND.name,
+    nameAr: BRAND.nameAr,
+    logo: BRAND_EMAIL_LOGO_URL,
+    theme: null,
+    email: null,
+    phone: null,
+    address: null,
+    defaultLanguage: 'ar',
+  });
+  await deliver({
+    to: data.email,
+    subject: 'متجرك هيتمسح نهائيًا | Your closed store will be deleted',
+    html,
+    replyTo: BRAND.supportEmail,
+  });
+}

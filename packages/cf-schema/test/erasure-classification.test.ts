@@ -116,6 +116,35 @@ describe('erasure classification', () => {
     expect(problems).toEqual([]);
   });
 
+  // Follow-up of the #1109 review (Ruling NZ-D15B): a store's KEPT platform tables survive a closed-store purge (only a tombstone row
+  // and scrubbed columns remain), so EVERY column of every store-keyed D1 table must have been decided: personal (piiColumns, cleared by
+  // lib/store-tombstone.ts) or reviewed as not personal (reviewedNotPii). A new, unclassified column fails here until someone decides.
+  // Tables the tombstone deletes outright are exempt: their rows go.
+  const DELETED_BY_TOMBSTONE = new Set([
+    'store_staff',
+    'merchant_api_keys',
+    'staff_invites',
+    'SlugRedirect',
+  ]);
+  it('every column of every store-keyed kept D1 table is classified (a new unclassified column fails CI)', () => {
+    const undecided: string[] = [];
+    let checked = 0;
+    for (const table of tableNames(DBS.d1)) {
+      const cols = (
+        DBS.d1.prepare(`PRAGMA table_info("${table}")`).all() as { name: string }[]
+      ).map(c => c.name);
+      if (!cols.includes('store_id') || DELETED_BY_TOMBSTONE.has(table)) continue;
+      const e = cls[`d1:${table}`];
+      if (!e) continue; // "classifies every table" owns a missing entry
+      checked++;
+      const decided = new Set([...e.piiColumns, ...(e.reviewedNotPii ?? [])]);
+      if (decided.has('*')) continue;
+      for (const c of cols) if (!decided.has(c)) undecided.push(`d1:${table}.${c}`);
+    }
+    expect(checked, 'the scan found the kept tables').toBeGreaterThanOrEqual(10);
+    expect(undecided).toEqual([]);
+  });
+
   it('every NOT_A_USER exception names a real column (no stale exemption)', () => {
     for (const key of Object.keys(NOT_A_USER)) {
       const [id, col] = key.split('.');
