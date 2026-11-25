@@ -13,6 +13,7 @@ import {
 } from '../lib/identity-client';
 import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
 import { hubOnD1, hubOwnedStores } from '../lib/platform-hub';
+import { shopperOneSignalPlayerIds } from './shopper-push-ids';
 import { eraseHubUserData, exportHubUserPlatform } from './platform/hub-user-data';
 import crypto from 'crypto';
 import {
@@ -2933,12 +2934,7 @@ export class AuthService {
     if (!doMoney)
       throw new AppError(503, 'STORE_BACKEND_UNAVAILABLE', 'Store backend is unavailable');
     const db = await storeDb(storeId);
-    const oneSignalPlayerIds =
-      (
-        await (db as any).oneSignalSubscription
-          ?.findMany({ where: { userId }, select: { playerId: true } })
-          .catch(() => [])
-      )?.map((x: { playerId: string }) => x.playerId) ?? [];
+    const oneSignalPlayerIds = await shopperOneSignalPlayerIds(db, userId);
     const key = await buyerKeyForErasure(user.phone);
     const provenKey =
       key && user.phone && (await phoneOnOwnOrder(storeId, userId, user.phone, db as never))

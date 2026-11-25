@@ -103,6 +103,7 @@ interface OrderRow {
 import { formatDate, formatPrice } from '../../../../../lib/format';
 import { ERASURE_REVIEW_PARAM } from '../_components/customerSegments';
 import { useT } from '../../../../../i18n/useT';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 function formatMajor(piastres: number): string {
   return formatPrice(piastres);
@@ -478,8 +479,8 @@ export default function CustomerDetailPage() {
     >
       {isLoading ? (
         <div className="space-y-4">
-          <div className="h-32 animate-pulse rounded-xl bg-muted" />
-          <div className="h-48 animate-pulse rounded-xl bg-muted" />
+          <div className="h-32 animate-pulse rounded-md bg-muted" />
+          <div className="h-48 animate-pulse rounded-md bg-muted" />
         </div>
       ) : (
         // Always render the error banner when present; then render partial
@@ -487,7 +488,7 @@ export default function CustomerDetailPage() {
         // the first page succeeded). `!customer` stays null-guarded below.
         <>
           {error && (
-            <div className="mb-4 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive-ink">
+            <div className="mb-4 rounded-md border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive-ink">
               {error}
               <button type="button" className="ms-4 font-medium underline" onClick={fetchDetail}>
                 {t('retry')}
@@ -498,7 +499,7 @@ export default function CustomerDetailPage() {
             <div className="space-y-6">
               {/* Identity + address card */}
               <div className="grid gap-6 lg:grid-cols-2">
-                <div className="rounded-xl border bg-card p-6 shadow-sm">
+                <div className="rounded-md border bg-card p-6 shadow-sm">
                   <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                     {t('contactSection')}
                   </h2>
@@ -554,7 +555,7 @@ export default function CustomerDetailPage() {
                             value={customer.groupId ?? ''}
                             disabled={savingGroup}
                             onChange={e => assignGroup(e.target.value || null)}
-                            className="rounded-md border bg-background px-2 py-1 text-sm font-medium text-foreground disabled:opacity-50"
+                            className={FIELD_CLASSES}
                           >
                             <option value="">{t('groupNone')}</option>
                             {groupOptions.map(g => (
@@ -632,7 +633,7 @@ export default function CustomerDetailPage() {
                   </dl>
                 </div>
 
-                <div className="rounded-xl border bg-card p-6 shadow-sm">
+                <div className="rounded-md border bg-card p-6 shadow-sm">
                   <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                     {t('shippingSection')}
                   </h2>
@@ -657,13 +658,13 @@ export default function CustomerDetailPage() {
 
               {/* Stats row */}
               <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <div className="rounded-xl border bg-card p-4">
+                <div className="rounded-md border bg-card p-4">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">
                     {t('statsOrders')}
                   </p>
                   <p className="mt-1 text-2xl font-bold text-foreground">{customer.totalOrders}</p>
                 </div>
-                <div className="rounded-xl border bg-card p-4">
+                <div className="rounded-md border bg-card p-4">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">
                     {t('statsSpent')}
                   </p>
@@ -671,7 +672,7 @@ export default function CustomerDetailPage() {
                     {formatMajor(customer.totalSpent)}
                   </p>
                 </div>
-                <div className="rounded-xl border bg-card p-4">
+                <div className="rounded-md border bg-card p-4">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">
                     {t('statsAvgOrder')}
                   </p>
@@ -679,7 +680,7 @@ export default function CustomerDetailPage() {
                     {formatMajor(customer.avgOrderValue)}
                   </p>
                 </div>
-                <div className="rounded-xl border bg-card p-4">
+                <div className="rounded-md border bg-card p-4">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">
                     {t('statsLastOrder')}
                   </p>
@@ -760,7 +761,7 @@ export default function CustomerDetailPage() {
                   Role-gated client-side to match the API's authorize()
                   (store_admin/super_admin only — never staff). */}
               {!customer.isGuest && canManagePrivacy && (
-                <div className="rounded-xl border border-destructive/30 bg-card shadow-sm">
+                <div className="rounded-md border border-destructive/30 bg-card shadow-sm">
                   <div className="border-b border-destructive/30 bg-destructive/10 p-4">
                     <h2 className="font-semibold text-destructive-ink">
                       {tPrivacy('sectionTitle')}

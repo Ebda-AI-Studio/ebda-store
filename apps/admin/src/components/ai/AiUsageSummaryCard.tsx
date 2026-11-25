@@ -217,7 +217,7 @@ export function AiUsageSummaryCard({
   if (loading) {
     return (
       <div
-        className={`rounded-xl border bg-card shadow-sm ${embedded ? 'px-4 py-3' : 'p-6'}`}
+        className={`rounded-md border bg-card shadow-sm ${embedded ? 'px-4 py-3' : 'p-6'}`}
         aria-busy="true"
       >
         <div className="flex items-center gap-2">
@@ -233,7 +233,7 @@ export function AiUsageSummaryCard({
   if (error || !summary) {
     return (
       <div
-        className={`rounded-xl border border-destructive/20 bg-card shadow-sm ${embedded ? 'px-4 py-3' : 'p-6'}`}
+        className={`rounded-md border border-destructive/20 bg-card shadow-sm ${embedded ? 'px-4 py-3' : 'p-6'}`}
       >
         <p className="text-xs text-destructive-ink">{t('loadError')}</p>
       </div>
@@ -255,7 +255,7 @@ export function AiUsageSummaryCard({
 
   if (embedded) {
     return (
-      <div className="rounded-xl border bg-card shadow-sm">
+      <div className="rounded-md border bg-card shadow-sm">
         {/* Header row */}
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div className="flex items-center gap-2">
@@ -346,7 +346,7 @@ export function AiUsageSummaryCard({
   // ── Full standalone layout (used on the /ai-usage page) ───────────
 
   return (
-    <div className="rounded-xl border bg-card p-6 shadow-sm">
+    <div className="rounded-md border bg-card p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-base font-semibold text-foreground">{t('standaloneHeader')}</h2>
         <Link href={`/stores/${storeId}/ai-usage`} className="text-xs text-primary hover:underline">

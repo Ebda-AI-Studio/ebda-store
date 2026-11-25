@@ -11,6 +11,8 @@ import { useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { RowActions } from '@/components/RowActions';
 import { useConfirm } from '@/hooks/useConfirm';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
+import { EmptyState } from '@/components/EmptyState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -311,12 +313,12 @@ export default function WarehousesPage() {
           rows={warehouses}
           rowKey={w => w.id}
           emptyState={
-            <div className="rounded-lg border border-dashed border-border py-16 text-center">
-              <p className="text-muted-foreground">{t('empty')}</p>
-              <Button onClick={openNew} className="mt-4">
-                {t('newButton')}
-              </Button>
-            </div>
+            <EmptyState
+              card
+              icon="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+              title={t('empty')}
+              action={{ label: t('newButton'), onClick: openNew }}
+            />
           }
         />
       )}
@@ -329,7 +331,7 @@ export default function WarehousesPage() {
             if (e.target === e.currentTarget) setModalOpen(false);
           }}
         >
-          <div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl">
+          <div className="w-full max-w-lg rounded-md border border-border bg-card p-6 shadow-xl">
             <h2 className="mb-4 text-base font-semibold">
               {editTarget ? t('editTitle') : t('newTitle')}
             </h2>
@@ -345,7 +347,7 @@ export default function WarehousesPage() {
                     type="text"
                     value={form.name}
                     onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={FIELD_CLASSES}
                     placeholder={t('warehouseNameEnSample')}
                   />
                 </label>
@@ -358,7 +360,7 @@ export default function WarehousesPage() {
                     dir="rtl"
                     value={form.nameAr}
                     onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={FIELD_CLASSES}
                     placeholder={t('warehouseNameArSample')}
                   />
                 </label>
@@ -374,7 +376,7 @@ export default function WarehousesPage() {
                     type="text"
                     value={form.code}
                     onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={`${FIELD_CLASSES} font-mono`}
                     placeholder="MAIN"
                     maxLength={20}
                   />
@@ -391,7 +393,7 @@ export default function WarehousesPage() {
                     onChange={e =>
                       setForm(f => ({ ...f, priority: parseInt(e.target.value) || 0 }))
                     }
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={FIELD_CLASSES}
                   />
                 </label>
               </div>
@@ -407,7 +409,7 @@ export default function WarehousesPage() {
                     step="any"
                     value={form.lat}
                     onChange={e => setForm(f => ({ ...f, lat: e.target.value }))}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={FIELD_CLASSES}
                     placeholder="30.0444"
                   />
                 </label>
@@ -420,7 +422,7 @@ export default function WarehousesPage() {
                     step="any"
                     value={form.lng}
                     onChange={e => setForm(f => ({ ...f, lng: e.target.value }))}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={FIELD_CLASSES}
                     placeholder="31.2357"
                   />
                 </label>
@@ -435,7 +437,7 @@ export default function WarehousesPage() {
                   type="text"
                   value={form.address}
                   onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className={FIELD_CLASSES}
                   placeholder={t('addressSample')}
                 />
               </label>
@@ -446,7 +448,7 @@ export default function WarehousesPage() {
                   type="checkbox"
                   checked={form.isDefault}
                   onChange={e => setForm(f => ({ ...f, isDefault: e.target.checked }))}
-                  className="h-4 w-4 rounded border-input text-primary"
+                  className="h-5 w-5 rounded-md border-input text-primary"
                 />
                 <span className="text-sm">{t('form.isDefault')}</span>
               </label>

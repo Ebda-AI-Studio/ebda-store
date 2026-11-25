@@ -77,7 +77,7 @@ export function RecentStores({ stores, isLoading }: RecentStoresProps) {
           ))
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
               <svg
                 className="h-8 w-8 text-muted-foreground"
                 fill="none"

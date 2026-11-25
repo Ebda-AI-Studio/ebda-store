@@ -5,6 +5,7 @@ import { Suspense, useState, useEffect, useMemo } from 'react';
 import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 import { usePathname, useRouter } from 'next/navigation';
 import { storefrontOrigin } from '@ebda/shared';
+import { liveDomain } from '@/lib/store-url';
 import { useAuth } from '../lib/auth';
 import { useStore } from '../contexts/StoreContext';
 import { useCurrentStore } from '../hooks/useCurrentStore';
@@ -21,7 +22,7 @@ import {
   type StoreBranding,
 } from './admin-layout/buildStoreAdminNav';
 import { HubTabs, type HubTab } from './admin-layout/HubTabs';
-import { detectHub, type HubLabels } from './admin-layout/hubs';
+import { detectHub, isHubTabVisible as hubTabVisible, type HubLabels } from './admin-layout/hubs';
 import {
   buildStorePaletteItems,
   type PaletteItem,
@@ -83,7 +84,11 @@ export function AdminLayout({
   // feature map has loaded AND the feature is on — never on the loading
   // default, so a store without the feature never sees the tab flash.
   const isHubTabVisible = (tab: HubTab) =>
-    !tab.featureKey || (!featuresLoading && isFeatureEnabled(tab.featureKey));
+    hubTabVisible(tab, {
+      role: user?.role,
+      featuresLoading,
+      isEnabled: isFeatureEnabled,
+    });
   const { isFocused, focusStoreId, enterFocusMode } = useFocusMode();
 
   // When a super_admin is browsing inside a specific store
@@ -274,13 +279,22 @@ export function AdminLayout({
   const { store: fetchedStore } = useCurrentStore(currentStoreId);
 
   const viewStoreUrl = useMemo(() => {
-    const domain = storeDomain || fetchedStore?.domain;
+    const domain = liveDomain({
+      domain: storeDomain || fetchedStore?.domain,
+      domainStatus: fetchedStore?.domainStatus,
+    });
     const slug = storeSlug || fetchedStore?.slug;
     // Custom domain, else the store's own `<slug>.ebda.app` host.
     if (slug) return storefrontOrigin({ slug, domain });
     if (domain) return `https://${domain}`;
     return null;
-  }, [storeDomain, storeSlug, fetchedStore?.domain, fetchedStore?.slug]);
+  }, [
+    storeDomain,
+    storeSlug,
+    fetchedStore?.domain,
+    fetchedStore?.domainStatus,
+    fetchedStore?.slug,
+  ]);
 
   // Hide the back button on top-level "home" pages — there's nowhere to
   // go back to. For super_admins that's `/` and `/dashboard`. For
@@ -426,7 +440,7 @@ export function AdminLayout({
           />
         </svg>
         <span className="flex-1 text-start">{tcp('trigger')}</span>
-        <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-xs lg:inline-block">
+        <kbd className="hidden shrink-0 rounded-md border border-border px-1.5 py-0.5 text-xs lg:inline-block">
           {/* i18n-gate-allow: keyboard shortcut keycap */}
           ⌘K
         </kbd>
@@ -504,7 +518,7 @@ export function AdminLayout({
       {/* Mobile Sidebar */}
       <aside
         id="admin-mobile-sidebar"
-        className={`fixed inset-y-0 start-0 z-50 w-72 transform border-e border-border/50 bg-card shadow-2xl transition-transform duration-300 ease-out lg:hidden ${
+        className={`fixed inset-y-0 start-0 z-50 w-72 transform border-e border-border/50 bg-card shadow-xl transition-transform duration-300 ease-out lg:hidden ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'
         }`}
         aria-hidden={!isSidebarOpen}

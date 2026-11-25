@@ -75,7 +75,7 @@ export function InstalmentsCard({ storeId }: { storeId: string }) {
   const input = 'rounded-lg border border-border bg-background px-3 py-2 text-sm';
   return (
     <section
-      className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm"
+      className="space-y-3 rounded-md border border-border bg-card p-4 shadow-sm"
       data-testid="instalments-card"
       data-setting-id="payment.instalments"
     >

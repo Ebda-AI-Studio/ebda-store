@@ -140,6 +140,8 @@ const nextConfig = {
         destination: '/stores/:id/builder',
         permanent: true,
       },
+      // STORE-QA-30: "فريق العمل" lives at /staff; /team is the obvious link guess.
+      { source: '/stores/:id/team', destination: '/stores/:id/staff', permanent: true },
       // The legacy in-Store WhatsApp bridge pages were deleted (Ruling WA-LEGACY-1);
       // old bookmarks land on Settings. `/integrations/*` only ever held that bridge page.
       ...[

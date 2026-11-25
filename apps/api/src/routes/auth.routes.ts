@@ -10,6 +10,7 @@ import {
   rejectIdentityManaged,
   rejectAdminOnMerchantOrigin,
   rejectImpersonated,
+  isCrossSiteAdminRequest,
 } from '../middleware/auth';
 import { guestProbe } from '../middleware/guest-probe';
 import { isAccountsToken, verifyAccountsToken } from '../lib/accounts-token';
@@ -814,6 +815,25 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
     // Read the refresh token from the body OR the cookie so a pure-browser
     // client (which never had the token in JS) still gets it revoked
     // server-side, not just cleared locally.
+    // ID-05: an identity-service session is not ended by a cross-site request (forced logout). Customers are exempt: their
+    // storefront runs on merchant domains by design.
+    {
+      const authHeader = req.headers.authorization;
+      const tok = authHeader?.startsWith('Bearer ')
+        ? authHeader.split(' ')[1]
+        : (req.cookies?.token as string | undefined);
+      if (tok && isAccountsToken(tok) && isCrossSiteAdminRequest(req)) {
+        res.status(403).json({
+          success: false,
+          error: {
+            code: 'ORIGIN_NOT_PERMITTED',
+            message: 'This endpoint is not available from this origin',
+          },
+        });
+        return;
+      }
+    }
+
     const refreshToken =
       (req.body?.refreshToken as string | undefined) ||
       (req.cookies?.refresh_token as string | undefined);
@@ -882,6 +902,40 @@ router.post(
         success: true,
         data: { message: 'All sessions revoked' },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /auth/impersonation/end (TEN-2)
+// Ends the impersonation session this token belongs to: its jti is denylisted for the rest of its life. Callable only WITH an
+// impersonation token (a real session gets 400), so it can never be turned against a normal login.
+router.post(
+  '/impersonation/end',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const jti = (req as Request & { tokenJti?: string }).tokenJti;
+      if (!req.user?.impersonatedBy || !jti) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'NOT_IMPERSONATING', message: 'This session is not an impersonation' },
+        });
+        return;
+      }
+      await redis.denyJti(jti, 3600);
+      await auditLog({
+        action: 'admin.impersonate.end',
+        userId: req.user.impersonatedBy,
+        resourceType: 'user',
+        resourceId: req.user.userId,
+        details: { impersonatedUserId: req.user.userId },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      clearSessionCookies(res);
+      res.json({ success: true, data: { message: 'Impersonation ended' } });
     } catch (error) {
       next(error);
     }

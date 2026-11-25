@@ -8,6 +8,7 @@ import { buttonVariants } from '@/components/ui/Button';
 import Link from 'next/link';
 import { resolveDefaultLanguage } from '@ebda/shared';
 import { AdminLayout } from '../../../components/AdminLayout';
+import { PlanLimitNotice } from '@/components/billing/PlanLimitNotice';
 import { useAuth } from '../../../lib/auth';
 import { getStoreDisplayUrl, getStoreHref } from '../../../lib/store-url';
 import { useT } from '@/i18n/useT';
@@ -107,6 +108,10 @@ export default function StoreDetailPage() {
         </Link>
       }
     >
+      <PlanLimitNotice
+        storeId={store.id}
+        keys={['maxProducts', 'maxOrdersPerMonth', 'maxStaff', 'maxStorageMb', 'ai']}
+      />
       <NeedsAction storeId={store.id} />
 
       {/* UX:D-5: one next step at a time: setup guide, else the order-alerts prompt, else the stale gold rate. */}
