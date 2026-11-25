@@ -8,6 +8,7 @@ const m = vi.hoisted(() => ({
   socketStatus: vi.fn(),
   returnStatus: vi.fn(),
   returnFind: vi.fn(),
+  orderFind: vi.fn(),
 }));
 
 vi.mock('../../lib/customer-directory', () => ({
@@ -32,7 +33,10 @@ vi.mock('../../lib/after-tenant-commit', () => ({
   deferAfterTenantCommit: async (_n: string, fn: () => Promise<unknown>) => fn(),
 }));
 vi.mock('../../lib/repo-factory', () => ({
-  storeDb: async () => ({ return: { findFirst: m.returnFind } }),
+  storeDb: async () => ({
+    return: { findFirst: m.returnFind },
+    order: { findFirst: m.orderFind },
+  }),
   storeMoney: async () => ({ returnStatus: m.returnStatus }),
 }));
 vi.mock('../order.service', () => ({ OrderService: {} }));
@@ -72,14 +76,28 @@ describe('guest return identity (withCustomer)', () => {
 });
 
 describe('return status update on a guest return', () => {
-  it('sends no email and no socket push, even when an address is present', async () => {
-    m.returnFind.mockResolvedValue(
-      guestRow({ firstName: 'Mona', lastName: 'Ali', email: 'm@x.com', phone: '0100' })
-    );
+  it('mails the contact on the order (the shopper asked for the return) but never pushes a socket event', async () => {
+    m.returnFind.mockResolvedValue(guestRow(null));
+    m.orderFind.mockResolvedValue({
+      shippingAddress: { firstName: 'Mona', lastName: 'Ali', email: 'm@x.com' },
+    });
     m.customerRows.mockResolvedValue([]);
     vi.spyOn(ReturnService, 'getById').mockResolvedValue({} as never);
     await ReturnService.updateStatus('s1', 'r1', 'approved' as never, 'u1');
     expect(m.returnStatus).toHaveBeenCalled();
+    expect(m.sendStatus).toHaveBeenCalledTimes(1);
+    expect(m.sendStatus.mock.calls[0][1]).toMatchObject({
+      email: 'm@x.com',
+      customerName: 'Mona Ali',
+    });
+    expect(m.socketStatus).not.toHaveBeenCalled();
+  });
+  it('a guest return whose order has no email is not mailed at all', async () => {
+    m.returnFind.mockResolvedValue(guestRow(null));
+    m.orderFind.mockResolvedValue({ shippingAddress: { phone: '0100' } });
+    m.customerRows.mockResolvedValue([]);
+    vi.spyOn(ReturnService, 'getById').mockResolvedValue({} as never);
+    await ReturnService.updateStatus('s1', 'r1', 'approved' as never, 'u1');
     expect(m.sendStatus).not.toHaveBeenCalled();
     expect(m.socketStatus).not.toHaveBeenCalled();
   });

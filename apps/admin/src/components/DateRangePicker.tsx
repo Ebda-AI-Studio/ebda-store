@@ -6,6 +6,7 @@ import { useT } from '@/i18n/useT';
 import { ANALYTICS_PERIOD_PRESETS } from '@ebda/shared';
 import type { Period, ResolvedDateRange } from '../app/stores/[id]/analytics/_components/types';
 import { resolveDateRange } from '../app/stores/[id]/analytics/_components/types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface DateRangePickerProps {
   period: Period;
@@ -111,7 +112,7 @@ export function DateRangePicker({ period, custom, onChange, exclude = [] }: Date
 
   return (
     <div className="mb-6 space-y-3">
-      <div className="flex flex-wrap items-center gap-1 rounded-xl bg-muted p-1 w-fit">
+      <div className="flex flex-wrap items-center gap-1 rounded-md bg-muted p-1 w-fit">
         {presets.map(p => {
           // 'week' / 'month' / 'year' map to the new equivalents for active highlight.
           const isActive =
@@ -133,25 +134,25 @@ export function DateRangePicker({ period, custom, onChange, exclude = [] }: Date
         })}
       </div>
       {period === 'custom' && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card px-4 py-3">
+          <label className="flex flex-col gap-1 text-sm text-muted-foreground">
             {t('dateFrom')}
             <input
               type="date"
               value={customStart}
               onChange={e => handleCustomChange(e.target.value, customEnd)}
               max={customEnd}
-              className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+              className={FIELD_CLASSES}
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          <label className="flex flex-col gap-1 text-sm text-muted-foreground">
             {t('dateTo')}
             <input
               type="date"
               value={customEnd}
               onChange={e => handleCustomChange(customStart, e.target.value)}
               min={customStart}
-              className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+              className={FIELD_CLASSES}
             />
           </label>
         </div>

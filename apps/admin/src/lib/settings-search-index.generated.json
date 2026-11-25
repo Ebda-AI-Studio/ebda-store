@@ -321,7 +321,7 @@
     "id": "page:/lifecycle-emails",
     "kind": "page",
     "route": "/lifecycle-emails",
-    "access": "staff",
+    "access": "owner",
     "en": "Setup emails",
     "ar": "رسائل البداية",
     "synEn": "setup emails onboarding trial reminder referral unsubscribe",
@@ -983,6 +983,16 @@
     "synEn": "team members roles permissions invite employee",
     "synAr": "موظفين فريق صلاحيات دعوة",
     "feature": "staff_accounts"
+  },
+  {
+    "id": "page:/activity",
+    "kind": "page",
+    "route": "/activity",
+    "access": "owner",
+    "en": "Store activity",
+    "ar": "نشاط المتجر",
+    "synEn": "audit log history who changed activity",
+    "synAr": "سجل نشاط مين غيّر تاريخ"
   },
   {
     "id": "page:/features",

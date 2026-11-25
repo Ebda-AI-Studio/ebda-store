@@ -1,3 +1,4 @@
+import { logAuditEvent, logEvent } from './audit-log';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod/v3';
 import bcrypt from 'bcryptjs';
@@ -8,6 +9,7 @@ import {
   isSessionRevoked,
   resolveRefresh,
   revokeAllForUser,
+  revokeOtherSessions,
   revokeSession,
   SESSION_TTL_MS,
   type Resolved,
@@ -38,7 +40,7 @@ import {
   revokeClient,
   rotateClient,
 } from './clients';
-import { jwks } from './keys';
+import { jwks, retiredKeysWithoutExp } from './keys';
 import { isDisposableEmail } from '../../../packages/shared/src/abuse/disposable-email-domains';
 import { renderSignupPage, signupReturn, SIGNUP_JS, SIGNUP_PAGE_HEADERS } from './signup-page';
 import { DUMMY_HASH, hashPassword, passwordPolicy, verifyPassword } from './password';
@@ -444,6 +446,26 @@ async function bearerAuth(
   return { user, sid: verified.sid, aud: verifiedAud };
 }
 
+/** Unused recovery codes; a null or malformed column (legacy row, operator reset) reads as none instead of a 500. */
+function remainingRecoveryCodes(raw: string | null): number {
+  try {
+    const list: unknown = JSON.parse(raw ?? '[]');
+    return Array.isArray(list) ? list.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** 10 single-use recovery codes: the plain list is shown once, only bcrypt hashes are stored. */
+async function newRecoveryCodes(): Promise<{ plain: string[]; hashed: string[] }> {
+  const plain = Array.from({ length: 10 }, () =>
+    [...crypto.getRandomValues(new Uint8Array(5))]
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+  );
+  return { plain, hashed: await Promise.all(plain.map(x => bcrypt.hash(x, 10))) };
+}
+
 /** Step-up for sensitive changes: the account password again, throttled like a login (a bearer token alone must not allow free guessing). */
 async function requirePassword(c: C, user: UserRow, password: unknown): Promise<void> {
   const a = await hit(c.env.DB, user.id, clientIp(c), { ...LOGIN, name: 'pw', brake: false });
@@ -525,6 +547,30 @@ export async function issueAndMail(
   })();
   // Neither channel waits for or can fail the other; sendCodeOverWhatsApp never rejects.
   await Promise.all([mail, whatsapp]);
+}
+
+/**
+ * ID-06: after MFA is turned off, a passkey is removed or the recovery phone changes, every OTHER session is signed out (a thief
+ * holding a stolen session loses it; the owner keeps the one they just used) and the mailbox owner is told. The mail is best
+ * effort and runs after the response; the revocation is not and happens before it.
+ */
+async function securityChanged(
+  c: C,
+  user: UserRow,
+  sid: string,
+  change: 'mfa_disabled' | 'passkey_removed' | 'phone_changed'
+): Promise<void> {
+  await revokeOtherSessions(c.env.DB, user.id, sid, change);
+  queueMail(
+    c,
+    c.env.MAILER?.sendNotice({
+      to: user.email,
+      kind: 'credential_changed',
+      change,
+      language: user.language === 'ar' ? 'ar' : 'en',
+      firstName: user.first_name,
+    }) ?? Promise.resolve()
+  );
 }
 
 /** Mail work runs after the response, so every branch of the caller answers in the same time (no registered-address oracle). */
@@ -952,14 +998,25 @@ export function createApp() {
   );
 
   // ---- discovery ----
-  app.get('/health', c =>
-    c.json({
+  app.get('/health', c => {
+    const noExp = retiredKeysWithoutExp(c.env);
+    if (noExp.length)
+      logEvent('jwt_previous_public_jwks_entry_without_exp', { kids: noExp }, 'error');
+    return c.json({
       status: 'ok',
+      ...(noExp.length
+        ? {
+            warning: 'retired_jwk_without_exp',
+            warningDetail:
+              'a retired JWKS key has no exp, or an exp more than 30 days ahead: it is not published',
+            retiredKeysWithoutExp: noExp,
+          }
+        : {}),
       service: 'accounts',
       commit: c.env.BUILD_COMMIT_SHA || null,
       deploymentId: c.env.CF_VERSION_METADATA?.id ?? null,
-    })
-  );
+    });
+  });
   app.get('/.well-known/jwks.json', async c => {
     c.header('Cache-Control', 'public, max-age=300');
     return c.json(await jwks(c.env));
@@ -1353,12 +1410,7 @@ export function createApp() {
     if (!user.mfa_secret || !c.env.MFA_KEY || user.mfa_enabled) throw err(409, 'MFA_NOT_PENDING');
     if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
     const mode = await authorizeEnrolment(c, user, sid, body);
-    const plain = Array.from({ length: 10 }, () =>
-      [...crypto.getRandomValues(new Uint8Array(5))]
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('')
-    );
-    const hashed = await Promise.all(plain.map(x => bcrypt.hash(x, 10)));
+    const { plain, hashed } = await newRecoveryCodes();
     await c.env.DB.prepare(
       `UPDATE users SET mfa_enabled = 1, mfa_enrolled_at = ?2, mfa_backup_codes = ?3 WHERE id = ?1`
     )
@@ -1368,8 +1420,52 @@ export function createApp() {
     return c.json({ success: true, data: { enabled: true, backupCodes: plain, requiresSignIn } });
   });
 
-  app.post('/mfa/disable', async c => {
+  // Recovery codes (A23): how many are left (never the codes), and a regenerate that retires the whole old set.
+  app.get('/mfa/recovery-codes', async c => {
     const { user } = await bearerAuth(c);
+    if (!user.mfa_enabled) throw err(409, 'MFA_NOT_ENABLED');
+    return c.json({
+      success: true,
+      data: { remaining: remainingRecoveryCodes(user.mfa_backup_codes) },
+    });
+  });
+
+  // Step-up = the account password AND a live authenticator code (a recovery code is refused: it must not mint more of
+  // itself). Both go through the throttled paths. The new list REPLACES the old one in one statement, so every old code dies.
+  // Super-admin override: staff may still reset MFA via scripts/mfa-reset.ts (last resort, docs/runbooks/mfa-recovery.md).
+  app.post('/mfa/recovery-codes/regenerate', async c => {
+    const { user } = await bearerAuth(c);
+    const body = await json(c, z.object({ password: z.string(), code: z.string().max(20) }));
+    if (!user.mfa_enabled || !user.mfa_secret || !c.env.MFA_KEY) throw err(409, 'MFA_NOT_ENABLED');
+    await requirePassword(c, user, body.password);
+    if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
+    const { plain, hashed } = await newRecoveryCodes();
+    // The new set and its audit row land together (no code, no hash in the row; actor 'self').
+    await c.env.DB.batch([
+      c.env.DB.prepare(`UPDATE users SET mfa_backup_codes = ?2 WHERE id = ?1`).bind(
+        user.id,
+        JSON.stringify(hashed)
+      ),
+      c.env.DB.prepare(
+        `INSERT INTO admin_audit (event, user_id, email, actor, at, detail) VALUES ('mfa_recovery_codes_regenerated', ?1, ?2, 'self', ?3, '{}')`
+      ).bind(user.id, user.email.toLowerCase(), nowMs()),
+    ]);
+    // Tell the mailbox owner (best effort; the change already happened): a stolen session regenerating codes must not be silent.
+    queueMail(
+      c,
+      c.env.MAILER?.sendNotice({
+        to: user.email,
+        kind: 'recovery_codes_changed',
+        language: user.language === 'ar' ? 'ar' : 'en',
+        firstName: user.first_name,
+      }) ?? Promise.resolve()
+    );
+    logAuditEvent('mfa_recovery_codes_regenerated', user.id);
+    return c.json({ success: true, data: { backupCodes: plain } });
+  });
+
+  app.post('/mfa/disable', async c => {
+    const { user, sid } = await bearerAuth(c);
     const body = await json(c, z.object({ password: z.string(), code: z.string() }));
     await requirePassword(c, user, body.password);
     if (!user.mfa_secret || !c.env.MFA_KEY) throw err(409, 'MFA_NOT_ENABLED');
@@ -1387,6 +1483,7 @@ export function createApp() {
     )
       .bind(user.id)
       .run();
+    await securityChanged(c, user, sid, 'mfa_disabled');
     return c.json({ success: true, data: { enabled: false } });
   });
 
@@ -1396,7 +1493,7 @@ export function createApp() {
   // account has a second factor, and a per-user throttle. Interim: the new number is NOT proven by a code sent to it (the
   // WhatsApp channel is flag-off); the re-authentication is the proof. Send the code to the new number here when it is on.
   app.post('/phone', async c => {
-    const { user } = await bearerAuth(c);
+    const { user, sid } = await bearerAuth(c);
     const body = await json(
       c,
       z.object({
@@ -1416,6 +1513,7 @@ export function createApp() {
     await c.env.DB.prepare(`UPDATE users SET phone = ?2, updated_at = ?3 WHERE id = ?1`)
       .bind(user.id, body.phone, iso())
       .run();
+    await securityChanged(c, user, sid, 'phone_changed');
     return c.json({ success: true, data: { phone: body.phone } });
   });
 
@@ -1519,6 +1617,7 @@ export function createApp() {
     }
     if (!(await passkeys.removePasskey(c.env.DB, user.id, c.req.param('id'))))
       throw err(404, 'NOT_FOUND');
+    await securityChanged(c, user, sid, 'passkey_removed');
     return c.json({ success: true, data: { deleted: true } });
   });
 

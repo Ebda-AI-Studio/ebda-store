@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { MediaPicker } from './MediaPicker';
 import { useRestoreFocus } from '../_lib/use-restore-focus';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 export interface SwapRequest {
   alt?: { en: string; ar?: string };
@@ -57,7 +58,7 @@ export function ImageSwapDialog({
       onClose={onClose}
       onCancel={onClose}
       aria-labelledby="swap-alt-title"
-      className="w-[min(30rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card p-0 text-foreground backdrop:bg-black/60"
+      className="w-[min(30rem,calc(100vw-2rem))] rounded-lg border border-border bg-card p-0 text-foreground backdrop:bg-black/60"
       data-testid="image-swap-alt"
     >
       <form
@@ -86,7 +87,7 @@ export function ImageSwapDialog({
               maxLength={300}
               onChange={e => setAr(e.target.value)}
               data-testid="swap-alt-ar"
-              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2"
+              className={`${FIELD_CLASSES} mt-1`}
             />
           </label>
         )}
@@ -99,7 +100,7 @@ export function ImageSwapDialog({
             maxLength={300}
             onChange={e => setEn(e.target.value)}
             data-testid="swap-alt-en"
-            className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2"
+            className={`${FIELD_CLASSES} mt-1`}
           />
         </label>
         <div className="flex justify-end gap-2 pt-1">
