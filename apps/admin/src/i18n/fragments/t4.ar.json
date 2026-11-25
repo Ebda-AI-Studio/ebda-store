@@ -292,7 +292,6 @@
   },
   "floatingWidget": {
     "pageTitle": "زرار الواتساب العايم",
-    "premiumSubtitle": "ميزة إضافية",
     "mainSubtitle": "أزرار ثابتة بيشوفها عميلك في كل صفحة، زي الواتساب والاتصال",
     "saveChanges": "احفظ الأزرار",
     "savedToast": "اتحفظت الأزرار",
