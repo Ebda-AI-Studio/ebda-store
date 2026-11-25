@@ -28,4 +28,27 @@ describe('capability registry rules (lens 192)', () => {
     );
     expect(r.violations.map(v => v.rule)).toContain('policy-free-writes');
   });
+
+  it('every live capability has 3-6 ar and 1-3 en example questions and none is baselined', () => {
+    const live = entries.filter(e => e.status === 'live');
+    expect(live.length).toBeGreaterThan(0);
+    const bad = live
+      .filter(
+        e =>
+          e.questions.ar.length < 3 ||
+          e.questions.ar.length > 6 ||
+          e.questions.en.length < 1 ||
+          e.questions.en.length > 3
+      )
+      .map(e => e.id);
+    expect(bad).toEqual([]);
+    expect(loadBaseline('registry').filter(id => id.startsWith('questions-count|'))).toEqual([]);
+  });
+
+  it('a live entry stripped of its questions fails questions-count (mutation proof)', () => {
+    const live = entries.find(e => e.status === 'live')!;
+    const stripped = { ...(live as object), questions: { ar: [], en: [] } };
+    const r = checkRegistry([{ name: `${live.id}.capability.json`, json: stripped }], readConfig());
+    expect(r.violations.map(v => v.rule)).toContain('questions-count');
+  });
 });

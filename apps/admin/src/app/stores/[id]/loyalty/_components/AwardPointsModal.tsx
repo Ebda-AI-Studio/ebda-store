@@ -4,6 +4,7 @@ import { useT } from '@/i18n/useT';
 import { BottomSheet } from '@/components/mobile/BottomSheet';
 import type { LoyaltyMember } from './types';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface AwardPointsModalProps {
   member: LoyaltyMember;
@@ -78,7 +79,7 @@ export function AwardPointsModal({
             value={points}
             onChange={e => onPointsChange(e.target.value)}
             placeholder={t('pointsPlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
             required
           />
         </div>
@@ -92,7 +93,7 @@ export function AwardPointsModal({
             value={reason}
             onChange={e => onReasonChange(e.target.value)}
             placeholder={t('reasonPlaceholder')}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
           />
         </div>
       </form>

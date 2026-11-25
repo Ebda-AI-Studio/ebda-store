@@ -18,7 +18,7 @@
   },
   "helpArticle": "products-and-csv-import",
   "questions": {
-    "ar": ["امسح المنتج ده", "ينفع ارجع منتج اتمسح؟"],
+    "ar": ["امسح المنتج ده", "ينفع ارجع منتج اتمسح؟", "ازاي اشيل منتج من المتجر؟"],
     "en": ["Delete a product", "Can I restore a deleted product?"]
   },
   "steps": ["Product list > delete."],

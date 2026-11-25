@@ -1,5 +1,6 @@
 'use client';
 
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 import { useEffect, useState } from 'react';
 import {
   TAX_DOCUMENT_KINDS,
@@ -140,15 +141,13 @@ export function TaxChangeRequest({ storeId }: { storeId: string }) {
     setFile(f);
   };
 
-  const inputCls =
-    'w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground';
   return (
     <div data-testid="vat-change-request" className="space-y-3 border-t border-border pt-3">
       <div>
         <h3 data-setting-id="tax.change-request" className="text-sm font-medium text-foreground">
           {t('change.title')}
         </h3>
-        <p className="text-xs text-muted-foreground">{t('change.hint')}</p>
+        <p className="text-sm text-muted-foreground">{t('change.hint')}</p>
       </div>
       {state?.lastRejection && !state.request && (
         <p role="status" className="text-sm text-destructive-ink">
@@ -176,7 +175,7 @@ export function TaxChangeRequest({ storeId }: { storeId: string }) {
               <input
                 dir="ltr"
                 inputMode="numeric"
-                className={`${inputCls} text-start`}
+                className={`${FIELD_CLASSES} text-start`}
                 value={trn}
                 placeholder={t('form.trnPlaceholder')}
                 disabled={busy}
@@ -188,7 +187,7 @@ export function TaxChangeRequest({ storeId }: { storeId: string }) {
                 {t('change.newLegalName')}
               </span>
               <input
-                className={inputCls}
+                className={FIELD_CLASSES}
                 value={legalName}
                 disabled={busy}
                 onChange={e => setLegalName(e.target.value)}
@@ -201,7 +200,7 @@ export function TaxChangeRequest({ storeId }: { storeId: string }) {
                 {t('documents.kindLabel')}
               </span>
               <select
-                className={inputCls}
+                className={FIELD_CLASSES}
                 value={kind}
                 disabled={busy}
                 onChange={e => setKind(e.target.value as TaxDocumentKindValue)}

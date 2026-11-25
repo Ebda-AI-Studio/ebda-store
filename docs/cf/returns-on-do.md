@@ -34,9 +34,13 @@ The store-credit credit (and the wallet share of a gateway refund) is written in
 - `tests/integration/repo-factory-returns-contract.test.ts` (real Postgres 17 vs the DO schema, real `ReturnService` and posting functions, 13 scenarios): equal returns or errors (status + code) and equal return, item, wallet, stock and journal rows.
 - `apps/api/workers-do/returns.test.ts` (real workerd, `npm run cf:test:do -- returns`): 40 concurrent completions claim once, two returns of one order complete one at a time, 10 concurrent requests for the same two tees hold them once, 30 concurrent journals of one refundKey book once, 25 retried completions credit the wallet once, a failing credit rolls the completion back.
 
+## Guest returns (Ruling GUEST-RET-1)
+
+`returnCreate` takes `guest: true` for a shopper-opened return on a guest order (`orders.customer_id` is null): the order is matched with `customer_id IS NULL`, an account `customerId` never reaches it, and the row stores the `guest:<orderId>` marker (`returns.customer_id` stays NOT NULL; GUEST-RETURN-MARKER-1). A null `customerId` is never accepted. `returnClaim` refuses `store_credit` for such a return (`GUEST_STORE_CREDIT`). The identity check (order number plus phone or email) is Worker-side in `ReturnService.createForGuest`, before the op, and the guest path needs a StoreDO store (`RETURNS_NEED_DO_STORE` otherwise). See `docs/rulings/GUEST-RET-1.md`.
+
 ## Merchant-opened returns and the admin partial refund (STORE-QA-76)
 
-`returnCreate` takes `byMerchant: true` (set only by `POST /returns/admin` and `POST /orders/:id/partial-refund`, never by a shopper route): the order's own customer is used, the return window does not bind the merchant, and an item may carry `restock: false`. A guest order is refused (`GUEST_ORDER_RETURN_UNSUPPORTED`) until GUEST-RET-1 makes `returns.customer_id` nullable.
+`returnCreate` takes `byMerchant: true` (set only by `POST /returns/admin` and `POST /orders/:id/partial-refund`, never by a shopper route): the order's own customer is used, the return window does not bind the merchant, and an item may carry `restock: false`. A guest order is allowed: the row stores the `guest:<orderId>` marker (GUEST-RET-1).
 
 - Per-line restock rides `return_items.condition = 'no_restock'` (merchant-opened only; a shopper-supplied value is dropped). `finishReturn` passes `skipRestock` to `refundOrder` (no stock move) and `postPartialReturnJournal` leaves those lines' COGS expensed (no inventory reversal). A return covering every line takes the whole-order reversal, which restocks everything, so a mixed choice there is refused at the claim (`FULL_RETURN_RESTOCK_ALL`).
 - `analyticsRefundQuote` (read): paid / refunded / refundable (the ONE balance, #624), per-line remaining quantity, and an estimate for a selection from `allocatePartialReturn`, the allocation the completion pays.
