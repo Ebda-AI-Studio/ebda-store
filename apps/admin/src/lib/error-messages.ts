@@ -16,6 +16,7 @@ export const ERROR_AR: Record<string, string> = {
   NETWORK_ERROR: 'مفيش اتصال بالنت دلوقتي. اتأكد من الاتصال وجرّب تاني.',
   PARSE_ERROR: 'السيرفر رد برد مش مفهوم. جرّب تاني بعد شوية.',
   VALIDATION_ERROR: 'فيه بيانات ناقصة أو غلط. راجع الخانات وجرّب تاني.',
+  STEP_UP_REQUIRED: 'عشان تأكّد التغيير ده لازم تسجّل دخول تاني. هنرجّعك للصفحة بعد ما تدخل.',
   NOT_FOUND: 'مش لاقيين اللي بتدوّر عليه. ممكن يكون اتمسح أو اتنقل.',
   FORBIDDEN: 'مش مسموحلك تعمل ده. كلّم صاحب المتجر لو محتاج الصلاحية.',
   SERVER_ERROR: 'حصلت مشكلة عندنا. جرّب تاني بعد شوية.',
@@ -32,6 +33,8 @@ export const ERROR_EN: Record<string, string> = {
   NETWORK_ERROR: 'No connection right now. Check your internet and try again.',
   PARSE_ERROR: 'The server sent a reply we could not read. Try again in a moment.',
   VALIDATION_ERROR: 'Some details are missing or wrong. Check the fields and try again.',
+  STEP_UP_REQUIRED:
+    'To confirm this change, please sign in again. We will bring you back here afterwards.',
   NOT_FOUND: 'We could not find what you were looking for. It may have been deleted or moved.',
   FORBIDDEN: 'You are not allowed to do this. Ask the store owner for access.',
   SERVER_ERROR: 'Something went wrong on our side. Try again in a moment.',

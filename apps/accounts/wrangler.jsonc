@@ -46,8 +46,8 @@
     // Verified 2026-10-25: no production secret is sealed in a legacy format (0 users with a TOTP), so legacy v1/v2 are refused from day one.
     "MFA_REJECT_LEGACY": "true",
     "PRODUCTS": "store,whatsapp,crm,erp",
-    // Show the Chat sign-up link on the Chat sign-in page. Mirror of Chat's STANDALONE_WORKSPACES flag: "true" only once it is not `off`.
-    "CHAT_SIGNUP_LINK": "false",
+    // Ebda Chat sign-up OPEN to everyone (Ahmad 2026-11-23): page, POST /signup, sign-in link. Mirror of Chat's STANDALONE_WORKSPACES (not `off`); flip both together. "false" = closed (404).
+    "CHAT_SIGNUP_OPEN": "true",
     // WhatsApp codes need the platform number (Meta, third party). "true" only after ebda-wa has PLATFORM_OTP_PHONE_NUMBER_ID + PLATFORM_OTP_TEMPLATE set.
     "WHATSAPP_OTP_ENABLED": "false",
     // Least privilege: a browser origin may only obtain tokens for ITS product audience (an XSS on one product cannot mint another's).

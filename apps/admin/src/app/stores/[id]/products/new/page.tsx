@@ -287,7 +287,7 @@ export default function NewProductPage() {
 
         <div className="mx-auto max-w-3xl space-y-6">
           {/* Essentials: the only things a product needs to exist. Everything else is behind "more details". */}
-          <div className="rounded-xl border bg-card p-6 shadow-sm">
+          <div className="rounded-md border bg-card p-6 shadow-sm">
             <h2 className="mb-4 text-lg font-semibold text-foreground">
               {t('sections.essentials')}
             </h2>
@@ -334,7 +334,7 @@ export default function NewProductPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border bg-card p-6 shadow-sm">
+          <div className="rounded-md border bg-card p-6 shadow-sm">
             <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">{t('sections.media')}</h2>
               <p className="text-xs text-muted-foreground">{t('fields.mediaSizeHint')}</p>
@@ -350,7 +350,7 @@ export default function NewProductPage() {
             />
           </div>
 
-          <div className="rounded-xl border bg-card shadow-sm">
+          <div className="rounded-md border bg-card shadow-sm">
             <button
               type="button"
               aria-expanded={showDetails}

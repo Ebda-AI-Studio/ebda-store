@@ -27,7 +27,7 @@ export function PromptResultsList({ storeId, prompts }: PromptResultsListProps) 
   }
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-md border border-border shadow-sm overflow-hidden">
       <h2 className="text-lg font-semibold text-foreground px-6 pt-6">{t('promptsTitle')}</h2>
       <ul className="divide-y divide-border mt-3">
         {prompts.map(prompt => (
@@ -51,7 +51,7 @@ export function PromptResultsList({ storeId, prompts }: PromptResultsListProps) 
                     {prompt.competitorUrls.map(url => (
                       <span
                         key={url}
-                        className="inline-block mr-1.5 rtl:mr-0 rtl:ml-1.5 rounded bg-muted px-1.5 py-0.5 font-mono text-xs"
+                        className="inline-block mr-1.5 rtl:mr-0 rtl:ml-1.5 rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs"
                       >
                         {url.replace(/^https?:\/\//, '')}
                       </span>

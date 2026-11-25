@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { SearchTermsField } from '@/components/SearchTermsField';
+import { SlugField } from './_components/SlugField';
+import { isValidProductSlug, savedSlugIfChanged, slugForUpdate } from './_components/slug-field';
 import { Badge, Input, Textarea, Select, cn, useToast } from '@ebda/ui';
 import { Button, buttonVariants } from '@/components/ui/Button';
 import { storefrontOrigin } from '@ebda/shared';
@@ -211,6 +213,7 @@ export default function EditProductPage() {
   const [formData, setFormData] = useState({
     name: '',
     nameAr: '',
+    slug: '',
     description: '',
     descriptionAr: '',
     excerpt: '',
@@ -342,6 +345,7 @@ export default function EditProductPage() {
         setFormData({
           name: p.name || '',
           nameAr: p.nameAr || '',
+          slug: p.slug || '',
           description: p.description || '',
           descriptionAr: p.descriptionAr || '',
           excerpt: (p as Product & { excerpt?: string }).excerpt || '',
@@ -628,6 +632,11 @@ export default function EditProductPage() {
         return;
       }
 
+      if (formData.slug.trim() !== '' && !isValidProductSlug(formData.slug)) {
+        setError(tFields('slugInvalid'));
+        return;
+      }
+
       const personal = personalisationPayload(personalisation);
       if ('error' in personal) {
         setError(tPersonal(personal.error));
@@ -636,6 +645,8 @@ export default function EditProductPage() {
 
       const body: Record<string, unknown> = {
         name: formData.name,
+        // Only a real change is sent; the API records the SlugRedirect from the old slug.
+        ...slugForUpdate(formData.slug, product.slug),
         // Clearable free text (nameAr / description / descriptionAr / sku).
         // null clears, undefined leaves alone — same convention as metaTitle
         // below. These MUST send null: `undefined` omits the key, so an
@@ -686,7 +697,7 @@ export default function EditProductPage() {
         body.categories = [];
       }
 
-      const { error: apiError } = await apiPut(
+      const { data: saved, error: apiError } = await apiPut<{ product?: { slug?: string } }>(
         `/api/v1/stores/${storeId}/products/${product.id}`,
         body
       );
@@ -701,7 +712,11 @@ export default function EditProductPage() {
       // `returnTo` (when present and same-store) restores the exact filtered list view. No router.refresh() and no
       // setSaving(false) on success: the bar stays busy until the route changes (UX:PN-1), and the list refetches
       // on mount.
-      queueFlashToast(t('toast.saved'));
+      // A taken slug is saved with `-1` appended: say which link the product really got.
+      const keptSlug = savedSlugIfChanged(body.slug as string | undefined, saved?.product?.slug);
+      queueFlashToast(
+        keptSlug ? t('toast.savedSlugChanged', { slug: keptSlug }) : t('toast.saved')
+      );
       router.push(returnTo);
     } catch {
       setError(t('updateFailed'));
@@ -730,7 +745,7 @@ export default function EditProductPage() {
   if (error && !product) {
     return (
       <AdminLayout title={t('notFoundTitle')} subtitle="">
-        <div className="rounded-xl border bg-card p-8 text-center">
+        <div className="rounded-md border bg-card p-8 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
             <svg
               className="h-6 w-6 text-muted-foreground"
@@ -871,7 +886,7 @@ export default function EditProductPage() {
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-6">
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
+            <div className="rounded-md border bg-card p-6 shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
                 <h2 className="text-lg font-semibold text-foreground">
                   {tSections('basicInformation')}
@@ -943,6 +958,7 @@ export default function EditProductPage() {
                     dir="rtl"
                   />
                 </div>
+                <SlugField value={formData.slug} onChange={v => updateField('slug', v)} />
                 <div>
                   <div className="mb-1 flex justify-end">
                     <AiFieldBadge
@@ -1039,7 +1055,7 @@ export default function EditProductPage() {
 
             <PersonalisationCard value={personalisation} onChange={setPersonalisation} />
 
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
+            <div className="rounded-md border bg-card p-6 shadow-sm">
               <div className="mb-4 flex items-baseline justify-between gap-3 flex-wrap">
                 <h2 className="text-lg font-semibold text-foreground">{tSections('media')}</h2>
                 <p className="text-xs text-muted-foreground">{tFields('mediaSizeHint')}</p>
@@ -1058,7 +1074,7 @@ export default function EditProductPage() {
               />
             </div>
 
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
+            <div className="rounded-md border bg-card p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('pricing')}</h2>
               {/* Row 1: Price (regular) + Cost */}
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1190,7 +1206,7 @@ export default function EditProductPage() {
               })()}
             </div>
 
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
+            <div className="rounded-md border bg-card p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-foreground mb-4">
                 {tSections('inventory')}
               </h2>
@@ -1265,7 +1281,7 @@ export default function EditProductPage() {
                 FAQ section's own draft endpoint — the same endpoints the
                 bulk sweeps use, so per-product regeneration stays
                 consistent with the catalogue-wide flow). */}
-            <div className="rounded-xl border bg-card p-6 shadow-sm">
+            <div className="rounded-md border bg-card p-6 shadow-sm">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-semibold text-foreground">{tSections('seo')}</h2>

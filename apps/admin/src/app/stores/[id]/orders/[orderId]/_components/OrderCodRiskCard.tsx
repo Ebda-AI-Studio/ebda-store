@@ -41,7 +41,7 @@ export function OrderCodRiskCard({ storeId, orderId }: { storeId: string; orderI
   const h = result.hint;
   return (
     <section
-      className="rounded-2xl border border-border bg-card p-5"
+      className="rounded-lg border border-border bg-card p-5"
       aria-labelledby="order-ci-title"
     >
       <h2
