@@ -69,7 +69,7 @@ export function OrderInstapayPanel({
 
   return (
     <section
-      className="rounded-2xl border border-border bg-card p-5"
+      className="rounded-lg border border-border bg-card p-5"
       data-testid="order-instapay-panel"
     >
       <h2 className="mb-1 text-sm font-medium text-muted-foreground uppercase tracking-wide">

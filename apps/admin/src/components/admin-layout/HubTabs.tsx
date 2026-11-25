@@ -28,6 +28,8 @@ export interface HubTab {
    * (B2B review I5); the badge renders only while the count is above 0 and the store is on the plan.
    */
   badgeKey?: 'wholesalePending';
+  /** Hidden from `staff` (the owner and super_admin still see it). The page's API route enforces the same. */
+  ownerOnly?: boolean;
   /** Draws a thin divider before this tab so a long strip reads as groups (audit 2.4 / M-2). */
   groupStart?: boolean;
   /** A caption next to that divider ("للمحاسب"), so the group says who it is for. Only read with `groupStart`. */

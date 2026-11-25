@@ -21,7 +21,7 @@
     "class": "irreversible",
     "note": "no (irreversible)"
   },
-  "helpArticle": null,
+  "helpArticle": "download-your-data-or-close-account",
   "questions": {
     "ar": ["عايز اقفل حسابي", "ازاي امسح بياناتي؟", "عايز نسخة من بياناتي"],
     "en": ["How do I close my account?", "Can I export my data?"]

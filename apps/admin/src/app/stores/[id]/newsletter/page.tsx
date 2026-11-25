@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDate } from '@/lib/format';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -7,7 +8,7 @@ import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, getApiUrl, apiFetch, apiPost } from '../../../../lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
-import { withNumerals } from '@ebda/shared';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Admin newsletter page.
@@ -181,9 +182,7 @@ export default function NewsletterPage() {
       cell: s => (
         <span
           className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-            s.isActive
-              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-              : 'bg-muted text-muted-foreground'
+            s.isActive ? 'bg-success/10 text-success-ink' : 'bg-muted text-muted-foreground'
           }`}
         >
           {s.isActive ? tTable('active') : tTable('unsubscribed')}
@@ -192,11 +191,7 @@ export default function NewsletterPage() {
     },
     {
       header: tTable('subscribedAt'),
-      cell: s => (
-        <span className="text-muted-foreground">
-          {new Date(s.subscribedAt).toLocaleDateString(undefined, withNumerals())}
-        </span>
-      ),
+      cell: s => <span className="text-muted-foreground">{formatDate(s.subscribedAt)}</span>,
     },
   ];
 
@@ -271,7 +266,7 @@ export default function NewsletterPage() {
       {/* Broadcast Modal */}
       {showBroadcast && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-2xl rounded-xl bg-background shadow-xl border border-border">
+          <div className="w-full max-w-2xl rounded-md bg-background shadow-xl border border-border">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <div>
                 <h2 className="text-lg font-semibold">{tPage('broadcastTitle')}</h2>
@@ -297,9 +292,9 @@ export default function NewsletterPage() {
 
             {broadcastResult ? (
               <div className="px-6 py-8 text-center">
-                <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-14 h-14 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg
-                    className="w-7 h-7 text-emerald-600"
+                    className="w-7 h-7 text-success-ink"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -342,7 +337,7 @@ export default function NewsletterPage() {
                     required
                     maxLength={300}
                     placeholder={tPage('broadcastSubjectPlaceholder')}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={FIELD_CLASSES}
                   />
                 </div>
 
@@ -357,7 +352,7 @@ export default function NewsletterPage() {
                     required
                     rows={10}
                     placeholder={tPage('broadcastBodyPlaceholder')}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y"
+                    className={`${TEXTAREA_CLASSES} font-mono resize-y`}
                   />
 
                   {hasRiskyHtml && (

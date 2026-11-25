@@ -167,7 +167,7 @@ export default function SizeChartsPage() {
             </div>
           )
         ) : (
-          <ul className="divide-y rounded-xl border bg-card shadow-sm">
+          <ul className="divide-y rounded-md border bg-card shadow-sm">
             {charts.map(c => (
               <li
                 key={c.id}
