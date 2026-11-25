@@ -1,7 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { cfWaitUntil } from '../cf/bindings';
 import { storeDb, storeMoney } from '../lib/repo-factory';
-import { requestHoldsOrderViewToken, requireOrderAccess } from '../lib/order-view-token';
+import {
+  requestHoldsOrderStatusLink,
+  requestHoldsOrderViewToken,
+  requireOrderAccess,
+} from '../lib/order-view-token';
 import { maskReceiptPayerPii } from '../services/payment-providers/instapay-receipt.service';
 import {
   INSTAPAY_DEFAULT_EXPIRY_HOURS,
@@ -188,7 +192,11 @@ async function customerOwnsOrder(customerId: string, orderId: string): Promise<b
     return row !== null;
   });
 }
-const requireInstapayOrderAccess = requireOrderAccess(customerOwnsOrder);
+const requireInstapayOrderAccess = requireOrderAccess(customerOwnsOrder, getOrderStoreId);
+/** The order's view token OR its signed order-status link (G54): either unlocks the shopper's own InstaPay details. */
+const holdsOrderCredential = async (req: Request, orderId: string): Promise<boolean> =>
+  requestHoldsOrderViewToken(req, orderId) ||
+  (await requestHoldsOrderStatusLink(req, orderId, getOrderStoreId));
 
 /**
  * Ruling NZ-MONEY-2 (review NEW-1 of PR 455): an EXISTING payment's reference is handed out again only when D1 routes it. A
@@ -1054,9 +1062,10 @@ router.get(
       if (!storeId) throw new AppError(404, 'NOT_FOUND', 'Order not found');
       const view = await InstapayService.getInstructions(storeId, orderId);
       // SEC-15: the receipt id (which opens the receipt poll) only with the order's view token.
-      const withToken = requestHoldsOrderViewToken(req, orderId);
+      const withToken = await holdsOrderCredential(req, orderId);
       res.setHeader('Cache-Control', 'private, no-store');
       res.vary('X-Order-View-Token');
+      res.vary('X-Order-Status-Link');
       res.json({
         success: true,
         data:
@@ -1123,10 +1132,11 @@ router.get(
       const storeId = await getOrderStoreId(orderId);
       if (!storeId) throw new AppError(404, 'NOT_FOUND', 'Order not found');
       const receipt = await InstapayService.getReceipt(storeId, orderId, receiptId);
-      // SEC-15: the payer's name / address / mobile / bank only with the order's view token.
+      // SEC-15: the payer's name / address / mobile / bank only with the order's view token (a header, never a URL).
       res.json({
         success: true,
         data: {
+          // The signed order-status link is a bearer URL that gets forwarded (WhatsApp): it never unmasks the payer.
           receipt: requestHoldsOrderViewToken(req, orderId)
             ? receipt
             : maskReceiptPayerPii(receipt),

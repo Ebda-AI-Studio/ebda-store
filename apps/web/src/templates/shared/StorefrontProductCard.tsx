@@ -56,6 +56,7 @@ import { fromMinor } from '@ebda/shared';
 import { REGION } from '@ebda/shared';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { Model3dChip } from '../../components/commerce/Model3dChip';
 import { useRenderNow } from '../../contexts/RenderClockContext';
 import { MissingImage } from './MissingImage';
 import { CARD_GRID_SIZES } from '../../lib/image-sizes';
@@ -607,6 +608,7 @@ function StorefrontProductCardImpl({
             {priceVisible && <TaxInclusiveLabel className="block text-xs text-muted-foreground" />}
             <SwatchDots product={product} max={5} className="mt-1" />
             <FactChips product={product} className="mt-1" />
+            <Model3dChip product={product} className="mt-1" />
           </>
         )}
 

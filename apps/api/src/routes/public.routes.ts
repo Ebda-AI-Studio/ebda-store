@@ -20,6 +20,7 @@ import { inDoStoreScope, readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
 import { recordQrScan, resolveQrScan } from '../services/qr.service';
 import { AppError } from '../middleware/error-handler';
+import { ReturnService } from '../services/return.service';
 import {
   authenticate,
   optionalAuthenticate,
@@ -43,6 +44,8 @@ import {
   whatsappConsentUserLimiter,
   auditLog,
   viewIngestLimiter,
+  guestReturnIpLimiter,
+  guestReturnOrderLimiter,
 } from '../middleware/security';
 import { refuseUnknownPublicStore } from '../middleware/tenant-context';
 import { catalogueMissRoute } from '../middleware/catalogue-miss';
@@ -604,7 +607,7 @@ router.get('/size-charts', async (req: Request, res: Response, next: NextFunctio
 /**
  * GET /public/feed/products.json — AI Product Feed (agent_feed; all paid plans).
  * Fail-closed: 404 when the feature is not enabled for the store, so the
- * URL does not reveal the add-on's existence on stores that didn't buy it.
+ * URL does not reveal the feature's existence on stores whose plan does not include it.
  * Response is the raw feed JSON (no {success,data} envelope) — this is a
  * public, machine-readable document consumed directly by AI shopping
  * agents, not an internal API response.
@@ -1690,6 +1693,53 @@ router.get(
   }
 );
 
+// POST /returns/guest - a GUEST asks to return a delivered order (Foundation criterion 19, Ruling GUEST-RET-1, S2-7).
+// Order number + the phone OR email on the order; per-IP and per-order limits; one identical failure body.
+// The return itself is made by ReturnService.create (window, eligibility), so a request moves no money.
+// No items named = the whole order (a guest cannot see line ids).
+const guestReturnSchema = z.object({
+  orderNumber: z.string().trim().min(1).max(64),
+  phone: z.string().trim().max(32).optional(),
+  email: z.string().trim().max(254).optional(),
+  type: z.enum(['return', 'exchange', 'refund']).default('return'),
+  reason: z.string().trim().min(1).max(500),
+  reasonDetail: z.string().max(2000).optional(),
+  customerNotes: z.string().max(2000).optional(),
+  items: z
+    .array(
+      z.object({
+        orderItemId: z.string().uuid(),
+        productId: z.string().uuid(),
+        productName: z.string().max(300),
+        quantity: z.number().int().min(1),
+        reason: z.string().max(500).optional(),
+        condition: z.enum(['new', 'opened', 'damaged']).optional(),
+      })
+    )
+    .optional(),
+  bundleGroupIds: z.array(z.string().uuid()).min(1).max(50).optional(),
+});
+router.post(
+  '/returns/guest',
+  guestReturnIpLimiter,
+  guestReturnOrderLimiter,
+  requireFeature('returns'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = await getStoreIdFromRequest(req);
+      const body = guestReturnSchema.parse(req.body);
+      const created = await ReturnService.createForGuest(storeId, body);
+      // The shopper gets the number only: the row carries order lines and amounts a guest need not see echoed.
+      res.status(201).json({
+        success: true,
+        data: { returnNumber: created.returnNumber, status: created.status },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // POST /orders/:id/verify-payment — GUEST-SAFE verify-on-return.
 //
 // THE PRIMARY payment-confirmation path. A gateway's webhook can be late,
@@ -2026,6 +2076,8 @@ router.get(
             include: {
               product: {
                 include: {
+                  // Card "3D" chip (id only; wishlistCardProduct maps it to has3d).
+                  model3d: { select: { id: true } },
                   images: {
                     orderBy: { position: 'asc' },
                     take: 1,

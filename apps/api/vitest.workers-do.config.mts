@@ -55,6 +55,7 @@ export default defineConfig(async () => {
       },
     },
     test: {
+      globalSetup: ['../../tests/global-setup-assistant-assets.ts'],
       include: ['workers-do/**/*.test.ts'],
       testTimeout: 30_000,
       hookTimeout: 30_000,

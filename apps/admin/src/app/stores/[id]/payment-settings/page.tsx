@@ -241,7 +241,7 @@ export default function StorePaymentSettingsPage() {
       <AdminLayout title={t('page.title')} subtitle={t('page.subtitle')}>
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
+            <div key={i} className="h-24 animate-pulse rounded-md bg-muted" />
           ))}
         </div>
       </AdminLayout>
@@ -251,7 +251,7 @@ export default function StorePaymentSettingsPage() {
   return (
     <AdminLayout title={t('page.title')} subtitle={t('page.subtitle')}>
       {error && (
-        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
+        <div className="mb-6 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
           {error}
           <Button type="button" variant="outline" className="ms-4" onClick={fetchConfigs}>
             {t('errors.retry')}
@@ -259,7 +259,7 @@ export default function StorePaymentSettingsPage() {
         </div>
       )}
 
-      <div className="mb-6 rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+      <div className="mb-6 rounded-md border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
         <p className="font-medium text-foreground">{t('page.intro')}</p>
         <p className="mt-1.5 text-xs">{t('page.testModeNote')}</p>
       </div>

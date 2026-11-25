@@ -67,6 +67,7 @@ import {
 } from './bundlePricing';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface BundleLineDTO {
   key: string;
   unitPrice: number;
@@ -604,7 +605,7 @@ export default function BundlesPage() {
                   <input
                     value={form.name}
                     onChange={e => handleNameChange(e.target.value)}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
                 <label className="block">
@@ -613,7 +614,7 @@ export default function BundlesPage() {
                     value={form.nameAr}
                     onChange={e => setForm({ ...form, nameAr: e.target.value })}
                     dir="rtl"
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
               </div>
@@ -627,7 +628,7 @@ export default function BundlesPage() {
                     setForm({ ...form, slug: e.target.value });
                   }}
                   dir="ltr"
-                  className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                  className={FIELD_CLASSES}
                 />
               </label>
 
@@ -637,7 +638,7 @@ export default function BundlesPage() {
                   <input
                     value={form.description}
                     onChange={e => setForm({ ...form, description: e.target.value })}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
                 <label className="block">
@@ -646,7 +647,7 @@ export default function BundlesPage() {
                     value={form.descriptionAr}
                     onChange={e => setForm({ ...form, descriptionAr: e.target.value })}
                     dir="rtl"
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
               </div>
@@ -674,7 +675,7 @@ export default function BundlesPage() {
                     onChange={e =>
                       setForm({ ...form, pricingType: e.target.value as BundlePricingType })
                     }
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   >
                     <option value="fixed_price">{t('pricingTypeFixedPrice')}</option>
                     <option value="percentage">{t('pricingTypePercentage')}</option>
@@ -712,7 +713,7 @@ export default function BundlesPage() {
                     step={form.pricingType === 'percentage' ? 0.01 : 0.01}
                     value={form.pricingValueInput}
                     onChange={e => setForm({ ...form, pricingValueInput: e.target.value })}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
               </div>
@@ -733,7 +734,7 @@ export default function BundlesPage() {
                     type="datetime-local"
                     value={form.startsAt}
                     onChange={e => setForm({ ...form, startsAt: e.target.value })}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
                 <label className="block">
@@ -742,7 +743,7 @@ export default function BundlesPage() {
                     type="datetime-local"
                     value={form.expiresAt}
                     onChange={e => setForm({ ...form, expiresAt: e.target.value })}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
               </div>
