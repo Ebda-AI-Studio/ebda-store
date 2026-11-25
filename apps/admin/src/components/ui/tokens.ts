@@ -2,7 +2,7 @@
  * The merchant admin's design tokens, in ONE place (ruling docs/rulings/ADM-DS-1.md).
  *
  * Colours live as CSS variables in styles/globals.css (night + Ebda gold; no orange, no blue/violet chrome).
- * Everything else the admin repeats lives here: type, radii, control + nav heights, elevation, motion, z-index.
+ * Everything else the admin repeats lives here as class names over the foundation values: type, radii, control + nav heights, elevation, motion, z-index.
  * tests/unit/admin-design-tokens.test.ts fails on raw palette colours, hex literals, `text-[Npx]`,
  * bare `rounded` and self-styled `data-ui="nav"` items outside these tokens (a shrinking baseline holds the
  * pages not yet migrated: waves W2/W3).
@@ -11,21 +11,27 @@
  * 12px is for counters/badges only (never the sole carrier of meaning).
  */
 
-/** Type scale: Tailwind class, px, and the [latin, arabic] leading in px. Page title is `title`. */
+import { CONTROL, MOTION, NAV, SPACE, TYPE as FDN_TYPE, Z } from '@ebda/shared/design';
+
+/**
+ * Values come from the vendored foundation (@ebda/shared/design, ebda-foundation design language v1); this file only
+ * maps them to the admin's Tailwind class names. tests/unit/admin-design-tokens-sync.test.ts proves each class maps
+ * to the foundation value, so a class and its token can never drift apart.
+ */
+export { MOTION, SPACE, Z };
+
+/** Type scale: Tailwind class (px + [latin, arabic] leading come from the foundation). Page title is `title`. */
 export const TYPE = {
-  caption: { cls: 'text-xs', px: 12, leading: [16, 20] },
-  ui: { cls: 'text-sm', px: 14, leading: [20, 24] },
-  body: { cls: 'text-base', px: 16, leading: [24, 28] },
-  titleSm: { cls: 'text-lg', px: 18, leading: [24, 30] },
-  title: { cls: 'text-xl', px: 20, leading: [28, 32] },
-  kpi: { cls: 'text-2xl', px: 24, leading: [32, 36] },
-  display: { cls: 'text-3xl', px: 30, leading: [36, 44] },
+  caption: { cls: 'text-xs', ...FDN_TYPE.caption },
+  ui: { cls: 'text-sm', ...FDN_TYPE.ui },
+  body: { cls: 'text-base', ...FDN_TYPE.body },
+  titleSm: { cls: 'text-lg', ...FDN_TYPE.titleSm },
+  title: { cls: 'text-xl', ...FDN_TYPE.title },
+  kpi: { cls: 'text-2xl', ...FDN_TYPE.kpi },
+  display: { cls: 'text-3xl', ...FDN_TYPE.display },
 } as const;
 
-/** 4px base. Page gutter 16 (phones) / 24 (lg); card padding 16 lists / 24 forms. */
-export const SPACE = [4, 8, 12, 16, 24, 32, 48] as const;
-
-/** Radii: control 12 (rounded-md), surface 14 (rounded-lg = --radius), pill (rounded-full). */
+/** Radii: control (rounded-md), surface (rounded-lg = --radius), pill (rounded-full). Pixel values: foundation RADIUS (`@ebda/shared/design`). */
 export const RADIUS = {
   control: 'rounded-md',
   surface: 'rounded-lg',
@@ -33,10 +39,10 @@ export const RADIUS = {
 } as const;
 
 /** Heights in px: every interactive control (button, input, select, nav item) sits on one of these. */
-export const CONTROL_HEIGHT = { sm: 32, md: 40, mdPhone: 44, lg: 44 } as const;
-export const NAV_HEIGHT = { sidebar: 44, tab: 40, tabPhone: 44, rail: 40, bottom: 56 } as const;
+export const CONTROL_HEIGHT = CONTROL;
+export const NAV_HEIGHT = NAV;
 
-/** Elevation: 0 flat hairline (default), 1 cards, 2 menus/popovers, 3 modals/sheets. No coloured shadows. */
+/** Elevation: 0 flat hairline (default), 1 cards, 2 menus/popovers, 3 modals/sheets. No coloured shadows. Shadow values: foundation ELEVATION (`@ebda/shared/design`). */
 export const ELEVATION = {
   flat: '',
   card: 'shadow-sm',
@@ -44,23 +50,16 @@ export const ELEVATION = {
   modal: 'shadow-xl',
 } as const;
 
-/** Motion: durations in ms and the one easing. Slides mirror in RTL; reduced-motion turns them off. */
-export const MOTION = {
-  fast: 150,
-  base: 200,
-  slow: 300,
-  ease: 'cubic-bezier(0.2, 0, 0, 1)',
-} as const;
+/**
+ * A text field / select on the control scale: 44px on phones, 40px from sm (CONTROL.mdPhone / CONTROL.md), control radius,
+ * 16px text on phones (no iOS zoom). Hand-built inputs at 30-42px with other radii were audit P1-1; use this or `@ebda/ui` Input.
+ */
+export const FIELD_CLASSES =
+  'h-11 w-full rounded-md border border-input bg-background px-3 text-base sm:h-10 sm:text-sm placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60';
 
-/** z-index ladder. */
-export const Z = {
-  sticky: 10,
-  header: 20,
-  bottomBar: 30,
-  drawer: 40,
-  modal: 50,
-  toast: 60,
-} as const;
+/** A multi-line field: same border, radius, padding rhythm and focus ring as FIELD_CLASSES, grows from 96px, 16px text on phones. */
+export const TEXTAREA_CLASSES =
+  'min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60';
 
 export type NavKind = 'sidebar' | 'tab' | 'rail';
 

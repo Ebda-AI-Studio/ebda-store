@@ -34,7 +34,6 @@ vi.mock('@ebda/database', () => ({
     product: { update: vi.fn() },
     productVariant: { update: vi.fn() },
     $transaction: vi.fn(),
-    $queryRaw: vi.fn(),
   },
   Prisma: {},
   OrderStatus: {},

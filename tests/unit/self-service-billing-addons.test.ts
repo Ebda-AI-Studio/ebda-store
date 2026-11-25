@@ -3,7 +3,7 @@
  * entitlement is granted exactly once per payment, a failed payment grants nothing, cancel ends it at the period end,
  * staff are refused, and the confirm step is a single-use token bound to the previewed payload.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 
@@ -130,6 +130,8 @@ const ev = (over: Record<string, any>) => ({
 });
 
 beforeEach(() => {
+  // fixtures are built around NOW; the code under test reads the real clock
+  vi.useFakeTimers({ toFake: ['Date'], now: NOW });
   vi.clearAllMocks();
   h.events = [];
   h.features = {};
@@ -146,6 +148,11 @@ beforeEach(() => {
   tx = fakeTx();
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+  delete process.env.AI_DAILY_REQUEST_CAP;
+});
+
 describe('catalog', () => {
   it('feature add-ons are real, visible add-on-tier registry keys with integer positive prices', async () => {
     const { ADDON_CATALOG } = await import('@api/services/billing/addon-catalog');
@@ -154,7 +161,7 @@ describe('catalog', () => {
       expect(Number.isSafeInteger(a.priceMinor) && a.priceMinor > 0).toBe(true);
       if (a.kind === 'feature') {
         const def = (FEATURE_REGISTRY as any)[a.featureKey!];
-        expect(def?.tier).toBe('addon');
+        expect(def?.tier).toBe('extra'); // renamed from 'addon' by BIZ-ALL-1
         expect(def?.hidden).not.toBe(true);
       }
     }
@@ -553,6 +560,7 @@ describe('A9 AI top-up raises the STORE cap only; platform caps still apply', ()
     delete process.env.AI_DAILY_REQUEST_CAP;
   });
   it('P6: with the platform at 450 a +1000 store stops at its 225 share; the next store still gets its first call', async () => {
+    process.env.AI_DAILY_REQUEST_CAP = '450'; // the one-key platform these numbers assume (default is now 1800, PLANS-1)
     const { assertAiQuota } = await import('@api/lib/ai-quota');
     h.events = [
       ev({ planCode: 'addon:ai:topup_1000', forPeriodEnd: new Date(Date.now() + 10 * DAY) }),
@@ -568,6 +576,7 @@ describe('A9 AI top-up raises the STORE cap only; platform caps still apply', ()
     await expect(assertAiQuota({ storeId: 's2' })).resolves.toBeUndefined();
   });
   it('P6: pack-funded calls pause at 70% of the pool, base-slice calls of other stores keep working', async () => {
+    process.env.AI_DAILY_REQUEST_CAP = '450'; // the one-key platform these numbers assume (default is now 1800, PLANS-1)
     const { assertAiQuota } = await import('@api/lib/ai-quota');
     h.countAiUsage.mockResolvedValue(320); // 70% of 450 is 315
     h.events = [
@@ -584,6 +593,7 @@ describe('A9 AI top-up raises the STORE cap only; platform caps still apply', ()
     await expect(assertAiQuota({ storeId: 's3' })).resolves.toBeUndefined();
   });
   it('P6: a top-up the platform cannot back is not sold (nothing charged); with enough capacity it is', async () => {
+    process.env.AI_DAILY_REQUEST_CAP = '450'; // the one-key platform these numbers assume (default is now 1800, PLANS-1)
     const { previewAddon } = await import('@api/services/billing/addons.service');
     const ctx = { storeId: 's1', userId: 'u1' };
     await expect(previewAddon({ ...ctx, sku: 'ai:topup_300' })).rejects.toMatchObject({

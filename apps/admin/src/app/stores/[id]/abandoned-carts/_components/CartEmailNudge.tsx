@@ -47,7 +47,7 @@ export function CartEmailNudge({ storeId, emailEnabled }: Props) {
     <div
       role="region"
       aria-label={t('title')}
-      className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+      className="rounded-md border border-primary/30 bg-primary/5 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
     >
       <div>
         <p className="font-medium text-foreground">{t('title')}</p>

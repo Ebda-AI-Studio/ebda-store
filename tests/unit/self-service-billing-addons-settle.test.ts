@@ -46,10 +46,19 @@ const row = {
   forPeriodEnd: null,
   attempt: 0,
   amountMinor: 9900,
+  currency: 'EGP',
   provider: 'kashier',
   status: 'pending',
   createdAt: NOW,
   failureReason: null,
+};
+
+/** The gateway's own statement of the amount (maySettle holds a success it cannot check against the row). */
+const PAID = {
+  status: 'succeeded' as const,
+  amountSource: 'gateway' as const,
+  amountMinor: 9900,
+  currency: 'EGP',
 };
 
 /** A ledger whose status transition is real: only the first pending -> succeeded update counts. */
@@ -94,20 +103,8 @@ describe('add-on payment settlement', () => {
   it('grants once: the replayed success is a no-op', async () => {
     const f = fakeTx();
     const effects: any[] = [];
-    const a = await settleInTx(
-      f.tx,
-      'e1',
-      { status: 'succeeded', providerRef: 'p1' },
-      NOW,
-      effects
-    );
-    const b = await settleInTx(
-      f.tx,
-      'e1',
-      { status: 'succeeded', providerRef: 'p1' },
-      NOW,
-      effects
-    );
+    const a = await settleInTx(f.tx, 'e1', { ...PAID, providerRef: 'p1' }, NOW, effects);
+    const b = await settleInTx(f.tx, 'e1', { ...PAID, providerRef: 'p1' }, NOW, effects);
     expect(a.transitioned).toBe(true);
     expect(b.transitioned).toBe(false);
     expect(f.grants).toHaveLength(1);
@@ -123,16 +120,14 @@ describe('add-on payment settlement', () => {
   });
   it('a late failure after the success does not take the grant away', async () => {
     const f = fakeTx();
-    await settleInTx(f.tx, 'e1', { status: 'succeeded' }, NOW, []);
+    await settleInTx(f.tx, 'e1', PAID, NOW, []);
     await settleInTx(f.tx, 'e1', { status: 'failed' }, NOW, []);
     expect(f.status()).toBe('succeeded');
     expect(f.grants).toHaveLength(1);
   });
   it('a failing grant write is surfaced, never swallowed', async () => {
     const f = fakeTx(true);
-    await expect(settleInTx(f.tx, 'e1', { status: 'succeeded' }, NOW, [])).rejects.toThrow(
-      'grant write failed'
-    );
+    await expect(settleInTx(f.tx, 'e1', PAID, NOW, [])).rejects.toThrow('grant write failed');
   });
 });
 

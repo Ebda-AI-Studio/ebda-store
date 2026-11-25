@@ -1,8 +1,8 @@
+import { resolveAiCaps } from './usage-caps';
 import { prisma, withStore } from '@ebda/database';
 import { activeAddons } from '../services/billing/addon-grant';
 import { ADDON_CATALOG } from '../services/billing/addon-catalog';
 import { countAiUsage } from './definer';
-import { geminiKeyCount } from './ai/gemini-keys';
 import { AppError } from '../middleware/error-handler';
 import { AI_DISABLED_BY_MERCHANT_CODE, assertStoreAiEnabled } from './store-ai-switch';
 
@@ -51,6 +51,9 @@ const AI_QUOTA_STOP_CODES = new Set([
   AI_QUOTA_STORE_DAILY_CODE,
   // the merchant turned AI off: a sweep must stop, not fail every remaining product
   AI_DISABLED_BY_MERCHANT_CODE,
+  // the store is suspended for billing (store-ai-switch AI_BILLING_SUSPENDED_CODE; a literal so the many test mocks
+  // of that module need no new export): a sweep must stop, not fail every remaining product
+  'AI_STORE_BILLING_SUSPENDED',
   'AI_QUOTA_EXCEEDED',
   'AI_BUDGET_EXCEEDED',
 ]);
@@ -65,20 +68,7 @@ export function isAiQuotaCapError(err: unknown): boolean {
 // bulk sweep blowing through it for the rest of the day. Only counts
 // non-cached calls — cache hits never touch Gemini.
 //
-// Gemini's real free-tier ceiling is ~500 requests/day per project/model.
-// The default daily cap is kept safely UNDER that (450) so our own
-// friendly AppError trips before Google's raw 429 does — a single named
-// constant so it's trivially raised (or disabled) once billing is
-// enabled or a local-AI-primary/Gemini-fallback setup lands. Override
-// via AI_DAILY_REQUEST_CAP / AI_MONTHLY_REQUEST_CAP env vars.
-const DEFAULT_DAILY_REQUEST_CAP = 450;
-const DEFAULT_MONTHLY_REQUEST_CAP = 20000;
-// Per-tenant slice BENEATH the global cap (adversarial audit P2): the global
-// cap is shared across all stores, so without a slice one merchant's bulk
-// sweep over a big catalog drained it and denied AI to every other tenant
-// for the rest of the day. 150 = a third of the global default; override via
-// AI_STORE_DAILY_REQUEST_CAP.
-const DEFAULT_STORE_DAILY_REQUEST_CAP = 150;
+// Caps live in ./usage-caps (Ruling PLANS-1: 1800/day + 54000/month platform-wide); the routes read them from there too.
 
 /**
  * The STORE's extra daily AI requests from running paid packs (SELF-SERVICE A9). Staleness class: NEVER-stale
@@ -91,13 +81,9 @@ export async function storeAiExtraRequests(storeId: string, now = new Date()): P
   return running.reduce((n, r) => n + (ADDON_CATALOG[r.sku]?.aiExtraRequests ?? 0), 0);
 }
 
-/** The platform's daily request cap (one Google project's ceiling, scaled by the Gemini keys unless set explicitly). */
+/** The platform's daily request cap (Ruling PLANS-1: one platform-wide total from `usage-caps`, not scaled per Gemini key). */
 function platformDailyCap(): number {
-  return parseInt(
-    process.env.AI_DAILY_REQUEST_CAP ??
-      String(DEFAULT_DAILY_REQUEST_CAP * Math.max(1, geminiKeyCount())),
-    10
-  );
+  return resolveAiCaps().dailyCap;
 }
 
 const pct = (env: string | undefined, dflt: number) => {
@@ -125,10 +111,7 @@ function topupPoolCeiling(): number {
 }
 
 function baseStoreDailyCap(): number {
-  return parseInt(
-    process.env.AI_STORE_DAILY_REQUEST_CAP ?? String(DEFAULT_STORE_DAILY_REQUEST_CAP),
-    10
-  );
+  return resolveAiCaps().storeDailyCap;
 }
 
 /** The multiplier a paid pack puts on the store's own daily limits (1 with no pack); the token budget scales by it. */
@@ -159,7 +142,7 @@ export async function storeAiAllowance(storeId: string) {
  *  1. per-store daily slice — `storeId` callers are bounded to their own
  *     share so a single tenant cannot exhaust the platform budget;
  *  2. global daily cap — KEPT: it protects the real Google project ceiling
- *     (~500 req/day free tier). `bulk: true` callers (background sweeps)
+ *     (2 Gemini projects, ~2000 req/day free tier). `bulk: true` callers (background sweeps)
  *     stop an interactive-reserve below it (AI_DAILY_INTERACTIVE_RESERVE,
  *     default 20% of the daily cap) so a sweep can never zero out the
  *     interactive features (translate button, palette, answer-engine) for
@@ -201,16 +184,10 @@ export async function assertAiQuota(
     opts.storeId ? storeAiExtraRequests(opts.storeId) : Promise.resolve(0),
   ]);
 
-  // The default daily cap models ONE Google project's free ceiling. Each extra
-  // Gemini key is a separate project with its own quota (GEMINI-FAILOVER-1), so
-  // the DEFAULT scales with the key count; an explicit AI_DAILY_REQUEST_CAP is
-  // taken as the operator's total and is never scaled.
-  const dailyCap = platformDailyCap();
-  const monthlyCap = parseInt(
-    process.env.AI_MONTHLY_REQUEST_CAP ?? String(DEFAULT_MONTHLY_REQUEST_CAP),
-    10
-  );
-  const storeDailyCap = Math.min(baseStoreDailyCap() + storeExtra, maxStoreDailyRequests());
+  // Caps live in ./usage-caps (Ruling PLANS-1: platform-wide, never scaled by the Gemini key count); a paid pack raises only
+  // the per-store slice, up to the store's maximum share of the platform day.
+  const { dailyCap, monthlyCap, storeDailyCap: baseSlice } = resolveAiCaps();
+  const storeDailyCap = Math.min(baseSlice + storeExtra, maxStoreDailyRequests());
 
   if (opts.storeId && storeToday >= storeDailyCap) {
     throw new AppError(

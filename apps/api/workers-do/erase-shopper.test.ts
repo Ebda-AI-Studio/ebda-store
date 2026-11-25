@@ -256,3 +256,51 @@ describe('eraseShopper and the assistant journal', () => {
     expect(await rows(stub, 'SELECT id FROM sl_audit')).toEqual([{ id: 'x2' }]);
   });
 });
+
+// QA98-ALIAS-1/2 security, on the path production runs (the store DO, no Postgres): erasure deletes only the account's OWN consent rows.
+// Guest groups are built from unverified order data: an attacker's guest order may carry a victim's phone, which must give the
+// attacker's erasure no reach over the victim's rows (the victim's opt-out included).
+describe('shopper erasure never reaches another person through a guest order', () => {
+  it("attacker's erasure leaves the victim's opt-out intact; the victim's own erasure removes the victim's rows", async () => {
+    const store = 'es-group-sec';
+    const stub = await seeded(store);
+    const x = (sql: string, ...b: unknown[]) => rows(stub, sql, ...b);
+    const consent = (id: string, key: string, phoneKey: string, granted: number) =>
+      x(
+        "INSERT INTO sms_marketing_consents (id, store_id, customer_key, phone, phone_key, granted, revoked_at, created_at, updated_at) VALUES (?, ?, ?, '', ?, ?, ?, 1, 1)",
+        id,
+        store,
+        key,
+        phoneKey,
+        granted,
+        granted ? null : 5
+      );
+    await consent('victim-optout', 'victim@example.test', '201000000001', 0); // the victim withdrew
+    await consent('attacker-own', 'attacker@example.test', '201099999999', 1);
+    // the attacker's guest order uses the victim's phone with the attacker's email (links them in a guest group)
+    await x(
+      'INSERT INTO orders (id, store_id, customer_id, order_number, subtotal, total, shipping_address, billing_address, created_at, updated_at) VALUES (\'og\', ?, NULL, \'EB-G\', 1, 1, \'{"email":"attacker@example.test","phone":"01000000001"}\', \'{}\', 1, 1)',
+      store
+    );
+    const attacker = {
+      ...args,
+      userId: 'ua',
+      email: 'attacker@example.test',
+      phone: '+201099999999',
+      smsPhoneKey: '201099999999',
+    };
+    const a = await op(stub, store, 'eraseShopper', attacker);
+    expect(a.ok).toBe(true);
+    const left = await x('SELECT id FROM sms_marketing_consents ORDER BY id');
+    expect(left).toEqual([{ id: 'victim-optout' }]); // own row gone, the victim's opt-out untouched
+    const victim = {
+      ...args,
+      userId: 'uv',
+      email: 'victim@example.test',
+      phone: '+201000000001',
+      smsPhoneKey: '201000000001',
+    };
+    expect((await op(stub, store, 'eraseShopper', victim)).ok).toBe(true);
+    expect(await x('SELECT id FROM sms_marketing_consents')).toEqual([]);
+  });
+});

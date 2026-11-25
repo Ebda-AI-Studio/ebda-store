@@ -39,7 +39,7 @@ export function BulkImportPreview({
     minor === null ? '' : formatMoney(minor, locale, { fixedDecimals: true });
 
   return (
-    <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+    <div className="rounded-md border bg-card p-6 shadow-sm space-y-4">
       <h3 className="font-semibold text-foreground">{t('title')}</h3>
       <p className="text-sm text-muted-foreground">
         {t('summary', {
