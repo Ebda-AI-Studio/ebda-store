@@ -5,6 +5,9 @@
     "storeNotOperational": "This store is suspended, so Ebda AI Studio has paused messages to customers and payouts. Contact support to get it reactivated.",
     "storeNotOperationalTitle": "Store suspended",
     "storeNotOperationalAppeal": "Contact support to appeal",
+    "storeNotOperationalAppealForm": "Appeal this suspension",
+    "storeNotOperationalBilling": "This store is suspended for an unpaid invoice, so Ebda AI Studio has paused messages to customers and payouts. Pay the invoice and the store switches back on.",
+    "storeNotOperationalPay": "Pay the invoice",
     "delete": "Delete",
     "edit": "Edit",
     "close": "Close",
@@ -425,6 +428,16 @@
             "label": "Act",
             "meaning": "The merchant can apply changes with one press; sensitive ones still need their confirmation."
           }
+        },
+        "effectiveOff": "The store does not see the assistant right now: {reason}",
+        "effectiveCapped": "The store sees the assistant in \"{mode}\" mode only (lower than saved).",
+        "reasons": {
+          "global_kill": "The assistant is stopped platform-wide (kill switch).",
+          "product_kill": "The Store assistant is stopped platform-wide.",
+          "platform_cap_off": "The platform-wide cap is still \"off\". Open it in platform settings.",
+          "store_ai_off": "The merchant turned AI features off for their store.",
+          "store_mode_off": "The store's own mode is off.",
+          "unreadable": "We could not read the assistant settings, so it is off for now."
         }
       }
     },
@@ -6130,6 +6143,7 @@
   },
   "auth": {
     "login": {
+      "stepUpRequired": "To confirm this change, sign in again. We will bring you back to the page afterwards.",
       "sessionEnded": "Your session ended because the password was changed or you signed out on another device. Please sign in again.",
       "title": "Sign in",
       "subtitle": "Sign in and get back to your store.",
@@ -7637,6 +7651,10 @@
       "description": "AI-powered reorder suggestions based on velocity + lead time + open backorders.",
       "lastScanned": "Last scanned {time}",
       "rescanNow": "Re-scan now",
+      "scanQueued": "Scan queued and running in the background. We will refresh when it finishes.",
+      "scanDone": "Scan finished and Last scanned is updated.",
+      "scanNoChange": "The scan is still running or found nothing new. Refresh in a moment.",
+      "scanFailed": "Could not start the scan. Try again.",
       "empty": "No reorder suggestions right now. The next AI scan runs tomorrow at 06:00 Cairo time.",
       "comingSoon": "AI-powered reorder suggestions are coming in Batch 3.",
       "explainer": "We'll compute weekly velocity × supplier lead time + safety stock + open backorders to surface 'reorder N units of X' cards. One click to draft a PO pre-filled with quantities and the best supplier.",
@@ -7666,6 +7684,10 @@
       "description": "Slow-moving SKUs with AI-suggested clearance.",
       "lastScanned": "Last scanned {time}",
       "rescanNow": "Re-scan now",
+      "scanQueued": "Scan queued and running in the background. We will refresh when it finishes.",
+      "scanDone": "Scan finished and Last scanned is updated.",
+      "scanNoChange": "The scan is still running or found nothing new. Refresh in a moment.",
+      "scanFailed": "Could not start the scan. Try again.",
       "empty": "No dead stock found. A product is flagged when it is in stock, has not sold for 90+ days (a product that has never sold counts from the day it was added) and is worth at least EGP 5,000 at cost — or has no cost price set, in which case its value is shown as unknown.",
       "comingSoon": "AI-powered dead-stock detection is coming in Batch 3.",
       "explainer": "We'll flag products with 0 sales in 90 days and stock value above EGP 5,000, with AI-generated bilingual clearance copy and suggested discount %.",

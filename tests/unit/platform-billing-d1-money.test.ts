@@ -1329,3 +1329,80 @@ function paid900(over: Record<string, unknown> = {}) {
     ...over,
   } as never;
 }
+
+describe('MONEY-BILL-HELD-2: a hold marker is never overwritten and never marks a row that is not this provider charge', () => {
+  const paid = (over: Record<string, unknown> = {}) =>
+    ({ ...(hook() as unknown as Record<string, unknown>), ...over }) as never;
+  const marker = (db: DatabaseSync, id = EV) =>
+    db.prepare('SELECT status s, failure_reason f FROM billing_events WHERE id = ?').get(id) as {
+      s: string;
+      f: string | null;
+    };
+
+  it('unknown_order: a row of ANOTHER provider is queued but its ledger row is not marked held', async () => {
+    const db = rig();
+    ledger(db, { provider: 'other' });
+    const r = await applyWebhookEvent('stub', paid({ eventId: 'wh-foreign' }));
+    expect(r).toMatchObject({ outcome: 'held', detail: 'unknown_order' });
+    expect(marker(db)).toEqual({ s: 'pending', f: null });
+  });
+
+  it('unknown_order: a REFUND row addressed by a charge webhook is queued but not marked held', async () => {
+    const db = rig();
+    ledger(db, { type: 'refund' });
+    const r = await applyWebhookEvent('stub', paid({ eventId: 'wh-refund-row' }));
+    expect(r).toMatchObject({ outcome: 'held', detail: 'unknown_order' });
+    expect(marker(db)).toEqual({ s: 'pending', f: null });
+  });
+
+  it.each(['held:amount_mismatch', 'held_resolved:refunded'])(
+    'expireStaleCheckouts leaves a row marked %s alone',
+    async failure_reason => {
+      const db = rig();
+      ledger(db, { failure_reason, created_at: Date.now() - 10 * 86_400_000 });
+      expect(await expireStaleCheckouts(new Date())).toBe(0);
+      expect(marker(db)).toEqual({ s: 'pending', f: failure_reason });
+    }
+  );
+
+  it('race: a hold written AFTER maySettle read the row but BEFORE the lease means no settle', async () => {
+    const db = rig();
+    db.prepare(
+      `INSERT INTO store_subscriptions (id, store_id, plan_code, status) VALUES ('s1', ?, 'free', 'active')`
+    ).run(STORE);
+    ledger(db);
+    let injected = false;
+    const be = prisma.billingEvent as unknown as Record<string, unknown>;
+    const tx = {
+      ...prisma,
+      billingEvent: new Proxy(be, {
+        get(target, prop) {
+          const v = target[prop as string];
+          if (prop !== 'updateMany' || typeof v !== 'function') return v;
+          return (args: unknown) => {
+            if (!injected) {
+              injected = true;
+              db.prepare(`UPDATE billing_events SET failure_reason = 'held:amount_mismatch'`).run();
+            }
+            return (v as (a: unknown) => unknown).call(target, args);
+          };
+        },
+      }),
+    };
+    const effects: never[] = [];
+    const out = await settleInTx(
+      tx as never,
+      EV,
+      { status: 'succeeded', providerRef: 'r', amountSource: 'charge_request' } as never,
+      new Date(),
+      effects
+    );
+    expect(injected).toBe(true);
+    expect(out.transitioned).toBe(false);
+    expect(marker(db)).toEqual({ s: 'pending', f: 'held:amount_mismatch' });
+    expect(
+      (db.prepare('SELECT plan_code p FROM store_subscriptions').get() as { p: string }).p
+    ).toBe('free');
+    expect(effects).toEqual([]);
+  });
+});
