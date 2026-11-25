@@ -14,6 +14,7 @@ const doStore = {
   store: { findUnique: async () => ({ domain: 'dahab.example', plan: 'growth' }) },
 };
 vi.mock('@api/lib/repo-factory', () => ({
+  requestPlanMemo: (_id: string, fn: () => Promise<unknown>) => fn(),
   storeRepo: async () => ({ backend: 'do', db: doStore }),
   storeDb: async () => doStore,
   storeWriter: async () => {

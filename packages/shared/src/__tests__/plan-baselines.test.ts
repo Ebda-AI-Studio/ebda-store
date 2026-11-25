@@ -9,6 +9,7 @@ import {
   publicPlanLabelForFeature,
   publicPlanForStorePlan,
   upgradeTargetForDisabledFeature,
+  BUSINESS_BASELINE_EXCLUSIONS,
   type StorePlan,
 } from '../plan-baselines';
 import { FEATURE_KEYS_ARRAY, FEATURE_REGISTRY, type FeatureKey } from '../features';
@@ -145,10 +146,11 @@ describe('PLAN_BASELINE', () => {
     expect(PLAN_BASELINE.free.length).toBeLessThanOrEqual(5);
   });
 
-  it('legacy `inventory` parent flag is NOT in any baseline (replaced by inventory.*)', () => {
-    for (const plan of STORE_PLANS) {
+  it('legacy `inventory` parent flag is only in Business (Ruling BIZ-ALL-1; routes read inventory.*)', () => {
+    for (const plan of ['free', 'starter', 'professional'] as const) {
       expect(PLAN_BASELINE[plan]).not.toContain('inventory');
     }
+    expect(PLAN_BASELINE.enterprise).toContain('inventory');
   });
 });
 
@@ -284,5 +286,43 @@ describe('upgradeTargetForDisabledFeature', () => {
     expect(upgradeTargetForDisabledFeature('comped', 'loyalty')).toBeNull();
     expect(upgradeTargetForDisabledFeature('nope', 'loyalty')).toBeNull();
     expect(upgradeTargetForDisabledFeature('basic', 'nonexistent_feature' as never)).toBeNull();
+  });
+});
+
+// Ruling BIZ-ALL-1 (Ahmad 2026-11-15): Business has every feature; nothing is sold separately.
+describe('Business baseline = every registry feature', () => {
+  const excluded = Object.keys(BUSINESS_BASELINE_EXCLUSIONS) as FeatureKey[];
+
+  it('every registry key is in the enterprise baseline or in the documented exclusion map', () => {
+    const missing = FEATURE_KEYS_ARRAY.filter(
+      k => !PLAN_BASELINE.enterprise.includes(k) && !excluded.includes(k)
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it('the exclusions are exactly the two keys that are not capabilities to switch on', () => {
+    expect([...excluded].sort()).toEqual(['agent_checkout_open_writes', 'whatsapp']);
+    for (const k of excluded) expect(PLAN_BASELINE.enterprise).not.toContain(k);
+  });
+
+  it('hidden-but-unfinished keys are entitled on Business', () => {
+    for (const k of ['b2b.wholesale', 'eta_ereceipt', 'search_autocomplete', 'seo'] as FeatureKey[])
+      expect(PLAN_BASELINE.enterprise).toContain(k);
+  });
+
+  it('Basic and Growth baselines did not gain the Business-only keys', () => {
+    for (const k of [
+      'bundles',
+      'customer_intelligence',
+      'eta_ereceipt',
+      'inventory',
+    ] as FeatureKey[]) {
+      expect(PLAN_BASELINE.starter).not.toContain(k);
+      expect(PLAN_BASELINE.professional).not.toContain(k);
+    }
+  });
+
+  it('no registry feature carries the old "addon" (sold separately) tier', () => {
+    for (const f of Object.values(FEATURE_REGISTRY)) expect(f.tier as string).not.toBe('addon');
   });
 });
