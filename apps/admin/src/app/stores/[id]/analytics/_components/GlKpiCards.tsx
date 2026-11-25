@@ -45,12 +45,12 @@ export function GlKpiCards({ gl, periodLabel }: GlKpiCardsProps) {
         {cards.map(card => (
           <div
             key={card.label}
-            className="bg-card rounded-xl border p-5 shadow-sm flex flex-col gap-2"
+            className="bg-card rounded-md border p-5 shadow-sm flex flex-col gap-2"
           >
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">{card.label}</span>
               <span
-                className="px-1.5 py-0.5 text-xs font-bold rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 cursor-help"
+                className="px-1.5 py-0.5 text-xs font-bold rounded-md bg-success/10 text-success-ink cursor-help"
                 title={t('tooltip')}
               >
                 {t('badge')}

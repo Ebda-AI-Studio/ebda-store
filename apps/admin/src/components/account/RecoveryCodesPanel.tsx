@@ -92,7 +92,7 @@ export function RecoveryCodesPanel() {
           <p className="text-sm font-medium">{t('saveNow')}</p>
           <div
             dir="ltr"
-            className="mt-2 grid grid-cols-2 gap-2 rounded-xl bg-muted/50 p-4 font-mono text-sm"
+            className="mt-2 grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-4 font-mono text-sm"
           >
             {fresh.map(c => (
               <span key={c}>{c}</span>

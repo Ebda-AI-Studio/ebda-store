@@ -41,6 +41,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -86,6 +87,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -161,6 +163,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -236,6 +239,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -302,6 +306,7 @@
      "availableQty": 3
     }
    ],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -386,6 +391,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -489,6 +495,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -564,6 +571,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -630,6 +638,7 @@
      "availableQty": 3
     }
    ],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -714,6 +723,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -826,6 +836,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -926,6 +937,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -1001,6 +1013,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -1085,6 +1098,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -1173,6 +1187,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -1248,6 +1263,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -1332,6 +1348,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -1420,6 +1437,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -1486,6 +1504,7 @@
      "availableQty": 3
     }
    ],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -1589,6 +1608,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -1673,6 +1693,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -1761,6 +1782,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -1827,6 +1849,7 @@
      "availableQty": 3
     }
    ],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -1930,6 +1953,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -2042,6 +2066,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -2143,6 +2168,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -2227,6 +2253,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -2306,6 +2333,7 @@
      "availableQty": 3
     }
    ],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -2409,6 +2437,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -2484,6 +2513,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -2550,6 +2580,7 @@
      "availableQty": 3
     }
    ],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -2634,6 +2665,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -2746,6 +2778,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -2812,6 +2845,7 @@
      "availableQty": 3
     }
    ],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -2887,6 +2921,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -2962,6 +2997,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -3074,6 +3110,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -3168,6 +3205,7 @@
      "availableQty": 3
     }
    ],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -3262,6 +3300,7 @@
      "availableQty": 3
     }
    ],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -3346,6 +3385,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -3391,6 +3431,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -3522,6 +3563,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -3597,6 +3639,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -3663,6 +3706,7 @@
      "availableQty": 3
     }
    ],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -3747,6 +3791,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -3850,6 +3895,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -3925,6 +3971,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -4009,6 +4056,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -4097,6 +4145,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -4172,6 +4221,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,
@@ -4256,6 +4306,7 @@
     "slug": "golden-<run>"
    },
    "variants": [],
+   "has3d": false,
    "inStock": true,
    "lowStock": true,
    "acceptsBackorder": false,

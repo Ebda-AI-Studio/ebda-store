@@ -107,3 +107,47 @@ describe('export -> unchanged re-import on the StoreDO backend', () => {
     expect(checked.errors.map(e => e.error).join()).toMatch(/already belongs to another product/);
   });
 });
+
+// Ported from tests/integration/bulk-import-duplicate-sku-update.test.ts (issue 2048): the duplicate-SKU guard also covers rows
+// that UPDATE existing products. The real BulkService + the DO's own importBatch, so the batch write is the DO's single section.
+describe('duplicate SKU on the UPDATE path (issue 2048) on the StoreDO backend', () => {
+  const skuOf = (slug: string) =>
+    (raw.prepare('SELECT sku FROM products WHERE slug = ?').get(slug) as { sku: string | null })
+      ?.sku;
+  beforeAll(async () => {
+    const r = await BulkService.importProducts(
+      STORE,
+      ['name,slug,price', 'Alpha,alpha,1000', 'Beta,beta,1000'].join('\n'),
+      { updateExisting: true },
+      'u1'
+    );
+    expect(r.failed).toBe(0);
+  });
+
+  it('fails only the second row that claims a SKU for a different existing product', async () => {
+    const csv = [
+      'name,slug,sku,price',
+      'Alpha,alpha,SHARED-1,1100',
+      'Beta,beta,SHARED-1,1200',
+      'Gamma,gamma,G-1,1300',
+    ].join('\n');
+    const result = await BulkService.importProducts(STORE, csv, { updateExisting: true }, 'u1');
+    expect(result.failed).toBe(1);
+    expect(result.errors).toEqual([
+      expect.objectContaining({ row: 3, error: 'Duplicate SKU "SHARED-1" within this import' }),
+    ]);
+    expect(result.updated).toBe(1);
+    expect(result.created).toBe(1);
+    expect(skuOf('alpha')).toBe('SHARED-1');
+    expect(skuOf('beta')).toBeNull();
+    expect(skuOf('gamma')).toBe('G-1');
+  });
+
+  it('the same product re-asserting its own SKU on two rows is not a collision', async () => {
+    const csv = ['name,slug,sku,price', 'Alpha,alpha,A-1,1100', 'Alpha 2,alpha,A-1,1150'].join(
+      '\n'
+    );
+    const result = await BulkService.importProducts(STORE, csv, { updateExisting: true }, 'u1');
+    expect(result.failed).toBe(0);
+  });
+});

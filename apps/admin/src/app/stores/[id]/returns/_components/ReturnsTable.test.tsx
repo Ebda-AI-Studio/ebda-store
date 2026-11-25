@@ -52,6 +52,40 @@ describe('ReturnsTable guest return', () => {
       />
     );
     expect(screen.getByText(/Mona Ali/)).toBeTruthy();
-    expect(screen.getByText('+201001234567')).toBeTruthy();
+    // name and phone are separated and the phone is formatted and left-to-right isolated: "Mona Ali · +20 100 123 4567"
+    const line = screen.getByText(/Mona Ali/).closest('p')!;
+    expect(line.textContent).toContain('Mona Ali · +20 100 123 4567');
+    const phone = screen.getByText('+20 100 123 4567');
+    expect(phone.tagName).toBe('BDI');
+    expect(phone.getAttribute('dir')).toBe('ltr');
+  });
+
+  it('a phone that is not a recognisable number is shown as typed, and no phone means no separator', () => {
+    const odd = {
+      ...guestReturn,
+      customer: { ...guestReturn.customer!, phone: '12345' },
+    } as unknown as ReturnRecord;
+    const none = {
+      ...guestReturn,
+      id: 'r2',
+      customer: { ...guestReturn.customer!, phone: null },
+    } as unknown as ReturnRecord;
+    render(
+      <ReturnsTable
+        returns={[odd, none]}
+        meta={{ page: 1, limit: 20, total: 2, totalPages: 1 }}
+        isLoading={false}
+        onSelect={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onMarkReceived={vi.fn()}
+        onComplete={vi.fn()}
+        onPageChange={vi.fn()}
+      />
+    );
+    expect(screen.getByText('12345')).toBeTruthy();
+    const lines = screen.getAllByText(/Mona Ali/).map(n => n.closest('p')!.textContent ?? '');
+    expect(lines.some(l => l.includes('Mona Ali · 12345'))).toBe(true);
+    expect(lines.some(l => !l.includes(' · ') && l.includes('Mona Ali'))).toBe(true);
   });
 });

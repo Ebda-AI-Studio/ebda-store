@@ -53,7 +53,7 @@ export default function ShippingSettingsPage() {
     <AdminLayout title={tHub('title')} subtitle={tHub('subtitle')}>
       <ShippingTabs />
       <div className="space-y-6 pb-24">
-        <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+        <div className="rounded-md border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
           {tPage('intro')}
         </div>
 
