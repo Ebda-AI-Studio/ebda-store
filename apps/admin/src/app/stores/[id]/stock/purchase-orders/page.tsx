@@ -8,6 +8,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { apiGetPage, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { minorToMajor, formatDate } from '@/lib/format';
@@ -31,14 +32,6 @@ interface PurchaseOrder {
 }
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
-
-const STATUS_CLASSES: Record<string, string> = {
-  draft: 'bg-muted text-foreground',
-  sent: 'bg-info/10 text-info-ink',
-  partial: 'bg-warning/10 text-warning-ink',
-  received: 'bg-success/10 text-success-ink',
-  cancelled: 'bg-destructive/10 text-destructive-ink',
-};
 
 const PER_PAGE = 50;
 
@@ -142,15 +135,7 @@ export default function PurchaseOrdersPage() {
                 header: t('status'),
                 mobileBadge: true,
                 className: 'w-28',
-                cell: po => (
-                  <span
-                    className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium ${
-                      STATUS_CLASSES[po.status] ?? 'bg-muted text-muted-ink'
-                    }`}
-                  >
-                    {t(`statuses.${po.status}`)}
-                  </span>
-                ),
+                cell: po => <OrderStatusBadge family="purchaseOrder" status={po.status} />,
               },
               {
                 header: t('expectedDate'),

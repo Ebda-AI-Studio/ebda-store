@@ -7,6 +7,7 @@ import { useLocale } from 'next-intl';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { OrderStatusBadge } from '../../../../components/OrderStatusBadge';
 import { apiGet, apiPost } from '../../../../lib/api';
+import { ProviderLogo } from '@/components/ProviderLogo';
 import { useT } from '@/i18n/useT';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { ShippingTabs } from '../shipping/_components/ShippingTabs';
@@ -77,13 +78,6 @@ interface ImportResult {
 }
 
 const CARRIERS = ['bosta', 'shipblu', 'mylerz', 'aramex', 'manual'];
-const STATUS_COLORS = {
-  awaiting: { className: 'bg-muted text-foreground' },
-  partial: { className: 'bg-warning/10 text-warning-ink' },
-  settled: { className: 'bg-success/10 text-success-ink' },
-  over_remitted: { className: 'bg-destructive/10 text-destructive-ink' },
-  mismatch: { className: 'bg-destructive/10 text-destructive-ink' },
-} as const;
 const PAGE_SIZE = 25;
 
 /**
@@ -347,7 +341,12 @@ export default function CodReconciliationPage() {
                   {report?.rows.map(r => (
                     <tr key={r.shipmentId} className="border-t border-border align-top">
                       <td className="px-3 py-2 font-medium">{r.orderNumber}</td>
-                      <td className="px-3 py-2">{carrierName(r)}</td>
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center gap-2">
+                          <ProviderLogo code={r.carrier} name={carrierName(r)} size="sm" />
+                          {carrierName(r)}
+                        </span>
+                      </td>
                       <td className="px-3 py-2 font-mono text-sm">{r.trackingNumber ?? '—'}</td>
                       <td className="px-3 py-2">{formatMoney(r.result.owed)}</td>
                       <td className="px-3 py-2">
@@ -366,11 +365,7 @@ export default function CodReconciliationPage() {
                           : formatMoney(r.result.outstanding)}
                       </td>
                       <td className="px-3 py-2">
-                        <OrderStatusBadge
-                          status={r.result.status}
-                          namespace="codReconciliation.statuses"
-                          colorMap={STATUS_COLORS}
-                        />
+                        <OrderStatusBadge status={r.result.status} family="codReconciliation" />
                       </td>
                     </tr>
                   ))}

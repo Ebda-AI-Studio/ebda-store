@@ -49,19 +49,6 @@ interface AudienceInfo {
   remainingToday: number;
 }
 
-// Colors reused for the status badge — subtle, distinct per status, dark-mode
-// aware (same shape OrderStatusBadge already renders for orders/returns).
-// Plain `as const` (no Record<K,V> annotation) mirrors returns/types.ts'
-// RETURN_COLORS — passed straight into `colorMap`'s `Record<string, ...>`.
-const CAMPAIGN_STATUS_COLORS = {
-  draft: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
-  scheduled: { bg: 'bg-info/10', text: 'text-info-ink', dot: 'bg-info' },
-  sending: { bg: 'bg-warning/10', text: 'text-warning-ink', dot: 'bg-warning' },
-  sent: { bg: 'bg-success/10', text: 'text-success-ink', dot: 'bg-success' },
-  cancelled: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
-  failed: { bg: 'bg-destructive/5', text: 'text-destructive-ink', dot: 'bg-destructive' },
-} as const;
-
 // Known lastError codes the send job can leave behind (campaign-send.ts) —
 // translated when recognized (shared `campaigns.errors` namespace, also used
 // by the editor/detail page), shown raw otherwise so a new backend code is
@@ -248,13 +235,7 @@ export default function CampaignsListPage() {
               {
                 header: t('colStatus'),
                 mobileBadge: true,
-                cell: c => (
-                  <OrderStatusBadge
-                    status={c.status}
-                    namespace="campaigns.status"
-                    colorMap={CAMPAIGN_STATUS_COLORS}
-                  />
-                ),
+                cell: c => <OrderStatusBadge status={c.status} family="campaign" />,
               },
               {
                 header: t('colRecipients'),

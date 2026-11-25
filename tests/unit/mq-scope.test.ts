@@ -78,6 +78,135 @@ describe('merge queue gate with a light merge group', () => {
   });
 });
 
+describe('CI-CAPACITY-1: the marketing dry-run only runs for a group that can move it', () => {
+  const marketing = (files: string[], labels: string[] = []) =>
+    decideScope({ files, labels }).marketing;
+  it('an API-only, admin-only or web-only group skips it', () => {
+    expect(marketing(['apps/api/src/routes/store.routes.ts', 'tests/unit/x.test.ts'])).toBe(true); // a test file is a rail: strict
+    expect(marketing(['apps/api/src/routes/store.routes.ts'])).toBe(false);
+    expect(marketing(['apps/admin/src/app/page.tsx'])).toBe(false);
+    expect(marketing(['apps/web/src/app/page.tsx', 'apps/api/src/a.ts'])).toBe(false);
+  });
+  it('marketing itself, and anything on a rail, runs it (strict: shared packages, root config, workflow, scripts, lockfile, tests)', () => {
+    for (const f of [
+      'apps/marketing/src/a.ts',
+      'packages/shared/src/a.ts',
+      'packages/database/src/a.ts',
+      'packages/repo/src/a.ts',
+      'package.json',
+      'package-lock.json',
+      'tsconfig.base.json',
+      '.github/workflows/ci.yml',
+      'scripts/ci/mq-scope.mjs',
+      'tests/unit/a.test.ts',
+      'apps/api/migrations/0001.sql',
+    ])
+      expect(marketing(['apps/api/src/a.ts', f]), f).toBe(true);
+  });
+  it('fails closed: the ci:full label and an empty diff never skip it', () => {
+    expect(marketing(['apps/api/src/a.ts'], ['ci:full'])).toBe(true);
+    expect(marketing([])).toBe(true);
+  });
+  it('the gate accepts a skipped worker-dry-run only when marketing=false, and never a failed one', () => {
+    const ids = ['guards', 'worker-dry-run', 'security'];
+    const n = (dry: string) =>
+      Object.fromEntries(ids.map(i => [i, { result: i === 'worker-dry-run' ? dry : 'success' }]));
+    expect(verdict('merge_group', n('skipped'), { heavy: 'true', marketing: 'false' }).ok).toBe(
+      true
+    );
+    expect(verdict('merge_group', n('skipped'), { heavy: 'true', marketing: 'true' }).ok).toBe(
+      false
+    );
+    expect(verdict('merge_group', n('skipped'), { heavy: 'true' }).ok).toBe(false);
+    expect(verdict('merge_group', n('failure'), { heavy: 'true', marketing: 'false' }).ok).toBe(
+      false
+    );
+    expect(verdict('merge_group', n('cancelled'), { heavy: 'true', marketing: 'false' }).ok).toBe(
+      false
+    );
+  });
+  it('ci.yml: the dry-run waits on the scope output for a merge group only, and tested-tree exports it', () => {
+    const ci = readFileSync(path.resolve(__dirname, '../../.github/workflows/ci.yml'), 'utf8');
+    expect(ci).toContain('marketing: ${{ steps.scope.outputs.marketing }}');
+    expect(ci).toContain(
+      "(github.event_name != 'merge_group' || needs.tested-tree.outputs.marketing != 'false')"
+    );
+  });
+});
+
+describe('CI-SCOPE-2: the Builder E2E shards only run for a group that can move the render path', () => {
+  const builder = (files: string[], labels: string[] = []) =>
+    decideScope({ files, labels }).builder;
+  it('an API-only, marketing, docs or status group skips them', () => {
+    expect(builder(['apps/api/src/routes/store.routes.ts'])).toBe(false);
+    expect(
+      builder(['apps/api/src/services/billing/account.service.ts', 'apps/api/wrangler.jsonc'])
+    ).toBe(false);
+    expect(builder(['apps/marketing/src/a.ts', 'docs/x.md', 'apps/status/src/a.ts'])).toBe(false);
+  });
+  it('web, admin, orders, accounts, any package, i18n, config, workflows, scripts, tests, lockfile and migrations run them', () => {
+    for (const f of [
+      'apps/web/src/a.ts',
+      'apps/admin/src/a.tsx',
+      'apps/orders/src/a.ts',
+      'apps/accounts/src/a.ts',
+      'packages/ui/src/a.tsx',
+      'packages/shared/src/a.ts',
+      'packages/repo/src/a.ts',
+      'apps/admin/src/i18n/messages/en.json',
+      'package.json',
+      'package-lock.json',
+      'tsconfig.base.json',
+      '.github/workflows/ci.yml',
+      'scripts/ci/mq-scope.mjs',
+      'tests/unit/a.test.ts',
+      'apps/api/migrations/0001.sql',
+      'playwright.builder.config.ts',
+    ])
+      expect(builder(['apps/api/src/a.ts', f]), f).toBe(true);
+  });
+  it('an API file named for the builder / look / layout / theme / template / storefront path runs them', () => {
+    for (const f of [
+      'apps/api/src/services/page-builder.service.ts',
+      'apps/api/src/routes/store-look.routes.ts',
+      'apps/api/src/lib/layout-save.ts',
+      'apps/api/src/services/theme.service.ts',
+      'apps/api/src/routes/storefront.routes.ts',
+    ])
+      expect(builder([f]), f).toBe(true);
+  });
+  it('fails closed: the ci:full label and an empty diff run them; builder is independent of heavy and marketing', () => {
+    expect(builder(['apps/api/src/a.ts'], ['ci:full'])).toBe(true);
+    expect(builder([])).toBe(true);
+    const r = decideScope({ files: ['apps/api/src/a.ts'] });
+    expect(r).toMatchObject({ heavy: true, marketing: false, builder: false });
+  });
+  it('the gate accepts skipped Builder E2E only when builder=false, and never a failed one', () => {
+    const n = (r: string) => ({
+      guards: { result: 'success' },
+      'builder-e2e': { result: r },
+    });
+    expect(verdict('merge_group', n('skipped'), { heavy: 'true', builder: 'false' }).ok).toBe(true);
+    expect(verdict('merge_group', n('skipped'), { heavy: 'true', builder: 'true' }).ok).toBe(false);
+    expect(verdict('merge_group', n('skipped'), { heavy: 'true' }).ok).toBe(false);
+    expect(verdict('merge_group', n('failure'), { heavy: 'true', builder: 'false' }).ok).toBe(
+      false
+    );
+    expect(verdict('merge_group', n('cancelled'), { heavy: 'true', builder: 'false' }).ok).toBe(
+      false
+    );
+  });
+  it('ci.yml: the shards wait on the scope output for a merge group only, and tested-tree exports it', () => {
+    const ci = readFileSync(path.resolve(__dirname, '../../.github/workflows/ci.yml'), 'utf8');
+    expect(ci).toContain('builder: ${{ steps.scope.outputs.builder }}');
+    const j = ci.match(/\n {2}builder-e2e:\n([\s\S]*?)(?=\n {2}[a-z0-9-]+:\n|$)/)?.[1] ?? '';
+    expect(j).toContain(
+      "(github.event_name != 'merge_group' || needs.tested-tree.outputs.builder != 'false')"
+    );
+    expect(j).toContain("needs.tested-tree.outputs.heavy != 'false'");
+  });
+});
+
 describe('ci.yml wiring', () => {
   const ci = readFileSync(path.resolve(__dirname, '../../.github/workflows/ci.yml'), 'utf8');
   const job = (id: string) =>

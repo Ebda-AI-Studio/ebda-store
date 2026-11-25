@@ -19,9 +19,10 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge, Select, useToast } from '@ebda/ui';
+import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { limitLevel, limitPct } from '@/lib/plan-limits';
 import { billingDisplayStatus, showPeriodEnd, trialDaysLeft } from '@/lib/billing-state';
 import { Button } from '@/components/ui/Button';
@@ -32,6 +33,7 @@ import { useAuth } from '../../../../lib/auth';
 import { useT } from '../../../../i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
 import { DataTable } from '@/components/mobile/DataTable';
+import { ProviderLogo } from '@/components/ProviderLogo';
 import { InstapayPanel } from '../../../../components/billing/InstapayPanel';
 import { SupportLink } from '../../../../components/billing/SupportLink';
 import { InstapayReceiptForm } from '../../../../components/instapay/InstapayReceiptForm';
@@ -501,6 +503,16 @@ export default function StoreBillingPage() {
   const [nowMs, setNowMs] = useState(0);
   useEffect(() => setNowMs(Date.now()), []);
   const info = data?.billing;
+  // The plan cards open on the interval the store is on (a yearly store opens on Yearly), once: a later reload never undoes the
+  // merchant's own toggle. The "Current plan" badge follows the same pair (plan AND interval), see `isCurrent` below.
+  const currentInterval: 'monthly' | 'yearly' =
+    info?.billingInterval === 'yearly' ? 'yearly' : 'monthly';
+  const intervalSynced = useRef(false);
+  useEffect(() => {
+    if (intervalSynced.current || !info?.billingInterval) return;
+    intervalSynced.current = true;
+    setInterval(info.billingInterval === 'yearly' ? 'yearly' : 'monthly');
+  }, [info?.billingInterval]);
   const notice = billingNotice(info);
   const noticeCopy = info && notice ? noticeText(notice, info, tNotice, locale) : null;
   const noticeUrgent = notice === 'unpaid' || notice === 'overdue' || notice === 'overStoreLimit';
@@ -724,19 +736,11 @@ export default function StoreBillingPage() {
                 <p className="text-xs text-muted-foreground">{t('currentPlan')}</p>
                 <h2 className="text-xl font-semibold text-foreground">{planName(data.plan)}</h2>
               </div>
-              <Badge
-                variant={
-                  displayStatus === 'past_due'
-                    ? 'destructive'
-                    : displayStatus === 'comped' || displayStatus === 'trialing'
-                      ? 'info'
-                      : displayStatus === 'awaiting_payment'
-                        ? 'warning'
-                        : 'success'
-                }
-              >
-                {t(`status.${displayStatus}`)}
-              </Badge>
+              <OrderStatusBadge
+                family="subscription"
+                status={displayStatus}
+                label={t(`status.${displayStatus}`)}
+              />
             </div>
             <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
               {data.subscription.trialEndsAt && (
@@ -791,21 +795,11 @@ export default function StoreBillingPage() {
             <section className="rounded-md border bg-card p-4 shadow-sm sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <h2 className="text-base font-semibold">{t('trial.title')}</h2>
-                <Badge
-                  variant={
-                    displayStatus === 'past_due'
-                      ? 'destructive'
-                      : displayStatus === 'trialing' || displayStatus === 'comped'
-                        ? 'info'
-                        : displayStatus === 'awaiting_payment'
-                          ? 'warning'
-                          : displayStatus === 'active'
-                            ? 'success'
-                            : 'secondary'
-                  }
-                >
-                  {t(`status.${displayStatus}`)}
-                </Badge>
+                <OrderStatusBadge
+                  family="subscription"
+                  status={displayStatus}
+                  label={t(`status.${displayStatus}`)}
+                />
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
                 {t(`stateLine.${displayStatus}`)}
@@ -951,7 +945,10 @@ export default function StoreBillingPage() {
 
               {(instapay?.available || instapayChosen) && instapay && (
                 <div className="space-y-3 border-t pt-4">
-                  <h3 className="text-sm font-medium">{t('pay.instapay')}</h3>
+                  <h3 className="flex items-center gap-2 text-sm font-medium">
+                    <ProviderLogo code="instapay" name={t('pay.instapay')} size="sm" />
+                    {t('pay.instapay')}
+                  </h3>
                   {!instapayChosen ? (
                     <Button
                       variant="outline"
@@ -1128,8 +1125,11 @@ export default function StoreBillingPage() {
             <div className="mb-4 grid gap-3 sm:grid-cols-3">
               {data.availablePlans.map(p => {
                 const price = planPrice(p);
-                const isCurrent = p.code === data.plan.subscribedPlanCode;
                 const paid = p.code !== 'free' && p.code !== 'comped' && p.code !== 'founding_free';
+                // Current = this plan on the interval the store is on: Business Yearly is not "current" under the Monthly toggle
+                // (picking it there is an interval change). A plan with no interval (free, comped) is current on either toggle.
+                const samePlan = p.code === data.plan.subscribedPlanCode;
+                const isCurrent = samePlan && (!paid || interval === currentInterval);
                 const hasCard =
                   !!data.billing?.hasPaymentMethod &&
                   data.subscription.status === 'active' &&
@@ -1165,7 +1165,8 @@ export default function StoreBillingPage() {
                           {price === null ? t('priceUnset') : t('chooseThisPlan')}
                         </Button>
                       )}
-                    {!isCurrent &&
+                    {/* a card switch carries no interval (change-plan takes the plan only): never offered for the plan the store is on */}
+                    {!samePlan &&
                       paid &&
                       data.subscription.status !== 'comped' &&
                       !payOnOtherStore &&
