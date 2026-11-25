@@ -8,6 +8,7 @@ import { useT } from '@/i18n/useT';
 import { ArrowStart, ArrowEnd } from '@/components/ArrowStart';
 import { useAuth } from '@/lib/auth';
 import { apiGet, apiPost } from '@/lib/api';
+import { useQueuedScan } from '@/hooks/useQueuedScan';
 import { VariantText, useToast } from '@ebda/ui';
 import { withNumerals } from '@ebda/shared';
 
@@ -69,20 +70,20 @@ function UrgencyBadge({
 }) {
   if (days < 3) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-ink">
         {t('card.urgencyDays', { days })}
       </span>
     );
   }
   if (days < 7) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-warning/10 text-warning-ink">
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-ink">
         {t('card.urgencyDays', { days })}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
+    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground">
       {t('card.urgencyDays', { days })}
     </span>
   );
@@ -125,7 +126,7 @@ function SuggestionCard({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+    <div className="rounded-md border border-border bg-card p-4 space-y-3">
       {/* Header row */}
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-0.5 min-w-0">
@@ -205,29 +206,30 @@ export default function ReorderPage() {
   const [meta, setMeta] = useState<ListMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rescanning, setRescanning] = useState(false);
   const [lastScanned, setLastScanned] = useState<string | null>(null);
 
   const load = useCallback(
-    async (page = 1) => {
-      if (!storeId) return;
-      setLoading(true);
+    async (page = 1, silent = false): Promise<string | null> => {
+      if (!storeId) return null;
+      if (!silent) setLoading(true);
       const { data, error: apiError } = await apiGet<{
         data: ReorderSuggestion[];
         meta: ListMeta;
       }>(`/api/v1/stores/${storeId}/stock/reorder-suggestions?status=open&page=${page}&perPage=20`);
       setLoading(false);
       if (apiError) {
-        setError(apiError.message);
-        return;
+        if (!silent) setError(apiError.message);
+        return null;
       }
       if (data) {
         setItems(data.data);
         setMeta(data.meta);
         if (data.data.length > 0) {
           setLastScanned(data.data[0].scannedAt);
+          return data.data[0].scannedAt;
         }
       }
+      return null;
     },
     [storeId]
   );
@@ -259,12 +261,12 @@ export default function ReorderPage() {
     }
   }
 
-  async function handleRescan() {
-    if (rescanning) return;
-    setRescanning(true);
-    await apiPost(`/api/v1/stores/${storeId}/stock/reorder-scan/run-now`, {});
-    setRescanning(false);
-  }
+  const { running: rescanning, start: handleRescan } = useQueuedScan({
+    path: `/api/v1/stores/${storeId}/stock/reorder-scan/run-now`,
+    reload: () => load(1, true),
+    currentStamp: lastScanned,
+    t,
+  });
 
   return (
     <AdminLayout title={t('title')}>
@@ -301,14 +303,14 @@ export default function ReorderPage() {
         </div>
 
         {/* Error */}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-destructive-ink">{error}</p>}
 
         {/* Loading */}
         {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
 
         {/* Empty state */}
         {!loading && !error && items.length === 0 && (
-          <div className="rounded-xl border border-border bg-muted/10 p-6 text-center">
+          <div className="rounded-md border border-border bg-muted/10 p-6 text-center">
             <p className="text-sm text-muted-foreground">{t('empty')}</p>
             <a
               href={`/stores/${storeId}/stock/reorder/rules`}

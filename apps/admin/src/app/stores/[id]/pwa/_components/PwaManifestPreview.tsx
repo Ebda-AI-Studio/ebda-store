@@ -4,6 +4,7 @@ import { useT } from '@/i18n/useT';
 import type { StoreTheme } from '@ebda/shared';
 import { ColorField } from '../../../../../components/ColorField';
 import { DISPLAY_OPTIONS, ORIENTATION_OPTIONS, type PWASettings } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface PwaManifestPreviewProps {
   settings: PWASettings;
@@ -26,7 +27,7 @@ export function PwaManifestPreview({
   const t = useT('pwa.manifest');
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6">
+    <div className="bg-card rounded-md border border-border p-6">
       <h2 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className={pwaEnabled ? '' : 'opacity-50 pointer-events-none'}>
@@ -58,7 +59,7 @@ export function PwaManifestPreview({
             onChange={e =>
               onChange({ ...settings, display: e.target.value as PWASettings['display'] })
             }
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
             disabled={!pwaEnabled}
           >
             {DISPLAY_OPTIONS.map(opt => (
@@ -80,7 +81,7 @@ export function PwaManifestPreview({
                 orientation: e.target.value as PWASettings['orientation'],
               })
             }
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
             disabled={!pwaEnabled}
           >
             {ORIENTATION_OPTIONS.map(opt => (

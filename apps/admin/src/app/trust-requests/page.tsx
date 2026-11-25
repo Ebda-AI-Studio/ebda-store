@@ -10,6 +10,8 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
+import { cn } from '@ebda/ui/cn';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { apiGet, apiPost } from '../../lib/api';
@@ -116,19 +118,18 @@ function Inner() {
 
   const when = (iso: string) => new Date(iso).toISOString().slice(0, 16).replace('T', ' ');
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) => setFilters(f => ({ ...f, [k]: v }));
-  const field = 'rounded-md border border-border bg-background px-2 py-1 text-sm';
 
   return (
     <div className="max-w-5xl space-y-6">
-      <section aria-labelledby="tr-filters" className="rounded-xl border bg-card p-4">
+      <section aria-labelledby="tr-filters" className="rounded-md border bg-card p-4">
         <h2 id="tr-filters" className="sr-only">
           {t('filter.title')}
         </h2>
         <div className="flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          <label className="flex flex-col gap-1 text-sm text-muted-foreground">
             {t('filter.kind')}
             <select
-              className={field}
+              className={FIELD_CLASSES}
               value={filters.kind}
               onChange={e => set('kind', e.target.value as Filters['kind'])}
             >
@@ -140,10 +141,10 @@ function Inner() {
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          <label className="flex flex-col gap-1 text-sm text-muted-foreground">
             {t('filter.status')}
             <select
-              className={field}
+              className={FIELD_CLASSES}
               value={filters.status}
               onChange={e => set('status', e.target.value as Filters['status'])}
             >
@@ -155,31 +156,31 @@ function Inner() {
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          <label className="flex flex-col gap-1 text-sm text-muted-foreground">
             {t('filter.store')}
             <input
-              className={`${field} w-72`}
+              className={cn(FIELD_CLASSES, 'w-72')}
               dir="ltr"
               placeholder={t('filter.storePlaceholder')}
               value={filters.storeId}
               onChange={e => set('storeId', e.target.value)}
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          <label className="flex flex-col gap-1 text-sm text-muted-foreground">
             {t('filter.from')}
             <input
               type="date"
-              className={field}
+              className={FIELD_CLASSES}
               value={filters.from}
               max={filters.to || undefined}
               onChange={e => set('from', e.target.value)}
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          <label className="flex flex-col gap-1 text-sm text-muted-foreground">
             {t('filter.to')}
             <input
               type="date"
-              className={field}
+              className={FIELD_CLASSES}
               value={filters.to}
               min={filters.from || undefined}
               onChange={e => set('to', e.target.value)}
@@ -188,7 +189,7 @@ function Inner() {
         </div>
       </section>
 
-      <section aria-labelledby="tr-list" className="rounded-xl border bg-card p-4">
+      <section aria-labelledby="tr-list" className="rounded-md border bg-card p-4">
         <h2 id="tr-list" className="text-base font-semibold text-foreground">
           {t('list.title')}
         </h2>
@@ -222,7 +223,7 @@ function Inner() {
                   <tr key={r.id} className="border-t border-border align-top">
                     <td className="py-1.5 pe-3">{t(`kind.${r.kind}`)}</td>
                     <td className="pe-3">{t(`status.${r.status}`)}</td>
-                    <td className="pe-3 text-xs text-muted-foreground" dir="ltr">
+                    <td className="pe-3 text-sm text-muted-foreground" dir="ltr">
                       {r.storeId ?? '—'}
                     </td>
                     <td className="pe-3">
@@ -230,7 +231,7 @@ function Inner() {
                       {r.slug ? `${r.slug}: ` : ''}
                       {(r.message ?? '').slice(0, 80)}
                     </td>
-                    <td className="pe-3 text-xs text-muted-foreground" dir="ltr">
+                    <td className="pe-3 text-sm text-muted-foreground" dir="ltr">
                       {when(r.createdAt)}
                     </td>
                     <td className="pe-3 text-xs text-muted-foreground" dir="ltr">
@@ -257,7 +258,7 @@ function Inner() {
       </section>
 
       {openId && (
-        <section aria-labelledby="tr-detail" className="rounded-xl border bg-card p-4">
+        <section aria-labelledby="tr-detail" className="rounded-md border bg-card p-4">
           <h2 id="tr-detail" className="text-base font-semibold text-foreground">
             {t('detail.title')}
           </h2>
@@ -287,7 +288,7 @@ function Inner() {
                   ltr
                 />
               </dl>
-              <p className="mt-3 text-xs text-muted-foreground">{t('detail.message')}</p>
+              <p className="mt-3 text-sm text-muted-foreground">{t('detail.message')}</p>
               <p className="mt-1 whitespace-pre-wrap rounded-md border border-border bg-background p-3 text-sm">
                 {detail.message ?? '—'}
               </p>
@@ -297,7 +298,7 @@ function Inner() {
                 </p>
               )}
               {detail.status === 'open' && detail.kind === 'store_cap' && (
-                <label className="mt-3 flex flex-col gap-1 text-xs text-muted-foreground">
+                <label className="mt-3 flex flex-col gap-1 text-sm text-muted-foreground">
                   {t('detail.newLimit')}
                   <input
                     type="number"
@@ -305,7 +306,7 @@ function Inner() {
                     min={3}
                     max={20}
                     step={1}
-                    className={`${field} w-28`}
+                    className={cn(FIELD_CLASSES, 'w-28')}
                     value={limit}
                     onChange={e => setLimit(e.target.value)}
                   />
@@ -344,7 +345,7 @@ function Inner() {
 function Item({ label, value, ltr }: { label: string; value: string | null; ltr?: boolean }) {
   return (
     <div>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dt className="text-sm text-muted-foreground">{label}</dt>
       <dd className="break-all text-foreground" dir={ltr ? 'ltr' : undefined}>
         {value || '—'}
       </dd>

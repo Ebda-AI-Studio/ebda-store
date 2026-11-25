@@ -117,7 +117,7 @@ export function PublicShell({
           </aside>
           <section
             aria-labelledby="public-page-title"
-            className={`mx-auto w-full rounded-2xl border border-border bg-card p-5 sm:p-7 ${wide ? 'max-w-xl' : 'max-w-md'}`}
+            className={`mx-auto w-full rounded-lg border border-border bg-card p-5 sm:p-7 ${wide ? 'max-w-xl' : 'max-w-md'}`}
           >
             <h1 id="public-page-title" className="text-xl font-semibold text-foreground">
               {title}

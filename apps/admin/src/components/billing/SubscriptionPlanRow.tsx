@@ -60,10 +60,10 @@ export function SubscriptionPlanRow({
 
   const name = plan ? (locale === 'ar' ? plan.nameAr : plan.nameEn) : null;
   return (
-    <div className="flex flex-col gap-3 rounded-xl border bg-card p-5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-lg border bg-card p-5 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <p className="text-sm font-medium text-foreground">{t('label')}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground" data-testid="subscription-plan-name">
+        <p className="mt-0.5 text-sm text-muted-foreground" data-testid="subscription-plan-name">
           {failed ? t('loadError') : name ? `${name} (${plan!.subscribedPlanCode})` : t('loading')}
         </p>
       </div>

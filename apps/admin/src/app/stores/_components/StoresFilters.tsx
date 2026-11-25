@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { StatusFilterPills } from '@/components/StatusFilterPills';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface StoresFiltersProps {
   search: string;
@@ -57,7 +58,7 @@ export function StoresFilters({
             placeholder={t('searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="force-input ps-11"
+            className={FIELD_CLASSES}
           />
         </div>
         <Button type="submit" variant="outline" size="sm">
@@ -73,7 +74,7 @@ export function StoresFilters({
             options={STATUS_KEYS.map(({ value, labelKey }) => ({ value, label: t(labelKey) }))}
             value={statusFilter}
             onChange={setStatusFilter}
-            className="flex items-center gap-1 rounded-xl bg-muted/50 p-1"
+            className="flex items-center gap-1 rounded-md bg-muted/50 p-1"
           />
         </div>
 
@@ -82,7 +83,7 @@ export function StoresFilters({
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
           aria-label={t('filterStatusLabel')}
-          className="rounded-xl border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:hidden"
+          className={`${FIELD_CLASSES} sm:hidden`}
         >
           <option value="all">{t('filterAllStatus')}</option>
           <option value="active">{t('filterActive')}</option>
@@ -91,7 +92,7 @@ export function StoresFilters({
         </select>
 
         {/* View Toggle */}
-        <div className="flex items-center gap-1 rounded-xl bg-muted/50 p-1">
+        <div className="flex items-center gap-1 rounded-md bg-muted/50 p-1">
           <Button
             variant={viewMode === 'grid' ? 'soft' : 'ghost'}
             size="icon-sm"

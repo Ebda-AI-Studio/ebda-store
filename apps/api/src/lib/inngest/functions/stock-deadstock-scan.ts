@@ -1,3 +1,4 @@
+import { readStorePlan } from '../../store-plan';
 import type { JobDef } from '../../jobs/types';
 import { withStoreDb } from '../../jobs/store-db';
 import { storeDirectory } from '@ebda/database';
@@ -48,10 +49,21 @@ export const stockDeadstockScanCron: JobDef = inngest.createFunction(
       ).then(list => list.filter(storeFilter(event)).map(s => ({ id: s.id })))
     );
 
+    // Stores to visit: entitlement read in one batched prefetch per run (selection only). The per-store gate below stays a
+    // LIVE read, so a downgrade mid-run is still honoured before any paid action (entitlements are NEVER-stale).
+    const enabledIds = new Set(
+      await step.run('select-enabled-stores', () =>
+        featureService.selectEnabled(
+          stores.map(s => s.id),
+          'inventory.basic'
+        )
+      )
+    );
+
     let totalFlagged = 0;
     let totalExpired = 0;
 
-    for (const store of stores) {
+    for (const store of stores.filter(s => enabledIds.has(s.id))) {
       const result = await step.run(`scan-${store.id}`, async () => {
         // Feature gate — dead-stock analysis requires inventory.basic.
         const enabled = await featureService.isFeatureEnabled(store.id, 'inventory.basic');
@@ -99,9 +111,7 @@ export const stockDeadstockScanOnDemand: JobDef = inngest.createFunction(
     // One step for both gates: on a Workflow only step bodies hold a database connection.
     const { enabled, store } = await step.run('gates', async () => ({
       enabled: await featureService.isFeatureEnabled(storeId, 'inventory.basic'),
-      store: await withStoreDb(storeId, db =>
-        db.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-      ),
+      store: await withStoreDb(storeId, db => readStorePlan(db as never, storeId)),
     }));
     if (!enabled) {
       logger.info(
