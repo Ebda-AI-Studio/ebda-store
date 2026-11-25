@@ -28,6 +28,7 @@ import { useT } from '../../i18n/useT';
 import { formatSpend } from '@/lib/ai-spend';
 
 import { formatMoney, withNumerals } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface UsageStoreRow {
   storeId: string;
   slug: string;
@@ -108,7 +109,7 @@ function UsageHistoryInner() {
 
   if (error) {
     return (
-      <div className="rounded-xl border bg-card p-6 text-center">
+      <div className="rounded-md border bg-card p-6 text-center">
         <p className="text-sm text-destructive-ink">{t('loadError')}</p>
         <Button variant="link" size="sm" type="button" onClick={fetchData} className="mt-3">
           {tCommon('retry')}
@@ -216,7 +217,7 @@ function UsageHistoryInner() {
         <select
           value={selected ?? ''}
           onChange={e => setSelected(e.target.value)}
-          className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          className={FIELD_CLASSES}
         >
           {periods.map(p => (
             <option key={p.periodStart} value={p.periodStart}>
@@ -228,7 +229,7 @@ function UsageHistoryInner() {
           {t('storeCount', { count: rows.length })}
         </span>
       </label>
-      <div className="rounded-xl border bg-card shadow-sm">
+      <div className="rounded-md border bg-card shadow-sm">
         <DataTable<UsageStoreRow>
           ariaLabel={t('title')}
           columns={columns}

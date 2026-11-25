@@ -4,6 +4,8 @@ import { ON_HAND_SQL, storeStockValueFils } from '../lib/effective-inventory-sql
 import { storeDb, storeMoney, storeRepo } from '../lib/repo-factory';
 import { countDistinctCustomersGrouped } from '../lib/buyer-counts';
 import { redis } from './redis.service';
+import { getCached } from '../lib/public-cache';
+import { analyticsDashboardPrefix } from '../lib/revenue-cache';
 import { netRevenue } from './revenue.service';
 import { topCustomersNet } from '../lib/order-refunds';
 import {
@@ -213,6 +215,11 @@ interface DashboardStats {
   revenueChange: number;
   ordersChange: number;
   customersChange: number;
+  /** Previous-period revenue/orders, so a client can tell "up 100%" from "first sales" (previous = 0). */
+  previousRevenue: number;
+  previousOrders: number;
+  previousCustomers: number;
+  previousProfit: number | null;
   /**
    * Sum of (price - costPrice) * quantity over the period's order lines that
    * carry a cost snapshot (orders not cancelled/refunded). `null` when lines
@@ -333,9 +340,12 @@ export class AnalyticsService {
     const endDate = dateRange?.endDate || endOfMinute(now);
 
     // Build a cache key that includes the date range so different periods don't collide
-    const cacheKey = `analytics:dashboard:${storeId}:${startDate.toISOString()}:${endDate.toISOString()}`;
+    const cacheKey = `${analyticsDashboardPrefix(storeId)}${startDate.toISOString()}:${endDate.toISOString()}`;
 
-    return getCachedAnalytics(cacheKey, 120, async () => {
+    // STORE-QA-74: revenue is NEVER-stale. The generation-guarded cache (public-cache) so every order / payment / refund / return write
+    // of the store drops this entry (`invalidateStoreRevenueCaches`, called from the money-op transport); the 120 s TTL is only the
+    // backstop for a Redis outage.
+    return getCached(cacheKey, 120, async () => {
       return this._computeDashboardStats(storeId, startDate, endDate);
     });
   }
@@ -419,6 +429,10 @@ export class AnalyticsService {
       revenueChange: Math.round(revenueChange * 10) / 10,
       ordersChange: Math.round(ordersChange * 10) / 10,
       customersChange: Math.round(customersChange * 10) / 10,
+      previousRevenue: prevStats.revenue,
+      previousOrders: prevStats.orders,
+      previousCustomers: prevStats.customers,
+      previousProfit: profitComparable ? prevStats.profit : null,
       totalProfit: currentStats.profit,
       profitItemsMissingCost: currentStats.itemsMissingCost,
       profitRevenueMissingCost: currentStats.revenueMissingCost,

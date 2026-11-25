@@ -22,7 +22,7 @@ import {
   type StoreBranding,
 } from './admin-layout/buildStoreAdminNav';
 import { HubTabs, type HubTab } from './admin-layout/HubTabs';
-import { detectHub, type HubLabels } from './admin-layout/hubs';
+import { detectHub, isHubTabVisible as hubTabVisible, type HubLabels } from './admin-layout/hubs';
 import {
   buildStorePaletteItems,
   type PaletteItem,
@@ -31,6 +31,7 @@ import {
 import { SidebarHeader } from './admin-layout/SidebarHeader';
 import { CommandPalette } from './CommandPalette';
 import { SidebarNav } from './admin-layout/SidebarNav';
+import { useAttention } from '../hooks/useAttention';
 import { SidebarFooter } from './admin-layout/SidebarFooter';
 import { ContactEbdaDialog } from './support/ContactEbdaDialog';
 import { SuspensionNotice } from './support/SuspensionNotice';
@@ -84,7 +85,11 @@ export function AdminLayout({
   // feature map has loaded AND the feature is on — never on the loading
   // default, so a store without the feature never sees the tab flash.
   const isHubTabVisible = (tab: HubTab) =>
-    !tab.featureKey || (!featuresLoading && isFeatureEnabled(tab.featureKey));
+    hubTabVisible(tab, {
+      role: user?.role,
+      featuresLoading,
+      isEnabled: isFeatureEnabled,
+    });
   const { isFocused, focusStoreId, enterFocusMode } = useFocusMode();
 
   // When a super_admin is browsing inside a specific store
@@ -309,6 +314,8 @@ export function AdminLayout({
   // Fall back to the resolved currentStoreId so a store_admin lands on
   // sensible nav links even on pages that don't pass `storeId` explicitly.
   const navStoreId = storeId ?? currentStoreId ?? '';
+  // One shared "needs attention" feed: the sidebar dot here, the section badges and the Settings list elsewhere.
+  const attention = useAttention(mode === 'store_admin' ? navStoreId : null);
   const allNavItems =
     mode === 'super_admin'
       ? buildSuperAdminNav(navLabels)
@@ -436,7 +443,7 @@ export function AdminLayout({
           />
         </svg>
         <span className="flex-1 text-start">{tcp('trigger')}</span>
-        <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-xs lg:inline-block">
+        <kbd className="hidden shrink-0 rounded-md border border-border px-1.5 py-0.5 text-xs lg:inline-block">
           {/* i18n-gate-allow: keyboard shortcut keycap */}
           ⌘K
         </kbd>
@@ -446,6 +453,11 @@ export function AdminLayout({
         pathname={pathname}
         onNavigate={() => setIsSidebarOpen(false)}
         activeHubKey={activeHubKey}
+        badges={
+          mode === 'store_admin'
+            ? { settings: attention.nav.settings, sales: attention.nav.orders }
+            : undefined
+        }
       />
       <SidebarFooter
         isDark={isDark}
@@ -514,7 +526,7 @@ export function AdminLayout({
       {/* Mobile Sidebar */}
       <aside
         id="admin-mobile-sidebar"
-        className={`fixed inset-y-0 start-0 z-50 w-72 transform border-e border-border/50 bg-card shadow-2xl transition-transform duration-300 ease-out lg:hidden ${
+        className={`fixed inset-y-0 start-0 z-50 w-72 transform border-e border-border/50 bg-card shadow-xl transition-transform duration-300 ease-out lg:hidden ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'
         }`}
         aria-hidden={!isSidebarOpen}
@@ -600,7 +612,11 @@ export function AdminLayout({
       {/* The Ebda assistant: renders nothing until the server says it is on for this store (rollout switch, default off). */}
       {navStoreId && mode === 'store_admin' && <AssistantDock storeId={navStoreId} />}
       {navStoreId && (
-        <MobileBottomNav storeId={navStoreId} onOpenMore={() => setIsSidebarOpen(true)} />
+        <MobileBottomNav
+          storeId={navStoreId}
+          onOpenMore={() => setIsSidebarOpen(true)}
+          badges={{ orders: attention.nav.orders, more: attention.nav.settings }}
+        />
       )}
     </div>
   );

@@ -54,20 +54,6 @@ export const DEFAULT_CONFIGS: NotificationConfigs = {
   push_notifications: { enabled: false },
 };
 
-/**
- * Color palette for the notification-log status pill. Handed to the shared
- * OrderStatusBadge via `colorMap`. Distinct from the shipment palette (different
- * vocabulary) and intentionally treats "sent" and "delivered" as equivalent
- * success states.
- */
-export const NOTIFICATION_COLORS = {
-  sent: { className: 'bg-success/10 text-success-ink' },
-  delivered: { className: 'bg-success/10 text-success-ink' },
-  failed: { className: 'bg-destructive/10 text-destructive-ink' },
-  pending: { className: 'bg-muted text-muted-foreground' },
-  queued: { className: 'bg-primary/10 text-primary-ink' },
-} as const;
-
 export const DEFAULT_EVENTS: EventConfig[] = [
   {
     event: 'order_confirmed',

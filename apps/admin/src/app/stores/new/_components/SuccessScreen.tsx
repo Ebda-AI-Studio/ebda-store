@@ -77,7 +77,7 @@ export function SuccessScreen({ store, owner }: SuccessScreenProps) {
   return (
     <AdminLayout title={t('successTitle')} subtitle={t('successSubtitle')}>
       <div className="mx-auto max-w-2xl">
-        <div className="rounded-xl border bg-card p-8 shadow-sm text-center">
+        <div className="rounded-md border bg-card p-8 shadow-sm text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
             <svg
               className="h-8 w-8 text-success-ink"

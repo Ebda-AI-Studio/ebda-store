@@ -36,6 +36,7 @@ import { getBillingRefundStoreId, getEntityStoreId } from '../../lib/definer';
 import { pageAcrossStores } from '../../lib/cross-store';
 import { AppError } from '../../middleware/error-handler';
 import { config } from '../../config';
+import { platformDb } from '../../lib/platform-db';
 import logger from '../../lib/logger';
 import { isStoreGoneError } from '../../lib/jobs/store-gone';
 import { sendAlert } from '../alerts.service';
@@ -49,7 +50,7 @@ import {
   ledgerTaxFieldsD1,
 } from '../platform/billing-d1';
 import { isFamilyFrozen } from '../platform/cutover';
-import { cfBindings } from '../../cf/bindings';
+import { cfBindings, cfWaitUntil } from '../../cf/bindings';
 import { encryption } from '../encryption.service';
 import {
   BillingProviderError,
@@ -129,6 +130,61 @@ export interface Outcome {
   cardLast4?: string;
   cardBrand?: string;
   customerRef?: string;
+  /**
+   * #627, what the success is worth and who said so: `charge_request` = the gateway's direct answer to OUR charge call for
+   * the row's amount; `gateway` = a status lookup or signed webhook that STATED `amountMinor` / `currency`. A success
+   * with neither is never settled (`maySettle`): it is held for a person.
+   */
+  amountSource?: 'charge_request' | 'gateway';
+  amountMinor?: number | null;
+  currency?: string | null;
+}
+
+/** The marker a held charge carries on its own ledger row (`billing_events.failure_reason`), so NO settle path takes it. */
+const HELD_ROW_PREFIX = 'held:';
+/**
+ * The marker a person's decision leaves (`resolveHeldBillingWebhook`). FINAL: once a person has decided (refunded / credited
+ * / ...), NOTHING settles the row again, whatever arrives later - a late signed webhook would otherwise apply a plan for
+ * money already refunded, or apply a credited one twice. A late delivery is recorded + alerted instead (`row_resolved`).
+ */
+const RESOLVED_ROW_PREFIX = 'held_resolved:';
+/**
+ * Where-clause fragment (put it in an `AND`) for EVERY bulk write on pending/failed ledger rows: a row carrying a hold
+ * (`held:*`) or a person's decision (`held_resolved:*`) is never touched, so a hold written between a read and the write
+ * is not overwritten (check + write in one statement). A null marker passes; `NOT startsWith` alone would drop nulls.
+ */
+const NOT_HELD = {
+  OR: [{ failureReason: null }, { NOT: { failureReason: { startsWith: 'held' } } }],
+};
+
+/**
+ * #627: THE one predicate every settle path goes through (settleInTx). A row with an open hold is never settled, either
+ * way (a person decides); a SUCCESS on a charge row must carry an amount we can check: from our own charge call, or one
+ * the gateway stated that equals the row in the row's currency. Anything else is a hold, never a settle on trust.
+ */
+export function maySettle(
+  row: { type: string; amountMinor: number; currency: string; failureReason: string | null },
+  o: Outcome
+): { ok: true } | { ok: false; reason: 'held' | 'resolved' | HeldBillingWebhook['reason'] } {
+  if (row.failureReason?.startsWith(RESOLVED_ROW_PREFIX)) return { ok: false, reason: 'resolved' };
+  if (row.failureReason?.startsWith(HELD_ROW_PREFIX)) return { ok: false, reason: 'held' };
+  if (o.status !== 'succeeded' || row.type === 'card_setup') return { ok: true };
+  if (o.amountSource === 'charge_request') {
+    // The gateway's direct answer to OUR charge of this row's amount: trusted when it states nothing more. If it DOES state an
+    // amount or currency (a lookup-style body), a disagreement is still a hold, never a settle on the strength of the call.
+    if (typeof o.amountMinor === 'number' && o.amountMinor !== row.amountMinor)
+      return { ok: false, reason: 'amount_mismatch' };
+    if (o.currency && o.currency.toUpperCase() !== String(row.currency).toUpperCase())
+      return { ok: false, reason: 'currency_mismatch' };
+    return { ok: true };
+  }
+  if (o.amountSource !== 'gateway' || typeof o.amountMinor !== 'number')
+    return { ok: false, reason: 'amount_missing' };
+  if (!o.currency) return { ok: false, reason: 'currency_missing' };
+  if (o.amountMinor !== row.amountMinor) return { ok: false, reason: 'amount_mismatch' };
+  if (o.currency.toUpperCase() !== String(row.currency).toUpperCase())
+    return { ok: false, reason: 'currency_mismatch' };
+  return { ok: true };
 }
 
 interface LedgerRow {
@@ -226,7 +282,7 @@ async function markFailedUnlessSettled(id: string, reason: string, raw?: unknown
     id,
     (tx, storeId) =>
       tx.billingEvent.updateMany({
-        where: { id, storeId, status: 'pending' },
+        where: { id, storeId, status: 'pending', AND: [NOT_HELD] },
         data: {
           status: 'failed',
           failureReason: reason,
@@ -242,7 +298,7 @@ async function markFailedUnlessSettled(id: string, reason: string, raw?: unknown
 async function downgradeToFree(
   tx: Tx,
   storeId: string,
-  reason: 'dunning' | 'canceled' | 'no_payment_method' | 'trial_ended',
+  reason: 'dunning' | 'canceled' | 'no_payment_method' | 'trial_ended' | 'payment_reversed',
   effects: BillingEffect[]
 ): Promise<void> {
   const free = await tx.plan.findUnique({ where: { code: FREE_PLAN_CODE } });
@@ -544,12 +600,20 @@ export async function settleInTx(
   o: Outcome,
   now: Date,
   effects: BillingEffect[]
-): Promise<{ transitioned: boolean }> {
+): Promise<{ transitioned: boolean; refused?: 'held' | 'resolved'; held?: HeldBillingWebhook }> {
   // Runs inside the event's store scope (inEventStore / the webhook's withStore).
   const row = await tx.billingEvent.findUnique({
     where: { id: eventId, storeId: currentStoreId() },
   });
   if (!row) return { transitioned: false };
+  const verdict = maySettle(row, o);
+  if (!verdict.ok) {
+    if (verdict.reason === 'held' || verdict.reason === 'resolved')
+      return { transitioned: false, refused: verdict.reason };
+    // a success we cannot check: hold the row (no settle path will take it) and queue it for a person, same section
+    const info = await holdLedgerRow(tx, row, verdict.reason, o);
+    return info ? { transitioned: false, held: info } : { transitioned: false };
+  }
   const raw = (o.raw ?? undefined) as Prisma.InputJsonValue | undefined;
   if (o.status === 'succeeded' && row.type === 'card_setup' && !o.cardToken) {
     // "Saved" with no token saves nothing: the store must not pass the go-live gate.
@@ -571,6 +635,7 @@ export async function settleInTx(
           id: eventId,
           storeId: row.storeId,
           status: { in: ['pending', 'failed'] },
+          AND: [NOT_HELD],
           OR: [
             { failureReason: null },
             { failureReason: { not: SETTLE_LEASE } },
@@ -615,7 +680,12 @@ export async function settleInTx(
       }
     }
     const upd = await tx.billingEvent.updateMany({
-      where: { id: eventId, storeId: row.storeId, status: { in: ['pending', 'failed'] } },
+      where: {
+        id: eventId,
+        storeId: row.storeId,
+        status: { in: ['pending', 'failed'] },
+        AND: [NOT_HELD],
+      },
       data: settled,
     });
     if (upd.count === 0) return { transitioned: false };
@@ -623,7 +693,7 @@ export async function settleInTx(
     return { transitioned: true };
   }
   const upd = await tx.billingEvent.updateMany({
-    where: { id: eventId, storeId: row.storeId, status: 'pending' },
+    where: { id: eventId, storeId: row.storeId, status: 'pending', AND: [NOT_HELD] },
     data: {
       status: 'failed',
       failureReason: o.failureReason ?? 'failed',
@@ -650,12 +720,72 @@ export async function settleInTx(
   return { transitioned: true };
 }
 
+/**
+ * Mark a ledger row held (`failure_reason = held:<reason>`, status untouched) and add it to the ONE held queue (a
+ * `billing_webhook_events` row, outcome `held`, keyed `settle:<rowId>` so a repeat adds nothing), in the caller's section.
+ */
+async function holdLedgerRow(
+  tx: Tx,
+  row: {
+    id: string;
+    storeId: string;
+    provider: string;
+    amountMinor: number;
+    currency: string;
+    failureReason?: string | null;
+  },
+  reason: HeldBillingWebhook['reason'],
+  o: Outcome
+): Promise<HeldBillingWebhook | null> {
+  const info: HeldBillingWebhook = {
+    reason,
+    kind: `settle.${o.status}`,
+    provider: row.provider,
+    storeId: row.storeId,
+    merchantOrderId: row.id,
+    providerRef: o.providerRef ?? null,
+    expectedMinor: row.amountMinor,
+    gotMinor: typeof o.amountMinor === 'number' ? o.amountMinor : null,
+    expectedCurrency: row.currency,
+    gotCurrency: o.currency ?? null,
+    occurredAt: new Date().toISOString(),
+    // the decline reason the `held:` marker replaces stays visible to the person resolving it
+    ...(row.failureReason ? { priorFailureReason: row.failureReason } : {}),
+  };
+  const marked = await tx.billingEvent.updateMany({
+    where: {
+      id: row.id,
+      storeId: row.storeId,
+      status: { in: ['pending', 'failed'] },
+      AND: [NOT_HELD],
+    },
+    data: { failureReason: `${HELD_ROW_PREFIX}${reason}` },
+  });
+  // a row that is no longer open (already succeeded) was not held: no queue entry, no alert for a hold that is not there
+  if (marked.count === 0) return null;
+  await tx.billingWebhookEvent.createMany({
+    data: [
+      {
+        provider: row.provider,
+        eventId: `settle:${row.id}`,
+        eventType: info.kind,
+        outcome: WEBHOOK_HELD,
+        detail: JSON.stringify(info),
+      },
+    ],
+    skipDuplicates: true,
+  });
+  return info;
+}
+
 async function settleCharge(eventId: string, o: Outcome, now: Date) {
   const effects: BillingEffect[] = [];
   const res = await inEventStore(eventId, tx => settleInTx(tx, eventId, o, now, effects), {
     transitioned: false,
   });
   await runBillingEffects(effects);
+  if (res.held)
+    await alertHeldBillingWebhook(res.held.provider ?? 'unknown', `settle:${eventId}`, res.held);
   return res;
 }
 
@@ -759,6 +889,10 @@ async function chargeAndSettle(args: {
       providerRef: res.chargeId,
       failureReason: res.failureReason,
       raw: res.raw,
+      // the gateway's direct answer to OUR charge of `args.amountMinor` for this row
+      amountSource: 'charge_request',
+      amountMinor: res.amountMinor ?? undefined,
+      currency: res.currency ?? undefined,
     },
     args.now
   );
@@ -1278,6 +1412,36 @@ export async function findDueSubscriptionIds(
   return rows.map(r => r.id);
 }
 
+/** Ledger rows matching `where` in every store (one D1 query, or one scope per store on Postgres); a failing store is logged. */
+async function ledgerRowsAcrossStores(
+  where: Prisma.BillingEventWhereInput,
+  label: string
+): Promise<
+  Array<{
+    id: string;
+    storeId: string;
+    idempotencyKey: string;
+    providerRef: string | null;
+    createdAt: Date;
+  }>
+> {
+  const parts = await acrossBilling(
+    storeId =>
+      prisma.billingEvent.findMany({
+        where: { ...(storeId ? { storeId } : {}), ...where },
+        select: {
+          id: true,
+          storeId: true,
+          idempotencyKey: true,
+          providerRef: true,
+          createdAt: true,
+        },
+      }),
+    { onStoreError: (storeId, err) => logger.error({ err, storeId }, `[billing] ${label} failed`) }
+  );
+  return parts.flatMap(p => p.value);
+}
+
 /** A renewal / upgrade charge is "stuck" when its outcome has not arrived this long after it was claimed. */
 export const STUCK_CHARGE_AFTER_MS = 3_600_000;
 
@@ -1298,28 +1462,10 @@ export async function sweepStuckCharges(
   provider?: BillingProvider
 ): Promise<{ polled: number; settled: number; notFound: number; stillStuck: number }> {
   const cutoff = new Date(now.getTime() - STUCK_CHARGE_AFTER_MS);
-  const parts = await acrossBilling(
-    storeId =>
-      prisma.billingEvent.findMany({
-        where: {
-          ...(storeId ? { storeId } : {}),
-          type: { in: ['renewal', 'upgrade'] },
-          status: 'pending',
-          createdAt: { lt: cutoff },
-        },
-        select: {
-          id: true,
-          storeId: true,
-          idempotencyKey: true,
-          providerRef: true,
-          createdAt: true,
-        },
-      }),
-    {
-      onStoreError: (storeId, err) => logger.error({ err, storeId }, '[billing] stuck scan failed'),
-    }
+  const rows = await ledgerRowsAcrossStores(
+    { type: { in: ['renewal', 'upgrade'] }, status: 'pending', createdAt: { lt: cutoff } },
+    'stuck scan'
   );
-  const rows = parts.flatMap(p => p.value);
   let active: BillingProvider | null = provider ?? null;
   if (!active && rows.length > 0) {
     try {
@@ -1362,10 +1508,15 @@ export async function sweepStuckCharges(
           providerRef: res.chargeId,
           failureReason: res.failureReason,
           raw: res.raw,
+          // #627: a status lookup only counts when it STATES the amount; a bare SUCCESS is held, not settled
+          amountSource: 'gateway',
+          amountMinor: res.amountMinor ?? null,
+          currency: res.currency ?? null,
         },
         now
       );
       if (t.transitioned) out.settled++;
+      else if (t.held) stuck.push(r.id);
     } catch (err) {
       logger.warn(
         { err, eventId: r.id },
@@ -1375,6 +1526,19 @@ export async function sweepStuckCharges(
     }
   }
   out.stillStuck = stuck.length;
+  // an open hold whose first P1 was lost (a crash between COMMIT and the alert) must not stay silent: every sweep re-alerts
+  try {
+    const open = await listHeldBillingWebhooks({ status: 'open', limit: 200 });
+    if (open.length > 0)
+      await sendAlert({
+        level: 'p1',
+        source: 'billing.held.open',
+        title: `Billing: ${open.length} held subscription payment(s) awaiting a person`,
+        body: `Open on the super-admin billing page (Held payments). Merchants may have paid without being upgraded.`,
+      });
+  } catch (err) {
+    logger.warn({ err }, '[billing] open-hold digest failed');
+  }
   if (stuck.length > 0) {
     void sendAlert({
       level: 'p1',
@@ -1382,7 +1546,77 @@ export async function sweepStuckCharges(
       body: `${stuck.length} renewal/upgrade charge(s) pending for over an hour with no gateway answer: ${stuck.slice(0, 10).join(', ')}. Not retried (a retry could charge the customer twice). Check the gateway dashboard and /billing-events.`,
     }).catch(() => undefined);
   }
+  await sweepStuckRefunds(now, active).catch(err =>
+    logger.error({ err }, '[billing] stuck-refund sweep failed')
+  );
   return out;
+}
+
+/**
+ * Ebda Store refunds whose outcome never arrived (pending past the in-flight window, MONEY-REVERSAL-2): asked against
+ * the gateway's record of the CHARGE (`listReversals`). The refund's own ref listed as a successful reversal settles
+ * it `succeeded`. A refund with no ref, or one the gateway does not list (yet), stays pending and is paged; it is
+ * never failed blindly, because the money may already be back with the customer.
+ */
+async function sweepStuckRefunds(now: Date, provider: BillingProvider | null): Promise<void> {
+  const rows = await ledgerRowsAcrossStores(
+    {
+      type: 'refund',
+      status: 'pending',
+      createdAt: { lt: new Date(now.getTime() - REFUND_IN_FLIGHT_MS) },
+    },
+    'stuck refund scan'
+  );
+  if (rows.length === 0) return;
+  let active = provider;
+  if (!active) {
+    try {
+      active = getBillingProvider();
+    } catch {
+      active = null;
+    }
+  }
+  const unresolved: string[] = [];
+  for (const r of rows) {
+    // a settled full refund that ends access pushes its `downgraded` effect here; it runs after the tx commits
+    const effects: BillingEffect[] = [];
+    try {
+      const settled = await withStore(r.storeId, async tx => {
+        const refund = await tx.billingEvent.findUnique({
+          where: { id: r.id, storeId: r.storeId },
+        });
+        const charge = refund?.relatedEventId
+          ? await tx.billingEvent.findUnique({
+              where: { id: refund.relatedEventId, storeId: r.storeId },
+            })
+          : null;
+        if (!refund?.providerRef || !charge?.providerRef || !active?.listReversals) return false;
+        const res = await active.listReversals({
+          chargeId: charge.providerRef,
+          merchantOrderId: charge.id,
+        });
+        if (!res.reversals.some(v => v.ref === refund.providerRef)) return false;
+        if (
+          await linkToBookedReversal(tx, r.storeId, refund.id, refund.provider, refund.providerRef)
+        )
+          return true;
+        await settleRefundInTx(tx, r.storeId, refund.id, true, undefined, effects);
+        return true;
+      });
+      await runBillingEffects(effects);
+      if (!settled) unresolved.push(r.id);
+    } catch (err) {
+      logger.warn({ err, eventId: r.id }, '[billing] stuck refund lookup failed; left pending');
+      unresolved.push(r.id);
+    }
+  }
+  if (unresolved.length) {
+    void sendAlert({
+      level: 'p1',
+      title: 'Billing: refunds with an unknown outcome',
+      body: `${unresolved.length} Ebda Store refund(s) pending past the in-flight window that the gateway record does not settle: ${unresolved.slice(0, 10).join(', ')}. Left pending (the money may already be back). A reversal the gateway reports for that charge is booked on its own. Check the gateway dashboard and /billing-events.`,
+    }).catch(() => undefined);
+  }
 }
 
 export async function expireStaleCheckouts(now: Date): Promise<number> {
@@ -1395,6 +1629,7 @@ export async function expireStaleCheckouts(now: Date): Promise<number> {
           type: { in: ['checkout', 'card_setup'] },
           status: 'pending',
           createdAt: { lt: cutoff },
+          AND: [NOT_HELD],
           // a row holding a LIVE D1 settle lease is being paid, not abandoned; a stale lease (its settler died) expires
           OR: [
             { failureReason: null },
@@ -1452,6 +1687,10 @@ export async function runBillingCycle(
     );
     await sweepStuckCharges(now, provider).catch(err =>
       logger.error({ err }, '[billing] stuck-charge sweep failed')
+    );
+    // #837: refunds / chargebacks made outside Ebda that no webhook reported.
+    await reconcileGatewayReversals(now, provider).catch(err =>
+      logger.error({ err }, '[billing] reversal reconcile failed')
     );
   }
   const ids = await findDueSubscriptionIds(now, only);
@@ -1616,8 +1855,40 @@ export async function resumeSubscription(args: { storeId: string }): Promise<voi
 
 export interface WebhookResult {
   duplicate: boolean;
-  outcome: 'processed' | 'ignored' | 'deferred';
+  outcome: 'processed' | 'ignored' | 'deferred' | 'held';
   detail?: string;
+}
+
+/**
+ * #627: a signed `charge.succeeded` we cannot match to what we billed (unknown order, a different amount or currency, or no
+ * amount / currency at all) is MONEY THE MERCHANT PAID. It is never `ignored`: the dedupe row is kept as `held` with the
+ * facts in `detail` (JSON), a P1 alert goes out after the commit, and the super-admin billing page lists it until a person
+ * resolves it (`resolveHeldBillingWebhook`). The provider still gets 200: the fact is recorded, a retry adds nothing.
+ */
+const WEBHOOK_HELD = 'held';
+const WEBHOOK_HELD_RESOLVED = 'held_resolved';
+interface HeldBillingWebhook {
+  reason:
+    | 'unknown_order'
+    | 'amount_mismatch'
+    | 'currency_mismatch'
+    | 'amount_missing'
+    | 'currency_missing'
+    | 'kind_mismatch'
+    | 'row_resolved';
+  /** The ledger row's earlier failure reason, replaced by the `held:` marker. */
+  priorFailureReason?: string;
+  /** The billing provider that owns the row (set by `holdLedgerRow`; the alert names it). */
+  provider?: string;
+  kind: string;
+  storeId: string | null;
+  merchantOrderId: string | null;
+  providerRef: string | null;
+  expectedMinor: number | null;
+  gotMinor: number | null;
+  expectedCurrency: string | null;
+  gotCurrency: string | null;
+  occurredAt: string;
 }
 
 /**
@@ -1640,6 +1911,11 @@ export async function applyWebhookEvent(
     webhookStoreId = event.providerRef
       ? await getBillingRefundStoreId(providerName, event.providerRef)
       : null;
+    // A refund Ebda did not start (gateway dashboard, reversal) has no pending refund row to find the store by: the
+    // charge it reverses does, through the merchant order id the gateway echoes (#837).
+    if (!webhookStoreId && event.merchantOrderId && UUID_RE.test(event.merchantOrderId)) {
+      webhookStoreId = await getEntityStoreId('billing_event', event.merchantOrderId);
+    }
   } else if (
     event.kind !== 'ignored' &&
     event.merchantOrderId &&
@@ -1648,6 +1924,10 @@ export async function applyWebhookEvent(
     webhookStoreId = await getEntityStoreId('billing_event', event.merchantOrderId);
   }
   const scopedStoreId = webhookStoreId;
+  const reversals: ReversalOutcome[] = [];
+  let unmatchedReversal = false;
+  let ambiguousReversal = false;
+  const heldRef: { v: HeldBillingWebhook | null } = { v: null };
   const applyInner = async (tx: Tx): Promise<WebhookResult> => {
     const ignore = async (detail: string): Promise<WebhookResult> => {
       await tx.billingWebhookEvent.updateMany({
@@ -1658,6 +1938,52 @@ export async function applyWebhookEvent(
     };
 
     if (event.kind === 'ignored') return ignore('unhandled_event');
+    let currentRow: { failureReason: string | null } | null = null;
+    const hold = async (
+      reason: HeldBillingWebhook['reason'],
+      expected: { amountMinor: number; currency: string } | null
+    ): Promise<WebhookResult> => {
+      const info: HeldBillingWebhook = {
+        reason,
+        kind: event.kind,
+        storeId: scopedStoreId,
+        merchantOrderId: event.merchantOrderId,
+        providerRef: event.providerRef,
+        expectedMinor: expected?.amountMinor ?? null,
+        gotMinor: event.amountMinor,
+        expectedCurrency: expected?.currency ?? null,
+        gotCurrency: event.currency,
+        occurredAt: event.occurredAt.toISOString(),
+      };
+      await tx.billingWebhookEvent.updateMany({
+        where: { provider: providerName, eventId: event.eventId },
+        data: { outcome: WEBHOOK_HELD, detail: JSON.stringify(info) },
+      });
+      // the ledger row (when there is one) carries the hold too, so NO other settle path (the stuck-charge sweep, a
+      // later delivery) can settle it while a person has not decided (maySettle)
+      // (an already-held row keeps its FIRST reason: the later delivery is still recorded on its own dedupe row)
+      if (
+        event.merchantOrderId &&
+        scopedStoreId &&
+        UUID_RE.test(event.merchantOrderId) &&
+        !currentRow?.failureReason?.startsWith('held')
+      )
+        await tx.billingEvent.updateMany({
+          where: {
+            id: event.merchantOrderId,
+            storeId: scopedStoreId,
+            // only THIS provider's own charge row: a foreign/refund row with a guessed id is never marked
+            provider: providerName,
+            type: { not: 'refund' },
+            status: { in: ['pending', 'failed'] },
+            AND: [NOT_HELD],
+          },
+          data: { failureReason: `${HELD_ROW_PREFIX}${reason}` },
+        });
+      heldRef.v = info;
+      return { duplicate: false, outcome: 'held', detail: reason };
+    };
+    const isCharge = event.kind === 'charge.succeeded';
 
     // Refund confirmations (async refunds only; sync ones are settled by refundCharge).
     if (event.kind === 'refund.succeeded' || event.kind === 'refund.failed') {
@@ -1673,7 +1999,52 @@ export async function applyWebhookEvent(
               },
             })
           : null;
-      if (!refundRow) return ignore('unknown_refund');
+      if (!refundRow) {
+        if (event.kind !== 'refund.succeeded' || !event.providerRef)
+          return ignore('unknown_refund');
+        // A confirmed refund Ebda did not start (#837): book it against the charge it reverses. Never dropped: a
+        // reversal that matches no charge pages a person below.
+        const charge = scopedStoreId
+          ? await findReversedCharge(tx, scopedStoreId, providerName, event)
+          : null;
+        if (!charge) {
+          unmatchedReversal = true;
+          return ignore('unknown_refund');
+        }
+        const known = await reversalIdentity(tx, charge, providerName, event.providerRef);
+        if (known.kind === 'booked') return ignore('refund_already_booked');
+        if (known.kind === 'ebda_refund_pending' && refundInFlight(known.row, now)) {
+          // Ebda Store started a refund on this charge minutes ago and its API call has not written the ref yet: the
+          // webhook can beat the response (Ruling MONEY-REVERSAL-2). Whatever the amount, nothing is booked from here
+          // while it is in flight: the gateway redelivers, and once refundCharge has written the ref the delivery
+          // matches that row (or, past the window, is booked once and paged). Booking now could count the money twice.
+          throw new AppError(
+            503,
+            'REFUND_NOT_YET_RECORDED',
+            'An Ebda Store refund for this charge is still being recorded; retry shortly',
+            { retryable: true }
+          );
+        }
+        if (known.kind === 'ebda_refund_unreferenced') {
+          ambiguousReversal = true;
+          return ignore('refund_ambiguous');
+        }
+        const out = await applyOutOfBandReversalInTx(
+          tx,
+          charge,
+          {
+            provider: providerName,
+            ref: event.providerRef,
+            amountMinor: event.amountMinor,
+            operation: 'refund',
+            source: 'webhook',
+          },
+          now,
+          effects
+        );
+        if (out) reversals.push(out);
+        return { duplicate: false, outcome: 'processed', detail: 'out_of_band_reversal' };
+      }
       await settleRefundInTx(
         tx,
         refundRow.storeId,
@@ -1691,10 +2062,35 @@ export async function applyWebhookEvent(
             where: { id: event.merchantOrderId, storeId: scopedStoreId },
           })
         : null;
+    currentRow = row;
     if (!row || row.provider !== providerName || row.type === 'refund') {
       logger.warn({ providerName, eventId: event.eventId }, '[billing] webhook for unknown order');
-      return ignore('unknown_order');
+      return isCharge ? hold('unknown_order', null) : ignore('unknown_order');
     }
+    // A person already decided this row (held_resolved:*): FINAL. Record the late delivery as a needs-attention fact
+    // (never drop money), P1 only when it is a success; the provider still gets 200; nothing is settled or re-held.
+    if (row.failureReason?.startsWith(RESOLVED_ROW_PREFIX)) {
+      const info: HeldBillingWebhook = {
+        reason: 'row_resolved',
+        kind: event.kind,
+        provider: providerName,
+        storeId: scopedStoreId,
+        merchantOrderId: row.id,
+        providerRef: event.providerRef,
+        expectedMinor: row.amountMinor,
+        gotMinor: event.amountMinor,
+        expectedCurrency: row.currency,
+        gotCurrency: event.currency,
+        occurredAt: event.occurredAt.toISOString(),
+      };
+      await tx.billingWebhookEvent.updateMany({
+        where: { provider: providerName, eventId: event.eventId },
+        data: { outcome: WEBHOOK_HELD, detail: JSON.stringify(info) },
+      });
+      if (isCharge) heldRef.v = info;
+      return { duplicate: false, outcome: 'held', detail: 'row_resolved' };
+    }
+    const expected = { amountMinor: row.amountMinor, currency: row.currency };
     // A card event settles ONLY a card_setup row, and a charge event never does:
     // otherwise a "card saved" delivery could activate a paid plan with no money,
     // or a charge could be booked against a no-charge setup.
@@ -1704,16 +2100,21 @@ export async function applyWebhookEvent(
         { eventId: event.eventId, kind: event.kind, rowType: row.type },
         '[billing] webhook kind does not match the ledger row'
       );
-      return ignore('kind_mismatch');
+      return isCharge ? hold('kind_mismatch', expected) : ignore('kind_mismatch');
     }
+    // a success MUST carry its amount and currency: a charge we cannot check is held, never settled on trust
+    if (isCharge && event.amountMinor === null) return hold('amount_missing', expected);
+    if (isCharge && !event.currency) return hold('currency_missing', expected);
     if (event.amountMinor !== null && event.amountMinor !== row.amountMinor) {
       logger.error(
         { eventId: event.eventId, expected: row.amountMinor, got: event.amountMinor },
-        '[billing] webhook amount mismatch — ignored'
+        '[billing] webhook amount mismatch'
       );
-      return ignore('amount_mismatch');
+      return isCharge ? hold('amount_mismatch', expected) : ignore('amount_mismatch');
     }
-    await settleInTx(
+    if (event.currency && event.currency.toUpperCase() !== String(row.currency).toUpperCase())
+      return isCharge ? hold('currency_mismatch', expected) : ignore('currency_mismatch');
+    const settled = await settleInTx(
       tx,
       row.id,
       {
@@ -1726,10 +2127,28 @@ export async function applyWebhookEvent(
         cardLast4: event.card?.last4,
         cardBrand: event.card?.brand,
         customerRef: event.customerRef,
+        amountSource: 'gateway',
+        amountMinor: event.amountMinor,
+        currency: event.currency,
       },
       now,
       effects
     );
+    // the shared predicate refused (an open hold on the row): the delivery is recorded as held, not processed
+    if (settled.refused) {
+      await tx.billingWebhookEvent.updateMany({
+        where: { provider: providerName, eventId: event.eventId },
+        data: {
+          outcome: WEBHOOK_HELD,
+          detail: JSON.stringify({
+            reason: 'row_already_held',
+            merchantOrderId: row.id,
+            storeId: scopedStoreId,
+          }),
+        },
+      });
+      return { duplicate: false, outcome: 'held', detail: 'row_already_held' };
+    }
     return { duplicate: false, outcome: 'processed' };
   };
   // The dedupe row is a CLAIM, not a receipt: it is inserted as `processing` and finalised after the settlement. On
@@ -1824,7 +2243,583 @@ export async function applyWebhookEvent(
     ? await withStore(webhookStoreId, apply)
     : await apply(prisma as unknown as Tx);
   await runBillingEffects(effects);
+  for (const r of reversals) alertReversal(r);
+  if (unmatchedReversal) {
+    void sendAlert({
+      level: 'p1',
+      title: 'Billing: a gateway refund matches no Ebda Store charge',
+      body: `${providerName} confirmed a refund (transaction ${event.providerRef}, order ${event.merchantOrderId ?? 'none'}, amount ${event.amountMinor ?? 'not stated'} piastres) that Ebda Store did not start and that matches no charge. Nothing was revoked. Find the store in the gateway dashboard and record it by hand.`,
+    }).catch(() => undefined);
+  }
+  if (ambiguousReversal) void alertAmbiguousReversal(providerName, event.providerRef);
+  if (result.outcome === 'held' && heldRef.v)
+    await alertHeldBillingWebhook(providerName, event.eventId, heldRef.v);
   return result;
+}
+
+async function alertHeldBillingWebhook(
+  providerName: string,
+  eventId: string,
+  h: HeldBillingWebhook
+): Promise<void> {
+  const { sendAlert } = await import('../alerts.service.js');
+  await sendAlert({
+    level: 'p1',
+    ...(h.storeId ? { scope: 'store' as const, store: { id: h.storeId, name: h.storeId } } : {}),
+    source: `billing.webhook.held.${h.reason}`,
+    title: `Subscription payment held: ${h.reason}`,
+    body: `${providerName} reported a successful charge we could not match (${h.reason}): expected ${h.expectedMinor ?? '?'} ${h.expectedCurrency ?? ''}, got ${h.gotMinor ?? '?'} ${h.gotCurrency ?? ''}. The merchant may have paid without being upgraded. Resolve it on the super-admin billing page (Held payments).`,
+    context: { provider: providerName, eventId, ...h },
+  }).catch(err => logger.error({ err, eventId }, '[billing] held-webhook alert failed'));
+}
+
+/**
+ * The `billing_webhook_events` client for the held queue. The table is PLATFORM-owned (model-split: d1; GLOBAL_MODELS in the tenant
+ * guard: no tenant scope applies), so the queue is read and written where the webhook handler writes it: the platform D1 client once
+ * `billing` is on D1 (a bare `prisma` call there is POSTGRES_REMOVED on a Worker), the Postgres client before that. One place, one
+ * narrow cast (the D1 client is prisma-shaped), instead of a cast at every call site.
+ */
+type WebhookEvents = Pick<Tx['billingWebhookEvent'], 'findMany' | 'findFirst' | 'updateMany'>;
+async function heldQueueDb(): Promise<WebhookEvents> {
+  if (await onD1()) {
+    const platform = await platformDb();
+    if (platform) return platform.billingWebhookEvent as unknown as WebhookEvents;
+  }
+  // before billing is on D1 the queue is still the Postgres table
+  const postgres = prisma as unknown as Tx;
+  return postgres.billingWebhookEvent;
+}
+
+/** Super-admin queue: every held subscription payment (newest first), with its facts. */
+export async function listHeldBillingWebhooks(args: {
+  status: 'open' | 'resolved';
+  limit?: number;
+}) {
+  const rows = await (
+    await heldQueueDb()
+  ).findMany({
+    where: { outcome: args.status === 'open' ? WEBHOOK_HELD : WEBHOOK_HELD_RESOLVED },
+    orderBy: { receivedAt: 'desc' },
+    take: Math.min(Math.max(args.limit ?? 100, 1), 200),
+  });
+  return rows.map(r => {
+    let detail: Record<string, unknown> = {};
+    try {
+      detail = r.detail ? (JSON.parse(r.detail) as Record<string, unknown>) : {};
+    } catch {
+      detail = { unparsed: r.detail };
+    }
+    return {
+      id: r.id,
+      provider: r.provider,
+      eventId: r.eventId,
+      receivedAt: r.receivedAt,
+      status: args.status,
+      ...detail,
+    };
+  });
+}
+
+/**
+ * A person settled a held payment (credited the plan by hand, refunded it at the provider, or confirmed it is not ours):
+ * the row moves to `held_resolved` with who, when and the note. Only an OPEN hold can be resolved (a second click is 409).
+ */
+export async function resolveHeldBillingWebhook(args: {
+  id: string;
+  actorId: string;
+  action: 'credited' | 'refunded' | 'not_ours';
+  note: string;
+  /** the audit row, written BEFORE anything changes: a resolve that cannot be audited changes nothing */
+  audit: () => Promise<void>;
+}): Promise<void> {
+  const queue = await heldQueueDb();
+  // An OPEN hold, or a hold an earlier build / attempt already moved to `held_resolved` whose LEDGER row is still `held:` (the
+  // queue closed first in the old order and the ledger close then failed): that one must stay resolvable, never a 409 that
+  // strands a paid merchant. Whether the ledger half is still owed is decided below, against the ledger row itself.
+  const row = await queue.findFirst({
+    where: { id: args.id, outcome: { in: [WEBHOOK_HELD, WEBHOOK_HELD_RESOLVED] } },
+  });
+  if (!row)
+    throw new AppError(
+      409,
+      'HELD_PAYMENT_NOT_OPEN',
+      'This held payment is already resolved or does not exist'
+    );
+  const queueAlreadyClosed = row.outcome === WEBHOOK_HELD_RESOLVED;
+  let detail: Record<string, unknown> = {};
+  try {
+    detail = row.detail ? (JSON.parse(row.detail) as Record<string, unknown>) : {};
+  } catch {
+    detail = { unparsed: row.detail };
+  }
+  const priorAction = (detail.resolution as { action?: unknown } | undefined)?.action;
+  await args.audit();
+  // 1) the LEDGER row first (the money truth, in its OWN store's scope): a person's decision. Idempotent: a row already
+  //    `held_resolved:<same action>` (an earlier attempt whose queue close failed) completes; a failure here leaves the
+  //    queue entry OPEN so the resolve can simply be retried. `ledgerStillOwed` = this call found the ledger row still
+  //    `held:` and closed it (the only thing a queue entry that is ALREADY closed can still need).
+  const rowId = typeof detail.merchantOrderId === 'string' ? detail.merchantOrderId : null;
+  const storeId = typeof detail.storeId === 'string' ? detail.storeId : null;
+  let ledgerClosedNow = false;
+  if (rowId && storeId && UUID_RE.test(rowId))
+    await withStore(storeId, async tx => {
+      const r = await tx.billingEvent.findFirst({
+        where: { id: rowId, storeId },
+        select: { failureReason: true, status: true },
+      });
+      if (!r || r.status === 'succeeded') return;
+      if (r.failureReason?.startsWith(RESOLVED_ROW_PREFIX)) {
+        if (queueAlreadyClosed) return; // both halves done already: the usual "not open" below
+        if (r.failureReason !== `${RESOLVED_ROW_PREFIX}${args.action}`)
+          throw new AppError(
+            409,
+            'HELD_PAYMENT_ACTION_CONFLICT',
+            `This payment was already resolved as ${r.failureReason.slice(RESOLVED_ROW_PREFIX.length)}`
+          );
+        return;
+      }
+      if (r.failureReason?.startsWith(HELD_ROW_PREFIX)) {
+        // the ledger half is still owed for a queue entry an earlier build closed: it completes the decision ALREADY recorded
+        if (queueAlreadyClosed && typeof priorAction === 'string' && priorAction !== args.action)
+          throw new AppError(
+            409,
+            'HELD_PAYMENT_ACTION_CONFLICT',
+            `This payment was already resolved as ${priorAction}`
+          );
+        const closed = await tx.billingEvent.updateMany({
+          where: { id: rowId, storeId, failureReason: r.failureReason },
+          data: { status: 'failed', failureReason: `${RESOLVED_ROW_PREFIX}${args.action}` },
+        });
+        ledgerClosedNow = closed.count > 0;
+      }
+    });
+  // 2) then the queue entry (already closed by an earlier attempt / build: nothing left to do here unless the ledger half was owed)
+  if (queueAlreadyClosed) {
+    if (!ledgerClosedNow)
+      throw new AppError(
+        409,
+        'HELD_PAYMENT_NOT_OPEN',
+        'This held payment is already resolved or does not exist'
+      );
+    return;
+  }
+  const done = await queue.updateMany({
+    where: { id: args.id, outcome: WEBHOOK_HELD },
+    data: {
+      outcome: WEBHOOK_HELD_RESOLVED,
+      detail: JSON.stringify({
+        ...detail,
+        resolution: {
+          action: args.action,
+          note: args.note,
+          by: args.actorId,
+          at: new Date().toISOString(),
+        },
+      }),
+    },
+  });
+  if (done.count < 1)
+    throw new AppError(
+      409,
+      'HELD_PAYMENT_NOT_OPEN',
+      'This held payment is already resolved or does not exist'
+    );
+}
+
+// ───────────────────── refunds / chargebacks made outside Ebda (#837) ─────────────────────
+
+/** Ledger rows that took money by card for a plan: what a gateway reversal can take back. */
+const CARD_MONEY_IN_TYPES = ['checkout', 'upgrade', 'renewal'];
+/** A full `billing_events` row (the module's LedgerRow carries only the settle fields). */
+type BillingEventRow = NonNullable<Awaited<ReturnType<Tx['billingEvent']['findFirst']>>>;
+
+interface ReversalFact {
+  provider: string;
+  /** The gateway's own id for the reversal transaction (the idempotency key: one ledger row per reversal). */
+  ref: string;
+  /** As the gateway states it; null = not stated (treated as the whole remainder, and a person is paged). */
+  amountMinor: number | null;
+  operation: string;
+  source: 'webhook' | 'reconcile';
+}
+
+interface ReversalOutcome {
+  storeId: string;
+  chargeId: string;
+  refundEventId: string;
+  provider: string;
+  operation: string;
+  source: ReversalFact['source'];
+  /** What the gateway said (null = not stated). */
+  reportedMinor: number | null;
+  /** What the ledger books: never more than the charge still holds. */
+  bookedMinor: number;
+  /** Reported above what the charge still held: recorded in `raw`, paged, never refused. */
+  excessMinor: number;
+  fullReversal: boolean;
+  revokedPlan: boolean;
+}
+
+/**
+ * Has this gateway reversal already been booked, or could it be one Ebda Store started itself? The gateway's reversal
+ * id is the ONE identity for Ebda-started and external refunds alike:
+ *  - `booked`: a refund row with this provider + ref exists, in ANY status (Ebda-started or out-of-band);
+ *  - `ebda_refund_pending`: Ebda started a refund on this charge whose API call has not written its ref yet (the
+ *    webhook can beat the response; refundCharge records the pending row BEFORE it calls the gateway);
+ *  - `ebda_refund_unreferenced`: a succeeded Ebda refund on this charge has no ref (the gateway returned none), so it
+ *    cannot be told apart: never auto-booked, a person is paged;
+ *  - `new`: nothing Ebda knows of.
+ */
+async function reversalIdentity(
+  tx: Tx,
+  charge: BillingEventRow,
+  provider: string,
+  ref: string
+): Promise<
+  | { kind: 'booked' | 'ebda_refund_unreferenced' | 'new' }
+  | { kind: 'ebda_refund_pending'; row: BillingEventRow }
+> {
+  const sameRef = await tx.billingEvent.findFirst({
+    where: { storeId: charge.storeId, type: 'refund', provider, providerRef: ref },
+    select: { id: true },
+  });
+  if (sameRef) return { kind: 'booked' };
+  const unref = await tx.billingEvent.findFirst({
+    where: {
+      storeId: charge.storeId,
+      type: 'refund',
+      relatedEventId: charge.id,
+      providerRef: null,
+      status: { in: ['pending', 'succeeded'] },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+  if (unref?.status === 'pending') return { kind: 'ebda_refund_pending', row: unref };
+  if (unref) return { kind: 'ebda_refund_unreferenced' };
+  return { kind: 'new' };
+}
+
+/**
+ * A pending Ebda Store refund whose gateway ref turns out to be booked already by ANOTHER refund row (an out-of-band
+ * booking made after the in-flight window): close this one as linked to that booking instead of settling it, so one
+ * gateway reversal stays one ledger row. Returns true when it linked.
+ */
+async function linkToBookedReversal(
+  tx: Tx,
+  storeId: string,
+  refundId: string,
+  provider: string,
+  ref: string
+): Promise<boolean> {
+  const booked = await tx.billingEvent.findFirst({
+    where: { storeId, type: 'refund', provider, providerRef: ref, NOT: { id: refundId } },
+    select: { id: true },
+  });
+  if (!booked) return false;
+  await tx.billingEvent.updateMany({
+    where: { id: refundId, storeId, status: 'pending' },
+    data: { status: 'failed', failureReason: `linked_to_gateway_reversal:${booked.id}` },
+  });
+  return true;
+}
+
+/**
+ * A pending Ebda Store refund counts as "its API call is still running" only this long (Ruling MONEY-REVERSAL-2).
+ * Past it, a reversal the gateway reports is booked, and the stuck sweep asks the gateway about the pending row.
+ */
+const REFUND_IN_FLIGHT_MS = 15 * 60_000;
+const refundInFlight = (row: { createdAt: Date }, now: Date) =>
+  now.getTime() - row.createdAt.getTime() < REFUND_IN_FLIGHT_MS;
+
+function alertAmbiguousReversal(provider: string, ref: string | null, chargeId?: string): void {
+  void sendAlert({
+    level: 'p1',
+    title: 'Billing: a gateway refund may duplicate an Ebda Store refund',
+    body: `${provider} reports reversal ${ref ?? '(no id)'}${chargeId ? ` on charge ${chargeId}` : ''}, and that charge has an Ebda Store refund with no gateway id yet, so they cannot be told apart for sure. A pending refund past its in-flight window, or one of another amount, does not stop the booking (access fails closed); a succeeded one does. Compare the gateway dashboard with /billing-events.`,
+  }).catch(() => undefined);
+}
+
+/**
+ * When the term a card charge paid for ends: a renewal pays from the period end it renewed (`forPeriodEnd`) for one
+ * interval; a checkout or upgrade starts a fresh period when it settles (no proration), so from its creation.
+ */
+function chargeTermEnd(charge: BillingEventRow): Date {
+  const interval = isInterval(charge.billingInterval) ? charge.billingInterval : 'monthly';
+  const from =
+    charge.type === 'renewal' && charge.forPeriodEnd ? charge.forPeriodEnd : charge.createdAt;
+  return addInterval(from, interval);
+}
+
+async function findReversedCharge(
+  tx: Tx,
+  storeId: string,
+  provider: string,
+  event: BillingWebhookEvent
+): Promise<BillingEventRow | null> {
+  const where = {
+    storeId,
+    provider,
+    type: { in: CARD_MONEY_IN_TYPES },
+    status: { in: ['succeeded', 'refunded'] },
+  };
+  if (event.merchantOrderId && UUID_RE.test(event.merchantOrderId)) {
+    const byOrder = await tx.billingEvent.findFirst({
+      where: { ...where, id: event.merchantOrderId },
+    });
+    if (byOrder) return byOrder;
+  }
+  return event.providerRef
+    ? tx.billingEvent.findFirst({ where: { ...where, providerRef: event.providerRef } })
+    : null;
+}
+
+/**
+ * Book a refund or chargeback the gateway made OUTSIDE Ebda against the charge it reverses. Global rule: an external
+ * money fact is never refused. It is recorded in full (the reported amount stays in `raw`), the ledger amount is
+ * clamped to what the charge still holds, and the excess is paged. Idempotent on the gateway's reversal id.
+ *
+ * Once the charge is FULLY reversed: the charge flips to `refunded`, the free months it earned are revoked, and if it
+ * is the payment behind the CURRENT plan (the latest money-in row of the store) the plan is revoked at once
+ * (`downgradeToFree(..., 'payment_reversed')`, which drops every cache layer through the `downgraded` effect). The
+ * plan is not put back into dunning: retrying a card whose holder disputed the charge would charge them again. A
+ * partial reversal changes no plan; the P1 asks a person to decide.
+ */
+async function applyOutOfBandReversalInTx(
+  tx: Tx,
+  charge: BillingEventRow,
+  fact: ReversalFact,
+  now: Date,
+  effects: BillingEffect[]
+): Promise<ReversalOutcome | null> {
+  const storeId = charge.storeId;
+  const key = `oob-reversal:${fact.provider}:${fact.ref}`;
+  // One identity (the gateway ref): booked = nothing to do. A succeeded Ebda refund with no ref cannot be told apart:
+  // paged, not booked. A PENDING Ebda refund is "in flight" only inside the window (MONEY-REVERSAL-2): the reconcile
+  // waits for it; past the window, or for a refund of another amount, the reversal is booked (fail closed on access,
+  // never lose the money fact) and a person is paged. A stale pending row of the same amount is closed as superseded
+  // so it can never settle a second time; the daily reconcile books the gateway's own record of it if it was real.
+  const known = await reversalIdentity(tx, charge, fact.provider, fact.ref);
+  if (known.kind === 'booked') return null;
+  if (known.kind === 'ebda_refund_unreferenced') {
+    if (fact.source === 'reconcile') alertAmbiguousReversal(fact.provider, fact.ref, charge.id);
+    return null;
+  }
+  if (known.kind === 'ebda_refund_pending') {
+    const inFlight = refundInFlight(known.row, now);
+    if (inFlight && fact.source === 'reconcile') return null;
+    alertAmbiguousReversal(fact.provider, fact.ref, charge.id);
+    if (!inFlight && (fact.amountMinor === null || fact.amountMinor === known.row.amountMinor)) {
+      await tx.billingEvent.updateMany({
+        where: { id: known.row.id, storeId, status: 'pending' },
+        data: {
+          status: 'failed',
+          failureReason: `superseded_by_gateway_reversal:${fact.ref}`.slice(0, 200),
+        },
+      });
+    }
+  }
+  const prior = await tx.billingEvent.aggregate({
+    where: { storeId, relatedEventId: charge.id, type: 'refund', status: 'succeeded' },
+    _sum: { amountMinor: true },
+  });
+  const priorMinor = prior._sum.amountMinor ?? 0;
+  const remaining = Math.max(0, charge.amountMinor - priorMinor);
+  const reported =
+    fact.amountMinor !== null && Number.isSafeInteger(fact.amountMinor) && fact.amountMinor > 0
+      ? fact.amountMinor
+      : null;
+  const booked = Math.min(reported ?? remaining, remaining);
+  const excess = reported !== null ? reported - booked : 0;
+  const refundEventId = crypto.randomUUID();
+  await tx.billingEvent.create({
+    data: {
+      id: refundEventId,
+      storeId,
+      subscriptionId: charge.subscriptionId,
+      type: 'refund',
+      planCode: charge.planCode,
+      billingInterval: charge.billingInterval,
+      amountMinor: booked,
+      currency: charge.currency,
+      provider: fact.provider,
+      providerRef: fact.ref,
+      idempotencyKey: key,
+      status: 'succeeded',
+      relatedEventId: charge.id,
+      vatMinor: charge.vatMinor ? Math.round((charge.vatMinor * booked) / charge.amountMinor) : 0,
+      raw: {
+        outOfBand: true,
+        operation: fact.operation,
+        source: fact.source,
+        reportedAmountMinor: fact.amountMinor,
+        excessMinor: excess,
+        recordedAt: now.toISOString(),
+      },
+    },
+  });
+  const fullReversal = priorMinor + booked >= charge.amountMinor;
+  let revokedPlan = false;
+  if (fullReversal) {
+    const flipped = await tx.billingEvent.updateMany({
+      where: { id: charge.id, storeId, status: 'succeeded' },
+      data: { status: 'refunded' },
+    });
+    if (flipped.count > 0) {
+      await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', now, storeId);
+    }
+    const latest = await tx.billingEvent.findFirst({
+      where: {
+        storeId,
+        type: { in: [...CARD_MONEY_IN_TYPES, 'manual_payment'] },
+        status: { in: ['succeeded', 'refunded'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
+    // Revoke when the reversed charge is the payment behind the current plan OR the term it paid for is still running
+    // (e.g. a yearly payment followed by an upgrade: the later charge is the latest, but the term the reversed money
+    // bought has not ended). Only a charge whose term is fully over leaves access unchanged (MONEY-REVERSAL-1).
+    if (
+      (latest?.id === charge.id || chargeTermEnd(charge).getTime() > now.getTime()) &&
+      sub &&
+      ['active', 'trialing', 'past_due'].includes(sub.status) &&
+      sub.planCode !== FREE_PLAN_CODE &&
+      !isGrantedPlan(sub.planCode)
+    ) {
+      await downgradeToFree(tx, storeId, 'payment_reversed', effects);
+      revokedPlan = true;
+    }
+  }
+  return {
+    storeId,
+    chargeId: charge.id,
+    refundEventId,
+    provider: fact.provider,
+    operation: fact.operation,
+    source: fact.source,
+    reportedMinor: fact.amountMinor,
+    bookedMinor: booked,
+    excessMinor: excess,
+    fullReversal,
+    revokedPlan,
+  };
+}
+
+function alertReversal(r: ReversalOutcome): void {
+  const what = r.operation === 'chargeback' || r.operation === 'dispute' ? 'chargeback' : 'refund';
+  void sendAlert({
+    level: 'p1',
+    title: `Billing: a ${what} was made outside Ebda Store (${r.provider})`,
+    body:
+      `Store ${r.storeId}, charge ${r.chargeId}: ${r.provider} reports a ${r.operation} of ` +
+      `${r.reportedMinor ?? 'an unstated amount (booked as the whole remainder)'} piastres (via ${r.source}). ` +
+      `Booked ${r.bookedMinor} as refund ${r.refundEventId}.` +
+      (r.excessMinor > 0
+        ? ` ${r.excessMinor} piastres MORE than the charge still held: recorded, not booked. Check the gateway.`
+        : '') +
+      (r.revokedPlan
+        ? ' It paid the current plan: the store is now on free (canceled).'
+        : r.fullReversal
+          ? ' Fully reversed; it was not the payment behind the current plan, so the plan is unchanged.'
+          : ' Partial: the plan is unchanged. Decide whether access should change.'),
+  }).catch(() => undefined);
+}
+
+/**
+ * Daily reversal reconcile (#837). Kashier's webhook docs list no chargeback / dispute event, so a webhook alone
+ * cannot be trusted to report every take-back. Once a day, every card charge from the last
+ * `REVERSAL_LOOKBACK_DAYS` that still counts as paid is checked against the gateway's own record
+ * (`provider.listReversals`), and any reversal the ledger does not have yet is booked through the same path as the
+ * webhook (idempotent on the gateway's reversal id). Skip-if-unchanged by construction: no card provider (production
+ * is InstaPay-only today, `BILLING_PROVIDER=none`) or no charge in the window = no gateway call. A gateway that
+ * cannot answer, or an operation this code does not know, pages a person; it is never read as "nothing happened".
+ */
+const REVERSAL_LOOKBACK_DAYS = 120;
+
+// pq-allow(unused-export): runBillingCycle (same file) is the runtime caller; exported for the D1 money test
+export async function reconcileGatewayReversals(
+  now: Date,
+  provider?: BillingProvider
+): Promise<{ checked: number; booked: number; failed: number }> {
+  const out = { checked: 0, booked: 0, failed: 0 };
+  let active: BillingProvider | null = provider ?? null;
+  if (!active) {
+    try {
+      active = getBillingProvider();
+    } catch {
+      return out; // card billing is off (InstaPay only): no gateway to ask
+    }
+  }
+  if (!active.listReversals) return out;
+  const since = new Date(now.getTime() - REVERSAL_LOOKBACK_DAYS * 86_400_000);
+  const charges = await ledgerRowsAcrossStores(
+    {
+      provider: active.name,
+      type: { in: CARD_MONEY_IN_TYPES },
+      status: 'succeeded',
+      providerRef: { not: null },
+      createdAt: { gte: since },
+    },
+    'reversal reconcile scan'
+  );
+  const failures: string[] = [];
+  const unknown: string[] = [];
+  for (const c of charges) {
+    out.checked++;
+    try {
+      const res = await active.listReversals({ chargeId: c.providerRef!, merchantOrderId: c.id });
+      if (res.unknownOperations.length) unknown.push(`${c.id}: ${res.unknownOperations.join('/')}`);
+      for (const rev of res.reversals) {
+        const effects: BillingEffect[] = [];
+        const outcome = await withStore(c.storeId, async tx => {
+          const charge = await tx.billingEvent.findUnique({
+            where: { id: c.id, storeId: c.storeId },
+          });
+          if (!charge) return null;
+          return applyOutOfBandReversalInTx(
+            tx,
+            charge,
+            {
+              provider: active!.name,
+              ref: rev.ref,
+              amountMinor: rev.amountMinor,
+              operation: rev.operation,
+              source: 'reconcile',
+            },
+            now,
+            effects
+          );
+        });
+        await runBillingEffects(effects);
+        if (outcome) {
+          out.booked++;
+          alertReversal(outcome);
+        }
+      }
+    } catch (err) {
+      out.failed++;
+      failures.push(c.id);
+      logger.warn(
+        { err, eventId: c.id },
+        '[billing] reversal reconcile could not read the gateway'
+      );
+    }
+  }
+  if (failures.length || unknown.length) {
+    void sendAlert({
+      level: 'p1',
+      title: 'Billing: the daily refund/chargeback check could not read every charge',
+      body:
+        (failures.length
+          ? `${failures.length} charge(s) the gateway did not answer for (retried tomorrow): ${failures.slice(0, 10).join(', ')}. `
+          : '') +
+        (unknown.length
+          ? `Operations this code does not know (could be a chargeback): ${unknown.slice(0, 10).join('; ')}. Check them in the gateway dashboard.`
+          : ''),
+    }).catch(() => undefined);
+  }
+  return out;
 }
 
 /**
@@ -1878,7 +2873,7 @@ export async function handleBillingWebhook(
     });
     return { duplicate: false, outcome: 'deferred', detail: 'family_frozen' };
   }
-  void drainDeferredSoon();
+  cfWaitUntil(drainDeferredSoon()); // a bare `void` dies with the response on a Worker
   return confirmAndApplyWebhook(provider, event);
 }
 
@@ -2174,6 +3169,14 @@ export async function refundCharge(args: {
       idempotencyKey: key,
     });
     await withStore(charge.storeId, async tx => {
+      // One money fact = one ledger row: the gateway's ref may already be booked (a webhook / the reconcile booked it
+      // out-of-band after the in-flight window). Then this row is linked to that booking and never settled again.
+      if (
+        res.refundId &&
+        (await linkToBookedReversal(tx, charge.storeId, refundId, charge.provider, res.refundId))
+      ) {
+        return;
+      }
       await tx.billingEvent.updateMany({
         where: { id: refundId, storeId: charge.storeId, status: 'pending' },
         data: {

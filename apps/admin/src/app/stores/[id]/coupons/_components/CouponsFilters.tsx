@@ -2,6 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import type { CouponStatusFilter } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface CouponsFiltersProps {
   searchTerm: string;
@@ -32,14 +33,14 @@ export function CouponsFilters({
           value={searchTerm}
           onChange={e => onSearchTermChange(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && onSubmitSearch()}
-          className="w-full max-w-md px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          className={`${FIELD_CLASSES} max-w-md`}
         />
       </div>
       <select
         value={filterActive}
         onChange={e => onFilterActiveChange(e.target.value as CouponStatusFilter)}
         aria-label={t('statusAriaLabel')}
-        className="px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+        className={FIELD_CLASSES}
       >
         <option value="all">{t('statusAll')}</option>
         <option value="active">{t('statusActive')}</option>
