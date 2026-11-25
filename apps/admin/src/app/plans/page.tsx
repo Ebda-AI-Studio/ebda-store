@@ -99,6 +99,7 @@ function UnitField({
   unit,
   help,
   error,
+  dir,
   ...props
 }: {
   label: string;
@@ -113,7 +114,10 @@ function UnitField({
       <label htmlFor={id} className="mb-2 block text-sm font-medium text-foreground">
         {label}
       </label>
-      <div className="relative">
+      {/* `dir` goes on the wrapper, not the input: the unit sits at `end-3` and the input pads `pe-14`, and both must
+          resolve against the SAME direction. A `dir="ltr"` input inside an RTL box padded its right edge while the unit
+          sat at the left, so the % glyph overprinted the number. */}
+      <div className="relative" dir={dir}>
         <Input
           id={id}
           className="pe-14 tabular-nums"
@@ -126,7 +130,7 @@ function UnitField({
           aria-hidden="true"
           className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-sm text-muted-foreground"
         >
-          {unit}
+          <bdi>{unit}</bdi>
         </span>
       </div>
       {(error || help) && (
@@ -417,7 +421,8 @@ function PlansInner() {
       <Modal
         isOpen={editing !== null}
         onClose={() => setEditing(null)}
-        title={editing ? t('editTitle', { code: editing.code }) : ''}
+        // the plan code is a Latin slug inside an Arabic sentence: isolate it (FSI..PDI) so it cannot reorder the title
+        title={editing ? t('editTitle', { code: `\u2068${editing.code}\u2069` }) : ''}
         closeLabel={t('form.close')}
         size="lg"
       >

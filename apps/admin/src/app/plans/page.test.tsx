@@ -26,8 +26,20 @@ vi.mock('@ebda/ui', () => ({
   Input: ({ label, ...p }: { label?: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
     <input aria-label={label} {...p} />
   ),
-  Modal: ({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) =>
-    isOpen ? <div role="dialog">{children}</div> : null,
+  Modal: ({
+    isOpen,
+    title,
+    children,
+  }: {
+    isOpen: boolean;
+    title?: string;
+    children: React.ReactNode;
+  }) =>
+    isOpen ? (
+      <div role="dialog" aria-label={title}>
+        {children}
+      </div>
+    ) : null,
   ModalBody: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ModalFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   useToast: () => ({ success: vi.fn(), error: vi.fn() }),
@@ -147,6 +159,18 @@ describe('super-admin plans page', () => {
     expect(body.limits.codPlatformFeeBps).toBe(0);
     expect(body.priceMonthlyMinor).toBe(29900);
     expect(body.priceYearlyMinor).toBeNull();
+  });
+
+  it('RTL: the fee input and its % glyph resolve against ONE direction, and the plan code is bidi-isolated', async () => {
+    await openFree();
+    const fee = screen.getByLabelText('limits.platformFeeBps');
+    const unit = fee.parentElement!.querySelector('bdi')!;
+    expect(unit.textContent).toBe('%');
+    // padding-end (input) and end-3 (glyph) must follow the same `dir`, else the glyph overprints the number
+    expect(unit.closest('[dir]')).toBe(fee.closest('[dir]'));
+    expect(fee.closest('[dir]')?.getAttribute('dir')).toBe('ltr');
+    // the dialog title carries the Latin code inside FSI..PDI so it cannot reorder an Arabic sentence
+    expect(screen.getByRole('dialog').getAttribute('aria-label')).toContain('\u2068free\u2069');
   });
 
   it('keeps save disabled for an invalid fee', async () => {
