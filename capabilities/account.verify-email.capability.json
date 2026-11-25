@@ -18,7 +18,12 @@
   },
   "helpArticle": "create-your-store",
   "questions": {
-    "ar": ["لينك التفعيل منتهي"],
+    "ar": [
+      "لينك التفعيل منتهي",
+      "ايميل التفعيل مش واصل",
+      "ابعت لينك التفعيل تاني",
+      "ازاي افعل الايميل بتاعي؟"
+    ],
     "en": ["My verification link expired"]
   },
   "steps": ["Resend from the page."],

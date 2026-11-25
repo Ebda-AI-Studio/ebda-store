@@ -25,6 +25,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { fromMinor, roundToMinor } from '@ebda/shared';
 import { formatPrice } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 type PromotionType = 'percentage' | 'fixed';
 
 interface Promotion {
@@ -268,17 +269,19 @@ export default function PromotionsPage() {
       cell: promo => (
         <div className="flex flex-wrap gap-1">
           {groupName(promo.customerGroupId) ? (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs">
               {groupName(promo.customerGroupId)}
             </span>
           ) : (
             <span className="text-xs text-muted-foreground">{t('allCustomers')}</span>
           )}
           {promo.firstOrderOnly && (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{t('firstOrderBadge')}</span>
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs">
+              {t('firstOrderBadge')}
+            </span>
           )}
           {(promo.scopeProductIds.length > 0 || promo.scopeCategoryIds.length > 0) && (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{t('scopedBadge')}</span>
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs">{t('scopedBadge')}</span>
           )}
         </div>
       ),
@@ -394,7 +397,7 @@ export default function PromotionsPage() {
                   <input
                     value={form.name}
                     onChange={e => setForm({ ...form, name: e.target.value })}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
                 <label className="block">
@@ -403,7 +406,7 @@ export default function PromotionsPage() {
                     value={form.nameAr}
                     onChange={e => setForm({ ...form, nameAr: e.target.value })}
                     dir="rtl"
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
               </div>
@@ -414,7 +417,7 @@ export default function PromotionsPage() {
                   <input
                     value={form.description}
                     onChange={e => setForm({ ...form, description: e.target.value })}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
                 <label className="block">
@@ -423,7 +426,7 @@ export default function PromotionsPage() {
                     value={form.descriptionAr}
                     onChange={e => setForm({ ...form, descriptionAr: e.target.value })}
                     dir="rtl"
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
               </div>
@@ -434,7 +437,7 @@ export default function PromotionsPage() {
                   <select
                     value={form.type}
                     onChange={e => setForm({ ...form, type: e.target.value as PromotionType })}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   >
                     <option value="percentage">{t('typePercentage')}</option>
                     <option value="fixed">{t('typeFixed')}</option>
@@ -451,7 +454,7 @@ export default function PromotionsPage() {
                     step={form.type === 'percentage' ? 1 : 0.01}
                     value={form.value}
                     onChange={e => setForm({ ...form, value: e.target.value })}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
                 {form.type === 'percentage' && (
@@ -463,7 +466,7 @@ export default function PromotionsPage() {
                       step={0.01}
                       value={form.maxDiscount}
                       onChange={e => setForm({ ...form, maxDiscount: e.target.value })}
-                      className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                      className={FIELD_CLASSES}
                     />
                   </label>
                 )}
@@ -479,7 +482,7 @@ export default function PromotionsPage() {
                     step={1}
                     value={form.priority}
                     onChange={e => setForm({ ...form, priority: e.target.value })}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
                 <label className="block">
@@ -488,7 +491,7 @@ export default function PromotionsPage() {
                     type="datetime-local"
                     value={form.startsAt}
                     onChange={e => setForm({ ...form, startsAt: e.target.value })}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
                 <label className="block">
@@ -497,7 +500,7 @@ export default function PromotionsPage() {
                     type="datetime-local"
                     value={form.expiresAt}
                     onChange={e => setForm({ ...form, expiresAt: e.target.value })}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
               </div>
@@ -520,7 +523,7 @@ export default function PromotionsPage() {
                   <select
                     value={form.customerGroupId}
                     onChange={e => setForm({ ...form, customerGroupId: e.target.value })}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   >
                     <option value="">{t('allCustomers')}</option>
                     {groups.map(g => (
@@ -538,7 +541,7 @@ export default function PromotionsPage() {
                     step={0.01}
                     value={form.minOrderAmount}
                     onChange={e => setForm({ ...form, minOrderAmount: e.target.value })}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
               </div>
@@ -552,7 +555,7 @@ export default function PromotionsPage() {
                     step={1}
                     value={form.minQuantity}
                     onChange={e => setForm({ ...form, minQuantity: e.target.value })}
-                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    className={FIELD_CLASSES}
                   />
                 </label>
                 <label className="mt-6 flex items-center gap-2 text-sm">

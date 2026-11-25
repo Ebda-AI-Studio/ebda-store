@@ -68,6 +68,7 @@ import {
 } from '../../../components/commerce/GoldRateLine';
 import { RatingSummary } from '../../../components/commerce/RatingSummary';
 import { BundleSaving } from '../../../components/commerce/BundleSaving';
+import { AutoPromotionLine } from '../../../components/commerce/AutoPromotionLine';
 import { TrustLine } from '../../../components/commerce/TrustLine';
 import { LOOK_CHIP_STYLE, relatedHeadingSize } from '../../../templates/shared/look-card';
 import type { CodOffer } from '../../../lib/cod-offer';
@@ -886,7 +887,12 @@ export default function ProductDetailClient({
                   />
                 ) : undefined
               }
-              bundleLine={<BundleSaving productId={product.id} />}
+              bundleLine={
+                <>
+                  <BundleSaving productId={product.id} />
+                  <AutoPromotionLine productId={product.id} quantity={quantity} />
+                </>
+              }
               priceNote={
                 <GoldRateLine
                   gold={goldForSelection}
@@ -1421,6 +1427,7 @@ export default function ProductDetailClient({
                 />
                 {/* Phase B3 (Ruling B3-6): one live bundle-saving line; renders nothing without a saving. */}
                 <BundleSaving productId={product.id} />
+                <AutoPromotionLine productId={product.id} quantity={quantity} />
                 <B2bPdpPanel
                   productId={product.id}
                   variantId={selectedVariant?.id ?? null}

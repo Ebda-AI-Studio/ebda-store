@@ -2,6 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import { TIER_COLORS, TIER_KEYS, type LoyaltySettings, type TierKey } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface TierSettingsProps {
   settings: LoyaltySettings;
@@ -27,7 +28,7 @@ export function TierSettings({ settings, disabled, onChange }: TierSettingsProps
   };
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6">
+    <div className="bg-card rounded-md border border-border p-6">
       <h2 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {TIER_KEYS.map(tier => (
@@ -38,18 +39,18 @@ export function TierSettings({ settings, disabled, onChange }: TierSettingsProps
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-muted-foreground mb-1">{t('minPoints')}</label>
+                <label className="block text-sm text-muted-foreground mb-1">{t('minPoints')}</label>
                 <input
                   type="number"
                   min="0"
                   value={settings.tiers[tier].minPoints}
                   onChange={e => updateTier(tier, { minPoints: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-1.5 border border-border rounded text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                  className={FIELD_CLASSES}
                   disabled={disabled || tier === 'bronze'}
                 />
               </div>
               <div>
-                <label className="block text-xs text-muted-foreground mb-1">
+                <label className="block text-sm text-muted-foreground mb-1">
                   {t('multiplier')}
                 </label>
                 <input
@@ -58,7 +59,7 @@ export function TierSettings({ settings, disabled, onChange }: TierSettingsProps
                   min="1"
                   value={settings.tiers[tier].multiplier}
                   onChange={e => updateTier(tier, { multiplier: parseFloat(e.target.value) || 1 })}
-                  className="w-full px-3 py-1.5 border border-border rounded text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                  className={FIELD_CLASSES}
                   disabled={disabled}
                 />
               </div>

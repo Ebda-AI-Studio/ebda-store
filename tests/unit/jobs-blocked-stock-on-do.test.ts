@@ -74,6 +74,7 @@ vi.mock('@api/lib/repo-factory', () => {
   };
   const repo = { backend: 'do', db, writer, money };
   return {
+    requestPlanMemo: (_id: string, fn: () => Promise<unknown>) => fn(),
     storeRepo: async () => repo,
     storeDb: async () => db,
     storeWriter: async () => writer,
@@ -112,7 +113,10 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('@api/services/feature.service', () => ({
-  featureService: { isFeatureEnabled: async () => true },
+  featureService: {
+    isFeatureEnabled: async () => true,
+    selectEnabled: async (ids: string[]) => ids,
+  },
 }));
 vi.mock('@api/services/email.service', () => ({
   EmailService: {

@@ -7,6 +7,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiFetch } from '@/lib/api';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AccountOption {
@@ -113,7 +114,7 @@ export default function ImportStatementPage() {
     >
       <div className="mx-auto max-w-2xl space-y-6 p-4 md:p-6">
         {/* Form card */}
-        <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-5">
+        <div className="rounded-md border border-border bg-card p-6 shadow-sm space-y-5">
           {/* GL Account select */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -122,7 +123,7 @@ export default function ImportStatementPage() {
             <select
               value={selectedAccountId}
               onChange={e => setSelectedAccountId(e.target.value)}
-              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className={FIELD_CLASSES}
             >
               <option value="">{ti('accountPlaceholder')}</option>
               {accounts.map(a => (
@@ -141,7 +142,7 @@ export default function ImportStatementPage() {
             </label>
             <div
               onClick={() => fileRef.current?.click()}
-              className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/50 py-8 transition hover:bg-muted"
+              className="flex cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-border bg-muted/50 py-8 transition hover:bg-muted"
             >
               <svg
                 className="mb-2 h-8 w-8 text-muted-foreground"
@@ -179,18 +180,18 @@ export default function ImportStatementPage() {
 
         {/* Error */}
         {errorMsg && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-ink">
             {errorMsg}
           </div>
         )}
 
         {/* Success result */}
         {result && (
-          <div className="rounded-xl border border-green-100 bg-green-50 p-5 space-y-3">
-            <p className="text-sm font-medium text-green-800">
+          <div className="rounded-md border border-success/30 bg-success/10 p-5 space-y-3">
+            <p className="text-sm font-medium text-success-ink">
               {ti('success', { count: result.imported })}
             </p>
-            <div className="text-sm text-green-700 space-y-1">
+            <div className="text-sm text-success-ink space-y-1">
               <p>
                 {t('imported')}: <strong>{result.imported}</strong>
               </p>
@@ -203,12 +204,12 @@ export default function ImportStatementPage() {
                 <p className="text-xs font-semibold text-warning-ink mb-1">{ti('parseErrors')}:</p>
                 <ul className="list-inside list-disc space-y-0.5">
                   {result.parseErrors.slice(0, 10).map((e, i) => (
-                    <li key={i} className="text-xs text-warning-ink">
+                    <li key={i} className="text-sm text-warning-ink">
                       {e}
                     </li>
                   ))}
                   {result.parseErrors.length > 10 && (
-                    <li className="text-xs text-warning-ink">
+                    <li className="text-sm text-warning-ink">
                       {ti('andMore', { count: result.parseErrors.length - 10 })}
                     </li>
                   )}
