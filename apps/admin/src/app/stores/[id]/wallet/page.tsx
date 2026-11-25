@@ -144,6 +144,14 @@ export default function WalletPage() {
                 </span>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">{checkoutCopy}</p>
+              {!data.checkout.available && (
+                <Link
+                  href={`/stores/${storeId}/billing/addons`}
+                  className="mt-1 inline-block text-xs font-medium text-primary underline"
+                >
+                  {t('checkoutOffCta')}
+                </Link>
+              )}
             </div>
           </div>
 

@@ -4549,7 +4549,7 @@
         "REFUND_ALREADY_ISSUED": "A refund for this return was already sent to the payment provider. Check the provider dashboard, then complete the return with \"Already refunded — record only\".",
         "RETURN_ALREADY_COMPLETING": "This return is already being completed. Refresh the page before trying again.",
         "PARTIAL_REFUND_EXCEEDS_PAYMENT": "Part of this payment was already refunded outside this return, so what is left is less than this return is worth. Complete it with store credit or bank transfer and settle the difference with the customer.",
-        "GUEST_STORE_CREDIT": "This is a guest return with no wallet to credit. Refund it to the original method or by bank transfer.",
+        "GUEST_STORE_CREDIT": "Store credit needs a customer account. This order was placed as a guest, so refund it in cash, by bank transfer or manually.",
         "PARTIAL_REFUND_NOTHING_TO_REFUND": "Every item in this return was already refunded by an earlier return.",
         "PAYMENT_FULLY_REFUNDED": "This payment has already been refunded in full.",
         "NO_COMPLETED_PAYMENT": "This order has no online payment to refund. Choose store credit or bank transfer.",
@@ -4569,7 +4569,6 @@
         "OVERRIDE_OUT_OF_RANGE": "The override must be between 0 and the standard refund for that item.",
         "OVERRIDE_UNKNOWN_ITEM": "The override names an item that is not on this return. Reopen the dialog and try again.",
         "FULL_RETURN_RESTOCK_ALL": "Every line of this order is in this return, so every line goes back on the shelf. Open a new return that leaves one unit out if some goods are not coming back to stock.",
-        "GUEST_STORE_CREDIT": "Store credit needs a customer account. This order was placed as a guest, so refund it in cash, by bank transfer or manually.",
         "RETURNS_FEATURE_REQUIRED_FOR_RESTOCK": "Putting refunded goods back on the shelf needs the Returns feature on your plan. Refund again without restocking: the money refund still goes through, only the stock is left alone."
       }
     },
@@ -6541,7 +6540,8 @@
       "unlocksGeneric": "This feature is not included in your current plan.",
       "availableOn": "Available on the {plan} plan and above.",
       "upgradeCta": "Upgrade to {plan}",
-      "seePlansCta": "See plans"
+      "seePlansCta": "See plans",
+      "getAddonCta": "Get this add-on"
     },
     "languageSwitcher": {
       "ariaLabel": "Language",
@@ -8151,6 +8151,8 @@
     "contactCta": "Talk to us",
     "requiresFeature": "Requires the “{feature}” feature.",
     "alsoIncluded": "Also included in this plan",
+    "getAddonCta": "Get this add-on",
+    "orAddFeature": "Or add just this feature for {price} a month.",
     "noSoldPlan": "This feature is not part of a plan you can buy. Our team switches it on for a single store, so get in touch if you need it.",
     "contactOnlyCta": "Talk to our team"
   },
@@ -9244,7 +9246,7 @@
     },
     "premiumSubtitle": "Extra feature",
     "featureNotEnabledTitle": "Feature not enabled",
-    "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Ebda Store to request access.",
+    "featureNotEnabledBody": "Floating widget is an add-on. Buy it from Add-ons and it turns on right after the payment goes through.",
     "mainSubtitle": "Fixed buttons your customer sees on every page, like WhatsApp and call",
     "showWidgetLabel": "Show widget on storefront",
     "showWidgetHint": "When off, no widget renders even though the feature is enabled.",
@@ -9306,7 +9308,8 @@
     "prefillExample": "Hi! I'd like to ask about…",
     "handleSampleDemoShop": "demo-shop",
     "handleSample": "mystore",
-    "emailSubjectExample": "Question about your store"
+    "emailSubjectExample": "Question about your store",
+    "featureNotEnabledCta": "Go to Add-ons"
   },
   "zoneEditor": {
     "resetToDefault": "Reset to default",
@@ -9442,7 +9445,7 @@
     "walletsWithBalance": "Customers with a balance",
     "checkoutTitle": "Pay with wallet at checkout",
     "checkoutOn": "On — signed-in customers can pay part or all of an order from their balance.",
-    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Use Contact Ebda Store to ask us to turn it on.",
+    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Buy the Wallet at Checkout add-on in Add-ons to turn it on.",
     "colCustomer": "Customer",
     "colContact": "Contact",
     "colBalance": "Balance",
@@ -9454,7 +9457,8 @@
     "retry": "Retry",
     "statusOn": "On",
     "statusOff": "Off",
-    "emptyAction": "Go to customers"
+    "emptyAction": "Go to customers",
+    "checkoutOffCta": "Go to Add-ons"
   },
   "usageHistory": {
     "title": "Store usage history",
@@ -9564,7 +9568,6 @@
     "usageTitle": "Usage",
     "ordersThisMonth": "Orders this month",
     "usedOf": "{used} of {limit}",
-    "storageUnknown": "Not known right now",
     "includedTitle": "Included in your plan",
     "included": "Included",
     "notIncluded": "Not included",
@@ -9770,6 +9773,8 @@
     "receiptProcessing": "Your payment went through. Your receipt will print here in a moment.",
     "cancelObject": "Cancelling your plan subscription",
     "cancelAction": "Cancel subscription",
+    "addonsLink": "Need more? Add features or AI requests",
+    "storageUnknown": "Not known right now",
     "adminPlanHidden": "hidden",
     "stateLine": {
       "none": "Your free plan is running.",
@@ -10327,7 +10332,9 @@
       "suggestedPeriod": "Paid period if approved: {start} to {end}",
       "subscriptionState": "Subscription: {status}",
       "storeSuspended": "The store is paused ({reason}).",
-      "close": "Close"
+      "close": "Close",
+      "addonApproved": "Add-on approved: it is on for the store now.",
+      "addonApproveFailed": "Could not approve the add-on. Nothing was turned on."
     },
     "vatLine": "incl. VAT {rate}% {vat} · TRN {trn}",
     "vatBreakdown": "Net {net} · VAT {vat} · Gross {gross}",
@@ -10433,6 +10440,7 @@
       "resolveTitle": "Resolve this held payment",
       "actionLabel": "What did you do?",
       "creditedHelp": "Resolving as \"activated by hand\" only closes this hold. The original charge row stays failed, so the money reaches the books only when you also record the payment on the manual payment form (it creates its own ledger row).",
+      "addonNoCreditHelp": "This is an add-on payment, which cannot be credited by hand. Refund it at the provider, and the merchant can buy the add-on again, or mark it as not ours.",
       "actions": {
         "credited": "Activated the plan by hand",
         "refunded": "Refunded it at the provider",
@@ -10443,7 +10451,12 @@
       "resolveSubmit": "Mark resolved",
       "resolveFailed": "Could not resolve it. It may have been resolved already; refresh the list.",
       "resolved": "The held payment was marked resolved."
-    }
+    },
+    "reverseAction": "Reverse InstaPay purchase",
+    "reverseObject": "the InstaPay add-on payment of {amount}",
+    "confirmReverse": "The add-on turns off for the store right now and the payment is marked refunded. Send the {amount} back to the merchant yourself: nothing is returned automatically.",
+    "reverseReason": "Reversed from the ledger by a super admin",
+    "reverseDone": "Purchase reversed. The add-on is off. Return the money outside the gateway."
   },
   "codReconciliation": {
     "title": "COD reconciliation",
@@ -12001,7 +12014,8 @@
     "title": "Use AI features",
     "onHint": "The assistant can translate, write SEO text, tag products and draft campaigns for this store. Turn it off and no AI call is made for your store.",
     "offHint": "AI is off for your store. Nothing is sent to an AI model, and every AI button and automatic fill is paused until you turn it back on.",
-    "failed": "Could not change this setting. Try again."
+    "failed": "Could not change this setting. Try again.",
+    "quotaLink": "Get more requests"
   },
   "eta": {
     "title": "ETA e-receipts (Egypt)",
@@ -12643,5 +12657,102 @@
     "viewOrders": "See orders",
     "open": "Open",
     "done": "Done"
+  },
+  "addons": {
+    "title": "Add-ons",
+    "subtitle": "Add a feature or more AI requests to your store. Pay by card, it turns on right after the payment goes through.",
+    "loading": "Loading add-ons...",
+    "loadFailed": "Could not load the add-ons. Try again.",
+    "cardOff": "Card payments are not available for your store yet, so add-ons cannot be bought here.",
+    "featuresHeading": "Features",
+    "aiHeading": "More AI requests",
+    "price": "{amount} for {days} days",
+    "includedInPlan": "Included in your plan",
+    "activeUntil": "Active until {date}",
+    "cancelsOn": "Ends on {date}, will not renew",
+    "renewsOn": "Renews on {date}",
+    "buy": "Buy",
+    "buyAgain": "Add another {days} days",
+    "cancel": "Stop renewing",
+    "resume": "Keep renewing",
+    "confirmTitle": "Confirm the payment",
+    "confirmBody": "You will be charged {amount} now for {days} days of {name}. Nothing is charged until you confirm.",
+    "confirmVat": "Includes {vat} VAT.",
+    "confirmYes": "Yes, charge {amount}",
+    "confirmNo": "Not now",
+    "previewError": "Could not prepare the payment. Nothing was charged.",
+    "checkoutError": "Could not start the payment. Nothing was charged.",
+    "cancelError": "Could not change this. Try again.",
+    "cancelDone": "Done. It stays on until {date}.",
+    "returnPending": "We are waiting for the bank to confirm your payment. It turns on by itself as soon as it does.",
+    "returnOk": "Payment received. Your add-on is on.",
+    "returnFailed": "The payment did not go through, so nothing was added and nothing was charged.",
+    "aiToday": "Today: {used} of {cap} requests used, {remaining} left.",
+    "aiExtra": "Includes {extra} extra requests from your packs.",
+    "aiBuyHint": "Packs raise your store's daily limit for {days} days. They do not renew.",
+    "confirmRenews": "Then {amount} every {days} days on your saved card until you stop it. We email you before each renewal, and you can stop it any time from Add-ons.",
+    "tryAgain": "Try again",
+    "returnDone": "Back from the payment page. Your add-ons below show the latest status.",
+    "instapayNote": "Paying by InstaPay: an add-on bought this way turns on after Ebda Store confirms your transfer, usually within one working day.",
+    "historyHeading": "Your add-on payments",
+    "historyEmpty": "No add-on payments yet.",
+    "historyUntil": "covers until {date}",
+    "receipt": "Receipt",
+    "receiptItem": "Add-on",
+    "receiptClose": "Close receipt",
+    "history": {
+      "succeeded": "Paid",
+      "pending": "Waiting for payment",
+      "failed": "Not paid",
+      "refunded": "Refunded",
+      "waiting_confirmation": "Waiting for confirmation",
+      "rejected": "Not accepted"
+    },
+    "state": {
+      "available": "Not added",
+      "pending_payment": "Waiting for payment",
+      "failed": "Payment failed",
+      "active": "Active",
+      "renewing": "Active, renews",
+      "cancelled_at_period_end": "Ends soon",
+      "expired": "Ended",
+      "refunded": "Refunded",
+      "included": "In your plan",
+      "granted": "Turned on for you",
+      "pending_paymentHint": "We are waiting for the bank to confirm your payment. It turns on by itself as soon as it does.",
+      "failedHint": "The payment did not go through, so nothing was added and nothing was charged.",
+      "expiredHint": "This add-on has ended. Buy it again to turn it back on.",
+      "refundedHint": "This payment was refunded and the add-on is off.",
+      "includedHint": "Included in your plan, nothing to buy.",
+      "grantedHint": "Ebda Store support turned this on for your store, nothing to buy.",
+      "waiting_confirmation": "Waiting for confirmation",
+      "rejected": "Transfer not accepted",
+      "waiting_confirmationHint": "We received your InstaPay receipt and are checking it. The add-on turns on only after Ebda Store confirms it.",
+      "rejectedHint": "We could not accept this InstaPay transfer, so nothing was added. You can pay again."
+    },
+    "instapayOff": "InstaPay is not available for add-ons right now. Use a card.",
+    "payInstapay": "Pay by InstaPay",
+    "instapayError": "Could not load the InstaPay details. Nothing was charged.",
+    "instapayTitle": "Pay for {name} by InstaPay",
+    "instapayHowItWorks": "Transfer the exact amount below, then upload the receipt. The add-on stays off until Ebda Store confirms the transfer.",
+    "instapayReviewerNote": "Ebda Store will check your transfer. The add-on turns on only after it is confirmed.",
+    "instapaySent": "Receipt sent. We will confirm it soon and the add-on turns on after that.",
+    "instapayClose": "Close",
+    "aiMeterLeft": "{remaining} AI requests left today",
+    "aiMeterUsed": "{used} of {cap} used",
+    "aiMeterSplit": "{base} included every day, plus {extra} from your packs.",
+    "aiPackEnds": "{name}: until {date}",
+    "aiBreakdownTitle": "What used them today",
+    "aiBreakdownEmpty": "Nothing has used AI requests today.",
+    "aiResets": "The count starts again every day at midnight (UTC).",
+    "aiFeature": {
+      "translate": "Translation",
+      "seo": "SEO",
+      "categorize": "Categorising",
+      "product-excerpt": "Product short description",
+      "product-faq": "Product questions and answers",
+      "product-meta-aeo": "Search and AI-answer text",
+      "product-tags": "Product tags"
+    }
   }
 }

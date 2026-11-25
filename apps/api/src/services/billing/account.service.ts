@@ -662,17 +662,50 @@ async function submitSubscriptionReceiptInner(args: {
   storeId: string;
   receiptId: string;
   fields: InstapayReceiptFields;
+  /**
+   * An add-on purchase paid by InstaPay (Ruling ADDON-SS-6): the SAME claim + receipt + super-admin review as a plan,
+   * with the add-on's code and quoted total instead of the plan's. Nothing is granted here, ever.
+   */
+  addon?: { planCode: string; amountMinor: number };
   now?: Date;
 }) {
   const now = args.now ?? new Date();
   await assertPayableStore(args.storeId);
-  const details = await instapayDetails(args.storeId);
+  const details = args.addon
+    ? {
+        handle: instapayHandle(),
+        reference:
+          (
+            await withStore(args.storeId, tx =>
+              tx.storeSubscription.findUnique({
+                where: { storeId: args.storeId },
+                select: { paymentReference: true },
+              })
+            )
+          )?.paymentReference ?? newPaymentReference(),
+        planCode: args.addon.planCode,
+        interval: 'monthly' as BillingInterval,
+        amountMinor: args.addon.amountMinor,
+      }
+    : await instapayDetails(args.storeId);
   if (!details?.reference || !details.amountMinor) {
     throw new AppError(409, 'INSTAPAY_NOT_CHOSEN', 'Choose a plan and InstaPay first');
   }
   const reference = normalizeInstapayReference(args.fields.reference)!;
   return withStore(args.storeId, async tx => {
     const sub = await tx.storeSubscription.findUnique({ where: { storeId: args.storeId } });
+    if (args.addon) {
+      // One open confirmation per add-on: a second submit while one waits is a duplicate, not another purchase.
+      const open = await tx.manualPaymentClaim.count({
+        where: { storeId: args.storeId, status: 'pending', planCode: args.addon.planCode },
+      });
+      if (open > 0)
+        throw new AppError(
+          409,
+          'ADDON_AWAITING_CONFIRMATION',
+          'This add-on is already waiting for confirmation'
+        );
+    }
     const pending = await tx.manualPaymentClaim.count({
       where: { storeId: args.storeId, status: 'pending' },
     });
@@ -860,6 +893,7 @@ export async function listClaimsForAdmin(status: 'pending' | 'confirmed' | 'reje
       storeSuspendedReason: c.store.billingSuspendedReason,
       subscriptionStatus: subStatus,
       planCode: c.planCode,
+      isAddon: c.planCode.startsWith('addon:'),
       billingInterval: c.billingInterval,
       amountMinor: c.amountMinor,
       method: c.method,
@@ -877,7 +911,7 @@ export async function listClaimsForAdmin(status: 'pending' | 'confirmed' | 'reje
 }
 
 /** A rejected/voided claim frees its transfer reference (the claim's unique index) for re-filing. */
-const freedReference = (ref: string, claimId: string, tag: 'rejected' | 'voided') =>
+export const freedReference = (ref: string, claimId: string, tag: 'rejected' | 'voided') =>
   `${ref}#${tag}-${claimId.slice(0, 8)}`.slice(0, 120);
 
 async function rejectClaimInner(args: {
@@ -894,8 +928,15 @@ async function rejectClaimInner(args: {
       where: { id: args.claimId, storeId: args.storeId, status: 'pending' },
     });
     if (!claim) throw new AppError(409, 'CLAIM_NOT_PENDING', 'This claim is not pending');
-    await tx.manualPaymentClaim.update({
-      where: { id: claim.id, storeId: args.storeId },
+    // An add-on approval takes the claim first (reviewedBy set while it is still pending): never reject under it.
+    if (claim.reviewedBy)
+      throw new AppError(
+        409,
+        'APPROVAL_IN_PROGRESS',
+        'This claim is being approved: finish the approval instead of rejecting it'
+      );
+    const guarded = await tx.manualPaymentClaim.updateMany({
+      where: { id: claim.id, storeId: args.storeId, status: 'pending', reviewedBy: null },
       data: {
         status: 'rejected',
         payerReference: freedReference(claim.payerReference, claim.id, 'rejected'),
@@ -904,6 +945,8 @@ async function rejectClaimInner(args: {
         reviewedAt: new Date(),
       },
     });
+    if (guarded.count === 0)
+      throw new AppError(409, 'CLAIM_NOT_PENDING', 'This claim is no longer pending');
     const receipt = await tx.instapayReceipt.findFirst({
       where: { storeId: args.storeId, claimId: claim.id },
       select: { id: true },
@@ -985,6 +1028,21 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
   if (explicit && !(input.periodEnd!.getTime() > input.periodStart!.getTime())) {
     throw new AppError(400, 'INVALID_PERIOD', 'The period must end after it starts');
   }
+  if (input.claimId) {
+    // An add-on claim is approved by `approveAddonClaim` only: through this plan path it would activate a plan.
+    const c = await withStore(input.storeId, tx =>
+      tx.manualPaymentClaim.findFirst({
+        where: { id: input.claimId, storeId: input.storeId },
+        select: { planCode: true },
+      })
+    );
+    if (c?.planCode.startsWith('addon:'))
+      throw new AppError(
+        409,
+        'USE_ADDON_APPROVAL',
+        'This claim is for an add-on: approve it with Approve add-on'
+      );
+  }
   const { plan } = await loadPayablePlan(input.planCode, input.interval);
   let key = manualPaymentKey(input.method, reference);
   if (input.replacesVoidedEventId) {
@@ -1031,6 +1089,7 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       where: {
         storeId: input.storeId,
         status: 'pending',
+        NOT: { planCode: { startsWith: 'addon:' } },
         ...(input.claimId
           ? { id: input.claimId }
           : {
@@ -1495,6 +1554,7 @@ export const rejectClaim = (args: Parameters<typeof rejectClaimInner>[0]) =>
   withClaimReleases(() => rejectClaimInner(args));
 export const recordManualRefund = (input: Parameters<typeof recordManualRefundInner>[0]) =>
   withClaimReleases(() => recordManualRefundInner(input));
+/** Same wrapper for both: a plan receipt and an add-on receipt release their reference claims alike. */
 export const submitSubscriptionReceipt = (
   args: Parameters<typeof submitSubscriptionReceiptInner>[0]
 ) => withClaimReleases(() => submitSubscriptionReceiptInner(args));

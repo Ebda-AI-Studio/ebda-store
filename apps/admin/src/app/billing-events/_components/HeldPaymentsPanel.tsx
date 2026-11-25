@@ -17,6 +17,8 @@ interface HeldRow {
   receivedAt: string;
   status: 'open' | 'resolved';
   reason?: string;
+  /** an add-on payment: it cannot be credited by hand (only refunded or marked not ours) */
+  isAddon?: boolean;
   storeId?: string | null;
   merchantOrderId?: string | null;
   providerRef?: string | null;
@@ -160,7 +162,7 @@ export function HeldPaymentsPanel({
             className="max-md:min-h-11 max-md:px-4"
             onClick={() => {
               setResolving(r);
-              setAction('credited');
+              setAction(r.isAddon ? 'refunded' : 'credited');
               setNote('');
               setNoteError('');
             }}
@@ -229,7 +231,7 @@ export function HeldPaymentsPanel({
           >
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium text-foreground">{t('actionLabel')}</legend>
-              {ACTIONS.map(a => (
+              {ACTIONS.filter(a => !(resolving.isAddon && a === 'credited')).map(a => (
                 <label key={a} className="flex items-center gap-2 text-sm">
                   <input
                     type="radio"
@@ -245,6 +247,11 @@ export function HeldPaymentsPanel({
             {action === 'credited' && (
               <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground" role="note">
                 {t('creditedHelp')}
+              </p>
+            )}
+            {resolving.isAddon && (
+              <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground" role="note">
+                {t('addonNoCreditHelp')}
               </p>
             )}
             <Input

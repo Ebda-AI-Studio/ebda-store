@@ -20,6 +20,8 @@ export interface ClaimRow {
   storeSlug: string;
   storeStatus: string;
   planCode: string;
+  /** An InstaPay add-on purchase: approving it turns the add-on on, it never touches the plan. */
+  isAddon?: boolean;
   billingInterval: 'monthly' | 'yearly';
   amountMinor: number;
   method: string;
@@ -86,7 +88,20 @@ export function ClaimsPanel({
     void fetchRows();
   }, [fetchRows, refreshKey]);
 
+  async function approveAddon(r: ClaimRow) {
+    setBusy(true);
+    const { error } = await apiPost(`/api/v1/admin/billing/claims/${r.id}/approve-addon`, {
+      storeId: r.storeId,
+    });
+    setBusy(false);
+    if (error) return onChanged(t('addonApproveFailed'));
+    onChanged(t('addonApproved'));
+    void fetchRows();
+  }
+
   function confirmClaim(r: ClaimRow) {
+    // An add-on claim has its own approval: the plan form would record a PLAN payment.
+    if (r.isAddon) return void approveAddon(r);
     onConfirm({
       storeId: r.storeId,
       storeName: r.storeName,

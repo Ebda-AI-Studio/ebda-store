@@ -38,6 +38,7 @@ import {
   listLedger,
   listSubscriptionsForAdmin,
   refundCharge,
+  reverseInstapayAddonPayment,
   resolveHeldBillingWebhook,
 } from '../services/billing/subscription-billing.service';
 import {
@@ -55,6 +56,7 @@ import {
   REGION,
   zonedLocalToUtc,
 } from '@ebda/shared';
+import { approveAddonClaim } from '../services/billing/addon-instapay';
 import { InstapayReceiptService } from '../services/payment-providers/instapay-receipt.service';
 import { config } from '../config';
 import logger from '../lib/logger';
@@ -656,7 +658,10 @@ router.get(
           limit: z.coerce.number().int().min(1).max(200).optional(),
         })
         .parse(req.query);
-      res.json({ success: true, data: { held: await listHeldBillingWebhooks(q) } });
+      res.json({
+        success: true,
+        data: { held: await listHeldBillingWebhooks({ ...q, flagAddons: true }) },
+      });
     } catch (error) {
       next(error);
     }
@@ -745,6 +750,32 @@ router.get(
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.send(img.body);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** Approve an InstaPay add-on claim: the add-on turns on only now (the existing claims queue; plans use manual-payment). */
+router.post(
+  '/billing/claims/:id/approve-addon',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = z.object({ storeId: z.string().uuid() }).strict().parse(req.body);
+      const claimId = z.string().uuid().parse(req.params.id);
+      const out = await approveAddonClaim({ storeId, claimId, actorId: req.user!.userId });
+      await auditLog({
+        action: 'billing.addon_claim_approved',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'manual_payment_claim',
+        resourceId: claimId,
+        details: { billingEventId: out.billingEventId },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: out });
     } catch (error) {
       next(error);
     }
@@ -958,6 +989,37 @@ router.post(
           keepAccess: keepAccess === true,
           status: out.status,
         },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: out });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** Reverse an approved InstaPay add-on purchase: ends the term at once, money returned outside the gateway. */
+router.post(
+  '/billing/events/:id/reverse-instapay-addon',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { reason } = z
+        .object({ reason: z.string().trim().min(3).max(500) })
+        .strict()
+        .parse(req.body ?? {});
+      const out = await reverseInstapayAddonPayment({
+        eventId: req.params.id,
+        reason,
+        actorId: req.user!.userId,
+      });
+      await auditLog({
+        action: 'billing.addon_instapay_reversed',
+        userId: req.user!.userId,
+        resourceType: 'billing_event',
+        resourceId: req.params.id,
+        details: { reason, refundEventId: out.refundEventId, duplicate: out.duplicate },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });

@@ -43,10 +43,13 @@ const PRINT_CSS = `@media print{body *{visibility:hidden}.ebda-receipt-print,.eb
 export function EbdaBillingReceipt({
   charge,
   planName,
+  itemLabel,
   locale,
 }: {
   charge: BillingReceiptCharge;
   planName?: string;
+  /** Row label when the receipt is not for a plan (an add-on): replaces "Plan". */
+  itemLabel?: string;
   locale: UiLocale;
 }) {
   const t = useT('ebdaReceipt');
@@ -98,7 +101,7 @@ export function EbdaBillingReceipt({
         <hr className="my-4 border-0 border-t border-dashed border-black/30" />
         <dl className="space-y-1.5 text-xs">
           {(planName || charge.planCode) && (
-            <Row label={t('plan')}>{planName ?? charge.planCode}</Row>
+            <Row label={itemLabel ?? t('plan')}>{planName ?? charge.planCode}</Row>
           )}
           <Row label={t('date')}>{fmtDate(charge.createdAt, locale)}</Row>
           {charge.vat && (charge.vatMinor ?? 0) > 0 && (
