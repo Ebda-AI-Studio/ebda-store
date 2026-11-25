@@ -49,9 +49,12 @@ export const PREPUSH_EXCLUDE = [
  * The rule is by content, not a list, so a new scanner is picked up the day it is written: a unit test (any depth under
  * tests/unit) whose source walks the tree (`readdirSync`, `globSync`, a `walk…(` helper, `git ls-files`) or greps it
  * (`git grep`). Fixture-only readers (`readFileSync` of one known file) are NOT scanners and are left to `related`.
+ * A test that loads the WHOLE API router (`@api/routes`) and walks its table is a scanner too: its import is dynamic, so
+ * `related` never reaches it from a changed `*.routes.ts`, and a wide push skips `related` anyway (PREPUSH-4). Missed:
+ * route-table-manifest went red in CI on #811 and #887 for a new route (PREPUSH-7).
  */
 export const SCANNER_RULE =
-  /\b(readdirSync|globSync)\b|\bwalk\w*\(|git[ '",]+(ls-files|grep)\b|['"`]ls-files['"`]|['"`]grep['"`]/;
+  /\b(readdirSync|globSync)\b|\bwalk\w*\(|git[ '",]+(ls-files|grep)\b|['"`]ls-files['"`]|['"`]grep['"`]|['"`]@api\/routes['"`]/;
 
 export function scannerTests(root = ROOT, rel = 'tests/unit') {
   const out = [];
