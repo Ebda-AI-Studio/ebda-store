@@ -30,6 +30,7 @@ const { findUnique, findMany, withRlsBypass } = vi.hoisted(() => {
   };
 });
 
+vi.mock('@api/services/billing/addon-grant', () => ({ activeAddons: async () => [] }));
 vi.mock('@ebda/database', () => ({
   prisma: {},
   Prisma: {},

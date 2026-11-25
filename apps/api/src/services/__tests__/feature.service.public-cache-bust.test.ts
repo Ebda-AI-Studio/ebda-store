@@ -77,6 +77,7 @@ vi.mock('@ebda/database', () => ({
         delete: mockStoreFeatureDelete,
         deleteMany: mockStoreFeatureDeleteMany,
       },
+      billingEvent: { findMany: async () => [] }, // running add-ons (none here)
       // plans engine (SP5): no subscription row -> the plan resolves from the legacy enum
       storeSubscription: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
       plan: { findUnique: vi.fn().mockResolvedValue(null) },
@@ -100,6 +101,7 @@ describe('FeatureService — public cache bust (audit-followup #1668)', () => {
       fn({
         storeFeature: { upsert: mockStoreFeatureUpsert, findMany: mockStoreFeatureFindMany },
         store: { findUnique: mockStoreFindUnique },
+        billingEvent: { findMany: async () => [] }, // running add-ons (none here)
         // plans engine (SP5): no subscription row -> the plan resolves from the legacy enum
         storeSubscription: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
         plan: { findUnique: vi.fn().mockResolvedValue(null) },

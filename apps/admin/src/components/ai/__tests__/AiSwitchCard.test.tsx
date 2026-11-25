@@ -30,6 +30,17 @@ describe('AiSwitchCard', () => {
     expect(screen.getByText('offHint')).toBeTruthy();
   });
 
+  it("shows today's remaining AI requests with the way to buy more", async () => {
+    api.apiGet.mockImplementation(async (url: string) =>
+      url.endsWith('/billing/addons')
+        ? { data: { ai: { used: 100, cap: 450, remaining: 350 } } }
+        : { data: { enabled: true } }
+    );
+    render(<AiSwitchCard storeId="s1" />);
+    const line = await screen.findByTestId('ai-quota');
+    expect(line.querySelector('a')?.getAttribute('href')).toBe('/stores/s1/billing/addons#ai');
+  });
+
   it('shows an error and keeps the old state when the save fails', async () => {
     api.apiGet.mockResolvedValue({ data: { enabled: true } });
     api.apiPut.mockResolvedValue({ error: { message: 'x' } });

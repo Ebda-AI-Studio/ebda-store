@@ -42,6 +42,7 @@ import { isStoreGoneError } from '../../lib/jobs/store-gone';
 import { sendAlert } from '../alerts.service';
 import {
   acrossBilling,
+  claimBillingEventD1,
   deferBillingWebhookD1,
   listDeferredBillingWebhooksD1,
   onD1,
@@ -90,6 +91,10 @@ import {
   sweepFreeMonthGrants,
 } from './grants.service';
 import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
+import { applyAddonGrant, replaceQueuedTerms } from './addon-grant';
+import { ADDON_MARKER_PREFIX, ADDON_PLAN_PREFIX, skuOfPlanCode } from './addon-catalog';
+import { SETTLE_LEASE, SETTLE_LEASE_MS } from './settle-lease';
+import { renewDueAddons } from './addon-renewal';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
 import { findReminderCandidates, sendDueReminder } from './reminders.service';
@@ -246,8 +251,30 @@ function vatColumns(charge: ChargeAmount | undefined) {
  * already claimed (another run / a retry): the caller must NOT call the provider.
  * `ON CONFLICT DO NOTHING` — a duplicate never aborts the surrounding tx.
  */
-async function claimEvent(input: ClaimInput): Promise<string | null> {
+export async function claimEvent(input: ClaimInput): Promise<string | null> {
   const id = crypto.randomUUID();
+  if (await onD1()) {
+    // D1: one native statement, never a prisma-lite write count (see claimBillingEventD1).
+    const { vatMinor, vat } = input.charge ? ledgerVat(input.charge) : { vatMinor: 0, vat: null };
+    const won = await claimBillingEventD1({
+      id,
+      storeId: input.storeId,
+      subscriptionId: input.subscriptionId ?? null,
+      type: input.type,
+      planCode: input.planCode ?? null,
+      billingInterval: input.billingInterval ?? null,
+      forPeriodEnd: input.forPeriodEnd ?? null,
+      attempt: input.attempt ?? 0,
+      amountMinor: input.amountMinor,
+      provider: input.provider,
+      idempotencyKey: input.idempotencyKey,
+      relatedEventId: input.relatedEventId ?? null,
+      vatMinor,
+      vat,
+      raw: input.raw ?? null,
+    });
+    return won ? id : null;
+  }
   const { count } = await withStore(input.storeId, tx =>
     tx.billingEvent.createMany({
       data: [
@@ -276,7 +303,11 @@ async function claimEvent(input: ClaimInput): Promise<string | null> {
   return count === 1 ? id : null;
 }
 
-async function markFailedUnlessSettled(id: string, reason: string, raw?: unknown): Promise<void> {
+export async function markFailedUnlessSettled(
+  id: string,
+  reason: string,
+  raw?: unknown
+): Promise<void> {
   await inEventStore(
     id,
     (tx, storeId) =>
@@ -329,6 +360,19 @@ async function applyPlan(tx: Tx, storeId: string, planCode: string): Promise<voi
   if (plan) await storeUpdate(tx, { where: { id: storeId }, data: { plan: plan.featureTier } });
 }
 
+/** A ledger row that bought an add-on or an AI pack (`upgrade` + `addon:<sku>`), not a plan. */
+function isAddonRow(row: { type: string; planCode: string | null }): boolean {
+  return row.type === 'upgrade' && !!row.planCode?.startsWith(ADDON_PLAN_PREFIX);
+}
+
+/**
+ * Zero-amount bookkeeping rows (`addon-cancel:` / `addon-resume:` here; `addon-grant:` / `addon-overlap:` up the stack)
+ * share `type: 'upgrade'` + `status: 'succeeded'` but are NOT payments: they must never read as a newer plan charge (B2).
+ */
+function isAddonMarkerRow(row: { planCode: string | null }): boolean {
+  return !!row.planCode?.startsWith(ADDON_MARKER_PREFIX);
+}
+
 async function applySuccess(
   tx: Tx,
   row: LedgerRow,
@@ -338,6 +382,11 @@ async function applySuccess(
 ): Promise<void> {
   if (row.type === 'card_setup') {
     await applyCardSaved(tx, row, o, now);
+    return;
+  }
+  if (isAddonRow(row)) {
+    // An add-on payment never touches the subscription (SELF-SERVICE A8/A9): it grants its own term.
+    await applyAddonGrant(tx, row, now, effects);
     return;
   }
   if (row.type === 'checkout' || row.type === 'upgrade') {
@@ -537,15 +586,17 @@ const WEBHOOK_PROCESSING = 'processing';
 const WEBHOOK_DEFERRED = 'deferred';
 const WEBHOOK_CLAIM_STALE_MS = 120_000;
 
-/** D1 settle lease marker (stored in `failure_reason` while a success is being applied) and how long it holds. */
-const SETTLE_LEASE = 'settling';
-const SETTLE_LEASE_MS = 120_000;
+/** The D1 settle lease marker and how long it holds: see settle-lease.ts. */
 
 /**
  * Repeat the idempotent parts of a success whose subscription write already committed: the tier on `stores` and the
  * notifications the interrupted attempt never sent.
  */
 async function healAppliedSuccess(tx: Tx, row: LedgerRow, effects: BillingEffect[]): Promise<void> {
+  if (isAddonRow(row)) {
+    effects.push({ kind: 'addon_granted', storeId: row.storeId });
+    return;
+  }
   const sub = await tx.storeSubscription.findUnique({ where: { storeId: row.storeId } });
   const planCode = row.type === 'card_setup' ? null : (row.planCode ?? sub?.planCode ?? null);
   if (planCode) await applyPlan(tx, row.storeId, planCode);
@@ -560,6 +611,7 @@ async function healAppliedSuccess(tx: Tx, row: LedgerRow, effects: BillingEffect
 
 /** Did an earlier, interrupted settlement of this success already move the subscription? (D1 lease path only.) */
 async function alreadyApplied(tx: Tx, row: LedgerRow & { createdAt: Date }): Promise<boolean> {
+  if (isAddonRow(row)) return row.forPeriodEnd !== null; // the grant writes the term end; unset until granted
   const sub = await tx.storeSubscription.findUnique({ where: { storeId: row.storeId } });
   if (!sub) return false;
   const started = sub.currentPeriodStart?.getTime();
@@ -788,6 +840,33 @@ async function settleCharge(eventId: string, o: Outcome, now: Date) {
   return res;
 }
 
+/**
+ * A super admin approved an InstaPay payment for a pending ledger row (add-on purchase): settle it through the SAME
+ * guarded pending -> succeeded transition a card webhook uses, so the grant happens exactly once and a replay is a no-op.
+ */
+export const settleApprovedPayment = (
+  eventId: string,
+  providerRef: string,
+  now: Date,
+  /**
+   * What the person confirmed was received. It is the gateway-style statement `maySettle` needs (#627): a success that
+   * states no amount is held, and one that states an amount or currency different from the ledger row is held too, so a
+   * tampered or mismatched claim never grants.
+   */
+  confirmed: { amountMinor: number; currency: string }
+) =>
+  settleDefinitive(
+    eventId,
+    {
+      status: 'succeeded',
+      providerRef,
+      amountSource: 'gateway',
+      amountMinor: confirmed.amountMinor,
+      currency: confirmed.currency,
+    },
+    now
+  );
+
 /** Test seam: the pause between settle retries (ms per attempt). */
 export const settleRetry = { delayMs: 250, attempts: 3 };
 
@@ -825,7 +904,7 @@ async function settleDefinitive(eventId: string, o: Outcome, now: Date) {
 
 type ChargeAttempt = { settled: 'succeeded' | 'failed' } | { settled: 'pending'; reason?: string };
 
-async function chargeAndSettle(args: {
+export async function chargeAndSettle(args: {
   provider: BillingProvider;
   eventId: string;
   token: string;
@@ -1445,6 +1524,7 @@ export async function sweepStuckCharges(
           storeId: true,
           idempotencyKey: true,
           providerRef: true,
+          provider: true,
           createdAt: true,
         },
       }),
@@ -1452,7 +1532,9 @@ export async function sweepStuckCharges(
       onStoreError: (storeId, err) => logger.error({ err, storeId }, '[billing] stuck scan failed'),
     }
   );
-  const rows = parts.flatMap(p => p.value);
+  // An InstaPay add-on row is pending only between the claim and a super admin's approval retry: the card gateway has
+  // never heard of it, so asking it would answer "never taken" and fail a payment that was made.
+  const rows = parts.flatMap(p => p.value).filter(r => r.provider !== 'instapay');
   let active: BillingProvider | null = provider ?? null;
   if (!active && rows.length > 0) {
     try {
@@ -1604,6 +1686,11 @@ export async function runBillingCycle(
     );
     await sweepStuckCharges(now, provider).catch(err =>
       logger.error({ err }, '[billing] stuck-charge sweep failed')
+    );
+  }
+  if (!only) {
+    await renewDueAddons(now, provider).catch(err =>
+      logger.error({ err }, '[billing] add-on renewal pass failed')
     );
   }
   const ids = await findDueSubscriptionIds(now, only);
@@ -2480,18 +2567,21 @@ async function confirmAndApplyWebhook(
  */
 async function endAccessForRefund(
   tx: Tx,
-  charge: { id: string; storeId: string; type: string; createdAt: Date },
+  charge: { id: string; storeId: string; type: string; createdAt: Date; planCode?: string | null },
   keepAccess: boolean,
   now: Date,
   effects: BillingEffect[]
 ): Promise<void> {
   if (keepAccess || !['checkout', 'renewal', 'upgrade'].includes(charge.type)) return;
+  // An add-on / AI-pack payment (`upgrade` + `addon:<sku>`) bought no plan period: refunding it never touches the plan
+  // (its entitlement is revoked by settleRefundInTx), and it is never the "newer charge" that owns the period.
+  if (isAddonRow({ type: charge.type, planCode: charge.planCode ?? null })) return;
   const { storeId } = charge;
   const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
   if (!sub || !['active', 'past_due', 'trialing'].includes(sub.status)) return;
   if (sub.planCode === FREE_PLAN_CODE || isGrantedPlan(sub.planCode)) return;
   // only the NEWEST paid charge can own the current period: an older one bought a period already used up
-  const newer = await tx.billingEvent.findFirst({
+  const newerRows = await tx.billingEvent.findMany({
     where: {
       storeId,
       id: { not: charge.id },
@@ -2499,9 +2589,9 @@ async function endAccessForRefund(
       status: { in: ['succeeded', 'refunded'] },
       createdAt: { gt: charge.createdAt },
     },
-    select: { id: true },
+    select: { id: true, type: true, planCode: true },
   });
-  if (newer) return;
+  if (newerRows.some(r => !isAddonRow(r) && !isAddonMarkerRow(r))) return;
   // the free months this payment earned go too (FOUNDING-3)
   await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', now, storeId);
   await downgradeToFree(tx, storeId, 'canceled', effects);
@@ -2514,7 +2604,12 @@ async function settleRefundInTx(
   succeeded: boolean,
   reason: string | undefined,
   /** a full refund that ends access pushes its `downgraded` effect here; the caller runs it after the tx */
-  effects: BillingEffect[]
+  effects: BillingEffect[],
+  /**
+   * Finish an interrupted settlement: the refund row already reads `succeeded` but the charge it refunds was not flipped yet
+   * (D1 has no interactive transaction). Every step below is compare-and-set, so repeating it only completes what is missing.
+   */
+  resume = false
 ): Promise<void> {
   const upd = await tx.billingEvent.updateMany({
     where: { id: refundId, storeId, status: 'pending' },
@@ -2522,8 +2617,9 @@ async function settleRefundInTx(
       ? { status: 'succeeded' }
       : { status: 'failed', failureReason: reason ?? 'refund_failed' },
   });
-  if (upd.count === 0 || !succeeded) return;
+  if (!succeeded || (upd.count === 0 && !resume)) return;
   const refund = await tx.billingEvent.findUnique({ where: { id: refundId, storeId } });
+  if (upd.count === 0 && refund?.status !== 'succeeded') return;
   if (!refund?.relatedEventId) return;
   const charge = await tx.billingEvent.findUnique({
     where: { id: refund.relatedEventId, storeId },
@@ -2547,6 +2643,13 @@ async function settleRefundInTx(
     // referrer in another tenant is restored by restoreRevokedGrants / the daily sweep).
     if (flipped.count === 1) {
       await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', new Date(), storeId);
+      // A refunded add-on stops being an entitlement AT ONCE: drop the cached feature map (NEVER-stale class).
+      if (isAddonRow(charge)) {
+        // A term queued behind the refunded one starts now instead of waiting for its end (F1).
+        const sku = skuOfPlanCode(charge.planCode);
+        if (sku) await replaceQueuedTerms(tx, storeId, sku, new Date());
+        effects?.push({ kind: 'addon_granted', storeId });
+      }
     }
   }
 }
@@ -2575,6 +2678,10 @@ export async function refundCharge(args: {
   if (charge.type === 'manual_payment' || charge.type === 'card_setup') {
     // A manual payment was never taken by the gateway; a card setup took nothing.
     throw new AppError(409, 'NOT_REFUNDABLE', 'Refund manual payments outside the gateway');
+  }
+  if (charge.provider === 'instapay') {
+    // InstaPay is push-only: its providerRef is the payer's transfer id, which the card gateway cannot refund.
+    throw new AppError(409, 'NOT_REFUNDABLE', 'Refund InstaPay payments outside the gateway');
   }
   if (charge.status !== 'succeeded' || !charge.providerRef) {
     throw new AppError(409, 'NOT_REFUNDABLE', 'Only a succeeded charge can be refunded');
@@ -2659,6 +2766,108 @@ export async function refundCharge(args: {
   }
 }
 
+/**
+ * Reverse an approved InstaPay ADD-ON purchase (money-abuse audit P5): the receipt was a mistake or a fake. Super admin
+ * only (route). The money goes back OUTSIDE the gateway (InstaPay is push-only), so this records it and ends the
+ * entitlement: a `refund` ledger row (provider `instapay`, key `addon-reverse:<id>`, once) settles through the same
+ * transition a gateway refund uses, which flips the payment to `refunded` (the term ends AT ONCE: entitlement reads only
+ * succeeded rows), revokes grants and emits `addon_granted` (drops the feature cache and the public store payload).
+ * A replay returns the first reversal; nothing is ever reversed twice.
+ */
+export async function reverseInstapayAddonPayment(args: {
+  eventId: string;
+  reason: string;
+  actorId: string;
+}): Promise<{ refundEventId: string; duplicate: boolean }> {
+  const storeId = await getEntityStoreId('billing_event', args.eventId);
+  const charge = storeId
+    ? await withStore(storeId, tx =>
+        tx.billingEvent.findUnique({ where: { id: args.eventId, storeId } })
+      )
+    : null;
+  if (!charge || !storeId) throw new AppError(404, 'NOT_FOUND', 'No such charge');
+  if (charge.type !== 'upgrade' || !isAddonRow(charge) || charge.provider !== 'instapay')
+    throw new AppError(
+      409,
+      'NOT_AN_INSTAPAY_ADDON',
+      'Only an InstaPay add-on payment can be reversed here'
+    );
+  const key = `addon-reverse:${charge.id}`;
+  const existing = await withStore(storeId, tx =>
+    tx.billingEvent.findFirst({
+      where: { storeId, idempotencyKey: key },
+      select: { id: true, status: true },
+    })
+  );
+  if (existing) {
+    // D1 has no interactive transaction: the refund row and its settlement are two steps. A run interrupted between them
+    // leaves a PENDING row, and answering "duplicate" for it would leave the purchase unrefunded and the add-on on while the
+    // admin was told it was reversed. So a still-pending row is settled now, and so is a `succeeded` refund whose charge was
+    // not flipped yet (every settlement step is compare-and-set, so a repeat only completes what is missing).
+    if (
+      existing.status === 'pending' ||
+      (existing.status === 'succeeded' && charge.status === 'succeeded')
+    ) {
+      await settleAddonReversal(storeId, existing.id, args);
+      return { refundEventId: existing.id, duplicate: false };
+    }
+    return { refundEventId: existing.id, duplicate: true };
+  }
+  if (charge.status !== 'succeeded')
+    throw new AppError(409, 'NOT_REVERSIBLE', 'Only a succeeded payment can be reversed');
+  const refundId = await claimEvent({
+    storeId,
+    subscriptionId: charge.subscriptionId,
+    type: 'refund',
+    planCode: charge.planCode,
+    amountMinor: charge.amountMinor,
+    provider: 'instapay',
+    idempotencyKey: key,
+    relatedEventId: charge.id,
+  });
+  if (!refundId) {
+    // lost the claim race: the winner is (or was) settling; finish a pending row instead of reporting a bare duplicate
+    const raced = await withStore(storeId, tx =>
+      tx.billingEvent.findFirst({
+        where: { storeId, idempotencyKey: key },
+        select: { id: true, status: true },
+      })
+    );
+    if (
+      raced?.status === 'pending' ||
+      (raced?.status === 'succeeded' && charge.status === 'succeeded')
+    )
+      await settleAddonReversal(storeId, raced.id, args);
+    return { refundEventId: raced?.id ?? '', duplicate: true };
+  }
+  await settleAddonReversal(storeId, refundId, args);
+  return { refundEventId: refundId, duplicate: false };
+}
+
+/** Settle the pending outside-the-gateway refund row of an InstaPay add-on reversal (guarded on pending, safe to repeat). */
+async function settleAddonReversal(
+  storeId: string,
+  refundId: string,
+  args: { reason: string; actorId: string }
+): Promise<void> {
+  const effects: BillingEffect[] = [];
+  await withStore(storeId, async tx => {
+    await tx.billingEvent.updateMany({
+      where: { id: refundId, storeId, status: 'pending' },
+      data: {
+        raw: {
+          outsideGateway: true,
+          reason: args.reason.slice(0, 500),
+          actorId: args.actorId,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await settleRefundInTx(tx, storeId, refundId, true, undefined, effects, true);
+  });
+  await runBillingEffects(effects);
+  await restoreRevokedGrants().catch(() => undefined);
+}
+
 // ───────────────────────────── read models (UI) ───────────────────────────
 
 const PUBLIC_FIELDS = {
@@ -2681,7 +2890,11 @@ const PUBLIC_FIELDS = {
 export async function listStoreCharges(storeId: string, limit = 50) {
   const rows = await withStore(storeId, tx =>
     tx.billingEvent.findMany({
-      where: { storeId },
+      // the append-only cancel / resume rows are bookkeeping, not charges
+      where: {
+        storeId,
+        OR: [{ planCode: null }, { NOT: { planCode: { startsWith: ADDON_MARKER_PREFIX } } }],
+      },
       orderBy: { createdAt: 'desc' },
       take: Math.min(Math.max(limit, 1), 200),
       select: PUBLIC_FIELDS,

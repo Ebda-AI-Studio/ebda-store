@@ -17,6 +17,7 @@
  *   to UPGRADE_CONTACT_WHATSAPP below. Ahmad can swap the number in one place.
  */
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
@@ -26,8 +27,11 @@ import {
   BRAND,
   lowestPlanForFeature,
   publicPlanLabelForFeature,
+  addonSkuForFeature,
+  formatMoney,
   type FeatureKey,
 } from '@ebda/shared';
+import { apiGet } from '../lib/api';
 
 // ─── Contact constant ─────────────────────────────────────────────────────────
 
@@ -72,6 +76,26 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
   }#plans`;
 
   const upgradeLink = buildUpgradeMailto(storeId, featureName);
+  // A feature the owner can buy outside the plan: the primary path is the Add-ons page, never "contact support".
+  const addonSku = addonSkuForFeature(featureKey);
+  const [addonPrice, setAddonPrice] = useState<number | null>(null);
+  useEffect(() => {
+    // The owner's own price for this one feature ("add just this feature for EGP X a month"); no price, no promise.
+    if (!addonSku) return;
+    let live = true;
+    void apiGet<{ addons: Array<{ sku: string; priceMinor: number }> }>(
+      `/api/v1/stores/${storeId}/billing/addons`
+    ).then(r => {
+      const hit = r.data?.addons.find(a => a.sku === addonSku);
+      if (live && hit) setAddonPrice(hit.priceMinor);
+    });
+    return () => {
+      live = false;
+    };
+  }, [addonSku, storeId]);
+  const addonLink = addonSku
+    ? `/stores/${encodeURIComponent(storeId)}/billing/addons?sku=${encodeURIComponent(addonSku)}`
+    : null;
 
   // Up to 3 sibling features from the same category — same plan gate or higher —
   // shown as an "also included" list to reinforce upsell value.
@@ -161,9 +185,21 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
                 </p>
               )}
 
+              {addonLink && addonPrice !== null && (
+                <p
+                  className="text-sm text-foreground/80 mb-6"
+                  dir={isAr ? 'rtl' : 'ltr'}
+                  data-testid="addon-price-line"
+                >
+                  {t('orAddFeature', {
+                    price: formatMoney(addonPrice, isAr ? 'ar' : 'en', { fixedDecimals: true }),
+                  })}
+                </p>
+              )}
+
               {/* CTA buttons */}
               {/* STORE-QA-25: a feature no sold plan unlocks has no upgrade path. Say so; offer contact only. */}
-              {!planLabel && (
+              {!planLabel && !addonLink && (
                 <p
                   className="text-sm font-medium text-foreground/80 mb-6"
                   dir={isAr ? 'rtl' : 'ltr'}
@@ -173,26 +209,50 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
                 </p>
               )}
               <div className="flex flex-col sm:flex-row gap-3">
+                {addonLink && (
+                  <Link href={addonLink} className="flex-1" data-testid="get-addon-cta">
+                    <Button
+                      type="button"
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 font-semibold"
+                    >
+                      {t('getAddonCta')}
+                    </Button>
+                  </Link>
+                )}
+                {/* Upgrade: the billing page plan picker (card + InstaPay). Only when a sold plan unlocks the feature (STORE-QA-25). */}
                 {planLabel && (
                   <Link href={billingLink} className="flex-1">
                     <Button
                       type="button"
-                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 font-semibold"
+                      variant={addonLink ? 'outline' : undefined}
+                      className={
+                        addonLink
+                          ? 'w-full'
+                          : 'w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 font-semibold'
+                      }
                     >
                       {t('upgradeCta', { plan: planLabel })}
                     </Button>
                   </Link>
                 )}
 
-                <a href={upgradeLink} target="_blank" rel="noopener noreferrer" className="flex-1">
-                  <Button
-                    type="button"
-                    variant={planLabel ? 'outline' : 'default'}
-                    className="w-full"
+                {/* Talk to us: only for plan-only features (a buyable add-on never sends the owner to support) */}
+                {!addonLink && (
+                  <a
+                    href={upgradeLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1"
                   >
-                    {planLabel ? t('contactCta') : t('contactOnlyCta')}
-                  </Button>
-                </a>
+                    <Button
+                      type="button"
+                      variant={planLabel ? 'outline' : 'default'}
+                      className="w-full"
+                    >
+                      {planLabel ? t('contactCta') : t('contactOnlyCta')}
+                    </Button>
+                  </a>
+                )}
               </div>
 
               {/* Sibling features — "also included" upsell list */}

@@ -9,7 +9,9 @@ vi.mock('@api/services/redis.service', () => ({
 }));
 
 const calls = vi.hoisted(() => ({
-  n: { feature: 0, sub: 0, plan: 0, perStore: 0 },
+  n: { feature: 0, sub: 0, plan: 0, addon: 0, perStore: 0 },
+  /** running add-on terms (platform billing_events) by store: `{ planCode, forPeriodEnd }` rows */
+  addons: new Map<string, Array<{ storeId: string; planCode: string; forPeriodEnd: Date }>>(),
   gone: new Set<string>(),
   pgRemoved: true,
   liveAbandoned: true,
@@ -31,6 +33,7 @@ vi.mock('@ebda/database', () => ({
       },
       storeSubscription: { findUnique: async () => null },
       plan: { findUnique: async () => null },
+      billingEvent: { findMany: async () => [] }, // running add-ons (none on the live path here)
     });
   }),
 }));
@@ -55,6 +58,16 @@ vi.mock('@api/lib/platform-db', () => ({
         return [];
       },
     },
+    // running add-on terms of the whole chunk, one statement (billing_events, planCode addon:*)
+    billingEvent: {
+      findMany: async (a: { where: { storeId: { in: string[] }; forPeriodEnd: { gt: Date } } }) => {
+        calls.n.addon++;
+        // the query's own filter: only terms still ahead (ended terms never come back from the database)
+        return a.where.storeId.in
+          .flatMap(id => calls.addons.get(id) ?? [])
+          .filter(r => r.forPeriodEnd > a.where.forPeriodEnd.gt);
+      },
+    },
   }),
 }));
 vi.mock('@api/lib/repo-factory', () => ({
@@ -73,7 +86,8 @@ import { withSweepScope } from '@api/lib/sweep-scope';
 
 describe('feature maps for N stores in a sweep scope', () => {
   beforeEach(() => {
-    calls.n = { feature: 0, sub: 0, plan: 0, perStore: 0 };
+    calls.n = { feature: 0, sub: 0, plan: 0, addon: 0, perStore: 0 };
+    calls.addons.clear();
     calls.gone.clear();
     calls.pgRemoved = true;
     calls.liveAbandoned = true;
@@ -90,6 +104,7 @@ describe('feature maps for N stores in a sweep scope', () => {
       expect(calls.n.feature).toBe(chunks);
       expect(calls.n.sub).toBe(chunks);
       expect(calls.n.plan).toBe(chunks);
+      expect(calls.n.addon).toBe(chunks); // running add-ons: one read per chunk, not one per store
       expect(calls.n.perStore).toBe(0);
     });
   }
@@ -131,5 +146,49 @@ describe('feature maps for N stores in a sweep scope', () => {
       // and invalidateCache drops the prefetched map for the rest of the run
       await featureService.invalidateCache('d1');
     });
+  });
+
+  it('a running add-on term enables its feature in the batched map (an add-on is an entitlement on the sweep path too)', async () => {
+    const day = 86_400_000;
+    calls.addons.set('a1', [
+      {
+        storeId: 'a1',
+        planCode: 'addon:feature:loyalty',
+        forPeriodEnd: new Date(Date.now() + 10 * day),
+      },
+    ]);
+    let selected: string[] = [];
+    await withSweepScope(async () => {
+      await featureService.prefetchStoreFeatures(['a1', 'a2']);
+      selected = await featureService.selectEnabled(['a1', 'a2'], 'loyalty');
+    });
+    expect(selected).toEqual(['a1']); // the store with the paid term; the other free store has none
+    expect(calls.n.addon).toBe(1);
+    expect(calls.n.perStore).toBe(0); // answered from the batch, no per-store fallback
+  });
+
+  it('an add-on term that has ended, or one not started yet (chained), unlocks nothing', async () => {
+    const day = 86_400_000;
+    calls.addons.set('b1', [
+      {
+        storeId: 'b1',
+        planCode: 'addon:feature:loyalty',
+        forPeriodEnd: new Date(Date.now() - day),
+      },
+    ]);
+    calls.addons.set('b2', [
+      // a term chained behind a running one: it starts at forPeriodEnd - 30 days, which is still ahead
+      {
+        storeId: 'b2',
+        planCode: 'addon:feature:loyalty',
+        forPeriodEnd: new Date(Date.now() + 40 * day),
+      },
+    ]);
+    let selected: string[] = ['x'];
+    await withSweepScope(async () => {
+      await featureService.prefetchStoreFeatures(['b1', 'b2']);
+      selected = await featureService.selectEnabled(['b1', 'b2'], 'loyalty');
+    });
+    expect(selected).toEqual([]);
   });
 });

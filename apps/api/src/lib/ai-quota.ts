@@ -1,5 +1,7 @@
 import { resolveAiCaps } from './usage-caps';
-import { prisma } from '@ebda/database';
+import { prisma, withStore } from '@ebda/database';
+import { activeAddons } from '../services/billing/addon-grant';
+import { ADDON_CATALOG } from '../services/billing/addon-catalog';
 import { countAiUsage } from './definer';
 import { AppError } from '../middleware/error-handler';
 import { AI_DISABLED_BY_MERCHANT_CODE, assertStoreAiEnabled } from './store-ai-switch';
@@ -69,6 +71,94 @@ export function isAiQuotaCapError(err: unknown): boolean {
 // Caps live in ./usage-caps (Ruling PLANS-1: 1800/day + 54000/month platform-wide); the routes read them from there too.
 
 /**
+ * The STORE's extra daily AI requests from running paid packs (SELF-SERVICE A9). Staleness class: NEVER-stale
+ * (entitlement) so it is NOT cached: one indexed ledger read per AI call, noise next to a model round trip, and a
+ * pack is usable the moment its payment settles. Only the per-store slice moves; the platform global daily/monthly
+ * caps below never read this, so a pack cannot spend the shared Gemini budget.
+ */
+export async function storeAiExtraRequests(storeId: string, now = new Date()): Promise<number> {
+  const running = await withStore(storeId, tx => activeAddons(tx, storeId, now));
+  return running.reduce((n, r) => n + (ADDON_CATALOG[r.sku]?.aiExtraRequests ?? 0), 0);
+}
+
+/** The platform's daily request cap (Ruling PLANS-1: one platform-wide total from `usage-caps`, not scaled per Gemini key). */
+function platformDailyCap(): number {
+  return resolveAiCaps().dailyCap;
+}
+
+const pct = (env: string | undefined, dflt: number) => {
+  const n = parseInt(env ?? '', 10);
+  return Number.isFinite(n) && n > 0 && n <= 100 ? n : dflt;
+};
+
+/**
+ * Money-abuse audit P6: a pack raises ONE store's limit, but every call still draws on the SHARED platform pool, so one
+ * store on +1000 could drain the day for everyone (Business included). Two ceilings keep that impossible:
+ *  - a store's share: no store (pack or not) may spend more than AI_STORE_MAX_SHARE_PCT (default 50) of the platform day;
+ *  - a pool reserve: requests funded by a pack (past the store's base slice) stop once the platform has used
+ *    AI_TOPUP_POOL_CEILING_PCT (default 70) of its day, so the last 30% stays for base-slice calls of every store.
+ * What cannot be delivered is not sold (`quoteAddon` refuses) and the meter shows the deliverable number.
+ */
+export function maxStoreDailyRequests(): number {
+  const share = Math.floor(
+    (platformDailyCap() * pct(process.env.AI_STORE_MAX_SHARE_PCT, 50)) / 100
+  );
+  return Math.max(baseStoreDailyCap(), share);
+}
+
+function topupPoolCeiling(): number {
+  return Math.floor((platformDailyCap() * pct(process.env.AI_TOPUP_POOL_CEILING_PCT, 70)) / 100);
+}
+
+function baseStoreDailyCap(): number {
+  return resolveAiCaps().storeDailyCap;
+}
+
+/** The multiplier a paid pack puts on the store's own daily limits (1 with no pack); the token budget scales by it. */
+export async function storeAiCapFactor(storeId: string): Promise<number> {
+  return 1 + (await storeAiExtraRequests(storeId)) / baseStoreDailyCap();
+}
+
+const countStoreUsage = (storeId: string, since: Date) =>
+  prisma.aiUsage.count({ where: { storeId, createdAt: { gte: since }, cachedHit: false } });
+
+/**
+ * What used today's AI requests, by feature (the existing `ai_usage` ledger; cached hits cost nothing and are excluded,
+ * exactly as the cap counts them). Bounded read: a day is at most the cap, so the take never truncates real usage.
+ */
+export async function storeAiUsageByFeature(
+  storeId: string
+): Promise<Array<{ feature: string; count: number }>> {
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const rows = await withStore(storeId, tx =>
+    tx.aiUsage.findMany({
+      where: { storeId, createdAt: { gte: startOfDay }, cachedHit: false },
+      select: { feature: true },
+      take: 5000,
+    })
+  );
+  const counts = new Map<string, number>();
+  for (const r of rows) counts.set(r.feature, (counts.get(r.feature) ?? 0) + 1);
+  return [...counts.entries()]
+    .map(([feature, count]) => ({ feature, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/** What the merchant sees in AI settings: base cap, paid extra, used today, remaining. */
+export async function storeAiAllowance(storeId: string) {
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const [extra, used] = await Promise.all([
+    storeAiExtraRequests(storeId),
+    countStoreUsage(storeId, startOfDay),
+  ]);
+  const baseCap = baseStoreDailyCap();
+  const cap = Math.min(baseCap + extra, maxStoreDailyRequests());
+  return { baseCap, extra, cap, used, remaining: Math.max(0, cap - used) };
+}
+
+/**
  * Enforce the platform AI request caps BEFORE spending a Gemini call.
  *
  * Layers (checked in order):
@@ -108,25 +198,40 @@ export async function assertAiQuota(
   // one statement; a per-store fan-out would cost a transaction per store on
   // every AI call. Same precedent as answer-engine/budget.ts.
   // The per-store slice stays on the ambient path — it IS store-filtered.
-  const [[today, thisMonth], storeToday] = await Promise.all([
+  const [[today, thisMonth], storeToday, storeExtra] = await Promise.all([
     Promise.all([
       countAiUsage({ since: startOfDay, cachedHit: false }),
       countAiUsage({ since: startOfMonth, cachedHit: false }),
     ]),
-    opts.storeId
-      ? prisma.aiUsage.count({
-          where: { storeId: opts.storeId, createdAt: { gte: startOfDay }, cachedHit: false },
-        })
-      : Promise.resolve(0),
+    opts.storeId ? countStoreUsage(opts.storeId, startOfDay) : Promise.resolve(0),
+    opts.storeId ? storeAiExtraRequests(opts.storeId) : Promise.resolve(0),
   ]);
 
-  const { dailyCap, monthlyCap, storeDailyCap } = resolveAiCaps();
+  // Caps live in ./usage-caps (Ruling PLANS-1: platform-wide, never scaled by the Gemini key count); a paid pack raises only
+  // the per-store slice, up to the store's maximum share of the platform day.
+  const { dailyCap, monthlyCap, storeDailyCap: baseSlice } = resolveAiCaps();
+  const storeDailyCap = Math.min(baseSlice + storeExtra, maxStoreDailyRequests());
 
   if (opts.storeId && storeToday >= storeDailyCap) {
     throw new AppError(
       429,
       AI_QUOTA_STORE_DAILY_CODE,
-      `This store's daily AI request cap is reached (${storeToday}/${storeDailyCap}). Resets at 00:00 UTC.`
+      `This store's daily AI request cap is reached (${storeToday}/${storeDailyCap}). Resets at 00:00 UTC. Need more? Buy a request pack in Billing > Add-ons.`
+    );
+  }
+
+  // A call past the base slice is funded by a pack: it may only use the pool while the pool is not nearly spent, so a
+  // top-up can never starve the base-slice calls of other stores.
+  if (
+    opts.storeId &&
+    storeExtra > 0 &&
+    storeToday >= baseStoreDailyCap() &&
+    today >= topupPoolCeiling()
+  ) {
+    throw new AppError(
+      429,
+      AI_QUOTA_DAILY_CODE,
+      `The shared AI capacity is busy (${today}/${dailyCap}), so top-up requests pause until it eases or resets at 00:00 UTC.`
     );
   }
 
