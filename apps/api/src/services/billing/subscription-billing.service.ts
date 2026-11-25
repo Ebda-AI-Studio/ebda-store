@@ -152,6 +152,14 @@ const HELD_ROW_PREFIX = 'held:';
  * money already refunded, or apply a credited one twice. A late delivery is recorded + alerted instead (`row_resolved`).
  */
 const RESOLVED_ROW_PREFIX = 'held_resolved:';
+/**
+ * Where-clause fragment (put it in an `AND`) for EVERY bulk write on pending/failed ledger rows: a row carrying a hold
+ * (`held:*`) or a person's decision (`held_resolved:*`) is never touched, so a hold written between a read and the write
+ * is not overwritten (check + write in one statement). A null marker passes; `NOT startsWith` alone would drop nulls.
+ */
+const NOT_HELD = {
+  OR: [{ failureReason: null }, { NOT: { failureReason: { startsWith: 'held' } } }],
+};
 
 /**
  * #627: THE one predicate every settle path goes through (settleInTx). A row with an open hold is never settled, either
@@ -304,7 +312,7 @@ export async function markFailedUnlessSettled(
     id,
     (tx, storeId) =>
       tx.billingEvent.updateMany({
-        where: { id, storeId, status: 'pending' },
+        where: { id, storeId, status: 'pending', AND: [NOT_HELD] },
         data: {
           status: 'failed',
           failureReason: reason,
@@ -678,6 +686,7 @@ export async function settleInTx(
           id: eventId,
           storeId: row.storeId,
           status: { in: ['pending', 'failed'] },
+          AND: [NOT_HELD],
           OR: [
             { failureReason: null },
             { failureReason: { not: SETTLE_LEASE } },
@@ -722,7 +731,12 @@ export async function settleInTx(
       }
     }
     const upd = await tx.billingEvent.updateMany({
-      where: { id: eventId, storeId: row.storeId, status: { in: ['pending', 'failed'] } },
+      where: {
+        id: eventId,
+        storeId: row.storeId,
+        status: { in: ['pending', 'failed'] },
+        AND: [NOT_HELD],
+      },
       data: settled,
     });
     if (upd.count === 0) return { transitioned: false };
@@ -730,7 +744,7 @@ export async function settleInTx(
     return { transitioned: true };
   }
   const upd = await tx.billingEvent.updateMany({
-    where: { id: eventId, storeId: row.storeId, status: 'pending' },
+    where: { id: eventId, storeId: row.storeId, status: 'pending', AND: [NOT_HELD] },
     data: {
       status: 'failed',
       failureReason: o.failureReason ?? 'failed',
@@ -790,7 +804,12 @@ async function holdLedgerRow(
     ...(row.failureReason ? { priorFailureReason: row.failureReason } : {}),
   };
   const marked = await tx.billingEvent.updateMany({
-    where: { id: row.id, storeId: row.storeId, status: { in: ['pending', 'failed'] } },
+    where: {
+      id: row.id,
+      storeId: row.storeId,
+      status: { in: ['pending', 'failed'] },
+      AND: [NOT_HELD],
+    },
     data: { failureReason: `${HELD_ROW_PREFIX}${reason}` },
   });
   // a row that is no longer open (already succeeded) was not held: no queue entry, no alert for a hold that is not there
@@ -1609,6 +1628,7 @@ export async function expireStaleCheckouts(now: Date): Promise<number> {
           type: { in: ['checkout', 'card_setup'] },
           status: 'pending',
           createdAt: { lt: cutoff },
+          AND: [NOT_HELD],
           // a row holding a LIVE D1 settle lease is being paid, not abandoned; a stale lease (its settler died) expires
           OR: [
             { failureReason: null },
@@ -1944,7 +1964,11 @@ export async function applyWebhookEvent(
           where: {
             id: event.merchantOrderId,
             storeId: scopedStoreId,
+            // only THIS provider's own charge row: a foreign/refund row with a guessed id is never marked
+            provider: providerName,
+            type: { not: 'refund' },
             status: { in: ['pending', 'failed'] },
+            AND: [NOT_HELD],
           },
           data: { failureReason: `${HELD_ROW_PREFIX}${reason}` },
         });

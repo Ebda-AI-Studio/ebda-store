@@ -90,9 +90,8 @@ export default function CustomerGroupsPage() {
 
   const openCreate = () => {
     setEditing(null);
-    // First group in an empty store becomes the default — a store with no
-    // default has nowhere to put new customers.
-    setForm({ ...EMPTY_FORM, isDefault: groups.length === 0 });
+    // QA-107: never pre-ticked. A default group auto-enrols EVERY new customer (maybe at a discount); the merchant opts in.
+    setForm({ ...EMPTY_FORM });
     setShowModal(true);
   };
 
