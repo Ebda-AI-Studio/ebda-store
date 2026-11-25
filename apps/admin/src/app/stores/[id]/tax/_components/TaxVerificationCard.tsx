@@ -117,14 +117,14 @@ export function TaxVerificationCard({ storeId, onStatusChange }: Props) {
 
   if (loading) {
     return (
-      <div id="vat-registration" className="rounded-xl border border-border bg-card p-4 mb-4">
+      <div id="vat-registration" className="rounded-md border border-border bg-card p-4 mb-4">
         <p className="text-sm text-muted-foreground">{t('loading')}</p>
       </div>
     );
   }
   if (loadError || !profile) {
     return (
-      <div id="vat-registration" className="rounded-xl border border-border bg-card p-4 mb-4">
+      <div id="vat-registration" className="rounded-md border border-border bg-card p-4 mb-4">
         <p role="alert" className="text-sm text-destructive-ink">
           {t('loadFailed')}
         </p>
@@ -266,7 +266,7 @@ export function TaxVerificationCard({ storeId, onStatusChange }: Props) {
     <section
       id="vat-registration"
       aria-labelledby="vat-registration-title"
-      className="rounded-xl border border-border bg-card p-4 mb-4 space-y-4"
+      className="rounded-md border border-border bg-card p-4 mb-4 space-y-4"
     >
       <div>
         <h2 id="vat-registration-title" className="text-base font-semibold text-foreground">

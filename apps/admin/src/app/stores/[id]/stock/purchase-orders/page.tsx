@@ -8,10 +8,12 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { apiGetPage, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { minorToMajor, formatDate } from '@/lib/format';
 import { withNumerals } from '@ebda/shared';
+import { EmptyState } from '@/components/EmptyState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,14 +32,6 @@ interface PurchaseOrder {
 }
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
-
-const STATUS_CLASSES: Record<string, string> = {
-  draft: 'bg-muted text-foreground',
-  sent: 'bg-info/10 text-info-ink',
-  partial: 'bg-warning/10 text-warning-ink',
-  received: 'bg-success/10 text-success-ink',
-  cancelled: 'bg-destructive/10 text-destructive-ink',
-};
 
 const PER_PAGE = 50;
 
@@ -141,15 +135,7 @@ export default function PurchaseOrdersPage() {
                 header: t('status'),
                 mobileBadge: true,
                 className: 'w-28',
-                cell: po => (
-                  <span
-                    className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                      STATUS_CLASSES[po.status] ?? 'bg-muted text-muted-ink'
-                    }`}
-                  >
-                    {t(`statuses.${po.status}`)}
-                  </span>
-                ),
+                cell: po => <OrderStatusBadge family="purchaseOrder" status={po.status} />,
               },
               {
                 header: t('expectedDate'),
@@ -182,7 +168,17 @@ export default function PurchaseOrdersPage() {
             rows={orders ?? []}
             rowKey={po => po.id}
             onRowClick={po => router.push(`/stores/${storeId}/stock/purchase-orders/${po.id}`)}
-            emptyState={<p className="text-muted-foreground text-sm">{t('emptyState')}</p>}
+            emptyState={
+              <EmptyState
+                card
+                icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                title={t('emptyState')}
+                action={{
+                  label: t('newButton'),
+                  href: `/stores/${storeId}/stock/purchase-orders/new`,
+                }}
+              />
+            }
           />
           <PageControls meta={meta} onPageChange={setPage} />
         </PageState>

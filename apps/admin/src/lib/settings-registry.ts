@@ -216,7 +216,7 @@ export const PAGES: PageEntry[] = [
     feature: 'payment_abandonment',
     syn: { en: 'failed payment abandoned checkout', ar: 'دفع فاشل تخلي' },
   }),
-  page('/lifecycle-emails', `${HUB}.lifecycleEmails`, 'staff', {
+  page('/lifecycle-emails', `${HUB}.lifecycleEmails`, 'owner', {
     syn: {
       en: 'setup emails onboarding trial reminder referral unsubscribe',
       ar: 'رسائل البداية التجربة تذكير إلغاء اشتراك',
@@ -486,6 +486,9 @@ export const PAGES: PageEntry[] = [
   page('/staff', 'staff.page.title', 'owner', {
     feature: 'staff_accounts',
     syn: { en: 'team members roles permissions invite employee', ar: 'موظفين فريق صلاحيات دعوة' },
+  }),
+  page('/activity', 'activity.title', 'owner', {
+    syn: { en: 'audit log history who changed activity', ar: 'سجل نشاط مين غيّر تاريخ' },
   }),
   page('/features', 'features.page.manageTitle', 'super_admin', {
     syn: { en: 'feature flags addons enable', ar: 'مزايا اضافات تفعيل' },

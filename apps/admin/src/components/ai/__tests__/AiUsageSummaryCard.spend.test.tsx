@@ -10,6 +10,8 @@ import { cleanup, render, screen } from '@testing-library/react';
 
 const { apiGet } = vi.hoisted(() => ({ apiGet: vi.fn() }));
 vi.mock('../../../lib/api', () => ({ apiGet }));
+const { auth } = vi.hoisted(() => ({ auth: { role: 'super_admin' } }));
+vi.mock('../../../lib/auth', () => ({ useAuth: () => ({ user: { role: auth.role } }) }));
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => (
     <a href={href}>{children}</a>
@@ -26,6 +28,7 @@ import { AiUsageSummaryCard } from '../AiUsageSummaryCard';
 const base = { today: 3, thisMonth: 40, dailyCap: 100, monthlyCap: 2000, last30Days: [] };
 
 afterEach(() => {
+  auth.role = 'super_admin';
   cleanup();
   vi.clearAllMocks();
 });
@@ -57,5 +60,21 @@ describe('AiUsageSummaryCard spend (issues 2204/2226)', () => {
     await screen.findByText('spendMonth');
     expect(screen.getByText('—')).toBeTruthy();
     expect(screen.queryByText('0')).toBeNull();
+  });
+
+  it('hides the cost-accounting floor caveat from a store owner (A1)', async () => {
+    auth.role = 'store_admin';
+    apiGet.mockResolvedValue({
+      data: {
+        ...base,
+        todayCostMicros: 1_250_000,
+        monthCostMicros: 12_345_600,
+        monthUnpricedCount: 59,
+      },
+      error: null,
+    });
+    render(<AiUsageSummaryCard storeId="s1" />);
+    expect(await screen.findByText('12.3456')).toBeTruthy();
+    expect(screen.queryByText(/spendUnpriced/)).toBeNull();
   });
 });

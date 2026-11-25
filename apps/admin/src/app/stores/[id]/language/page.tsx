@@ -77,7 +77,7 @@ export default function LanguagePage() {
     return (
       <AdminLayout title={t('title')}>
         <div className="animate-pulse space-y-4">
-          <div className="h-40 rounded-xl bg-muted" />
+          <div className="h-40 rounded-md bg-muted" />
         </div>
       </AdminLayout>
     );
@@ -86,7 +86,7 @@ export default function LanguagePage() {
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       <div className="space-y-6 pb-24">
-        <div className="space-y-4 rounded-xl border bg-card p-6 shadow-sm">
+        <div className="space-y-4 rounded-md border bg-card p-6 shadow-sm">
           <div>
             <h2 data-setting-id="language.default" className="font-semibold text-foreground">
               {t('defaultTitle')}
@@ -108,7 +108,7 @@ export default function LanguagePage() {
                   role="radio"
                   aria-checked={selected}
                   onClick={() => setDefaultLanguage(opt.id)}
-                  className={`flex min-h-11 items-center gap-3 rounded-xl border-2 p-4 transition-all ${
+                  className={`flex min-h-11 items-center gap-3 rounded-md border-2 p-4 transition-all ${
                     selected ? 'border-primary bg-primary/5' : 'border-border hover:border-input'
                   }`}
                 >

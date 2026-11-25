@@ -14,6 +14,7 @@ const doStore = {
   store: { findUnique: async () => ({ domain: 'dahab.example', plan: 'growth' }) },
 };
 vi.mock('@api/lib/repo-factory', () => ({
+  requestPlanMemo: (_id: string, fn: () => Promise<unknown>) => fn(),
   storeRepo: async () => ({ backend: 'do', db: doStore }),
   storeDb: async () => doStore,
   storeWriter: async () => {
@@ -75,7 +76,10 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('@api/services/feature.service', () => ({
-  featureService: { isFeatureEnabled: async () => true },
+  featureService: {
+    isFeatureEnabled: async () => true,
+    selectEnabled: async (ids: string[]) => ids,
+  },
 }));
 vi.mock('@api/services/answer-engine/gsc-client', () => ({
   isGscConfigured: () => true,

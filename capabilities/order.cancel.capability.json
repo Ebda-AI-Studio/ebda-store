@@ -18,7 +18,7 @@
   },
   "helpArticle": "orders-and-cod",
   "questions": {
-    "ar": ["الغي الاوردر ده", "العميل عايز يلغي"],
+    "ar": ["الغي الاوردر ده", "العميل عايز يلغي", "ينفع الغي اوردر اتشحن؟"],
     "en": ["Cancel an order"]
   },
   "steps": ["Order > cancel."],
