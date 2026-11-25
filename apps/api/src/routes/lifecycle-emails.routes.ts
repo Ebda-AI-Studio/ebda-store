@@ -18,14 +18,15 @@ const TEST_SEND_ERRORS = {
  * GET /stores/:storeId/lifecycle-emails
  * The merchant's own view of the setup / trial / referral emails Ebda sent them: each kind with
  * `sent | skipped (why) | failed | pending`, and whether they unsubscribed. Read-only. No plan gate:
- * these are onboarding emails for every self-serve store.
+ * these are onboarding emails for every self-serve store. Owner (`store_admin`) and platform support only:
+ * staff never see the setup emails (Ahmad 2026-11-15), mirrored by the hidden tab + registry `owner` access.
  */
 const router = Router({ mergeParams: true });
 
 router.get(
   '/',
   authenticate,
-  authorize('store_admin', 'super_admin', 'staff'),
+  authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

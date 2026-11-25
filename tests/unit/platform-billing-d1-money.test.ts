@@ -57,6 +57,10 @@ import {
   applyWebhookEvent,
   expireStaleCheckouts,
   settleInTx,
+  listHeldBillingWebhooks,
+  resolveHeldBillingWebhook,
+  sweepStuckCharges,
+  maySettle,
 } from '../../apps/api/src/services/billing/subscription-billing.service';
 
 const MIG = PLATFORM_MIGRATION_SQL;
@@ -149,7 +153,10 @@ const hook = (kind = 'charge.succeeded') =>
     eventId: 'wh-1',
     merchantOrderId: EV,
     providerRef: 'ref-1',
-    amountMinor: null,
+    // #627: a success carries its amount and currency (the ledger row bills 1000 EGP)
+    amountMinor: 1000,
+    currency: 'EGP',
+    occurredAt: new Date(),
     failureReason: undefined,
     raw: {},
     customerRef: undefined,
@@ -223,7 +230,7 @@ describe('BILLING-INTERVAL-PENDING-1: a settled card payment drops the InstaPay 
     await settleInTx(
       prisma as never,
       EV,
-      { status: 'succeeded', providerRef: 'r' } as never,
+      { status: 'succeeded', providerRef: 'r', amountSource: 'charge_request' } as never,
       new Date(),
       []
     );
@@ -261,7 +268,7 @@ describe('settle lease', () => {
     const out = await settleInTx(
       prisma as never,
       EV,
-      { status: 'succeeded', providerRef: 'r' } as never,
+      { status: 'succeeded', providerRef: 'r', amountSource: 'charge_request' } as never,
       new Date(),
       effects
     );
@@ -598,7 +605,7 @@ describe('webhooks during the freeze are deferred, not 503d, and applied exactly
     kind: 'charge.succeeded',
     merchantOrderId: EV,
     providerRef: 'ref-9',
-    amountMinor: null,
+    amountMinor: 1000,
     currency: 'EGP',
     failureReason: undefined,
     card: undefined,
@@ -724,5 +731,678 @@ describe('webhooks during the freeze are deferred, not 503d, and applied exactly
     expect(db.prepare('SELECT status FROM billing_events WHERE id = ?').get(EV)).toEqual({
       status: 'succeeded',
     });
+  });
+});
+
+describe('#627: a paid subscription charge we cannot match is HELD, alerted and resolvable, never ignored', () => {
+  const paid = (over: Record<string, unknown> = {}) =>
+    ({ ...(hook() as unknown as Record<string, unknown>), ...over }) as never;
+
+  it.each([
+    ['amount_mismatch', { amountMinor: 900 }],
+    ['currency_mismatch', { currency: 'USD' }],
+    ['amount_missing', { amountMinor: null }],
+    ['currency_missing', { currency: null }],
+  ])(
+    '%s: held with the facts, the ledger row stays pending, a P1 alert goes out',
+    async (reason, over) => {
+      const db = rig();
+      ledger(db);
+      vi.mocked(sendAlert).mockClear();
+      const r = await applyWebhookEvent('stub', paid({ eventId: `wh-${reason}`, ...over }));
+      expect(r).toMatchObject({ duplicate: false, outcome: 'held', detail: reason });
+      expect(db.prepare('SELECT status FROM billing_events WHERE id = ?').get(EV)).toEqual({
+        status: 'pending',
+      });
+      const row = db.prepare('SELECT outcome, detail FROM billing_webhook_events').get() as {
+        outcome: string;
+        detail: string;
+      };
+      expect(row.outcome).toBe('held');
+      expect(JSON.parse(row.detail)).toMatchObject({
+        reason,
+        kind: 'charge.succeeded',
+        merchantOrderId: EV,
+        expectedMinor: 1000,
+        expectedCurrency: 'EGP',
+      });
+      expect(sendAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ level: 'p1', source: `billing.webhook.held.${reason}` })
+      );
+      // a redelivery is a replay: the fact stays held, nothing applies
+      expect(
+        await applyWebhookEvent('stub', paid({ eventId: `wh-${reason}`, ...over }))
+      ).toMatchObject({
+        duplicate: true,
+      });
+    }
+  );
+
+  it('an unknown order is held too (the merchant paid; we have no row to settle)', async () => {
+    rig();
+    const r = await applyWebhookEvent(
+      'stub',
+      paid({ eventId: 'wh-unknown', merchantOrderId: '44444444-4444-4444-8444-444444444444' })
+    );
+    expect(r).toMatchObject({ outcome: 'held', detail: 'unknown_order' });
+  });
+
+  it('a FAILED charge that mismatches is still only ignored (no money moved)', async () => {
+    const db = rig();
+    ledger(db);
+    const r = await applyWebhookEvent(
+      'stub',
+      paid({ eventId: 'wh-fail', kind: 'charge.failed', amountMinor: 900 })
+    );
+    expect(r).toMatchObject({ outcome: 'ignored', detail: 'amount_mismatch' });
+  });
+
+  it('the super-admin queue lists it; resolving moves it out once, with who and why', async () => {
+    const db = rig();
+    ledger(db);
+    await applyWebhookEvent('stub', paid({ eventId: 'wh-q', amountMinor: 900 }));
+    const open = await listHeldBillingWebhooks({ status: 'open' });
+    expect(open).toHaveLength(1);
+    expect(open[0]).toMatchObject({ reason: 'amount_mismatch', gotMinor: 900, status: 'open' });
+    await resolveHeldBillingWebhook({
+      id: open[0].id,
+      actorId: 'admin-1',
+      action: 'refunded',
+      note: 'refunded at Kashier',
+      audit: async () => undefined,
+    });
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(0);
+    const done = await listHeldBillingWebhooks({ status: 'resolved' });
+    expect(done[0]).toMatchObject({
+      resolution: { action: 'refunded', by: 'admin-1', note: 'refunded at Kashier' },
+    });
+    await expect(
+      resolveHeldBillingWebhook({
+        id: open[0].id,
+        actorId: 'a',
+        action: 'credited',
+        note: 'again',
+        audit: async () => undefined,
+      })
+    ).rejects.toMatchObject({ statusCode: 409, code: 'HELD_PAYMENT_NOT_OPEN' });
+  });
+});
+
+describe('#627 review: ONE may-settle predicate on every settle path (a held charge never upgrades the plan later)', () => {
+  const OLD = new Date('2026-01-01T00:00:00Z');
+  const NOW = new Date('2026-01-02T00:00:00Z');
+  const renewal = (db: DatabaseSync, over: Record<string, unknown> = {}) => {
+    db.prepare(
+      `INSERT INTO store_subscriptions (id, store_id, plan_code, status) VALUES ('s1', ?, 'free', 'active')`
+    ).run(STORE);
+    ledger(db, { type: 'renewal', provider_ref: 'ref-1', created_at: OLD.getTime(), ...over });
+  };
+  const gateway = (answer: Record<string, unknown> | null) =>
+    ({
+      name: 'stub',
+      getChargeStatus: async () => answer,
+    }) as never;
+  const plan = (db: DatabaseSync) =>
+    (db.prepare('SELECT plan_code p FROM store_subscriptions').get() as { p: string }).p;
+  const status = (db: DatabaseSync) =>
+    db.prepare('SELECT status s, failure_reason f FROM billing_events WHERE id = ?').get(EV) as {
+      s: string;
+      f: string | null;
+    };
+
+  it('the reviewer repro: billed 1000, signed 900 -> held; the stuck-charge sweep then gets SUCCESS and does NOT upgrade', async () => {
+    const db = rig();
+    renewal(db);
+    const held = await applyWebhookEvent('stub', paid900());
+    expect(held).toMatchObject({ outcome: 'held', detail: 'amount_mismatch' });
+    expect(status(db)).toEqual({ s: 'pending', f: 'held:amount_mismatch' });
+    const out = await sweepStuckCharges(
+      NOW,
+      gateway({
+        status: 'succeeded',
+        chargeId: 'ref-1',
+        raw: {},
+        amountMinor: 1000,
+        currency: 'EGP',
+      })
+    );
+    expect(out.settled).toBe(0);
+    expect(plan(db)).toBe('free');
+    expect(status(db).s).toBe('pending');
+  });
+
+  it('the sweep never settles a SUCCESS that states no amount: the row is held and queued for a person', async () => {
+    const db = rig();
+    renewal(db);
+    vi.mocked(sendAlert).mockClear();
+    const out = await sweepStuckCharges(
+      NOW,
+      gateway({ status: 'succeeded', chargeId: 'ref-1', raw: {} })
+    );
+    expect(out.settled).toBe(0);
+    expect(plan(db)).toBe('free');
+    expect(status(db)).toEqual({ s: 'pending', f: 'held:amount_missing' });
+    const q = await listHeldBillingWebhooks({ status: 'open' });
+    expect(q).toEqual([expect.objectContaining({ reason: 'amount_missing', merchantOrderId: EV })]);
+    expect(sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'billing.webhook.held.amount_missing' })
+    );
+    // the next sweep tick does not queue it twice
+    await sweepStuckCharges(NOW, gateway({ status: 'succeeded', chargeId: 'ref-1', raw: {} }));
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(1);
+  });
+
+  it('the sweep still settles a SUCCESS whose stated amount and currency match the row', async () => {
+    const db = rig();
+    renewal(db);
+    const out = await sweepStuckCharges(
+      NOW,
+      gateway({
+        status: 'succeeded',
+        chargeId: 'ref-1',
+        raw: {},
+        amountMinor: 1000,
+        currency: 'EGP',
+      })
+    );
+    expect(out.settled).toBe(1);
+    expect(status(db).s).toBe('succeeded');
+  });
+
+  it('a FAILED settle (an unreadable card, a declined gateway lookup) never closes a held row either', async () => {
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const r = await settleInTx(
+      prisma as never,
+      EV,
+      { status: 'failed', failureReason: 'payment_method_unreadable' },
+      NOW,
+      []
+    );
+    expect(r).toMatchObject({ transitioned: false, refused: 'held' });
+    expect(status(db)).toEqual({ s: 'pending', f: 'held:amount_mismatch' });
+  });
+
+  it('a later signed delivery on a held row is held too, never processed', async () => {
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const again = await applyWebhookEvent(
+      'stub',
+      paid900({ eventId: 'wh-other', amountMinor: 1000 })
+    );
+    expect(again).toMatchObject({ outcome: 'held', detail: 'row_already_held' });
+    expect(plan(db)).toBe('free');
+  });
+
+  it('maySettle: the rules, one by one', () => {
+    const row = { type: 'renewal', amountMinor: 1000, currency: 'EGP', failureReason: null };
+    expect(maySettle(row, { status: 'succeeded', amountSource: 'charge_request' })).toEqual({
+      ok: true,
+    });
+    expect(maySettle(row, { status: 'succeeded' })).toEqual({
+      ok: false,
+      reason: 'amount_missing',
+    });
+    expect(
+      maySettle(row, { status: 'succeeded', amountSource: 'gateway', amountMinor: 1000 })
+    ).toEqual({ ok: false, reason: 'currency_missing' });
+    expect(
+      maySettle(row, {
+        status: 'succeeded',
+        amountSource: 'gateway',
+        amountMinor: 1000,
+        currency: 'egp',
+      })
+    ).toEqual({ ok: true });
+    expect(maySettle({ ...row, failureReason: 'held:x' }, { status: 'failed' })).toEqual({
+      ok: false,
+      reason: 'held',
+    });
+    expect(
+      maySettle({ ...row, failureReason: 'held_resolved:refunded' }, { status: 'succeeded' })
+    ).toEqual({ ok: false, reason: 'resolved' });
+    expect(maySettle({ ...row, type: 'card_setup' }, { status: 'succeeded' })).toEqual({
+      ok: true,
+    });
+  });
+
+  it.each(['refunded', 'credited'] as const)(
+    'held_resolved is FINAL: hold (SUCCESS, no amount) -> resolve %s -> a late signed webhook is recorded + alerted, never settles',
+    async action => {
+      const db = rig();
+      renewal(db);
+      await sweepStuckCharges(NOW, gateway({ status: 'succeeded', chargeId: 'ref-1', raw: {} }));
+      const [h] = await listHeldBillingWebhooks({ status: 'open' });
+      await resolveHeldBillingWebhook({
+        id: h.id,
+        actorId: 'a',
+        action,
+        note: 'decided',
+        audit: async () => undefined,
+      });
+      expect(status(db)).toEqual({ s: 'failed', f: `held_resolved:${action}` });
+      vi.mocked(sendAlert).mockClear();
+      const late = await applyWebhookEvent(
+        'stub',
+        paid900({ eventId: 'wh-late', amountMinor: 1000 })
+      );
+      expect(late).toMatchObject({ outcome: 'held', detail: 'row_resolved' });
+      expect(status(db)).toEqual({ s: 'failed', f: `held_resolved:${action}` });
+      expect(plan(db)).toBe('free');
+      expect(sendAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ level: 'p1', source: 'billing.webhook.held.row_resolved' })
+      );
+      const q = await listHeldBillingWebhooks({ status: 'open' });
+      expect(q).toEqual([expect.objectContaining({ reason: 'row_resolved', eventId: 'wh-late' })]);
+      // a late AMOUNT-MISMATCHED delivery must not re-open the hold either
+      await applyWebhookEvent('stub', paid900({ eventId: 'wh-late2' }));
+      expect(status(db)).toEqual({ s: 'failed', f: `held_resolved:${action}` });
+      // and the shared predicate / a direct settle refuses too
+      const r = await settleInTx(
+        prisma as never,
+        EV,
+        { status: 'succeeded', amountSource: 'charge_request' },
+        NOW,
+        []
+      );
+      expect(r).toMatchObject({ transitioned: false, refused: 'resolved' });
+      expect(plan(db)).toBe('free');
+    }
+  );
+
+  it('resolve is retriable: a failing LEDGER close leaves the queue entry open; a failing QUEUE close is completed by the retry', async () => {
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const [h] = await listHeldBillingWebhooks({ status: 'open' });
+    const go = () =>
+      resolveHeldBillingWebhook({
+        id: h.id,
+        actorId: 'a',
+        action: 'credited',
+        note: 'credited by hand',
+        audit: async () => undefined,
+      });
+    // step 1 (ledger) throws: nothing is closed, the entry is still OPEN and un-resolved
+    db.exec(
+      `CREATE TRIGGER boom1 BEFORE UPDATE ON billing_events WHEN NEW.failure_reason LIKE 'held_resolved:%' BEGIN SELECT RAISE(ABORT, 'boom1'); END`
+    );
+    await expect(go()).rejects.toThrow();
+    db.exec('DROP TRIGGER boom1');
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(1);
+    expect(status(db)).toEqual({ s: 'pending', f: 'held:amount_mismatch' });
+    // step 2 (queue) throws AFTER the ledger closed: the ledger is final, the entry is still open
+    db.exec(
+      `CREATE TRIGGER boom2 BEFORE UPDATE ON billing_webhook_events WHEN NEW.outcome = 'held_resolved' BEGIN SELECT RAISE(ABORT, 'boom2'); END`
+    );
+    await expect(go()).rejects.toThrow();
+    db.exec('DROP TRIGGER boom2');
+    expect(status(db)).toEqual({ s: 'failed', f: 'held_resolved:credited' });
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(1);
+    // retry completes (idempotent), and a second one is the usual 409
+    await go();
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(0);
+    expect(await listHeldBillingWebhooks({ status: 'resolved' })).toHaveLength(1);
+    expect(plan(db)).toBe('free');
+    await expect(go()).rejects.toMatchObject({ statusCode: 409, code: 'HELD_PAYMENT_NOT_OPEN' });
+  });
+
+  it('a second delivery with a DIFFERENT reason keeps the FIRST hold reason on the row and is recorded in the queue', async () => {
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const second = await applyWebhookEvent(
+      'stub',
+      paid900({ eventId: 'wh-b', amountMinor: 1000, currency: 'USD' })
+    );
+    expect(second).toMatchObject({ outcome: 'held' });
+    expect(status(db)).toEqual({ s: 'pending', f: 'held:amount_mismatch' });
+    const q = await listHeldBillingWebhooks({ status: 'open' });
+    expect(q.map(x => x.eventId).sort()).toEqual(['wh-900', 'wh-b']);
+    expect(q.find(x => x.eventId === 'wh-b')).toMatchObject({ reason: 'currency_mismatch' });
+    expect(q.find(x => x.eventId === 'wh-900')).toMatchObject({ reason: 'amount_mismatch' });
+  });
+
+  it('a hold on an already SUCCEEDED row queues nothing', async () => {
+    const db = rig();
+    renewal(db);
+    db.prepare(`UPDATE billing_events SET status = 'succeeded' WHERE id = ?`).run(EV);
+    vi.mocked(sendAlert).mockClear();
+    const r = await settleInTx(
+      prisma as never,
+      EV,
+      { status: 'succeeded', amountSource: 'gateway' },
+      NOW,
+      []
+    );
+    expect(r).toEqual({ transitioned: false });
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(0);
+  });
+
+  it('the held-at-settle alert names the PROVIDER, not the webhook kind', async () => {
+    const db = rig();
+    renewal(db);
+    vi.mocked(sendAlert).mockClear();
+    await sweepStuckCharges(NOW, gateway({ status: 'succeeded', chargeId: 'ref-1', raw: {} }));
+    expect(sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ provider: 'stub', eventId: `settle:${EV}` }),
+      })
+    );
+  });
+
+  it('resolve: the audit row is written FIRST (a failing audit changes nothing), then the held row is closed', async () => {
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const [h] = await listHeldBillingWebhooks({ status: 'open' });
+    await expect(
+      resolveHeldBillingWebhook({
+        id: h.id,
+        actorId: 'a',
+        action: 'refunded',
+        note: 'refunded at Kashier',
+        audit: async () => {
+          throw new Error('audit down');
+        },
+      })
+    ).rejects.toThrow('audit down');
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(1);
+    const order: string[] = [];
+    await resolveHeldBillingWebhook({
+      id: h.id,
+      actorId: 'a',
+      action: 'refunded',
+      note: 'refunded at Kashier',
+      audit: async () => {
+        order.push('audit');
+        expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(1);
+      },
+    });
+    expect(order).toEqual(['audit']);
+    expect(status(db)).toEqual({ s: 'failed', f: 'held_resolved:refunded' });
+    // and the sweep leaves a resolved row alone
+    await sweepStuckCharges(
+      NOW,
+      gateway({
+        status: 'succeeded',
+        chargeId: 'ref-1',
+        raw: {},
+        amountMinor: 1000,
+        currency: 'EGP',
+      })
+    );
+    expect(plan(db)).toBe('free');
+  });
+
+  // Review of #687 (info): the `charge_request` trust path (the gateway's direct answer to OUR charge of this row's amount).
+  describe('charge_request trust path', () => {
+    const settleAs = (o: Record<string, unknown>) =>
+      settleInTx(
+        prisma as never,
+        EV,
+        {
+          status: 'succeeded',
+          providerRef: 'ref-1',
+          amountSource: 'charge_request',
+          ...o,
+        } as never,
+        NOW,
+        []
+      );
+
+    it('our own charge call that states nothing more settles the row and applies the plan, once', async () => {
+      const db = rig();
+      renewal(db, { type: 'upgrade' }); // an upgrade row: settling it moves the plan free -> basic
+      const r = await settleAs({});
+      expect(r).toMatchObject({ transitioned: true });
+      expect(status(db)).toMatchObject({ s: 'succeeded' });
+      expect(plan(db)).toBe('basic');
+      // a replay of the same answer changes nothing
+      expect(await settleAs({})).toMatchObject({ transitioned: false });
+      expect(plan(db)).toBe('basic');
+    });
+
+    it('a stated amount or currency that disagrees is HELD (queued, P1), never settled on the strength of the call', async () => {
+      for (const [stated, reason] of [
+        [{ amountMinor: 900, currency: 'EGP' }, 'amount_mismatch'],
+        [{ amountMinor: 1000, currency: 'USD' }, 'currency_mismatch'],
+      ] as const) {
+        const db = rig();
+        renewal(db);
+        vi.mocked(sendAlert).mockClear();
+        const r = await settleAs(stated);
+        expect(r).toMatchObject({ transitioned: false, held: expect.objectContaining({ reason }) });
+        expect(status(db)).toEqual({ s: 'pending', f: `held:${reason}` });
+        expect(plan(db)).toBe('free');
+        expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(1);
+      }
+    });
+
+    it('a stated amount and currency that MATCH settle, and the trust path never bypasses an open hold', async () => {
+      const db = rig();
+      renewal(db);
+      expect(await settleAs({ amountMinor: 1000, currency: 'egp' })).toMatchObject({
+        transitioned: true,
+      });
+      const held = rig();
+      renewal(held);
+      await applyWebhookEvent('stub', paid900());
+      expect(await settleAs({})).toMatchObject({ transitioned: false, refused: 'held' });
+      expect(plan(held)).toBe('free');
+    });
+
+    it('maySettle: the rule table for charge_request', () => {
+      const row = { type: 'renewal', amountMinor: 1000, currency: 'EGP', failureReason: null };
+      const may = (o: Record<string, unknown>) =>
+        maySettle(row, { status: 'succeeded', amountSource: 'charge_request', ...o } as never);
+      expect(may({})).toEqual({ ok: true });
+      expect(may({ amountMinor: 1000, currency: 'EGP' })).toEqual({ ok: true });
+      expect(may({ amountMinor: 999 })).toEqual({ ok: false, reason: 'amount_mismatch' });
+      expect(may({ currency: 'USD' })).toEqual({ ok: false, reason: 'currency_mismatch' });
+      // a failure is never judged by amount, and a held row is never settled whatever the source
+      expect(maySettle(row, { status: 'failed', amountSource: 'charge_request' } as never)).toEqual(
+        { ok: true }
+      );
+      expect(
+        maySettle({ ...row, failureReason: 'held:amount_mismatch' }, {
+          status: 'succeeded',
+          amountSource: 'charge_request',
+        } as never)
+      ).toEqual({ ok: false, reason: 'held' });
+    });
+  });
+
+  // Review of #687 (critical): the resolve must never strand a paid merchant. Ledger row first, queue row second, retriable.
+  const heldLedger = (db: DatabaseSync) =>
+    db.prepare('SELECT status s, failure_reason f FROM billing_events WHERE id = ?').get(EV) as {
+      s: string;
+      f: string | null;
+    };
+  const resolveAs = (id: string, action: 'credited' | 'refunded' | 'not_ours') =>
+    resolveHeldBillingWebhook({
+      id,
+      actorId: 'a',
+      action,
+      note: 'checked at Kashier',
+      audit: async () => {},
+    });
+
+  it('a throw BETWEEN the two steps (ledger closed, queue close fails): the hold stays open, the retry completes, nothing is applied twice', async () => {
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const [h] = await listHeldBillingWebhooks({ status: 'open' });
+    // inject the failure exactly at the queue close
+    db.exec(
+      `CREATE TRIGGER fail_queue_close BEFORE UPDATE ON billing_webhook_events WHEN NEW.outcome = 'held_resolved'
+       BEGIN SELECT RAISE(ABORT, 'injected: queue close failed'); END`
+    );
+    await expect(resolveAs(h.id, 'credited')).rejects.toThrow();
+    // the ledger row is already closed (settled for the person), the queue entry is still OPEN and listed: no stranded row
+    expect(heldLedger(db)).toEqual({ s: 'failed', f: 'held_resolved:credited' });
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(1);
+    db.exec('DROP TRIGGER fail_queue_close');
+    await resolveAs(h.id, 'credited'); // the retry
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(0);
+    expect(await listHeldBillingWebhooks({ status: 'resolved' })).toHaveLength(1);
+    expect(heldLedger(db)).toEqual({ s: 'failed', f: 'held_resolved:credited' });
+    // exactly once: resolving applies no plan change (a hand credit is a person's act), and a sweep afterwards still cannot upgrade it
+    expect(plan(db)).toBe('free');
+    expect(db.prepare('SELECT COUNT(*) n FROM billing_events').get()).toEqual({ n: 1 });
+    await sweepStuckCharges(
+      NOW,
+      gateway({
+        status: 'succeeded',
+        chargeId: 'ref-1',
+        raw: {},
+        amountMinor: 1000,
+        currency: 'EGP',
+      })
+    );
+    expect(plan(db)).toBe('free');
+    // and a third click is the usual 409
+    await expect(resolveAs(h.id, 'credited')).rejects.toMatchObject({
+      code: 'HELD_PAYMENT_NOT_OPEN',
+    });
+  });
+
+  it('a queue row an EARLIER build already closed while its ledger row stayed held is resolvable again (not a 409), once, with the same action', async () => {
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const [h] = await listHeldBillingWebhooks({ status: 'open' });
+    // the old order: queue closed first, ledger close never happened
+    db.prepare(
+      `UPDATE billing_webhook_events SET outcome = 'held_resolved', detail = json_set(detail, '$.resolution', json('{"action":"credited","note":"x","by":"a"}')) WHERE id = ?`
+    ).run(h.id);
+    expect(heldLedger(db).f).toBe('held:amount_mismatch'); // stranded shape
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(0);
+    // a DIFFERENT action than the recorded decision is refused and changes nothing
+    await expect(resolveAs(h.id, 'refunded')).rejects.toMatchObject({
+      code: 'HELD_PAYMENT_ACTION_CONFLICT',
+    });
+    expect(heldLedger(db).f).toBe('held:amount_mismatch');
+    await resolveAs(h.id, 'credited');
+    expect(heldLedger(db)).toEqual({ s: 'failed', f: 'held_resolved:credited' });
+    expect(plan(db)).toBe('free');
+    await expect(resolveAs(h.id, 'credited')).rejects.toMatchObject({
+      code: 'HELD_PAYMENT_NOT_OPEN',
+    });
+  });
+
+  it('the held queue goes through ONE platform-aware client, not a bare prisma cast at each call site (review of #687)', async () => {
+    const src = (await import('node:fs')).readFileSync(
+      new URL(
+        '../../apps/api/src/services/billing/subscription-billing.service.ts',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    expect(src).not.toMatch(/prisma as unknown as Tx\)\.billingWebhookEvent/);
+    expect(src).toMatch(/async function heldQueueDb\(\)/);
+    // and it still works end to end on the D1 rig
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const [h] = await listHeldBillingWebhooks({ status: 'open' });
+    await resolveAs(h.id, 'not_ours');
+    expect(await listHeldBillingWebhooks({ status: 'resolved' })).toHaveLength(1);
+  });
+});
+
+function paid900(over: Record<string, unknown> = {}) {
+  return {
+    kind: 'charge.succeeded',
+    eventId: 'wh-900',
+    merchantOrderId: EV,
+    providerRef: 'ref-1',
+    amountMinor: 900,
+    currency: 'EGP',
+    occurredAt: new Date(),
+    failureReason: undefined,
+    raw: {},
+    customerRef: undefined,
+    card: undefined,
+    ...over,
+  } as never;
+}
+
+describe('MONEY-BILL-HELD-2: a hold marker is never overwritten and never marks a row that is not this provider charge', () => {
+  const paid = (over: Record<string, unknown> = {}) =>
+    ({ ...(hook() as unknown as Record<string, unknown>), ...over }) as never;
+  const marker = (db: DatabaseSync, id = EV) =>
+    db.prepare('SELECT status s, failure_reason f FROM billing_events WHERE id = ?').get(id) as {
+      s: string;
+      f: string | null;
+    };
+
+  it('unknown_order: a row of ANOTHER provider is queued but its ledger row is not marked held', async () => {
+    const db = rig();
+    ledger(db, { provider: 'other' });
+    const r = await applyWebhookEvent('stub', paid({ eventId: 'wh-foreign' }));
+    expect(r).toMatchObject({ outcome: 'held', detail: 'unknown_order' });
+    expect(marker(db)).toEqual({ s: 'pending', f: null });
+  });
+
+  it('unknown_order: a REFUND row addressed by a charge webhook is queued but not marked held', async () => {
+    const db = rig();
+    ledger(db, { type: 'refund' });
+    const r = await applyWebhookEvent('stub', paid({ eventId: 'wh-refund-row' }));
+    expect(r).toMatchObject({ outcome: 'held', detail: 'unknown_order' });
+    expect(marker(db)).toEqual({ s: 'pending', f: null });
+  });
+
+  it.each(['held:amount_mismatch', 'held_resolved:refunded'])(
+    'expireStaleCheckouts leaves a row marked %s alone',
+    async failure_reason => {
+      const db = rig();
+      ledger(db, { failure_reason, created_at: Date.now() - 10 * 86_400_000 });
+      expect(await expireStaleCheckouts(new Date())).toBe(0);
+      expect(marker(db)).toEqual({ s: 'pending', f: failure_reason });
+    }
+  );
+
+  it('race: a hold written AFTER maySettle read the row but BEFORE the lease means no settle', async () => {
+    const db = rig();
+    db.prepare(
+      `INSERT INTO store_subscriptions (id, store_id, plan_code, status) VALUES ('s1', ?, 'free', 'active')`
+    ).run(STORE);
+    ledger(db);
+    let injected = false;
+    const be = prisma.billingEvent as unknown as Record<string, unknown>;
+    const tx = {
+      ...prisma,
+      billingEvent: new Proxy(be, {
+        get(target, prop) {
+          const v = target[prop as string];
+          if (prop !== 'updateMany' || typeof v !== 'function') return v;
+          return (args: unknown) => {
+            if (!injected) {
+              injected = true;
+              db.prepare(`UPDATE billing_events SET failure_reason = 'held:amount_mismatch'`).run();
+            }
+            return (v as (a: unknown) => unknown).call(target, args);
+          };
+        },
+      }),
+    };
+    const effects: never[] = [];
+    const out = await settleInTx(
+      tx as never,
+      EV,
+      { status: 'succeeded', providerRef: 'r', amountSource: 'charge_request' } as never,
+      new Date(),
+      effects
+    );
+    expect(injected).toBe(true);
+    expect(out.transitioned).toBe(false);
+    expect(marker(db)).toEqual({ s: 'pending', f: 'held:amount_mismatch' });
+    expect(
+      (db.prepare('SELECT plan_code p FROM store_subscriptions').get() as { p: string }).p
+    ).toBe('free');
+    expect(effects).toEqual([]);
   });
 });
