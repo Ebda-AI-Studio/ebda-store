@@ -6387,7 +6387,8 @@
       "markAllRead": "Mark all read",
       "clear": "Clear",
       "empty": "No notifications yet",
-      "reconnecting": "Reconnecting to notification server…"
+      "reconnecting": "Reconnecting to notification server…",
+      "needsAttention": "Needs your attention"
     },
     "connectionStatus": {
       "testing": "Testing…",
@@ -12601,6 +12602,16 @@
         "error": "I could not apply it. Nothing was changed, try again."
       }
     }
+  },
+  "attention": {
+    "title": "Needs your attention",
+    "subtitle": "Fix these so your store keeps selling.",
+    "info": "For your information",
+    "fix": "Fix now",
+    "view": "Open",
+    "badge": "{count, plural, =1 {{count, number, latn} thing needs your attention} other {{count, number, latn} things need your attention}}",
+    "infoDot": "Has a note for you",
+    "section": "Section needing attention"
   },
   "refundLines": {
     "legend": "Choose what is being refunded or returned",
