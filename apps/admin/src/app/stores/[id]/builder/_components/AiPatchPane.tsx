@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 export interface AiPatchChangeRow {
   op: string;
@@ -85,10 +86,10 @@ export function AiPatchPane({
               <p className="text-xs text-muted-foreground">{t('none')}</p>
             ) : (
               <>
-                <h3 className="text-xs font-semibold text-muted-foreground">{t('changesTitle')}</h3>
+                <h3 className="text-sm font-semibold text-muted-foreground">{t('changesTitle')}</h3>
                 <ul className="space-y-2">
                   {proposal.changes.map((c, i) => (
-                    <li key={i} className="rounded-lg border border-border p-2 text-xs">
+                    <li key={i} className="rounded-lg border border-border p-2 text-sm">
                       <span className="block font-medium">
                         {locale === 'ar' ? c.labelAr : c.labelEn}
                       </span>
@@ -98,11 +99,11 @@ export function AiPatchPane({
                       c.op === 'setSectionHidden' ? (
                         <span className="mt-1 flex flex-wrap items-center gap-1 text-muted-foreground">
                           <span>{t('from')}</span>
-                          <bdi className="rounded bg-muted px-1 line-through decoration-muted-foreground/60">
+                          <bdi className="rounded-md bg-muted px-1 line-through decoration-muted-foreground/60">
                             {show(c.before, c.op, t)}
                           </bdi>
                           <span>{t('to')}</span>
-                          <bdi className="rounded bg-primary/15 px-1 text-foreground">
+                          <bdi className="rounded-md bg-primary/15 px-1 text-foreground">
                             {show(c.after, c.op, t)}
                           </bdi>
                         </span>
@@ -165,7 +166,7 @@ export function AiPatchPane({
               onChange={e => setText(e.target.value)}
               placeholder={t('placeholder')}
               disabled={busy !== null}
-              className="w-full rounded-lg border border-border bg-background p-2 text-sm"
+              className={TEXTAREA_CLASSES}
             />
             <div className="flex flex-wrap gap-2">
               {(['example1', 'example2'] as const).map(k => (

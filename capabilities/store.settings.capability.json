@@ -12,7 +12,8 @@
     "PUT /stores/:storeId",
     "PUT /stores/:storeId/contact",
     "PUT /stores/:storeId/social",
-    "GET /stores/:storeId/stats"
+    "GET /stores/:storeId/stats",
+    "GET /stores/:storeId/attention"
   ],
   "mcpTool": null,
   "planGate": null,

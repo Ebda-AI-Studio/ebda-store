@@ -89,7 +89,7 @@ export default function SettingsClient() {
   async function fetchProfile() {
     try {
       const result = await api.getProfile();
-      if (result.success && result.data) {
+      if (result.success && result.data?.user) {
         setUser(result.data.user);
         setProfileData({
           firstName: result.data.user.firstName || '',
