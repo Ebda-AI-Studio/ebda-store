@@ -984,6 +984,8 @@ export interface MoneyClient {
   >;
   analyticsStock(a: Record<string, never>): Promise<{
     stockValue: number;
+    stockedProducts: number;
+    uncostedProducts: number;
     backorderCount: number;
     backorderValue: number;
   }>;
@@ -1166,7 +1168,12 @@ export interface MoneyClient {
     asOfMs: number;
     startMs?: number | null;
   }): Promise<{ debit: number; credit: number; unmatchedCount: number; unmatchedNet: number }>;
-  stockValue(): Promise<{ value: number; disabledValue: number }>;
+  stockValue(): Promise<{
+    value: number;
+    disabledValue: number;
+    stockedProducts: number;
+    uncostedProducts: number;
+  }>;
   /** Order fan-out claims, refund notification markers and affiliate commission writes (Ruling CF-JOBS-4). */
   orderNotifyClaim(a: { orderId: string }): Promise<{ claimed: boolean }>;
   statusFanoutClaim(a: { orderId: string; status: string }): Promise<{ claimed: boolean }>;

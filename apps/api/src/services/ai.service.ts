@@ -58,6 +58,8 @@ type Feature =
   | 'store-categories'
   // Visual builder Phase 5: a structured, reviewable patch to the store's page document.
   | 'builder-patch'
+  // Review tools (lib/ai/review-tools.ts): translate, spam check on submit, product summary, owner-response draft.
+  | 'reviews'
   // Smart Layer assistant turns (the Ebda assistant side panel): usage is labelled so the meter and the per-feature cost views can tell it apart.
   | 'assistant'
   // Accounting smart layer — called through accounting/gemini-ai.service.ts,

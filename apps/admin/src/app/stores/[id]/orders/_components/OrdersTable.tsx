@@ -160,7 +160,11 @@ export function OrdersTable({
     },
     {
       header: t('table.total'),
-      cell: order => <span className="font-bold text-foreground">{formatPrice(order.total)}</span>,
+      cell: order => (
+        <span className="font-bold text-foreground">
+          {t('table.totalValue', { amount: formatPrice(order.total) })}
+        </span>
+      ),
     },
     {
       header: t('table.status'),

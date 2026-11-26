@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { resolveDefaultLanguage } from '@ebda/shared';
 import { API_URL } from '../lib/api';
 import { hidesFromSearch } from '../lib/hide-from-search';
+import { classifyResolve } from '../lib/store-indexing';
 import { resolveStoreByDomain, StoreTemporarilyUnavailableError } from '../lib/store-resolver';
 import {
   localePathsOn,
@@ -31,6 +32,8 @@ const STORE_STATIC_PAGES: Array<{ path: string; priority: number; freq: 'monthly
 type StoreListEntry = {
   id: string;
   slug: string;
+  /** Store status: a suspended store serves the maintenance page, so its sitemap is a 404 (Ruling ROBOTS-CLOSED-1). */
+  status?: string;
   /** The demo showroom (Ruling B1-14): listed nowhere. */
   isDemo?: boolean;
   /** The merchant switched on "hide from search engines": nothing to submit. */
@@ -80,6 +83,7 @@ async function resolveStoreByHost(host: string): Promise<StoreListEntry | null> 
     return {
       id: store.id,
       slug: store.slug,
+      status: typeof store.status === 'string' ? store.status : undefined,
       isDemo: store.isDemo === true,
       hidden: hidesFromSearch(store),
       defaultLanguage: (store.settings as { defaultLanguage?: string } | undefined)
@@ -298,7 +302,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // not ask" throws (SitemapSourceUnavailableError → 5xx, so Google keeps its
   // last-good copy).
   const tenant = await resolveStoreByHost(storeHost);
-  if (!tenant) notFound();
+  if (!tenant || classifyResolve(200, { status: tenant.status }) === 'closed') notFound();
   // The demo showroom is noindex (Ruling B1-14): nothing to submit.
   // A store hidden from search engines by its merchant lists no URLs either.
   if (tenant.isDemo || tenant.hidden) return [];
