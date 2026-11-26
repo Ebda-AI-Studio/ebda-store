@@ -7,6 +7,7 @@ import { AppError } from '../../middleware/error-handler';
 import logger from '../logger';
 import { assertAiQuota } from '../ai-quota';
 import { rethrowAsAppError } from './gemini-errors';
+import { recordUsage } from '../../services/ai.service';
 import { EGYPTIAN_ARABIC_REGISTER } from './arabic-register';
 import {
   applyPrefilter,
@@ -21,14 +22,37 @@ async function throttle() {
   await new Promise(r => setTimeout(r, ms));
 }
 
+const reviewModelName = () => process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
+
+/**
+ * Every review AI call writes its `ai_usage` row (feature `reviews`), the row `assertAiQuota` counts. Without it these
+ * calls (spam detection runs on EVERY customer review) never counted toward the store's daily slice or the platform
+ * caps (money review, 2026-11-16).
+ */
+async function recordReviewUsage(
+  storeId: string,
+  result: {
+    response: { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } };
+  }
+): Promise<void> {
+  const usage = result.response.usageMetadata;
+  await recordUsage(
+    storeId,
+    'reviews',
+    usage?.promptTokenCount ?? 0,
+    usage?.candidatesTokenCount ?? 0,
+    false,
+    { model: reviewModelName() }
+  );
+}
+
 function getModel() {
   if (!config.googleAiKey) {
     throw new Error('AI_NOT_CONFIGURED: GOOGLE_GENERATIVE_AI_KEY missing');
   }
   const genAI = new GeminiFailoverClient();
-  const modelName = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
   return genAI.getGenerativeModel({
-    model: modelName,
+    model: reviewModelName(),
     generationConfig: { responseMimeType: 'application/json' },
   });
 }
@@ -93,6 +117,7 @@ ${review.body}`;
   } catch (err) {
     rethrowAsAppError(err, 'AI review translation failed');
   }
+  await recordReviewUsage(review.storeId, result);
   const parsed = JSON.parse(stripFences(result.response.text())) as { translated: string };
 
   await (
@@ -141,6 +166,7 @@ export async function detectSpamReview(reviewId: string): Promise<SpamCheckResul
   } catch (err) {
     rethrowAsAppError(err, 'AI review spam detection failed');
   }
+  await recordReviewUsage(review.storeId, result);
   // Fail closed (SEC-2): an unparseable or non-numeric reply is `pending`, never `published`.
   let parsed: { spamScore?: unknown; reasons?: unknown } = {};
   try {
@@ -217,6 +243,7 @@ ${reviewsText}`;
   } catch (err) {
     rethrowAsAppError(err, 'AI review summarization failed');
   }
+  await recordReviewUsage(reviews[0].storeId, result);
   const parsed = JSON.parse(stripFences(result.response.text())) as Omit<
     ReviewSummary,
     'reviewCount'
@@ -287,6 +314,7 @@ Review:
   } catch (err) {
     rethrowAsAppError(err, 'AI owner response draft failed');
   }
+  await recordReviewUsage(review.storeId, result);
   const parsed = JSON.parse(stripFences(result.response.text())) as OwnerResponseDraft;
 
   logger.info({ reviewId }, '[REVIEW-TOOLS] draftOwnerResponse: done');
