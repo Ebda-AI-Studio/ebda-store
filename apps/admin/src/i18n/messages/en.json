@@ -3459,7 +3459,9 @@
       "title": "Store time zone",
       "description": "Your store's one time zone. It decides which calendar day each sale, expense and tax period belongs to in your reports and VAT figures, and it is also the clock your storefront uses: delivery-window cutoffs at checkout and the dates customers see on orders and invoices.",
       "label": "Time zone",
-      "saved": "Time zone saved"
+      "saved": "Time zone saved",
+      "zoneCairo": "Cairo (Egypt time)",
+      "zoneUtc": "Universal time (UTC)"
     },
     "rates": {
       "title": "Tax Rates",
@@ -4572,7 +4574,7 @@
         "REFUND_ALREADY_ISSUED": "A refund for this return was already sent to the payment provider. Check the provider dashboard, then complete the return with \"Already refunded — record only\".",
         "RETURN_ALREADY_COMPLETING": "This return is already being completed. Refresh the page before trying again.",
         "PARTIAL_REFUND_EXCEEDS_PAYMENT": "Part of this payment was already refunded outside this return, so what is left is less than this return is worth. Complete it with store credit or bank transfer and settle the difference with the customer.",
-        "GUEST_STORE_CREDIT": "This is a guest return with no wallet to credit. Refund it to the original method or by bank transfer.",
+        "GUEST_STORE_CREDIT": "Store credit needs a customer account. This order was placed as a guest, so refund it in cash, by bank transfer or manually.",
         "PARTIAL_REFUND_NOTHING_TO_REFUND": "Every item in this return was already refunded by an earlier return.",
         "PAYMENT_FULLY_REFUNDED": "This payment has already been refunded in full.",
         "NO_COMPLETED_PAYMENT": "This order has no online payment to refund. Choose store credit or bank transfer.",
@@ -4592,7 +4594,6 @@
         "OVERRIDE_OUT_OF_RANGE": "The override must be between 0 and the standard refund for that item.",
         "OVERRIDE_UNKNOWN_ITEM": "The override names an item that is not on this return. Reopen the dialog and try again.",
         "FULL_RETURN_RESTOCK_ALL": "Every line of this order is in this return, so every line goes back on the shelf. Open a new return that leaves one unit out if some goods are not coming back to stock.",
-        "GUEST_STORE_CREDIT": "Store credit needs a customer account. This order was placed as a guest, so refund it in cash, by bank transfer or manually.",
         "RETURNS_FEATURE_REQUIRED_FOR_RESTOCK": "Putting refunded goods back on the shelf needs the Returns feature on your plan. Refund again without restocking: the money refund still goes through, only the stock is left alone."
       }
     },
@@ -5034,13 +5035,13 @@
     },
     "sms": {
       "title": "SMS",
-      "subtitle": "SMS via Unifonic",
+      "subtitle": "SMS to your customers",
       "fields": {
-        "appSid": "App key from Unifonic",
+        "appSid": "App key from your SMS provider",
         "senderId": "Sender name the customer sees"
       },
       "placeholders": {
-        "appSid": "The key in your Unifonic account",
+        "appSid": "The key in your SMS provider account",
         "senderId": "e.g. MyStore"
       }
     },
@@ -5326,8 +5327,8 @@
       "retry": "Retry"
     },
     "toggle": {
-      "enabled": "Enabled",
-      "disabled": "Disabled"
+      "enabled": "On",
+      "disabled": "Off"
     },
     "configure": "Configure",
     "cod": {

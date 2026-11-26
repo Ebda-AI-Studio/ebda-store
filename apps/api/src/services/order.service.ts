@@ -529,6 +529,26 @@ function forBackend<const I extends { customer?: unknown }>(onDo: boolean, inclu
   return rest as I;
 }
 
+/**
+ * `id -> nameAr` for a set of product ids, in ONE query selecting only those two columns, keyed on the primary key
+ * (`id IN (...)`, scoped by store): the plan is a PK lookup, so no new index is needed. At most `limit` (<=100) orders
+ * x their lines, de-duplicated.
+ */
+// pq-allow(unused-export): test seam, imported by tests/unit/storeqa-rest-2.test.ts (asserts the query shape)
+export async function productArabicNames(
+  db: { product: { findMany: (args: { where: object; select: object }) => Promise<unknown> } },
+  storeId: string,
+  productIds: Array<string | null | undefined>
+): Promise<Map<string, string>> {
+  const ids = [...new Set(productIds.filter((v): v is string => !!v))];
+  if (ids.length === 0) return new Map();
+  const rows = (await db.product.findMany({
+    where: { storeId, id: { in: ids } },
+    select: { id: true, nameAr: true },
+  })) as Array<{ id: string; nameAr: string | null }>;
+  return new Map(rows.filter(r => r.nameAr).map(r => [r.id, r.nameAr as string]));
+}
+
 export class OrderService {
   /**
    * WHERE clause for the order list and its export. Async because a search
@@ -660,11 +680,26 @@ export class OrderService {
     const pageRows = cursor && ordersRaw.length > limit ? ordersRaw.slice(0, limit) : ordersRaw;
     // QA-D1: the list rows carried only `payments[]`, so a consumer reading `paymentMethod` got null. The
     // method is the provider of the completed payment, else of the newest one (same rule as the detail card).
+    // STORE-QA-8: the line's Arabic name for the list (lines snapshot only the English one). ONE extra read of
+    // `products.nameAr` by primary key for the page's distinct product ids: no join, no include widening.
+    const arNames = await productArabicNames(
+      repo.db,
+      storeId,
+      pageRows.flatMap(o =>
+        ((o as { items?: Array<{ productId?: string | null }> }).items ?? []).map(i => i.productId)
+      )
+    );
     const orders = pageRows.map(o => {
       const pays = ((o as { payments?: Array<{ provider: string; status: string }> }).payments ??
         []) as Array<{ provider: string; status: string }>;
       const chosen = pays.find(p => p.status === 'completed') ?? pays[0];
-      return { ...o, paymentMethod: chosen?.provider ?? null };
+      const items = ((o as { items?: Array<{ productId?: string | null }> }).items ?? []).map(
+        i => ({
+          ...i,
+          product: { nameAr: (i.productId && arNames.get(i.productId)) || null },
+        })
+      );
+      return { ...o, items, paymentMethod: chosen?.provider ?? null };
     });
     const nextCursor =
       cursor && ordersRaw.length > limit ? (ordersRaw[limit] as { id: string }).id : undefined;
@@ -2388,7 +2423,9 @@ export class OrderService {
           // The sale's fiscal document (tax invoice or receipt) with its gap-free
           // serial, in THIS transaction: the order and its number commit or roll
           // back together (ruling MONEYB-1).
-          await FiscalDocumentService.issueSaleDocument(tx, storeId, newOrder.id);
+          await FiscalDocumentService.issueSaleDocument(tx, storeId, newOrder.id, {
+            cod: data.paymentMethod === 'cod',
+          });
 
           // Check for abandoned cart recovery
           try {
@@ -3191,6 +3228,8 @@ export class OrderService {
         triggeredByUserId: null,
         details: { reason: 'cod_collected_on_delivery', orderNumber: order.orderNumber },
       });
+      // COD-RECEIPT-NUMBER-AT-PAYMENT-1: delivered = the cash is collected, so the receipt number is allocated now.
+      await FiscalDocumentService.issueOnCodPayment(storeId, orderId);
       // Same post-payment fan-out as "Mark paid" (journal posting); its
       // notification half is deduped by orderCreatedNotifiedAt.
       void deferAfterTenantCommit('order.codCollectedOnDelivery', () =>
@@ -4086,6 +4125,10 @@ export class OrderService {
         }),
       ]);
     }
+
+    // COD-RECEIPT-NUMBER-AT-PAYMENT-1: the cash is in, so the receipt's gapless serial is allocated now. A Durable Object
+    // store did this inside its own section (codMarkPaid); here it is the Postgres twin (idempotent either way).
+    if (!money) await FiscalDocumentService.issueOnCodPayment(storeId, orderId);
 
     // Append-only audit row for the COD completion.
     await (money ? recordPaymentEventForStore : recordPaymentEvent)({

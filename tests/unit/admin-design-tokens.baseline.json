@@ -242,7 +242,7 @@
     "app/stores/[id]/payment-settings/_components/ActiveMethodsStrip.tsx": 2,
     "app/stores/[id]/payment-settings/_components/GatewayConnectCard.tsx": 7,
     "app/stores/[id]/payment-settings/_components/InstalmentsCard.tsx": 2,
-    "app/stores/[id]/payment-settings/_components/ProviderCard.tsx": 4,
+    "app/stores/[id]/payment-settings/_components/ProviderCard.tsx": 3,
     "app/stores/[id]/payment-settings/page.tsx": 1,
     "app/stores/[id]/products/[productId]/_components/Product3dModelCard.tsx": 5,
     "app/stores/[id]/products/[productId]/edit/_components/EditSidebar.tsx": 1,

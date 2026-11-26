@@ -58,6 +58,7 @@ const INVOICE_LABELS = {
     invoice: 'Invoice',
     taxInvoice: 'Tax invoice',
     receipt: 'Sales receipt',
+    orderConfirmation: 'Order confirmation',
     orderSummary: 'Order summary',
     orderNo: 'Order',
     codFee: 'Cash on delivery fee',
@@ -101,6 +102,7 @@ const INVOICE_LABELS = {
     invoice: 'فاتورة',
     taxInvoice: 'فاتورة ضريبية',
     receipt: 'إيصال بيع',
+    orderConfirmation: 'تأكيد الطلب',
     orderSummary: 'ملخص الطلب',
     orderNo: 'طلب',
     codFee: 'رسوم الدفع عند الاستلام',
@@ -273,14 +275,32 @@ function documentHeading(
   const sale = docs?.sale;
   if (sale?.number) {
     return {
-      title: sale.docType === 'tax_invoice' ? labels.taxInvoice : labels.receipt,
+      // STORE-QA-67: a receipt says money was received. Since COD-RECEIPT-NUMBER-AT-PAYMENT-1 an unpaid COD order has no
+      // RCT- number at all; this guard only covers a legacy COD receipt issued at placement (before that ruling) that is
+      // still unpaid: it prints as an ORDER CONFIRMATION under its number, never a "sales receipt".
+      title:
+        sale.docType === 'tax_invoice'
+          ? labels.taxInvoice
+          : ['paid', 'refunded', 'partially_refunded'].includes(
+                (order as { paymentStatus?: string }).paymentStatus ?? ''
+              )
+            ? labels.receipt
+            : labels.orderConfirmation,
       number: sale.number,
       issuedAt: new Date(sale.issuedAt),
       cancelled: sale.status === 'cancelled',
     };
   }
   return {
-    title: isTax ? labels.taxInvoice : labels.orderSummary,
+    // no sale document: an unpaid order (cash on delivery before collection, COD-RECEIPT-NUMBER-AT-PAYMENT-1) is an ORDER
+    // CONFIRMATION numbered by its order number; the RCT- receipt exists only once the cash is in
+    title: isTax
+      ? labels.taxInvoice
+      : ['paid', 'refunded', 'partially_refunded'].includes(
+            (order as { paymentStatus?: string }).paymentStatus ?? ''
+          )
+        ? labels.orderSummary
+        : labels.orderConfirmation,
     number: `${labels.orderNo} ${order.orderNumber}`,
     issuedAt: new Date(order.createdAt),
     cancelled: false,

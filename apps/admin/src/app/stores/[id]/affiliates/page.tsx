@@ -51,6 +51,7 @@ export default function AffiliatesPage() {
   const storeId = params?.id as string;
   const { success: toastSuccess, error: showError } = useToast();
   const tPage = useT('affiliates.page');
+  const tCloseLabel = useT('common');
   const tTabs = useT('affiliates.tabs');
   const tToasts = useT('affiliates.toasts');
 
@@ -396,6 +397,7 @@ export default function AffiliatesPage() {
               <button
                 type="button"
                 onClick={closeInviteModal}
+                aria-label={tCloseLabel('close')}
                 className="text-muted-foreground hover:text-foreground"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1,5 +1,6 @@
 // Store-side statements for the non-money background jobs (INFRA-CF-1, Ruling CF-JOBS-4). Same rules as job-ops.ts: each is
 // scoped by the `store_id` the DO holds, never by the caller.
+import { issueSaleDocument } from './fiscal';
 import { MoneyError, type SyncSql } from './sync-sql';
 import { orderNetRevenueSql, refundJoinsSql, revenueOrderPredicateSql } from '../revenue';
 import {
@@ -553,6 +554,8 @@ export function codMarkPaidOp(
         "UPDATE orders SET payment_status = 'paid', status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END, updated_at = ?1 WHERE id = ?2 AND store_id = ?3",
         [now, orderId, storeId]
       );
+      // COD-RECEIPT-NUMBER-AT-PAYMENT-1: the cash is in, so the receipt's gapless serial is allocated now (idempotent)
+      issueSaleDocument(db, { storeId, orderId, now });
       updated.push({
         orderId,
         paymentId: p.id as string,

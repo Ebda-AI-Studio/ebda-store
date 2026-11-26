@@ -34,7 +34,7 @@ export function SidebarHeader({
 
   return (
     <>
-      {/* Logo Section */}
+      {/* Logo Section. STORE-QA-28: the logos are decorative (the name is printed beside them), so a screen reader hears the name once. */}
       <div className="flex h-16 items-center gap-3 border-b border-border/50 px-6">
         {isStoreAdminWithBranding && storeBranding?.logo ? (
           // Store Branding Logo
@@ -42,7 +42,8 @@ export function SidebarHeader({
             <div className="flex h-9 w-9 items-center justify-center rounded-md overflow-hidden bg-muted shadow-md">
               <Image
                 src={storeBranding.logo}
-                alt={storeBranding.name}
+                alt=""
+                aria-hidden="true"
                 width={36}
                 height={36}
                 className="h-9 w-9 object-contain"
@@ -65,7 +66,8 @@ export function SidebarHeader({
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gradient-to-br from-primary to-primary/90 shadow-md shadow-sm">
               <Image
                 src="/logo-white.svg"
-                alt={tb('brandAlt')}
+                alt=""
+                aria-hidden="true"
                 width={12}
                 height={22}
                 unoptimized

@@ -179,12 +179,36 @@ describe.skipIf(!hasDb)('fiscal documents — integration', () => {
     expect(payload.lines.map(l => l.kind)).toEqual(['item', 'cod_fee']);
   });
 
-  it('a non-VAT store issues a plain receipt with its own series and no buyer data', async () => {
+  it('a non-VAT COD order gets NO receipt at placement (COD-RECEIPT-NUMBER-AT-PAYMENT-1); the RCT serial comes with the cash', async () => {
+    const before = await prisma.fiscalDocumentCounter.findUnique({
+      where: { storeId_docType: { storeId: plainStore.storeId, docType: 'receipt' } },
+    });
     const order = await checkout(plainStore);
     expect(order.codFee).toBe(1_000);
     expect(order.tax).toBe(0);
-    const [doc] = await docsOf(plainStore.storeId, order.id);
-    expect(doc).toMatchObject({ docType: 'receipt', number: 'RCT-000001', vatAmount: 0 });
+    expect(await docsOf(plainStore.storeId, order.id)).toHaveLength(0);
+    const after = await prisma.fiscalDocumentCounter.findUnique({
+      where: { storeId_docType: { storeId: plainStore.storeId, docType: 'receipt' } },
+    });
+    expect(after?.lastSerial ?? 0).toBe(before?.lastSerial ?? 0); // no serial reserved (gap-free)
+    // collected: the settle path allocates the next gapless serial, once
+    await prisma.order.update({ where: { id: order.id }, data: { paymentStatus: 'paid' } });
+    const settle = () =>
+      runInTenantContext(plainStore.storeId, () =>
+        prisma.$transaction(tx =>
+          FiscalDocumentService.issueSaleDocument(tx, plainStore.storeId, order.id, { cod: true })
+        )
+      );
+    await settle();
+    await settle(); // replay
+    const [doc, ...rest] = await docsOf(plainStore.storeId, order.id);
+    expect(rest).toHaveLength(0);
+    expect(doc).toMatchObject({
+      docType: 'receipt',
+      vatAmount: 0,
+      serial: (before?.lastSerial ?? 0) + 1,
+    });
+    expect(doc.number).toMatch(/^RCT-\d{6}$/);
     expect((doc.payload as { buyer: { name: string } }).buyer.name).toBe('');
   });
 
@@ -303,18 +327,25 @@ describe.skipIf(!hasDb)('fiscal documents — integration', () => {
   });
 
   it('an unpaid cancel keeps the number and marks the document cancelled (no credit note)', async () => {
-    const order = await checkout(plainStore);
+    const order = await checkout(vatStore);
     await prisma.order.update({ where: { id: order.id }, data: { status: 'cancelled' } });
-    await handleOrderRefunded(order.id, plainStore.storeId, true, false, stepStub, undefined, true);
-    const docs = await docsOf(plainStore.storeId, order.id);
+    await handleOrderRefunded(order.id, vatStore.storeId, true, false, stepStub, undefined, true);
+    const docs = await docsOf(vatStore.storeId, order.id);
     expect(docs).toHaveLength(1);
-    expect(docs[0]).toMatchObject({ docType: 'receipt', status: 'cancelled' });
+    expect(docs[0]).toMatchObject({ docType: 'tax_invoice', status: 'cancelled' });
     expect(docs[0].cancelledAt).not.toBeNull();
   });
 
-  it('issued documents are immutable: no edit, no delete', async () => {
+  it('an unpaid COD cancel of a non-VAT order never had a receipt number to cancel', async () => {
     const order = await checkout(plainStore);
-    const [doc] = await docsOf(plainStore.storeId, order.id);
+    await prisma.order.update({ where: { id: order.id }, data: { status: 'cancelled' } });
+    await handleOrderRefunded(order.id, plainStore.storeId, true, false, stepStub, undefined, true);
+    expect(await docsOf(plainStore.storeId, order.id)).toHaveLength(0);
+  });
+
+  it('issued documents are immutable: no edit, no delete', async () => {
+    const order = await checkout(vatStore);
+    const [doc] = await docsOf(vatStore.storeId, order.id);
     await expect(
       prisma.fiscalDocument.update({ where: { id: doc.id }, data: { totalAmount: 1 } })
     ).rejects.toThrow(/immutable/);
@@ -361,6 +392,10 @@ describe.skipIf(!hasDb)('fiscal documents — integration', () => {
     expect(
       await prisma.orderEvent.count({ where: { orderId: delivered.id, toStatus: 'delivered' } })
     ).toBe(1);
+    // delivered = cash collected: the receipt number is allocated now, not at placement
+    const deliveredDocs = await docsOf(plainStore.storeId, delivered.id);
+    expect(deliveredDocs).toHaveLength(1);
+    expect(deliveredDocs[0].number).toMatch(/^RCT-\d{6}$/);
 
     const returned = await checkout(plainStore);
     await prisma.payment.create({
@@ -395,6 +430,7 @@ describe.skipIf(!hasDb)('fiscal documents — integration', () => {
     expect(afterReturn.status).toBe('cancelled');
     expect(afterReturn.paymentStatus).toBe('unpaid');
     expect(afterReturn.payments[0].status).toBe('cancelled');
+    expect(await docsOf(plainStore.storeId, returned.id)).toHaveLength(0); // never paid: never numbered
   });
 
   it('store deletion is refused while money is in flight', async () => {
@@ -426,6 +462,11 @@ describe.skipIf(!hasDb)('fiscal documents — integration', () => {
       where: { id: issued.id },
       data: { status: 'delivered', paymentStatus: 'paid' },
     });
+    await runInTenantContext(s.storeId, () =>
+      prisma.$transaction(tx =>
+        FiscalDocumentService.issueSaleDocument(tx, s.storeId, issued.id, { cod: true })
+      )
+    );
     // A legacy order from before numbering (no document).
     const legacy = await prisma.order.create({
       data: {

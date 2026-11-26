@@ -1,4 +1,4 @@
-import { prisma, type Prisma } from '@ebda/database';
+import { prisma, withStore, type Prisma } from '@ebda/database';
 import { RETENTION_YEARS } from '../config/retention';
 import { priceLineLabel, struckListPrice } from '../lib/order-pricing';
 import { groupOrderLinesForDisplay, mulDivRound, orderAddressLines } from '@ebda/shared';
@@ -304,12 +304,31 @@ function buyerName(order: { shippingAddress: unknown; billingAddress: unknown })
 
 export class FiscalDocumentService {
   /**
+   * COD-RECEIPT-NUMBER-AT-PAYMENT-1: the cash of a cash-on-delivery order was just collected (marked paid, bulk-marked paid
+   * or delivered), so its receipt's gapless serial is allocated now, in its own store-scoped transaction. Idempotent.
+   */
+  static async issueOnCodPayment(storeId: string, orderId: string) {
+    return withStore(storeId, tx =>
+      FiscalDocumentService.issueSaleDocument(tx, storeId, orderId, { cod: true, paid: true })
+    );
+  }
+
+  /**
    * Issue the sale document (tax invoice or receipt) for an order, inside the
    * caller's transaction. Idempotent: an order already holding a sale document
    * gets that one back. Throws (rolling the order back) if the document would
    * not balance — an invoice whose lines do not add up is never issued.
    */
-  static async issueSaleDocument(tx: Prisma.TransactionClient, storeId: string, orderId: string) {
+  static async issueSaleDocument(
+    tx: Prisma.TransactionClient,
+    storeId: string,
+    orderId: string,
+    /**
+     * `cod`: the order is cash on delivery (its payment row may not exist yet at placement). `paid`: the caller has just
+     * collected the cash in a transaction this read may not see yet, so the receipt is due now.
+     */
+    opts: { cod?: boolean; paid?: boolean } = {}
+  ) {
     const existing = await tx.fiscalDocument.findFirst({
       where: { storeId, orderId, docType: { in: [...SALE_TYPES] } },
     });
@@ -331,6 +350,12 @@ export class FiscalDocumentService {
     if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
 
     const isTaxInvoice = !!order.sellerTaxRegistrationNumber;
+    // Ruling COD-RECEIPT-NUMBER-AT-PAYMENT-1: a receipt says money was received. An unpaid cash-on-delivery order gets NO
+    // receipt number at placement (its order number is its confirmation number); the RCT- serial is allocated when the cash is
+    // collected (the settle paths call this again, idempotently). A tax invoice is a tax document, not proof of payment: it
+    // still issues at placement.
+    const isCod = opts.cod === true || order.payments[0]?.provider === 'cod';
+    if (!isTaxInvoice && isCod && !opts.paid && order.paymentStatus !== 'paid') return null;
     const docType = isTaxInvoice ? 'tax_invoice' : 'receipt';
     const { lines, discounts } = buildSaleLines(order);
     const off = documentBalance({

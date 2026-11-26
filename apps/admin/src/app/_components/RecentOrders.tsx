@@ -84,10 +84,15 @@ export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-foreground">
-                    {order.orderNumber || `#${order.id.slice(0, 8).toUpperCase()}`}
+                    <bdi dir="ltr">
+                      {order.orderNumber || `#${order.id.slice(0, 8).toUpperCase()}`}
+                    </bdi>
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {order.customer?.firstName} {order.customer?.lastName} • {order.store?.name}
+                    <bdi>
+                      {order.customer?.firstName} {order.customer?.lastName}
+                    </bdi>{' '}
+                    • <bdi>{order.store?.name}</bdi>
                   </p>
                 </div>
               </div>

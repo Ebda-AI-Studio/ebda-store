@@ -18,6 +18,8 @@ Every order gets a document the moment it is placed:
 - a **Tax invoice** (INV-000001, INV-000002, …) when your store is [verified for VAT](/en/vat-registration/) and the order carries VAT;
 - otherwise a **Sales receipt** (RCT-000001, …) with no VAT wording.
 
+A **cash-on-delivery** order that is not paid yet has no receipt: its order number (ORD-…) is its order confirmation. The **Sales receipt** number is given when the cash is collected (the order is marked paid or delivered), so a receipt always means money was received. A tax invoice is still issued when the order is placed.
+
 Each type has its own series for your store, and the numbers follow each other with **no gaps**: a number is only used when the order really exists. The number is not the order number (ORD-…), which stays as the order's reference.
 
 The document lists every line the customer pays for: the products, the **shipping**, the **cash-on-delivery fee** and any extra amount, then the discounts, the VAT and the total. The lines always add up to the total.
