@@ -91,6 +91,7 @@ import {
   sweepFreeMonthGrants,
 } from './grants.service';
 import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
+import { bustStoreCaches } from '../store.service';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
 import { findReminderCandidates, sendDueReminder } from './reminders.service';
@@ -574,6 +575,9 @@ async function applyFailure(tx: Tx, row: LedgerRow, effects: BillingEffect[]): P
   // features on `stores`. Repeat the (idempotent) tier write.
   if (sub?.status === 'canceled' && sub.planCode === FREE_PLAN_CODE && (await onD1())) {
     await applyPlan(tx, row.storeId, FREE_PLAN_CODE);
+    // A tier write is a plan write: the effect clears the public store payload and the feature list in every layer
+    // (billing-notify -> bustStoreCaches; RESOLVE-SWR-1). Without it this repair left the paid payload cached.
+    effects.push({ kind: 'plan_changed', storeId: row.storeId });
     return;
   }
   if (
@@ -3881,9 +3885,16 @@ export async function reconcilePlanTiers(
   let repaired = 0;
   for (const d of drift) {
     try {
-      await withStore(d.storeId, tx =>
-        storeUpdate(tx, { where: { id: d.storeId }, data: { plan: d.tier as never } })
-      );
+      const row = await withStore(d.storeId, async tx => {
+        await storeUpdate(tx, { where: { id: d.storeId }, data: { plan: d.tier as never } });
+        return tx.store.findUnique({
+          where: { id: d.storeId },
+          select: { slug: true, domain: true },
+        });
+      });
+      // The tier decides `enabledFeatures` in the public store payload, so a repair is a plan write like any other
+      // (RESOLVE-SWR-1): clear its caches in every layer, not only the row.
+      if (row) await bustStoreCaches(d.storeId, row.slug, row.domain);
       repaired++;
     } catch (err) {
       logger.error({ err, storeId: d.storeId }, '[billing] plan tier repair failed');

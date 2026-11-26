@@ -14,7 +14,7 @@
  * data — including after A's response was cached — and an unknown host asked
  * right after a known one is a 404 (no stale store).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
@@ -219,7 +219,7 @@ vi.mock('@api/lib/logger', () => ({
 
 import publicRoutes from '@api/routes/public.routes';
 import { errorHandler } from '@api/middleware/error-handler';
-import { invalidateCachedPrefix } from '@api/lib/public-cache';
+import { invalidateCachedPrefix, invalidateCached } from '@api/lib/public-cache';
 import { invalidateStoreDirectory } from '@api/lib/store-directory';
 
 function buildApp() {
@@ -466,5 +466,52 @@ describe('GET /public/stores/:slugOrId', () => {
     const res = await request(app).get('/public/stores/newcomer');
     expect(res.status).toBe(200);
     expect(res.body.data.store.id).toBe('store-n');
+  });
+});
+
+// RESOLVE-SWR-1: the resolved payload is served stale-while-revalidate (120 s soft age, 600 s hard max). A write of a
+// NEVER-stale field is cleared by its bust, so a bust is never followed by the old payload, at any age.
+/** Lets an un-awaited background refresh (in-memory mocks only, no real I/O) run to its end. */
+const settleRefresh = async () => {
+  for (let i = 0; i < 20; i++) await new Promise(r => setImmediate(r));
+};
+
+describe('GET /public/store/resolve: stale-while-revalidate, NEVER-stale cleared by the bust', () => {
+  const HOST = 'amelia.ebda.app';
+  const KEY = 'public:store:resolve:amelia.ebda.app';
+  let clock: number;
+  beforeEach(() => {
+    clock = 1_700_000_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+  });
+  afterEach(() => vi.restoreAllMocks());
+  const suspend = () => {
+    world.stores = (world.stores as StoreRow[]).map(s =>
+      s.id === STORE_A.id ? { ...s, status: 'suspended' as const } : s
+    );
+  };
+  const status = async () => (await resolve(HOST)).body.data.store.status as string;
+
+  it('past the soft age the cached payload is served at once and refreshed behind the response', async () => {
+    expect(await status()).toBe('active');
+    clock += 200_000;
+    suspend(); // a write that was NOT busted (the BOUNDED-stale case the window is for)
+    expect(await status()).toBe('active'); // stale, served without waiting on the refill
+    await settleRefresh();
+    expect(await status()).toBe('suspended'); // the background refresh landed
+  });
+
+  it('a suspension followed by its bust is served as suspended at every age, never the cached active payload', async () => {
+    for (const ageMs of [0, 119_000, 200_000, 590_000]) {
+      redisData.clear();
+      await invalidateCachedPrefix('');
+      world.stores = [STORE_A, STORE_B];
+      expect(await status()).toBe('active'); // cache the ACTIVE payload
+      clock += ageMs;
+      suspend(); // the write ...
+      await invalidateStoreDirectory(STORE_A.id, STORE_A.slug, STORE_A.domain);
+      await invalidateCached(KEY); // ... and what bustStoreCaches does to the resolve key
+      expect(await status(), `age ${ageMs} ms`).toBe('suspended');
+    }
   });
 });

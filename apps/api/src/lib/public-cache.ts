@@ -7,6 +7,7 @@ import { isWorkers } from './runtime';
 import { dropEdgeGensMemo } from './edge-gens-memo';
 import { cfWaitUntil } from '../cf/bindings';
 import { currentIoTally } from './io-tally';
+import logger from './logger';
 
 /**
  * Public-route response cache. Used by the storefront-facing endpoints
@@ -241,6 +242,103 @@ export async function getCached<T>(
 }
 
 /**
+ * STALE-WHILE-REVALIDATE read (Ruling RESOLVE-SWR-1). Same two layers, same generation guard as `getCached`; the difference
+ * is only WHEN an entry is considered usable:
+ *
+ *   age <= softSeconds                 served as is (what `getCached` does until its TTL)
+ *   softSeconds < age <= hardSeconds   served STALE at once, and ONE background refresh runs (single-flight per key,
+ *                                      waitUntil on Workers); the next read gets the fresh value
+ *   age > hardSeconds                  the entry is gone (the layer's TTL is the hard max): a synchronous fill, as before
+ *
+ * Why: a cache miss on the public store payload cost 3-8 s (Logpush, 2026-11-15) and every shopper after an idle gap paid
+ * it. With a stale window the shopper almost never pays the fill.
+ *
+ * STALENESS CLASS, declared here as the rules require: only what changed WITHOUT an event can be served stale, and only
+ * for at most `hardSeconds` (BOUNDED-stale). Anything that is NEVER-stale (store status / suspension, plan and the feature
+ * list it implies, slug, domain, deletion) is cleared by EVENT, not by this window: every writer calls `bustStoreCaches`
+ * (services/store.service.ts), which goes through `invalidateCached`: bump the key's generation FIRST, then delete the entry
+ * from KV and memory. A deleted entry cannot be served stale, and a refresh that began before the write cannot republish its
+ * pre-write value (it captured the generation first and skips its write when the generation moved, exactly as a fill does).
+ * `tests/unit/store-directory-bust-coverage.test.ts` fails when a writer of those columns has no bust.
+ *
+ * RESIDUAL (Ruling RESOLVE-SWR-1b, accepted): a KV delete takes up to ~60 s to reach other data centres, so a just-busted
+ * entry can still be READ elsewhere for that long, with or without a stale window. Reads only; writes never use this cache.
+ * Cost if wrong: a suspended store's pages stay browsable for ~60 s; no sale can complete.
+ *
+ * Entries written before this shape existed (a bare value, no envelope) are read as an ordinary TTL entry.
+ * A failed background refresh keeps serving the stale copy until the hard max, then the synchronous fill surfaces the error.
+ */
+const SWR_MARK = '__swr1';
+interface SwrEnvelope<T> {
+  __swr1: 1;
+  at: number;
+  data: T;
+}
+function isSwrEnvelope(v: unknown): v is SwrEnvelope<unknown> {
+  return (
+    !!v &&
+    typeof v === 'object' &&
+    (v as Record<string, unknown>)[SWR_MARK] === 1 &&
+    typeof (v as Record<string, unknown>).at === 'number'
+  );
+}
+const swrRefreshing = new Set<string>();
+
+export async function getCachedSwr<T>(
+  key: string,
+  softSeconds: number,
+  hardSeconds: number,
+  fetchFn: () => Promise<T>,
+  opts: { cacheIf?: (data: T) => boolean } = {}
+): Promise<T> {
+  const got = await getCached<SwrEnvelope<T> | T>(
+    key,
+    hardSeconds,
+    async () => ({ __swr1: 1 as const, at: Date.now(), data: await fetchFn() }),
+    {
+      cacheIf: v => (isSwrEnvelope(v) ? (opts.cacheIf ? opts.cacheIf(v.data as T) : true) : true),
+    }
+  );
+  if (!isSwrEnvelope(got)) return got as T;
+  if (Date.now() - got.at > softSeconds * 1000)
+    refreshInBackground(key, hardSeconds, fetchFn, opts);
+  return got.data as T;
+}
+
+function refreshInBackground<T>(
+  key: string,
+  hardSeconds: number,
+  fetchFn: () => Promise<T>,
+  opts: { cacheIf?: (data: T) => boolean }
+): void {
+  if (swrRefreshing.has(key)) return;
+  swrRefreshing.add(key);
+  const run: Promise<void> = (async () => {
+    const genNames = generationNamesFor(key);
+    const localBefore = readLocalGens(genNames);
+    const sharedBefore = await readSharedGens(genNames);
+    const data = await retryTransientRead(fetchFn, { label: `swr:${key.split(':')[1] ?? key}` });
+    if (opts.cacheIf && !opts.cacheIf(data)) return;
+    const env: SwrEnvelope<T> = { __swr1: 1, at: Date.now(), data };
+    if (sharedBefore !== null) {
+      // A write that landed while this refresh was reading has bumped the generation: our value predates it, drop it.
+      if ((await readSharedGens(genNames)) !== sharedBefore) return;
+      await redis.set(key, JSON.stringify(env), hardSeconds);
+      if ((await readSharedGens(genNames)) !== sharedBefore) await redis.delete(key);
+    } else if (!isWorkers && readLocalGens(genNames) === localBefore) {
+      memoryCache.set(key, { data: env, expiresAt: Date.now() + hardSeconds * 1000 });
+    }
+  })()
+    .catch(err => {
+      logger.warn({ err, key }, '[public-cache] background refresh failed; serving the stale copy');
+    })
+    .finally(() => {
+      swrRefreshing.delete(key);
+    });
+  if (isWorkers) cfWaitUntil(run);
+}
+
+/**
  * Invalidate a cached entry from BOTH Redis and the in-memory fallback.
  * Without this, a write on the admin side leaves the storefront
  * serving stale rows until the TTL expires (60s for store, 120s for
@@ -252,6 +350,7 @@ export async function invalidateCached(key: string): Promise<void> {
   await bumpGeneration(key);
   // A caller arriving after the write must not join a pre-write fetch.
   inFlight.delete(key);
+  swrRefreshing.delete(key);
   try {
     await redis.delete(key);
   } catch {
@@ -274,6 +373,9 @@ export async function invalidateCachedPrefix(prefix: string): Promise<void> {
   await bumpGeneration(generationNameForPrefix(prefix));
   for (const key of inFlight.keys()) {
     if (key.startsWith(prefix)) inFlight.delete(key);
+  }
+  for (const key of swrRefreshing) {
+    if (key.startsWith(prefix)) swrRefreshing.delete(key);
   }
   for (const key of memoryCache.keys()) {
     if (key.startsWith(prefix)) memoryCache.delete(key);
