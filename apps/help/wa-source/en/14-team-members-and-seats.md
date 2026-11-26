@@ -1,3 +1,11 @@
+---
+capabilities:
+  - access.roles@1
+  - team.seat-assign@1
+  - team.seat-remove@1
+  - team.seats-view@1
+---
+
 # Your team and seats in Ebda Chat
 
 Your package says how many people can work in Ebda Chat, **you included**: "Chat 300 AI replies" and Store-included 2, "Chat 1,500 AI replies" 5, "Chat 5,000 AI replies" 15. You decide who gets the seats.

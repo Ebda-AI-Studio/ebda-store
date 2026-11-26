@@ -8,7 +8,34 @@ import {
   withMoneyTx,
   SlugEntityType,
   withStore,
+  ambientScope,
 } from '@ebda/database';
+
+/**
+ * INV-AUDIT-3: a Postgres-store stock write records its movement row, the same row the StoreDO op writes (type, reason, actor =
+ * the request's user). A change that changes nothing writes nothing.
+ */
+async function recordPgStockMovements(
+  storeId: string,
+  moves: Array<{ productId: string; previous: number; next: number }>,
+  opts: { type?: 'initial' | 'adjustment'; reason?: string } = {}
+): Promise<void> {
+  const rows = moves.filter(m => m.previous !== m.next);
+  if (rows.length === 0) return;
+  await prisma.inventoryHistory.createMany({
+    data: rows.map(m => ({
+      productId: m.productId,
+      storeId,
+      type: opts.type ?? 'adjustment',
+      quantity: m.next - m.previous,
+      previousStock: m.previous,
+      newStock: m.next,
+      reason: opts.reason ?? 'Bulk inventory update',
+      reference: null,
+      createdBy: ambientScope().userId ?? null,
+    })),
+  });
+}
 import { assertBarcodeAvailable, ensureBarcode, parseBarcodeOrThrow } from './barcode.service';
 import { AppError } from '../middleware/error-handler';
 import { effectiveInventory, enrichStockFlags } from '../lib/effective-inventory';
@@ -1012,6 +1039,8 @@ export class ProductService {
           productIds: [product.id],
           mode: 'set',
           value: data.inventory,
+          type: 'initial',
+          reason: 'Opening stock',
         });
         (product as { inventory?: number }).inventory = data.inventory;
       } catch (err) {
@@ -1020,6 +1049,13 @@ export class ProductService {
         throw err;
       }
     }
+
+    if (data.inventory && !openingStockOnDo)
+      await recordPgStockMovements(
+        storeId,
+        [{ productId: product.id, previous: 0, next: data.inventory }],
+        { type: 'initial', reason: 'Opening stock' }
+      );
 
     // BARCODE-1: no barcode typed -> the store's next in-store EAN-13 (when inventory.barcode is on).
     // A product that later gets variants carries its codes on the variants.
@@ -1464,7 +1500,7 @@ export class ProductService {
   }
 
   static async updateInventory(storeId: string, productId: string, quantity: number) {
-    await this.getById(storeId, productId);
+    const before = await this.getById(storeId, productId);
 
     const doStock = await storeStock(storeId);
     if (doStock) {
@@ -1476,6 +1512,9 @@ export class ProductService {
       where: { id: productId, storeId },
       data: { inventory: quantity },
     });
+    await recordPgStockMovements(storeId, [
+      { productId, previous: (before as { inventory: number }).inventory, next: quantity },
+    ]);
 
     await this.invalidateStoreProductCache(storeId);
 
@@ -1696,15 +1735,25 @@ export class ProductService {
           where: { storeId, id: { in: simpleIds }, deletedAt: null },
           data: { inventory: qty },
         });
+        await recordPgStockMovements(
+          storeId,
+          simpleProducts.map(p => ({ productId: p.id, previous: p.inventory, next: qty }))
+        );
       } else {
         // adjust: add delta, floor at 0.
         // Run in chunks of 20 to avoid pool exhaustion.
         await runChunked(simpleProducts, 20, p => {
           const newQty = Math.max(0, p.inventory + Math.round(value));
-          return prisma.product.update({
-            where: { id: p.id, storeId },
-            data: { inventory: newQty },
-          });
+          return prisma.product
+            .update({
+              where: { id: p.id, storeId },
+              data: { inventory: newQty },
+            })
+            .then(() =>
+              recordPgStockMovements(storeId, [
+                { productId: p.id, previous: p.inventory, next: newQty },
+              ])
+            );
         });
       }
     }

@@ -37,6 +37,7 @@ vi.mock('@ebda/database', () => ({
   },
   Prisma: { sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }) },
   withRlsBypass: vi.fn(),
+  ambientScope: () => ({ userId: 'user-1' }), // the audit row's createdBy (INV-AUDIT-3)
   withMoneyTx: h.withMoneyTx,
   afterTxCommit: () => false, // no hook registry: notifyAfterCommit notifies immediately
 }));

@@ -219,7 +219,9 @@ ol {
 }
 .ta-list mark {
   background: transparent;
-  color: var(--gold);
+  color: var(
+    --accent-text
+  ); /* gold text is 3.1:1 on white; accent-text is 5.1:1 on the raised row (AA needs 4.5:1) */
   font-weight: 600;
 }
 .ta-all {

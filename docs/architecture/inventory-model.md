@@ -140,6 +140,18 @@ Every stock writer follows this shape: checkout, refund restore, the
 payment-failure rollback, PO receive, stock adjustments, the backorder-line
 cancel's debt heal.
 
+**A snapshot never overwrites live stock** (INV-AUDIT-1). A stock adjustment draft and a cycle-count line
+carry a quantity captured earlier; on the StoreDO, posting applies the DELTA (`delta_qty`; for a count line the
+variance counted - system-at-scan) to the live row inside the single-writer section and writes the ledger row from
+the live before/after. A post that would take live stock below zero is refused with 409 `STALE_SNAPSHOT` and the
+draft stays open.
+
+**Every stock write has a movement row** (INV-AUDIT-3). On the StoreDO each function that changes a stock quantity
+(grid, warehouse set, bulk edit, opening stock, CSV import, gold variants, adjustments, sales, restocks) writes an
+`inventory_history` row with reason and actor in the same section; unchanged values write none. The actor is the caller's
+`userId` or the request scope's user. `packages/repo/test/stock-movement-guard.test.ts` discovers stock writers from the
+source and fails when a new one has no movement row.
+
 Consequences worth stating explicitly:
 
 - **`InventoryHistory` has no `variantId`** (it is keyed on `productId`). For a
@@ -183,6 +195,10 @@ product.costPrice`. Order lines snapshot it at sale time
   (`reorder-scan.service.ts`, step 1b). The per-unit metrics (sales, on
   order, backlog) are per variant; the last-PO supplier and its lead time are
   product-level and looked up once per product per scan (issue 2344).
+  **Velocity is demand, not revenue** (INV-AUDIT-4): the 7/28-day sales count every
+  order that is not `cancelled`/`refunded` whatever its payment status (a COD
+  order stays `unpaid` until delivery settles it), net of units taken back by
+  COMPLETED returns (`sumOrderQty`). Revenue definitions are unchanged.
 - **Reorder rules have one writer** (M-107). `ReorderRule` (min qty, reorder
   qty, lead time, safety days, preferred supplier) is created, edited and
   deleted only through `reorder-rules.routes.ts`
