@@ -3,6 +3,11 @@ import { prisma } from '@ebda/database';
 import { countAiUsage } from './definer';
 import { AppError } from '../middleware/error-handler';
 import { AI_DISABLED_BY_MERCHANT_CODE, assertStoreAiEnabled } from './store-ai-switch';
+import { reserveStoreSlot, type StoreSlot } from './ai-store-reservation';
+
+/** The caller's hold on the store's daily slice; release it in a `finally` once the model call is over. */
+type AiQuotaSlot = Pick<StoreSlot, 'release'>;
+const NO_SLOT: AiQuotaSlot = { release: async () => undefined };
 
 export const AI_QUOTA_DAILY_CODE = 'AI_QUOTA_DAILY_EXCEEDED';
 export const AI_QUOTA_MONTHLY_CODE = 'AI_QUOTA_MONTHLY_EXCEEDED';
@@ -86,11 +91,31 @@ export function isAiQuotaCapError(err: unknown): boolean {
  * global caps (backward compatible).
  */
 export async function assertAiQuota(
-  opts: { storeId?: string; bulk?: boolean } = {}
-): Promise<void> {
+  opts: { storeId?: string; bulk?: boolean; reserve?: boolean } = {}
+): Promise<AiQuotaSlot> {
   // The merchant's own switch comes first: off means no AI spend at all for this store.
   if (opts.storeId) await assertStoreAiEnabled(opts.storeId);
 
+  // Reserve the store's slice BEFORE counting (issue #845, ai-store-reservation.ts): the rows are written after the
+  // model call, so a count alone lets concurrent calls all pass at cap-1. A refusal gives the slot straight back; an
+  // accepted call's slot is released by `recordUsage` once its row exists.
+  // `reserve: false` = a check-only probe (no model call follows, e.g. queue-depth-watch, or an outer pre-check
+  // whose generator reserves itself): it counts, holds nothing.
+  const slot = opts.storeId && opts.reserve !== false ? await reserveStoreSlot(opts.storeId) : null;
+  try {
+    await checkQuota(opts, slot?.inFlight ?? 1);
+  } catch (err) {
+    await slot?.release();
+    throw err;
+  }
+  return slot ?? NO_SLOT;
+}
+
+async function checkQuota(
+  opts: { storeId?: string; bulk?: boolean },
+  /** Slots in flight for the store, this call included (1 when the atomic counter is unavailable). */
+  inFlight: number
+): Promise<void> {
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
   const startOfMonth = new Date();
@@ -122,11 +147,11 @@ export async function assertAiQuota(
 
   const { dailyCap, monthlyCap, storeDailyCap } = resolveAiCaps();
 
-  if (opts.storeId && storeToday >= storeDailyCap) {
+  if (opts.storeId && storeToday + inFlight > storeDailyCap) {
     throw new AppError(
       429,
       AI_QUOTA_STORE_DAILY_CODE,
-      `This store's daily AI request cap is reached (${storeToday}/${storeDailyCap}). Resets at 00:00 UTC.`
+      `This store's daily AI request cap is reached (${storeToday + inFlight - 1}/${storeDailyCap}). Resets at 00:00 UTC.`
     );
   }
 

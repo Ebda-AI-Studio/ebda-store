@@ -203,33 +203,36 @@ const bulkAiCategorizeFn = inngest.createFunction(
               }
 
               try {
-                await assertAiQuota({ storeId, bulk: true });
+                const aiSlot = await assertAiQuota({ storeId, bulk: true });
+                try {
+                  const matches = await callWithRetry(
+                    () =>
+                      suggestProductCategory(
+                        {
+                          storeId,
+                          storeName,
+                          product: { name: product.name, description: product.description },
+                          existingCategories,
+                        },
+                        apiKey,
+                        MODEL
+                      ),
+                    `categorize:${product.id}`
+                  );
 
-                const matches = await callWithRetry(
-                  () =>
-                    suggestProductCategory(
-                      {
-                        storeId,
-                        storeName,
-                        product: { name: product.name, description: product.description },
-                        existingCategories,
-                      },
-                      apiKey,
-                      MODEL
-                    ),
-                  `categorize:${product.id}`
-                );
-
-                const best = matches[0];
-                if (!best) {
-                  bSkipped++;
-                } else {
-                  await (
-                    await storeWriter(storeId)
-                  ).productCategory.create({
-                    data: { productId: product.id, categoryId: best.id, position: 0 },
-                  });
-                  bFilled++;
+                  const best = matches[0];
+                  if (!best) {
+                    bSkipped++;
+                  } else {
+                    await (
+                      await storeWriter(storeId)
+                    ).productCategory.create({
+                      data: { productId: product.id, categoryId: best.id, position: 0 },
+                    });
+                    bFilled++;
+                  }
+                } finally {
+                  await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
                 }
               } catch (err) {
                 if (isAiQuotaCapError(err)) {

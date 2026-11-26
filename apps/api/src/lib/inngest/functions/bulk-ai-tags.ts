@@ -205,53 +205,56 @@ const bulkAiTagsFn = inngest.createFunction(
             }
 
             try {
-              await assertAiQuota({ storeId, bulk: true });
+              const aiSlot = await assertAiQuota({ storeId, bulk: true });
+              try {
+                const suggested = await callWithRetry(
+                  () =>
+                    suggestProductTags(
+                      {
+                        storeId,
+                        storeName,
+                        product: { name: product.name, description: product.description },
+                        existingTagNames,
+                      },
+                      apiKey,
+                      MODEL
+                    ),
+                  `tags:${product.id}`
+                );
 
-              const suggested = await callWithRetry(
-                () =>
-                  suggestProductTags(
-                    {
-                      storeId,
-                      storeName,
-                      product: { name: product.name, description: product.description },
-                      existingTagNames,
-                    },
-                    apiKey,
-                    MODEL
-                  ),
-                `tags:${product.id}`
-              );
+                // Resolve each suggested name to a tag id, creating new Tag rows
+                // only when no case-insensitive match already exists.
+                const toLink: string[] = [];
+                for (const name of suggested) {
+                  if (toLink.length >= remainingSlots) break;
+                  const key = name.toLowerCase();
+                  let tagId = tagByLowerName.get(key);
+                  if (!tagId) {
+                    const created = await (
+                      await storeWriter(storeId)
+                    ).tag.create({ data: { storeId, name } });
+                    tagId = created.id;
+                    tagByLowerName.set(key, tagId);
+                    existingTagNames.push(name);
+                  }
+                  if (!currentTagIds.has(tagId) && !toLink.includes(tagId)) {
+                    toLink.push(tagId);
+                  }
+                }
 
-              // Resolve each suggested name to a tag id, creating new Tag rows
-              // only when no case-insensitive match already exists.
-              const toLink: string[] = [];
-              for (const name of suggested) {
-                if (toLink.length >= remainingSlots) break;
-                const key = name.toLowerCase();
-                let tagId = tagByLowerName.get(key);
-                if (!tagId) {
-                  const created = await (
+                if (toLink.length === 0) {
+                  bSkipped++;
+                } else {
+                  await (
                     await storeWriter(storeId)
-                  ).tag.create({ data: { storeId, name } });
-                  tagId = created.id;
-                  tagByLowerName.set(key, tagId);
-                  existingTagNames.push(name);
+                  ).productTag.createMany({
+                    data: toLink.map(tagId => ({ productId: product.id, tagId })),
+                    skipDuplicates: true,
+                  });
+                  bFilled++;
                 }
-                if (!currentTagIds.has(tagId) && !toLink.includes(tagId)) {
-                  toLink.push(tagId);
-                }
-              }
-
-              if (toLink.length === 0) {
-                bSkipped++;
-              } else {
-                await (
-                  await storeWriter(storeId)
-                ).productTag.createMany({
-                  data: toLink.map(tagId => ({ productId: product.id, tagId })),
-                  skipDuplicates: true,
-                });
-                bFilled++;
+              } finally {
+                await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
               }
             } catch (err) {
               if (isAiQuotaCapError(err)) {

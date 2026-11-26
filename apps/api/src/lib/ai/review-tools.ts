@@ -84,25 +84,29 @@ export async function translateReview(reviewId: string): Promise<void> {
 Review:
 ${review.body}`;
 
-  await assertAiQuota({ storeId: review.storeId });
-  await throttle();
-
-  let result;
+  const aiSlot = await assertAiQuota({ storeId: review.storeId });
   try {
-    result = await getModel().generateContent(prompt);
-  } catch (err) {
-    rethrowAsAppError(err, 'AI review translation failed');
+    await throttle();
+
+    let result;
+    try {
+      result = await getModel().generateContent(prompt);
+    } catch (err) {
+      rethrowAsAppError(err, 'AI review translation failed');
+    }
+    const parsed = JSON.parse(stripFences(result.response.text())) as { translated: string };
+
+    await (
+      await storeWriter(review.storeId)
+    ).review.update({
+      where: { id: reviewId, storeId: review.storeId },
+      data: { bodyTranslated: parsed.translated, bodyTranslatedAt: new Date() },
+    });
+
+    logger.info({ reviewId, target }, '[REVIEW-TOOLS] translateReview: done');
+  } finally {
+    await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
   }
-  const parsed = JSON.parse(stripFences(result.response.text())) as { translated: string };
-
-  await (
-    await storeWriter(review.storeId)
-  ).review.update({
-    where: { id: reviewId, storeId: review.storeId },
-    data: { bodyTranslated: parsed.translated, bodyTranslatedAt: new Date() },
-  });
-
-  logger.info({ reviewId, target }, '[REVIEW-TOOLS] translateReview: done');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -132,32 +136,36 @@ export async function detectSpamReview(reviewId: string): Promise<SpamCheckResul
   const boundary = `REVIEW_${randomUUID().replace(/-/g, '')}`;
   const prompt = buildSpamPrompt(review, boundary);
 
-  await assertAiQuota({ storeId: review.storeId });
-  await throttle();
-
-  let result;
+  const aiSlot = await assertAiQuota({ storeId: review.storeId });
   try {
-    result = await getModel().generateContent(prompt);
-  } catch (err) {
-    rethrowAsAppError(err, 'AI review spam detection failed');
-  }
-  // Fail closed (SEC-2): an unparseable or non-numeric reply is `pending`, never `published`.
-  let parsed: { spamScore?: unknown; reasons?: unknown } = {};
-  try {
-    parsed = JSON.parse(stripFences(result.response.text())) as typeof parsed;
-  } catch {
-    logger.warn({ reviewId }, '[REVIEW-TOOLS] detectSpamReview: unparseable reply -> pending');
-  }
+    await throttle();
 
-  const { score, status } = scoreToStatus(parsed?.spamScore);
-  const recommendedStatus = applyPrefilter(status, pre);
-  const reasons = [...sanitizeReasons(parsed?.reasons), ...pre.reasons];
+    let result;
+    try {
+      result = await getModel().generateContent(prompt);
+    } catch (err) {
+      rethrowAsAppError(err, 'AI review spam detection failed');
+    }
+    // Fail closed (SEC-2): an unparseable or non-numeric reply is `pending`, never `published`.
+    let parsed: { spamScore?: unknown; reasons?: unknown } = {};
+    try {
+      parsed = JSON.parse(stripFences(result.response.text())) as typeof parsed;
+    } catch {
+      logger.warn({ reviewId }, '[REVIEW-TOOLS] detectSpamReview: unparseable reply -> pending');
+    }
 
-  logger.info(
-    { reviewId, score, recommendedStatus, prefiltered: pre.holdForHuman },
-    '[REVIEW-TOOLS] detectSpamReview: done'
-  );
-  return { spamScore: score, reasons, recommendedStatus };
+    const { score, status } = scoreToStatus(parsed?.spamScore);
+    const recommendedStatus = applyPrefilter(status, pre);
+    const reasons = [...sanitizeReasons(parsed?.reasons), ...pre.reasons];
+
+    logger.info(
+      { reviewId, score, recommendedStatus, prefiltered: pre.holdForHuman },
+      '[REVIEW-TOOLS] detectSpamReview: done'
+    );
+    return { spamScore: score, reasons, recommendedStatus };
+  } finally {
+    await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -208,25 +216,29 @@ Each theme should be a short phrase (3-7 words) summarizing what multiple review
 Reviews:
 ${reviewsText}`;
 
-  await assertAiQuota({ storeId: reviews[0].storeId });
-  await throttle();
-
-  let result;
+  const aiSlot = await assertAiQuota({ storeId: reviews[0].storeId });
   try {
-    result = await getModel().generateContent(prompt);
-  } catch (err) {
-    rethrowAsAppError(err, 'AI review summarization failed');
-  }
-  const parsed = JSON.parse(stripFences(result.response.text())) as Omit<
-    ReviewSummary,
-    'reviewCount'
-  >;
+    await throttle();
 
-  logger.info(
-    { productId, reviewCount: reviews.length, sentiment: parsed.overallSentiment },
-    '[REVIEW-TOOLS] summarizeProductReviews: done'
-  );
-  return { ...parsed, reviewCount: reviews.length };
+    let result;
+    try {
+      result = await getModel().generateContent(prompt);
+    } catch (err) {
+      rethrowAsAppError(err, 'AI review summarization failed');
+    }
+    const parsed = JSON.parse(stripFences(result.response.text())) as Omit<
+      ReviewSummary,
+      'reviewCount'
+    >;
+
+    logger.info(
+      { productId, reviewCount: reviews.length, sentiment: parsed.overallSentiment },
+      '[REVIEW-TOOLS] summarizeProductReviews: done'
+    );
+    return { ...parsed, reviewCount: reviews.length };
+  } finally {
+    await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -278,17 +290,21 @@ Review:
 - title: ${review.title ?? '(none)'}
 - body: ${review.body}`;
 
-  await assertAiQuota({ storeId: review.storeId });
-  await throttle();
-
-  let result;
+  const aiSlot = await assertAiQuota({ storeId: review.storeId });
   try {
-    result = await getModel().generateContent(prompt);
-  } catch (err) {
-    rethrowAsAppError(err, 'AI owner response draft failed');
-  }
-  const parsed = JSON.parse(stripFences(result.response.text())) as OwnerResponseDraft;
+    await throttle();
 
-  logger.info({ reviewId }, '[REVIEW-TOOLS] draftOwnerResponse: done');
-  return parsed;
+    let result;
+    try {
+      result = await getModel().generateContent(prompt);
+    } catch (err) {
+      rethrowAsAppError(err, 'AI owner response draft failed');
+    }
+    const parsed = JSON.parse(stripFences(result.response.text())) as OwnerResponseDraft;
+
+    logger.info({ reviewId }, '[REVIEW-TOOLS] draftOwnerResponse: done');
+    return parsed;
+  } finally {
+    await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
+  }
 }

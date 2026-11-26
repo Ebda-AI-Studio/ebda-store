@@ -420,27 +420,28 @@ const bulkAiRecommendationsFn = inngest.createFunction(
             }
 
             try {
-              await assertAiQuota({ storeId, bulk: true });
+              const aiSlot = await assertAiQuota({ storeId, bulk: true });
+              try {
+                const desc = (product.description ?? '').slice(0, 300);
+                const candidates = catalogIndex
+                  .filter(c => c.id !== productId)
+                  .slice(0, CANDIDATE_SLICE);
+                const productCategory =
+                  catalogIndex.find(c => c.id === productId)?.category ?? null;
 
-              const desc = (product.description ?? '').slice(0, 300);
-              const candidates = catalogIndex
-                .filter(c => c.id !== productId)
-                .slice(0, CANDIDATE_SLICE);
-              const productCategory = catalogIndex.find(c => c.id === productId)?.category ?? null;
+                const fbt = (coPurchase.get(productId) ?? [])
+                  .filter(p => nameById.has(p.productId))
+                  .map(p => ({
+                    productId: p.productId,
+                    name: nameById.get(p.productId)!,
+                    coOrders: p.coOrders,
+                  }));
+                const fbtBlock =
+                  fbt.length > 0
+                    ? `\nFrequently bought together (REAL co-purchase data — customers ordered these in the SAME order as the source product; higher coOrders = stronger signal). Prioritise these when they fit as complements:\n${JSON.stringify(fbt)}\n`
+                    : '';
 
-              const fbt = (coPurchase.get(productId) ?? [])
-                .filter(p => nameById.has(p.productId))
-                .map(p => ({
-                  productId: p.productId,
-                  name: nameById.get(p.productId)!,
-                  coOrders: p.coOrders,
-                }));
-              const fbtBlock =
-                fbt.length > 0
-                  ? `\nFrequently bought together (REAL co-purchase data — customers ordered these in the SAME order as the source product; higher coOrders = stronger signal). Prioritise these when they fit as complements:\n${JSON.stringify(fbt)}\n`
-                  : '';
-
-              const prompt = `You recommend complementary products for an e-commerce store. Pick the ${RECS_PER_PRODUCT} catalog products that are most likely to be bought TOGETHER with the source product (genuine cross-sells / bundles / accessories — NOT substitutes or near-duplicates).
+                const prompt = `You recommend complementary products for an e-commerce store. Pick the ${RECS_PER_PRODUCT} catalog products that are most likely to be bought TOGETHER with the source product (genuine cross-sells / bundles / accessories — NOT substitutes or near-duplicates).
 
 Ranking priority:
 1. Products in the "Frequently bought together" list below — these are real co-purchases and should rank highest when they make sense as complements.
@@ -462,65 +463,71 @@ Output schema: [{"productId":"<id from candidate list>","score":0.0,"reason":"<o
 
 Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by descending score (strongest complement first).`;
 
-              const genResult = await callWithRetry(
-                () => model.generateContent(prompt),
-                `recommendations:${product.id}`
-              ).catch((err: unknown) => rethrowAsAppError(err, 'AI recommendations sweep failed'));
-              const usage = genResult.response.usageMetadata;
-              await recordUsage(
-                storeId,
-                'recommendations',
-                usage?.promptTokenCount ?? 0,
-                usage?.candidatesTokenCount ?? 0,
-                false
-              );
-              const raw = genResult.response.text();
-              let parsed: LlmRec[];
+                const genResult = await callWithRetry(
+                  () => model.generateContent(prompt),
+                  `recommendations:${product.id}`
+                ).catch((err: unknown) =>
+                  rethrowAsAppError(err, 'AI recommendations sweep failed')
+                );
+                const usage = genResult.response.usageMetadata;
+                await recordUsage(
+                  storeId,
+                  'recommendations',
+                  usage?.promptTokenCount ?? 0,
+                  usage?.candidatesTokenCount ?? 0,
+                  false
+                );
+                const raw = genResult.response.text();
+                let parsed: LlmRec[];
 
-              try {
-                parsed = parseAiJson<LlmRec[]>(raw);
-              } catch {
-                throw new Error('LLM returned unparseable JSON');
-              }
+                try {
+                  parsed = parseAiJson<LlmRec[]>(raw);
+                } catch {
+                  throw new Error('LLM returned unparseable JSON');
+                }
 
-              if (!Array.isArray(parsed)) {
-                throw new Error('LLM response is not a JSON array');
-              }
+                if (!Array.isArray(parsed)) {
+                  throw new Error('LLM response is not a JSON array');
+                }
 
-              const validIdSet = new Set(catalogIndex.map(c => c.id));
-              const validRecs = parsed
-                .filter(
-                  (r): r is LlmRec =>
-                    r !== null &&
-                    typeof r === 'object' &&
-                    typeof r.productId === 'string' &&
-                    validIdSet.has(r.productId) &&
-                    r.productId !== product.id
-                )
-                .slice(0, RECS_PER_PRODUCT);
+                const validIdSet = new Set(catalogIndex.map(c => c.id));
+                const validRecs = parsed
+                  .filter(
+                    (r): r is LlmRec =>
+                      r !== null &&
+                      typeof r === 'object' &&
+                      typeof r.productId === 'string' &&
+                      validIdSet.has(r.productId) &&
+                      r.productId !== product.id
+                  )
+                  .slice(0, RECS_PER_PRODUCT);
 
-              if (validRecs.length === 0) {
-                bSkipped++;
-              } else {
-                // replace this product's rows as ONE atomic batch (Postgres: the writer is `prisma`, the batch one
-                // transaction; DO: one `mutate` RPC). A re-delivery replaces the same rows again, so it is idempotent.
-                const rw = await storeWriter(storeId);
-                await rw.$transaction([
-                  rw.aiRecommendation.deleteMany({
-                    where: { storeId, sourceProductId: product.id },
-                  }),
-                  rw.aiRecommendation.createMany({
-                    data: validRecs.map(r => ({
-                      storeId,
-                      sourceProductId: product.id,
-                      targetProductId: r.productId,
-                      score: typeof r.score === 'number' ? Math.max(0, Math.min(1, r.score)) : 0.5,
-                      reason: typeof r.reason === 'string' ? r.reason.slice(0, 500) : null,
-                    })),
-                    skipDuplicates: true,
-                  }),
-                ]);
-                bFilled++;
+                if (validRecs.length === 0) {
+                  bSkipped++;
+                } else {
+                  // replace this product's rows as ONE atomic batch (Postgres: the writer is `prisma`, the batch one
+                  // transaction; DO: one `mutate` RPC). A re-delivery replaces the same rows again, so it is idempotent.
+                  const rw = await storeWriter(storeId);
+                  await rw.$transaction([
+                    rw.aiRecommendation.deleteMany({
+                      where: { storeId, sourceProductId: product.id },
+                    }),
+                    rw.aiRecommendation.createMany({
+                      data: validRecs.map(r => ({
+                        storeId,
+                        sourceProductId: product.id,
+                        targetProductId: r.productId,
+                        score:
+                          typeof r.score === 'number' ? Math.max(0, Math.min(1, r.score)) : 0.5,
+                        reason: typeof r.reason === 'string' ? r.reason.slice(0, 500) : null,
+                      })),
+                      skipDuplicates: true,
+                    }),
+                  ]);
+                  bFilled++;
+                }
+              } finally {
+                await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
               }
             } catch (err) {
               if (isAiQuotaCapError(err)) {

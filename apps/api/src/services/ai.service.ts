@@ -523,42 +523,46 @@ export class AIService {
       return { translation: hit, cached: true };
     }
 
-    await assertAiQuota({ storeId: input.storeId });
-    await checkBudget(input.storeId);
-
-    const lengthHint =
-      input.kind === 'meta-title'
-        ? ` Stay under ${META_TITLE_MAX} characters.`
-        : input.kind === 'meta-description'
-          ? ` Stay under ${META_DESCRIPTION_MAX} characters.`
-          : '';
-
-    const systemInstruction = TRANSLATE_INSTRUCTION;
-
-    const userPrompt = `Translate from ${input.from === 'en' ? 'English' : 'Arabic'} to ${
-      input.to === 'en' ? 'English' : 'Arabic'
-    }. Kind: ${input.kind}.${lengthHint}\n\nSource:\n${trimmed}`;
-
-    const model = getClient().getGenerativeModel({ model: MODEL, systemInstruction });
-    let res;
+    const aiSlot = await assertAiQuota({ storeId: input.storeId });
     try {
-      res = await model.generateContent(userPrompt);
-    } catch (err) {
-      rethrowAsAppError(err, 'AI translation failed');
+      await checkBudget(input.storeId);
+
+      const lengthHint =
+        input.kind === 'meta-title'
+          ? ` Stay under ${META_TITLE_MAX} characters.`
+          : input.kind === 'meta-description'
+            ? ` Stay under ${META_DESCRIPTION_MAX} characters.`
+            : '';
+
+      const systemInstruction = TRANSLATE_INSTRUCTION;
+
+      const userPrompt = `Translate from ${input.from === 'en' ? 'English' : 'Arabic'} to ${
+        input.to === 'en' ? 'English' : 'Arabic'
+      }. Kind: ${input.kind}.${lengthHint}\n\nSource:\n${trimmed}`;
+
+      const model = getClient().getGenerativeModel({ model: MODEL, systemInstruction });
+      let res;
+      try {
+        res = await model.generateContent(userPrompt);
+      } catch (err) {
+        rethrowAsAppError(err, 'AI translation failed');
+      }
+      const translation = res.response.text().trim();
+
+      const usage = res.response.usageMetadata;
+      await recordUsage(
+        input.storeId,
+        'translate',
+        usage?.promptTokenCount ?? 0,
+        usage?.candidatesTokenCount ?? 0,
+        false
+      );
+
+      await redis.set(key, translation, CACHE_TTL_SECONDS);
+      return { translation, cached: false };
+    } finally {
+      await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
     }
-    const translation = res.response.text().trim();
-
-    const usage = res.response.usageMetadata;
-    await recordUsage(
-      input.storeId,
-      'translate',
-      usage?.promptTokenCount ?? 0,
-      usage?.candidatesTokenCount ?? 0,
-      false
-    );
-
-    await redis.set(key, translation, CACHE_TTL_SECONDS);
-    return { translation, cached: false };
   }
 
   /**
@@ -585,68 +589,72 @@ export class AIService {
       return { suggestion: JSON.parse(hit) as SeoSuggestion, cached: true };
     }
 
-    await assertAiQuota({ storeId: input.storeId });
-    await checkBudget(input.storeId);
+    const aiSlot = await assertAiQuota({ storeId: input.storeId });
+    try {
+      await checkBudget(input.storeId);
 
-    const systemInstruction = SEO_INSTRUCTION;
+      const systemInstruction = SEO_INSTRUCTION;
 
-    const detailLines = [
-      `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
-      `Kind: ${input.kind}`,
-      `Name: ${input.entityName}${input.entityNameAr ? ` / ${input.entityNameAr}` : ''}`,
-      input.entityDescription && `Description: ${input.entityDescription}`,
-      input.entityDescriptionAr && `Description (AR): ${input.entityDescriptionAr}`,
-      input.categoryNames?.length && `Categories: ${input.categoryNames.join(', ')}`,
-    ].filter(Boolean);
+      const detailLines = [
+        `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
+        `Kind: ${input.kind}`,
+        `Name: ${input.entityName}${input.entityNameAr ? ` / ${input.entityNameAr}` : ''}`,
+        input.entityDescription && `Description: ${input.entityDescription}`,
+        input.entityDescriptionAr && `Description (AR): ${input.entityDescriptionAr}`,
+        input.categoryNames?.length && `Categories: ${input.categoryNames.join(', ')}`,
+      ].filter(Boolean);
 
-    const userPrompt = `Generate SEO meta:\n\n${detailLines.join('\n')}`;
+      const userPrompt = `Generate SEO meta:\n\n${detailLines.join('\n')}`;
 
-    const model = getClient().getGenerativeModel({
-      model: MODEL,
-      systemInstruction,
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-    // One retry when the model puts the wrong language in a field (BE:F-4); every attempt is metered.
-    let parsed: SeoSuggestion | null = null;
-    for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
-      let res;
-      try {
-        res = await model.generateContent(userPrompt);
-      } catch (err) {
-        rethrowAsAppError(err, 'AI SEO generation failed');
-      }
-      const raw = stripJsonFences(res.response.text());
-
-      const candidate: SeoSuggestion = parseAiJson(seoSuggestionSchema, raw, {
-        storeId: input.storeId,
-        kind: 'SEO',
+      const model = getClient().getGenerativeModel({
+        model: MODEL,
+        systemInstruction,
+        generationConfig: { responseMimeType: 'application/json' },
       });
+      // One retry when the model puts the wrong language in a field (BE:F-4); every attempt is metered.
+      let parsed: SeoSuggestion | null = null;
+      for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
+        let res;
+        try {
+          res = await model.generateContent(userPrompt);
+        } catch (err) {
+          rethrowAsAppError(err, 'AI SEO generation failed');
+        }
+        const raw = stripJsonFences(res.response.text());
 
-      const usage = res.response.usageMetadata;
-      await recordUsage(
-        input.storeId,
-        'seo',
-        usage?.promptTokenCount ?? 0,
-        usage?.candidatesTokenCount ?? 0,
-        false
-      );
-      if (seoLanguagesOk(candidate, [input.entityName, input.storeName])) parsed = candidate;
-      else
-        logger.warn(
-          { storeId: input.storeId, kind: input.kind, attempt },
-          '[AI] SEO suggestion had the wrong language in a field'
+        const candidate: SeoSuggestion = parseAiJson(seoSuggestionSchema, raw, {
+          storeId: input.storeId,
+          kind: 'SEO',
+        });
+
+        const usage = res.response.usageMetadata;
+        await recordUsage(
+          input.storeId,
+          'seo',
+          usage?.promptTokenCount ?? 0,
+          usage?.candidatesTokenCount ?? 0,
+          false
         );
-    }
-    if (!parsed) {
-      throw new AppError(
-        422,
-        'AI_WRONG_LANGUAGE',
-        'The AI answered in the wrong language. Try again.'
-      );
-    }
+        if (seoLanguagesOk(candidate, [input.entityName, input.storeName])) parsed = candidate;
+        else
+          logger.warn(
+            { storeId: input.storeId, kind: input.kind, attempt },
+            '[AI] SEO suggestion had the wrong language in a field'
+          );
+      }
+      if (!parsed) {
+        throw new AppError(
+          422,
+          'AI_WRONG_LANGUAGE',
+          'The AI answered in the wrong language. Try again.'
+        );
+      }
 
-    await redis.set(key, JSON.stringify(parsed), CACHE_TTL_SECONDS);
-    return { suggestion: parsed, cached: false };
+      await redis.set(key, JSON.stringify(parsed), CACHE_TTL_SECONDS);
+      return { suggestion: parsed, cached: false };
+    } finally {
+      await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
+    }
   }
 
   /**
@@ -696,53 +704,57 @@ export class AIService {
       };
     }
 
-    await assertAiQuota({ storeId: input.storeId });
-    await checkBudget(input.storeId);
-
-    const systemInstruction = SECTION_INSTRUCTION;
-
-    const detailLines = [
-      `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
-      input.storeDescription && `About: ${input.storeDescription}`,
-      input.storeDescriptionAr && `About (AR): ${input.storeDescriptionAr}`,
-      `Section: ${input.section}`,
-      input.existingTitle && `Existing title: ${input.existingTitle}`,
-      input.existingTitleAr && `Existing title (AR): ${input.existingTitleAr}`,
-      input.categoryNames?.length &&
-        `Sample categories: ${input.categoryNames.slice(0, 8).join(', ')}`,
-    ].filter(Boolean);
-
-    const userPrompt = `Write kicker + subtitle for this homepage section:\n\n${detailLines.join('\n')}`;
-
-    const model = getClient().getGenerativeModel({
-      model: MODEL,
-      systemInstruction,
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-    let res;
+    const aiSlot = await assertAiQuota({ storeId: input.storeId });
     try {
-      res = await model.generateContent(userPrompt);
-    } catch (err) {
-      rethrowAsAppError(err, 'AI section content generation failed');
+      await checkBudget(input.storeId);
+
+      const systemInstruction = SECTION_INSTRUCTION;
+
+      const detailLines = [
+        `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
+        input.storeDescription && `About: ${input.storeDescription}`,
+        input.storeDescriptionAr && `About (AR): ${input.storeDescriptionAr}`,
+        `Section: ${input.section}`,
+        input.existingTitle && `Existing title: ${input.existingTitle}`,
+        input.existingTitleAr && `Existing title (AR): ${input.existingTitleAr}`,
+        input.categoryNames?.length &&
+          `Sample categories: ${input.categoryNames.slice(0, 8).join(', ')}`,
+      ].filter(Boolean);
+
+      const userPrompt = `Write kicker + subtitle for this homepage section:\n\n${detailLines.join('\n')}`;
+
+      const model = getClient().getGenerativeModel({
+        model: MODEL,
+        systemInstruction,
+        generationConfig: { responseMimeType: 'application/json' },
+      });
+      let res;
+      try {
+        res = await model.generateContent(userPrompt);
+      } catch (err) {
+        rethrowAsAppError(err, 'AI section content generation failed');
+      }
+      const raw = stripJsonFences(res.response.text());
+
+      const parsed = parseAiJson(sectionContentSchema, raw, {
+        storeId: input.storeId,
+        kind: 'section content',
+      });
+
+      const usage = res.response.usageMetadata;
+      await recordUsage(
+        input.storeId,
+        'section',
+        usage?.promptTokenCount ?? 0,
+        usage?.candidatesTokenCount ?? 0,
+        false
+      );
+
+      await redis.set(key, JSON.stringify(parsed), CACHE_TTL_SECONDS);
+      return { suggestion: parsed, cached: false };
+    } finally {
+      await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
     }
-    const raw = stripJsonFences(res.response.text());
-
-    const parsed = parseAiJson(sectionContentSchema, raw, {
-      storeId: input.storeId,
-      kind: 'section content',
-    });
-
-    const usage = res.response.usageMetadata;
-    await recordUsage(
-      input.storeId,
-      'section',
-      usage?.promptTokenCount ?? 0,
-      usage?.candidatesTokenCount ?? 0,
-      false
-    );
-
-    await redis.set(key, JSON.stringify(parsed), CACHE_TTL_SECONDS);
-    return { suggestion: parsed, cached: false };
   }
 
   /**
@@ -755,33 +767,37 @@ export class AIService {
     products: Array<{ id: string; name: string; nameAr: string | null; description: string }>;
   }): Promise<z.infer<typeof storeCategoriesAiSchema>> {
     ensureEnabled();
-    await assertAiQuota({ storeId: input.storeId });
-    await checkBudget(input.storeId);
-
-    const model = getClient().getGenerativeModel({
-      model: MODEL,
-      systemInstruction: STORE_CATEGORIES_INSTRUCTION,
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-    let res;
+    const aiSlot = await assertAiQuota({ storeId: input.storeId });
     try {
-      res = await model.generateContent(JSON.stringify({ products: input.products }));
-    } catch (err) {
-      rethrowAsAppError(err, 'AI category suggestion failed');
+      await checkBudget(input.storeId);
+
+      const model = getClient().getGenerativeModel({
+        model: MODEL,
+        systemInstruction: STORE_CATEGORIES_INSTRUCTION,
+        generationConfig: { responseMimeType: 'application/json' },
+      });
+      let res;
+      try {
+        res = await model.generateContent(JSON.stringify({ products: input.products }));
+      } catch (err) {
+        rethrowAsAppError(err, 'AI category suggestion failed');
+      }
+      const parsed = parseAiJson(storeCategoriesAiSchema, stripJsonFences(res.response.text()), {
+        storeId: input.storeId,
+        kind: 'store categories',
+      });
+      const usage = res.response.usageMetadata;
+      await recordUsage(
+        input.storeId,
+        'store-categories',
+        usage?.promptTokenCount ?? 0,
+        usage?.candidatesTokenCount ?? 0,
+        false
+      );
+      return parsed;
+    } finally {
+      await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
     }
-    const parsed = parseAiJson(storeCategoriesAiSchema, stripJsonFences(res.response.text()), {
-      storeId: input.storeId,
-      kind: 'store categories',
-    });
-    const usage = res.response.usageMetadata;
-    await recordUsage(
-      input.storeId,
-      'store-categories',
-      usage?.promptTokenCount ?? 0,
-      usage?.candidatesTokenCount ?? 0,
-      false
-    );
-    return parsed;
   }
 
   /**
@@ -796,36 +812,40 @@ export class AIService {
     page: unknown;
   }): Promise<{ patch: AiPatch }> {
     ensureEnabled();
-    await assertAiQuota({ storeId: input.storeId });
-    await checkBudget(input.storeId);
-
-    const model = getClient().getGenerativeModel({
-      model: MODEL,
-      systemInstruction: BUILDER_PATCH_INSTRUCTION,
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-    let res;
+    const aiSlot = await assertAiQuota({ storeId: input.storeId });
     try {
-      res = await model.generateContent(
-        JSON.stringify({ page: input.page, merchantRequest: input.instruction })
+      await checkBudget(input.storeId);
+
+      const model = getClient().getGenerativeModel({
+        model: MODEL,
+        systemInstruction: BUILDER_PATCH_INSTRUCTION,
+        generationConfig: { responseMimeType: 'application/json' },
+      });
+      let res;
+      try {
+        res = await model.generateContent(
+          JSON.stringify({ page: input.page, merchantRequest: input.instruction })
+        );
+      } catch (err) {
+        rethrowAsAppError(err, 'AI page edit failed');
+      }
+      const raw = stripJsonFences(res.response.text());
+      const patch = parseAiJson(aiPatchSchema, raw, {
+        storeId: input.storeId,
+        kind: 'builder patch',
+      });
+      const usage = res.response.usageMetadata;
+      await recordUsage(
+        input.storeId,
+        'builder-patch',
+        usage?.promptTokenCount ?? 0,
+        usage?.candidatesTokenCount ?? 0,
+        false
       );
-    } catch (err) {
-      rethrowAsAppError(err, 'AI page edit failed');
+      return { patch };
+    } finally {
+      await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
     }
-    const raw = stripJsonFences(res.response.text());
-    const patch = parseAiJson(aiPatchSchema, raw, {
-      storeId: input.storeId,
-      kind: 'builder patch',
-    });
-    const usage = res.response.usageMetadata;
-    await recordUsage(
-      input.storeId,
-      'builder-patch',
-      usage?.promptTokenCount ?? 0,
-      usage?.candidatesTokenCount ?? 0,
-      false
-    );
-    return { patch };
   }
 
   /**
@@ -851,46 +871,52 @@ export class AIService {
       return { suggestion: JSON.parse(hit) as z.infer<typeof campaignDraftAiSchema>, cached: true };
     }
 
-    await assertAiQuota({ storeId: input.storeId });
-    await checkBudget(input.storeId);
-
-    const systemInstruction = CAMPAIGN_INSTRUCTION;
-
-    const detailLines = [
-      `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
-      input.storeDescription && `About: ${input.storeDescription}`,
-      input.storeDescriptionAr && `About (AR): ${input.storeDescriptionAr}`,
-      `Brief from the merchant: ${input.brief}`,
-    ].filter(Boolean);
-
-    const model = getClient().getGenerativeModel({
-      model: MODEL,
-      systemInstruction,
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-    let res;
+    const aiSlot = await assertAiQuota({ storeId: input.storeId });
     try {
-      res = await model.generateContent(`Write this campaign email:\n\n${detailLines.join('\n')}`);
-    } catch (err) {
-      rethrowAsAppError(err, 'AI campaign draft generation failed');
+      await checkBudget(input.storeId);
+
+      const systemInstruction = CAMPAIGN_INSTRUCTION;
+
+      const detailLines = [
+        `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
+        input.storeDescription && `About: ${input.storeDescription}`,
+        input.storeDescriptionAr && `About (AR): ${input.storeDescriptionAr}`,
+        `Brief from the merchant: ${input.brief}`,
+      ].filter(Boolean);
+
+      const model = getClient().getGenerativeModel({
+        model: MODEL,
+        systemInstruction,
+        generationConfig: { responseMimeType: 'application/json' },
+      });
+      let res;
+      try {
+        res = await model.generateContent(
+          `Write this campaign email:\n\n${detailLines.join('\n')}`
+        );
+      } catch (err) {
+        rethrowAsAppError(err, 'AI campaign draft generation failed');
+      }
+      const raw = stripJsonFences(res.response.text());
+      const parsed = parseAiJson(campaignDraftAiSchema, raw, {
+        storeId: input.storeId,
+        kind: 'campaign draft',
+      });
+
+      const usage = res.response.usageMetadata;
+      await recordUsage(
+        input.storeId,
+        'campaign',
+        usage?.promptTokenCount ?? 0,
+        usage?.candidatesTokenCount ?? 0,
+        false
+      );
+
+      await redis.set(key, JSON.stringify(parsed), CACHE_TTL_SECONDS);
+      return { suggestion: parsed, cached: false };
+    } finally {
+      await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
     }
-    const raw = stripJsonFences(res.response.text());
-    const parsed = parseAiJson(campaignDraftAiSchema, raw, {
-      storeId: input.storeId,
-      kind: 'campaign draft',
-    });
-
-    const usage = res.response.usageMetadata;
-    await recordUsage(
-      input.storeId,
-      'campaign',
-      usage?.promptTokenCount ?? 0,
-      usage?.candidatesTokenCount ?? 0,
-      false
-    );
-
-    await redis.set(key, JSON.stringify(parsed), CACHE_TTL_SECONDS);
-    return { suggestion: parsed, cached: false };
   }
 
   /**
@@ -905,105 +931,111 @@ export class AIService {
    */
   static async extractPaletteFromLogo(logoUrl: string, storeId: string): Promise<ExtractedPalette> {
     ensureEnabled();
-    await assertAiQuota({ storeId });
-
-    // Fetch the logo bytes — Gemini Vision needs inline base64 data.
-    // SSRF guard: logoUrl is merchant-controlled — block private/loopback/
-    // metadata targets before fetching server-side.
-    let logoFetch: Response;
+    const aiSlot = await assertAiQuota({ storeId });
     try {
-      logoFetch = await safeFetchImage(logoUrl);
-    } catch {
-      throw new AppError(502, 'AI_LOGO_FETCH_FAILED', 'Could not reach the logo URL.');
-    }
-    if (!logoFetch.ok) {
-      throw new AppError(
-        502,
-        'AI_LOGO_FETCH_FAILED',
-        `Logo fetch returned HTTP ${logoFetch.status}.`
-      );
-    }
-
-    const arrayBuf = await logoFetch.arrayBuffer();
-    const rawMime = (logoFetch.headers.get('content-type') ?? 'image/png')
-      .split(';')[0]
-      .trim()
-      .toLowerCase();
-
-    let base64: string;
-    let mimeType: string;
-    try {
-      const inline = geminiInlineImage(Buffer.from(arrayBuf), rawMime);
-      base64 = inline.data;
-      mimeType = inline.mimeType;
-    } catch (err) {
-      if (err instanceof GeminiImageUnsupported) {
-        // No rasterizing on workerd (Ruling FU46-8): an SVG/GIF logo cannot be read by the AI.
-        const messageEn =
-          'The AI can read a PNG, JPEG or WebP logo. Upload the logo in one of those.';
-        const messageAr =
-          'الذكاء الاصطناعي بيقرا الشعار PNG أو JPEG أو WebP بس. ارفع الشعار بواحدة منهم.';
-        throw new AppError(400, 'AI_LOGO_UNSUPPORTED_FORMAT', messageEn, { messageEn, messageAr });
+      // Fetch the logo bytes — Gemini Vision needs inline base64 data.
+      // SSRF guard: logoUrl is merchant-controlled — block private/loopback/
+      // metadata targets before fetching server-side.
+      let logoFetch: Response;
+      try {
+        logoFetch = await safeFetchImage(logoUrl);
+      } catch {
+        throw new AppError(502, 'AI_LOGO_FETCH_FAILED', 'Could not reach the logo URL.');
       }
-      logger.error({ err, rawMime, logoUrl }, 'Logo rasterization failed before Gemini call');
-      throw new AppError(
-        502,
-        'AI_LOGO_RASTERIZE_FAILED',
-        'Could not prepare the logo image for AI processing.'
-      );
-    }
+      if (!logoFetch.ok) {
+        throw new AppError(
+          502,
+          'AI_LOGO_FETCH_FAILED',
+          `Logo fetch returned HTTP ${logoFetch.status}.`
+        );
+      }
 
-    const prompt =
-      'Look at this brand logo. Identify the 3 most important brand colors:\n' +
-      '1. PRIMARY — the most dominant brand color (often the main shape/wordmark)\n' +
-      '2. ACCENT — a complementary color that appears in the logo (or a harmonious accent if logo is single-color)\n' +
-      '3. NEUTRAL — a background/surface color (white, cream, light gray — pick what complements primary)\n\n' +
-      'Output ONLY a JSON object, no prose, no markdown fences:\n' +
-      '{ "primary": "#RRGGBB", "accent": "#RRGGBB", "neutral": "#RRGGBB" }\n\n' +
-      'Use 6-digit hex. Do not output any other text.';
+      const arrayBuf = await logoFetch.arrayBuffer();
+      const rawMime = (logoFetch.headers.get('content-type') ?? 'image/png')
+        .split(';')[0]
+        .trim()
+        .toLowerCase();
 
-    const model = getClient().getGenerativeModel({ model: MODEL });
+      let base64: string;
+      let mimeType: string;
+      try {
+        const inline = geminiInlineImage(Buffer.from(arrayBuf), rawMime);
+        base64 = inline.data;
+        mimeType = inline.mimeType;
+      } catch (err) {
+        if (err instanceof GeminiImageUnsupported) {
+          // No rasterizing on workerd (Ruling FU46-8): an SVG/GIF logo cannot be read by the AI.
+          const messageEn =
+            'The AI can read a PNG, JPEG or WebP logo. Upload the logo in one of those.';
+          const messageAr =
+            'الذكاء الاصطناعي بيقرا الشعار PNG أو JPEG أو WebP بس. ارفع الشعار بواحدة منهم.';
+          throw new AppError(400, 'AI_LOGO_UNSUPPORTED_FORMAT', messageEn, {
+            messageEn,
+            messageAr,
+          });
+        }
+        logger.error({ err, rawMime, logoUrl }, 'Logo rasterization failed before Gemini call');
+        throw new AppError(
+          502,
+          'AI_LOGO_RASTERIZE_FAILED',
+          'Could not prepare the logo image for AI processing.'
+        );
+      }
 
-    let res;
-    try {
-      res = await model.generateContent([
-        {
-          inlineData: {
-            mimeType,
-            data: base64,
+      const prompt =
+        'Look at this brand logo. Identify the 3 most important brand colors:\n' +
+        '1. PRIMARY — the most dominant brand color (often the main shape/wordmark)\n' +
+        '2. ACCENT — a complementary color that appears in the logo (or a harmonious accent if logo is single-color)\n' +
+        '3. NEUTRAL — a background/surface color (white, cream, light gray — pick what complements primary)\n\n' +
+        'Output ONLY a JSON object, no prose, no markdown fences:\n' +
+        '{ "primary": "#RRGGBB", "accent": "#RRGGBB", "neutral": "#RRGGBB" }\n\n' +
+        'Use 6-digit hex. Do not output any other text.';
+
+      const model = getClient().getGenerativeModel({ model: MODEL });
+
+      let res;
+      try {
+        res = await model.generateContent([
+          {
+            inlineData: {
+              mimeType,
+              data: base64,
+            },
           },
-        },
-        prompt,
-      ]);
-    } catch (err) {
-      rethrowAsAppError(err, 'AI logo palette extraction failed');
-    }
+          prompt,
+        ]);
+      } catch (err) {
+        rethrowAsAppError(err, 'AI logo palette extraction failed');
+      }
 
-    const rawText = stripJsonFences(res.response.text());
-    let parsed: ExtractedPalette;
-    try {
-      parsed = paletteExtractionSchema.parse(JSON.parse(rawText));
-    } catch (err) {
-      logger.error({ err, rawText }, 'Gemini returned invalid JSON for logo palette extraction');
-      throw new AppError(
-        502,
-        'AI_BAD_RESPONSE',
-        'AI returned an unexpected response for logo palette extraction.'
+      const rawText = stripJsonFences(res.response.text());
+      let parsed: ExtractedPalette;
+      try {
+        parsed = paletteExtractionSchema.parse(JSON.parse(rawText));
+      } catch (err) {
+        logger.error({ err, rawText }, 'Gemini returned invalid JSON for logo palette extraction');
+        throw new AppError(
+          502,
+          'AI_BAD_RESPONSE',
+          'AI returned an unexpected response for logo palette extraction.'
+        );
+      }
+
+      const usage = res.response.usageMetadata;
+      // Record as 'seo' feature bucket — no dedicated 'vision' bucket yet.
+      // Token counts land in per-store quota tracking regardless.
+      await recordUsage(
+        storeId,
+        'seo',
+        usage?.promptTokenCount ?? 0,
+        usage?.candidatesTokenCount ?? 0,
+        false
       );
+
+      return parsed;
+    } finally {
+      await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
     }
-
-    const usage = res.response.usageMetadata;
-    // Record as 'seo' feature bucket — no dedicated 'vision' bucket yet.
-    // Token counts land in per-store quota tracking regardless.
-    await recordUsage(
-      storeId,
-      'seo',
-      usage?.promptTokenCount ?? 0,
-      usage?.candidatesTokenCount ?? 0,
-      false
-    );
-
-    return parsed;
   }
 
   /**
@@ -1040,58 +1072,62 @@ export class AIService {
       };
     }
 
-    await assertAiQuota({ storeId: input.storeId });
-    await checkBudget(input.storeId);
-
-    const catList = input.existingCategories
-      .map(c => `${c.id} :: ${c.name}${c.nameAr ? ` / ${c.nameAr}` : ''}`)
-      .join('\n');
-
-    const systemInstruction = CATEGORIZE_INSTRUCTION;
-
-    const userPrompt = `Available categories (id :: name [/ name_ar]):\n${catList}\n\nProduct name: ${input.productName}\nProduct description: ${input.productDescription || '(none)'}`;
-
-    const model = getClient().getGenerativeModel({
-      model: MODEL,
-      systemInstruction,
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-    let res;
+    const aiSlot = await assertAiQuota({ storeId: input.storeId });
     try {
-      res = await model.generateContent(userPrompt);
-    } catch (err) {
-      rethrowAsAppError(err, 'AI categorisation failed');
-    }
-    const raw = stripJsonFences(res.response.text());
+      await checkBudget(input.storeId);
 
-    const parsed = parseAiJson(categorizeSchema, raw, {
-      storeId: input.storeId,
-      kind: 'categorize',
-    });
+      const catList = input.existingCategories
+        .map(c => `${c.id} :: ${c.name}${c.nameAr ? ` / ${c.nameAr}` : ''}`)
+        .join('\n');
 
-    const idSet = new Set(input.existingCategories.map(c => c.id));
-    const suggestions: CategorySuggestion[] = parsed.matches
-      .filter(m => idSet.has(m.id))
-      .map(m => {
-        const cat = input.existingCategories.find(c => c.id === m.id)!;
-        return {
-          id: cat.id,
-          name: cat.name,
-          nameAr: cat.nameAr,
-          confidence: m.confidence,
-        };
+      const systemInstruction = CATEGORIZE_INSTRUCTION;
+
+      const userPrompt = `Available categories (id :: name [/ name_ar]):\n${catList}\n\nProduct name: ${input.productName}\nProduct description: ${input.productDescription || '(none)'}`;
+
+      const model = getClient().getGenerativeModel({
+        model: MODEL,
+        systemInstruction,
+        generationConfig: { responseMimeType: 'application/json' },
+      });
+      let res;
+      try {
+        res = await model.generateContent(userPrompt);
+      } catch (err) {
+        rethrowAsAppError(err, 'AI categorisation failed');
+      }
+      const raw = stripJsonFences(res.response.text());
+
+      const parsed = parseAiJson(categorizeSchema, raw, {
+        storeId: input.storeId,
+        kind: 'categorize',
       });
 
-    const usage = res.response.usageMetadata;
-    await recordUsage(
-      input.storeId,
-      'categorize',
-      usage?.promptTokenCount ?? 0,
-      usage?.candidatesTokenCount ?? 0,
-      false
-    );
+      const idSet = new Set(input.existingCategories.map(c => c.id));
+      const suggestions: CategorySuggestion[] = parsed.matches
+        .filter(m => idSet.has(m.id))
+        .map(m => {
+          const cat = input.existingCategories.find(c => c.id === m.id)!;
+          return {
+            id: cat.id,
+            name: cat.name,
+            nameAr: cat.nameAr,
+            confidence: m.confidence,
+          };
+        });
 
-    await redis.set(key, JSON.stringify(suggestions), CACHE_TTL_SECONDS);
-    return { suggestions, cached: false };
+      const usage = res.response.usageMetadata;
+      await recordUsage(
+        input.storeId,
+        'categorize',
+        usage?.promptTokenCount ?? 0,
+        usage?.candidatesTokenCount ?? 0,
+        false
+      );
+
+      await redis.set(key, JSON.stringify(suggestions), CACHE_TTL_SECONDS);
+      return { suggestions, cached: false };
+    } finally {
+      await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
+    }
   }
 }

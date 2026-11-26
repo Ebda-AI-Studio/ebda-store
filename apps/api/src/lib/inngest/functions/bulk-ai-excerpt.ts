@@ -203,45 +203,48 @@ const bulkAiExcerptFn = inngest.createFunction(
             }
 
             try {
-              await assertAiQuota({ storeId, bulk: true });
+              const aiSlot = await assertAiQuota({ storeId, bulk: true });
+              try {
+                const result = await callWithRetry(
+                  () =>
+                    generateProductExcerpt(
+                      {
+                        storeId,
+                        storeName,
+                        product: {
+                          name: product.name,
+                          nameAr: product.nameAr,
+                          description: product.description,
+                          descriptionAr: product.descriptionAr,
+                        },
+                      },
+                      apiKey,
+                      MODEL
+                    ),
+                  `excerpt:${product.id}`
+                );
 
-              const result = await callWithRetry(
-                () =>
-                  generateProductExcerpt(
-                    {
-                      storeId,
-                      storeName,
-                      product: {
-                        name: product.name,
-                        nameAr: product.nameAr,
-                        description: product.description,
-                        descriptionAr: product.descriptionAr,
+                if (!result.excerpt.trim() && !result.excerptAr.trim()) {
+                  bSkipped++;
+                } else {
+                  await (
+                    await storeWriter(storeId)
+                  ).product.update({
+                    where: { id: product.id, storeId },
+                    data: {
+                      excerpt: result.excerpt || product.excerpt,
+                      excerptAr: result.excerptAr || product.excerptAr,
+                      aiFieldSources: {
+                        ...sources,
+                        ...(result.excerpt ? { excerpt: 'ai' } : {}),
+                        ...(result.excerptAr ? { excerptAr: 'ai' } : {}),
                       },
                     },
-                    apiKey,
-                    MODEL
-                  ),
-                `excerpt:${product.id}`
-              );
-
-              if (!result.excerpt.trim() && !result.excerptAr.trim()) {
-                bSkipped++;
-              } else {
-                await (
-                  await storeWriter(storeId)
-                ).product.update({
-                  where: { id: product.id, storeId },
-                  data: {
-                    excerpt: result.excerpt || product.excerpt,
-                    excerptAr: result.excerptAr || product.excerptAr,
-                    aiFieldSources: {
-                      ...sources,
-                      ...(result.excerpt ? { excerpt: 'ai' } : {}),
-                      ...(result.excerptAr ? { excerptAr: 'ai' } : {}),
-                    },
-                  },
-                });
-                bFilled++;
+                  });
+                  bFilled++;
+                }
+              } finally {
+                await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
               }
             } catch (err) {
               if (isAiQuotaCapError(err)) {

@@ -38,42 +38,46 @@ export class GeminiVisionExtractor implements CatalogueExtractor {
     if (!process.env.GOOGLE_GENERATIVE_AI_KEY && !process.env.GEMINI_API_KEY) {
       throw new AppError(503, 'AI_NOT_CONFIGURED', 'AI is not configured.');
     }
-    await assertAiQuota({ storeId: input.storeId, bulk: true });
-    this.client ??= new GeminiFailoverClient();
-    const m = model();
-    let result;
+    const aiSlot = await assertAiQuota({ storeId: input.storeId, bulk: true });
     try {
-      result = await this.client
-        .getGenerativeModel({
-          model: m,
-          generationConfig: {
-            responseMimeType: 'application/json',
-            // The SDK's schema enum types are strings at runtime.
-            responseSchema: CATALOGUE_RESPONSE_SCHEMA as never,
-            temperature: 0,
-          },
-        })
-        .generateContent({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { text: buildCataloguePrompt(input) },
-                { inlineData: { mimeType: input.mime, data: input.bytes.toString('base64') } },
-              ],
+      this.client ??= new GeminiFailoverClient();
+      const m = model();
+      let result;
+      try {
+        result = await this.client
+          .getGenerativeModel({
+            model: m,
+            generationConfig: {
+              responseMimeType: 'application/json',
+              // The SDK's schema enum types are strings at runtime.
+              responseSchema: CATALOGUE_RESPONSE_SCHEMA as never,
+              temperature: 0,
             },
-          ],
-        });
-    } catch (err) {
-      rethrowAsAppError(err, 'catalogue extraction failed');
+          })
+          .generateContent({
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  { text: buildCataloguePrompt(input) },
+                  { inlineData: { mimeType: input.mime, data: input.bytes.toString('base64') } },
+                ],
+              },
+            ],
+          });
+      } catch (err) {
+        rethrowAsAppError(err, 'catalogue extraction failed');
+      }
+      const usage = result.response.usageMetadata;
+      const inputTokens = usage?.promptTokenCount ?? 0;
+      const outputTokens = usage?.candidatesTokenCount ?? 0;
+      await recordUsage(input.storeId, 'catalog-import', inputTokens, outputTokens, false, {
+        model: m,
+      });
+      return { raw: parseJson(result.response.text()), inputTokens, outputTokens, model: m };
+    } finally {
+      await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
     }
-    const usage = result.response.usageMetadata;
-    const inputTokens = usage?.promptTokenCount ?? 0;
-    const outputTokens = usage?.candidatesTokenCount ?? 0;
-    await recordUsage(input.storeId, 'catalog-import', inputTokens, outputTokens, false, {
-      model: m,
-    });
-    return { raw: parseJson(result.response.text()), inputTokens, outputTokens, model: m };
   }
 }
 

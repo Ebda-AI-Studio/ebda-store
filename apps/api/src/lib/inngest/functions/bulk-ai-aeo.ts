@@ -417,91 +417,94 @@ Return ONLY a JSON array. Each element must have exactly these keys:
   question, questionAr, answer, answerAr
 No other text, no markdown code fences — pure JSON only.`;
 
-        await assertAiQuota({ storeId, bulk: true });
-
-        const genAI = getGenAI();
-        const model = genAI.getGenerativeModel({
-          model: MODEL,
-          generationConfig: { responseMimeType: 'application/json' },
-        });
-
-        let drafted: DraftedFaq[] = [];
+        const aiSlot = await assertAiQuota({ storeId, bulk: true });
         try {
-          const genResult = await callWithRetry(
-            () => model.generateContent(prompt),
-            `faq-aeo:${storeId}`
-          ).catch((err: unknown) => rethrowAsAppError(err, 'AI FAQ AEO sweep failed'));
-          const usage = genResult.response.usageMetadata;
-          await recordUsage(
-            storeId,
-            'aeo',
-            usage?.promptTokenCount ?? 0,
-            usage?.candidatesTokenCount ?? 0,
-            false
-          );
-          const raw = sanitizeJsonControlChars(stripFences(genResult.response.text()));
-          const parsed = JSON.parse(raw);
-          if (!Array.isArray(parsed)) throw new Error('Gemini returned non-array');
-          drafted = parsed.slice(0, count);
-        } catch (err) {
-          if (isAiQuotaCapError(err)) throw err;
-          const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
-          logger.error({ err, storeId, jobId }, 'bulk-ai-faq-aeo: Gemini error');
-          if (errors.length < ERROR_CAP)
-            errors.push({
-              entityKind: 'store',
-              entityId: storeId,
-              entityName: store.name,
-              error: msg,
-            });
-          failed++;
-        }
+          const genAI = getGenAI();
+          const model = genAI.getGenerativeModel({
+            model: MODEL,
+            generationConfig: { responseMimeType: 'application/json' },
+          });
 
-        await sleep(THROTTLE_MS);
-
-        let orderCursor = maxOrder;
-        for (const f of drafted) {
-          if (!f.question?.trim() || !f.answer?.trim()) {
-            skipped++;
-            continue;
-          }
-          if (isPlaceholderText(f.question) || isPlaceholderText(f.answer)) {
-            skipped++;
-            continue;
-          }
-          if (lockedQuestions.has(f.question.trim().toLowerCase())) {
-            skipped++;
-            continue;
-          }
+          let drafted: DraftedFaq[] = [];
           try {
-            orderCursor++;
-            await sw.storeFaq.create({
-              data: {
-                storeId,
-                question: f.question.trim(),
-                questionAr: f.questionAr?.trim() || null,
-                answer: f.answer.trim(),
-                answerAr: f.answerAr?.trim() || null,
-                aiDrafted: true,
-                manuallyEdited: false,
-                orderIndex: orderCursor,
-              },
-            });
-            filled++;
+            const genResult = await callWithRetry(
+              () => model.generateContent(prompt),
+              `faq-aeo:${storeId}`
+            ).catch((err: unknown) => rethrowAsAppError(err, 'AI FAQ AEO sweep failed'));
+            const usage = genResult.response.usageMetadata;
+            await recordUsage(
+              storeId,
+              'aeo',
+              usage?.promptTokenCount ?? 0,
+              usage?.candidatesTokenCount ?? 0,
+              false
+            );
+            const raw = sanitizeJsonControlChars(stripFences(genResult.response.text()));
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) throw new Error('Gemini returned non-array');
+            drafted = parsed.slice(0, count);
           } catch (err) {
-            if (errors.length < ERROR_CAP) {
+            if (isAiQuotaCapError(err)) throw err;
+            const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
+            logger.error({ err, storeId, jobId }, 'bulk-ai-faq-aeo: Gemini error');
+            if (errors.length < ERROR_CAP)
               errors.push({
-                entityKind: 'faq',
+                entityKind: 'store',
                 entityId: storeId,
-                entityName: f.question.slice(0, 80),
-                error: err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE,
+                entityName: store.name,
+                error: msg,
               });
-            }
             failed++;
           }
-        }
 
-        return { notFound: false, filled, skipped, failed, errors };
+          await sleep(THROTTLE_MS);
+
+          let orderCursor = maxOrder;
+          for (const f of drafted) {
+            if (!f.question?.trim() || !f.answer?.trim()) {
+              skipped++;
+              continue;
+            }
+            if (isPlaceholderText(f.question) || isPlaceholderText(f.answer)) {
+              skipped++;
+              continue;
+            }
+            if (lockedQuestions.has(f.question.trim().toLowerCase())) {
+              skipped++;
+              continue;
+            }
+            try {
+              orderCursor++;
+              await sw.storeFaq.create({
+                data: {
+                  storeId,
+                  question: f.question.trim(),
+                  questionAr: f.questionAr?.trim() || null,
+                  answer: f.answer.trim(),
+                  answerAr: f.answerAr?.trim() || null,
+                  aiDrafted: true,
+                  manuallyEdited: false,
+                  orderIndex: orderCursor,
+                },
+              });
+              filled++;
+            } catch (err) {
+              if (errors.length < ERROR_CAP) {
+                errors.push({
+                  entityKind: 'faq',
+                  entityId: storeId,
+                  entityName: f.question.slice(0, 80),
+                  error: err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE,
+                });
+              }
+              failed++;
+            }
+          }
+
+          return { notFound: false, filled, skipped, failed, errors };
+        } finally {
+          await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
+        }
       }
 
       if (result.notFound) {
@@ -738,98 +741,101 @@ Return ONLY a JSON array. Each element must have exactly:
 where steps and stepsAr are arrays of { name, text }.
 No markdown, no code fences — pure JSON only.`;
 
-        await assertAiQuota({ storeId, bulk: true });
-
-        const genAI = getGenAI();
-        const model = genAI.getGenerativeModel({
-          model: MODEL,
-          generationConfig: { responseMimeType: 'application/json' },
-        });
-
-        let drafted: DraftedHowTo[] = [];
+        const aiSlot = await assertAiQuota({ storeId, bulk: true });
         try {
-          const genResult = await callWithRetry(
-            () => model.generateContent(prompt),
-            `howto-aeo:${storeId}`
-          ).catch((err: unknown) => rethrowAsAppError(err, 'AI HowTo AEO sweep failed'));
-          const usage = genResult.response.usageMetadata;
-          await recordUsage(
-            storeId,
-            'aeo',
-            usage?.promptTokenCount ?? 0,
-            usage?.candidatesTokenCount ?? 0,
-            false
-          );
-          const raw = sanitizeJsonControlChars(stripFences(genResult.response.text()));
-          const parsed = JSON.parse(raw);
-          if (!Array.isArray(parsed)) throw new Error('Gemini returned non-array');
-          drafted = parsed.slice(0, count);
-        } catch (err) {
-          if (isAiQuotaCapError(err)) throw err;
-          const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
-          logger.error({ err, storeId, jobId }, 'bulk-ai-howto-aeo: Gemini error');
-          if (errors.length < ERROR_CAP)
-            errors.push({
-              entityKind: 'store',
-              entityId: storeId,
-              entityName: store.name,
-              error: msg,
-            });
-          failed++;
-        }
+          const genAI = getGenAI();
+          const model = genAI.getGenerativeModel({
+            model: MODEL,
+            generationConfig: { responseMimeType: 'application/json' },
+          });
 
-        await sleep(THROTTLE_MS);
-
-        let orderCursor = maxOrder;
-        for (const h of drafted) {
-          if (
-            !h.title?.trim() ||
-            !h.description?.trim() ||
-            !Array.isArray(h.steps) ||
-            h.steps.length === 0
-          ) {
-            skipped++;
-            continue;
-          }
-          if (isPlaceholderText(h.title) || isPlaceholderText(h.description)) {
-            skipped++;
-            continue;
-          }
-          if (lockedTitles.has(h.title.trim().toLowerCase())) {
-            skipped++;
-            continue;
-          }
+          let drafted: DraftedHowTo[] = [];
           try {
-            orderCursor++;
-            await sw.storeHowto.create({
-              data: {
-                storeId,
-                title: h.title.trim(),
-                titleAr: h.titleAr?.trim() || null,
-                description: h.description.trim(),
-                descriptionAr: h.descriptionAr?.trim() || null,
-                steps: h.steps as object,
-                stepsAr: (h.stepsAr || []) as object,
-                aiDrafted: true,
-                manuallyEdited: false,
-                orderIndex: orderCursor,
-              },
-            });
-            filled++;
+            const genResult = await callWithRetry(
+              () => model.generateContent(prompt),
+              `howto-aeo:${storeId}`
+            ).catch((err: unknown) => rethrowAsAppError(err, 'AI HowTo AEO sweep failed'));
+            const usage = genResult.response.usageMetadata;
+            await recordUsage(
+              storeId,
+              'aeo',
+              usage?.promptTokenCount ?? 0,
+              usage?.candidatesTokenCount ?? 0,
+              false
+            );
+            const raw = sanitizeJsonControlChars(stripFences(genResult.response.text()));
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) throw new Error('Gemini returned non-array');
+            drafted = parsed.slice(0, count);
           } catch (err) {
-            if (errors.length < ERROR_CAP) {
+            if (isAiQuotaCapError(err)) throw err;
+            const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
+            logger.error({ err, storeId, jobId }, 'bulk-ai-howto-aeo: Gemini error');
+            if (errors.length < ERROR_CAP)
               errors.push({
-                entityKind: 'howto',
+                entityKind: 'store',
                 entityId: storeId,
-                entityName: h.title.slice(0, 80),
-                error: err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE,
+                entityName: store.name,
+                error: msg,
               });
-            }
             failed++;
           }
-        }
 
-        return { notFound: false, filled, skipped, failed, errors };
+          await sleep(THROTTLE_MS);
+
+          let orderCursor = maxOrder;
+          for (const h of drafted) {
+            if (
+              !h.title?.trim() ||
+              !h.description?.trim() ||
+              !Array.isArray(h.steps) ||
+              h.steps.length === 0
+            ) {
+              skipped++;
+              continue;
+            }
+            if (isPlaceholderText(h.title) || isPlaceholderText(h.description)) {
+              skipped++;
+              continue;
+            }
+            if (lockedTitles.has(h.title.trim().toLowerCase())) {
+              skipped++;
+              continue;
+            }
+            try {
+              orderCursor++;
+              await sw.storeHowto.create({
+                data: {
+                  storeId,
+                  title: h.title.trim(),
+                  titleAr: h.titleAr?.trim() || null,
+                  description: h.description.trim(),
+                  descriptionAr: h.descriptionAr?.trim() || null,
+                  steps: h.steps as object,
+                  stepsAr: (h.stepsAr || []) as object,
+                  aiDrafted: true,
+                  manuallyEdited: false,
+                  orderIndex: orderCursor,
+                },
+              });
+              filled++;
+            } catch (err) {
+              if (errors.length < ERROR_CAP) {
+                errors.push({
+                  entityKind: 'howto',
+                  entityId: storeId,
+                  entityName: h.title.slice(0, 80),
+                  error: err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE,
+                });
+              }
+              failed++;
+            }
+          }
+
+          return { notFound: false, filled, skipped, failed, errors };
+        } finally {
+          await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
+        }
       }
 
       if (result.notFound) {
@@ -1075,40 +1081,46 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                 continue;
               }
               try {
-                await assertAiQuota({ storeId, bulk: true });
-                const prompt = buildMetaAeoPrompt('store', s.name, s.description ?? '');
-                const genResult = await callWithRetry(
-                  () => model.generateContent(prompt),
-                  `meta-aeo:store:${storeId}`
-                ).catch((err: unknown) => rethrowAsAppError(err, 'AI store meta AEO sweep failed'));
-                const usage = genResult.response.usageMetadata;
-                await recordUsage(
-                  storeId,
-                  'aeo',
-                  usage?.promptTokenCount ?? 0,
-                  usage?.candidatesTokenCount ?? 0,
-                  false
-                );
-                const raw = stripFences(genResult.response.text());
-                const parsed = JSON.parse(raw) as { en: string; ar: string };
-                if (
-                  typeof parsed.en === 'string' &&
-                  parsed.en.trim() &&
-                  !isPlaceholderText(parsed.en)
-                ) {
-                  await storeUpdate(prisma, {
-                    where: { id: storeId },
-                    data: {
-                      metaDescriptionAeo: parsed.en.trim().slice(0, 160),
-                      metaDescriptionAeoAr:
-                        parsed.ar?.trim().slice(0, 160) || s.metaDescriptionAeoAr || null,
-                    },
-                  });
-                  bFilled++;
-                } else {
-                  bSkipped++;
+                const aiSlot = await assertAiQuota({ storeId, bulk: true });
+                try {
+                  const prompt = buildMetaAeoPrompt('store', s.name, s.description ?? '');
+                  const genResult = await callWithRetry(
+                    () => model.generateContent(prompt),
+                    `meta-aeo:store:${storeId}`
+                  ).catch((err: unknown) =>
+                    rethrowAsAppError(err, 'AI store meta AEO sweep failed')
+                  );
+                  const usage = genResult.response.usageMetadata;
+                  await recordUsage(
+                    storeId,
+                    'aeo',
+                    usage?.promptTokenCount ?? 0,
+                    usage?.candidatesTokenCount ?? 0,
+                    false
+                  );
+                  const raw = stripFences(genResult.response.text());
+                  const parsed = JSON.parse(raw) as { en: string; ar: string };
+                  if (
+                    typeof parsed.en === 'string' &&
+                    parsed.en.trim() &&
+                    !isPlaceholderText(parsed.en)
+                  ) {
+                    await storeUpdate(prisma, {
+                      where: { id: storeId },
+                      data: {
+                        metaDescriptionAeo: parsed.en.trim().slice(0, 160),
+                        metaDescriptionAeoAr:
+                          parsed.ar?.trim().slice(0, 160) || s.metaDescriptionAeoAr || null,
+                      },
+                    });
+                    bFilled++;
+                  } else {
+                    bSkipped++;
+                  }
+                  await sleep(THROTTLE_MS);
+                } finally {
+                  await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
                 }
-                await sleep(THROTTLE_MS);
               } catch (err) {
                 if (isAiQuotaCapError(err)) {
                   bQuotaReached = true;
@@ -1151,7 +1163,6 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                 continue;
               }
               try {
-                await assertAiQuota({ storeId, bulk: true });
                 // Shared core — identical prompt + parse + usage-recording
                 // path as the per-product "Generate with AI" route
                 // (POST /ai/product-meta-aeo). DRY: both call
@@ -1227,44 +1238,53 @@ const bulkAiMetaAeoFn = inngest.createFunction(
               continue;
             }
             try {
-              await assertAiQuota({ storeId, bulk: true });
-              const prompt = buildMetaAeoPrompt('category', c.name, c.description ?? '', storeName);
-              const genResult = await callWithRetry(
-                () => model.generateContent(prompt),
-                `meta-aeo:category:${c.id}`
-              ).catch((err: unknown) =>
-                rethrowAsAppError(err, 'AI category meta AEO sweep failed')
-              );
-              const usage = genResult.response.usageMetadata;
-              await recordUsage(
-                storeId,
-                'aeo',
-                usage?.promptTokenCount ?? 0,
-                usage?.candidatesTokenCount ?? 0,
-                false
-              );
-              const raw = stripFences(genResult.response.text());
-              const parsed = JSON.parse(raw) as { en: string; ar: string };
-              if (
-                typeof parsed.en === 'string' &&
-                parsed.en.trim() &&
-                !isPlaceholderText(parsed.en)
-              ) {
-                await (
-                  await storeWriter(storeId)
-                ).category.update({
-                  where: { id: c.id, storeId },
-                  data: {
-                    metaDescriptionAeo: parsed.en.trim().slice(0, 160),
-                    metaDescriptionAeoAr:
-                      parsed.ar?.trim().slice(0, 160) || c.metaDescriptionAeoAr || null,
-                  },
-                });
-                bFilled++;
-              } else {
-                bSkipped++;
+              const aiSlot = await assertAiQuota({ storeId, bulk: true });
+              try {
+                const prompt = buildMetaAeoPrompt(
+                  'category',
+                  c.name,
+                  c.description ?? '',
+                  storeName
+                );
+                const genResult = await callWithRetry(
+                  () => model.generateContent(prompt),
+                  `meta-aeo:category:${c.id}`
+                ).catch((err: unknown) =>
+                  rethrowAsAppError(err, 'AI category meta AEO sweep failed')
+                );
+                const usage = genResult.response.usageMetadata;
+                await recordUsage(
+                  storeId,
+                  'aeo',
+                  usage?.promptTokenCount ?? 0,
+                  usage?.candidatesTokenCount ?? 0,
+                  false
+                );
+                const raw = stripFences(genResult.response.text());
+                const parsed = JSON.parse(raw) as { en: string; ar: string };
+                if (
+                  typeof parsed.en === 'string' &&
+                  parsed.en.trim() &&
+                  !isPlaceholderText(parsed.en)
+                ) {
+                  await (
+                    await storeWriter(storeId)
+                  ).category.update({
+                    where: { id: c.id, storeId },
+                    data: {
+                      metaDescriptionAeo: parsed.en.trim().slice(0, 160),
+                      metaDescriptionAeoAr:
+                        parsed.ar?.trim().slice(0, 160) || c.metaDescriptionAeoAr || null,
+                    },
+                  });
+                  bFilled++;
+                } else {
+                  bSkipped++;
+                }
+                await sleep(THROTTLE_MS);
+              } finally {
+                await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
               }
-              await sleep(THROTTLE_MS);
             } catch (err) {
               if (isAiQuotaCapError(err)) {
                 bQuotaReached = true;

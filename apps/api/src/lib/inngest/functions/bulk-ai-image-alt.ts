@@ -199,29 +199,32 @@ const bulkAiImageAltFn = inngest.createFunction(
 
             for (const image of missingAlt) {
               try {
-                await assertAiQuota({ storeId, bulk: true });
+                const aiSlot = await assertAiQuota({ storeId, bulk: true });
+                try {
+                  const alt = await callWithRetry(
+                    () =>
+                      generateProductAltText(
+                        {
+                          storeId,
+                          imageUrl: image.url,
+                          product: { name: product.name, nameAr: product.nameAr },
+                        },
+                        apiKey,
+                        MODEL
+                      ),
+                    `image-alt:${image.id}`
+                  );
 
-                const alt = await callWithRetry(
-                  () =>
-                    generateProductAltText(
-                      {
-                        storeId,
-                        imageUrl: image.url,
-                        product: { name: product.name, nameAr: product.nameAr },
-                      },
-                      apiKey,
-                      MODEL
-                    ),
-                  `image-alt:${image.id}`
-                );
-
-                await (
-                  await storeWriter(storeId)
-                ).productImage.update({
-                  where: { id: image.id },
-                  data: { alt },
-                });
-                productFilled++;
+                  await (
+                    await storeWriter(storeId)
+                  ).productImage.update({
+                    where: { id: image.id },
+                    data: { alt },
+                  });
+                  productFilled++;
+                } finally {
+                  await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
+                }
               } catch (err) {
                 if (isAiQuotaCapError(err)) {
                   logger.warn(

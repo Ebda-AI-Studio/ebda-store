@@ -22,8 +22,10 @@ vi.mock('@google/generative-ai', () => ({
   },
 }));
 
-// The generator budgets itself (#838); the quota is not under test here.
-vi.mock('@api/lib/ai-quota', () => ({ assertAiQuota: async () => undefined }));
+// The generator budgets itself (#838/#845); the quota is not under test here.
+vi.mock('@api/lib/ai-quota', () => ({
+  assertAiQuota: async () => ({ release: async () => undefined }),
+}));
 import {
   buildMetaAeoPrompt,
   generateProductMetaAeo,

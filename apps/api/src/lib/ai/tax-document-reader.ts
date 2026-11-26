@@ -71,40 +71,44 @@ async function defaultCall({
     throw Object.assign(new Error('Workers AI binding is not available'), {
       code: 'AI_UNAVAILABLE',
     });
-  await assertAiQuota({ storeId });
-  const override = cfBindings()?.TAX_DOCUMENT_AI_MODEL ?? process.env.TAX_DOCUMENT_AI_MODEL;
-  const model = (typeof override === 'string' ? override.trim() : '') || MODEL_DEFAULT;
-  const out = await ai.run(
-    model,
-    {
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: PROMPT },
-            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
-          ],
-        },
-      ],
-      guided_json: JSON_SCHEMA,
-      max_tokens: 300,
-      temperature: 0,
-    },
-    { signal }
-  );
-  const usage = (out as { usage?: { prompt_tokens?: number; completion_tokens?: number } } | null)
-    ?.usage;
-  await recordUsage(
-    storeId,
-    'tax-document',
-    usage?.prompt_tokens ?? 0,
-    usage?.completion_tokens ?? 0,
-    false,
-    {
+  const aiSlot = await assertAiQuota({ storeId });
+  try {
+    const override = cfBindings()?.TAX_DOCUMENT_AI_MODEL ?? process.env.TAX_DOCUMENT_AI_MODEL;
+    const model = (typeof override === 'string' ? override.trim() : '') || MODEL_DEFAULT;
+    const out = await ai.run(
       model,
-    }
-  ).catch(() => undefined);
-  return unwrapWorkersAiAnswer(out);
+      {
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: PROMPT },
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+            ],
+          },
+        ],
+        guided_json: JSON_SCHEMA,
+        max_tokens: 300,
+        temperature: 0,
+      },
+      { signal }
+    );
+    const usage = (out as { usage?: { prompt_tokens?: number; completion_tokens?: number } } | null)
+      ?.usage;
+    await recordUsage(
+      storeId,
+      'tax-document',
+      usage?.prompt_tokens ?? 0,
+      usage?.completion_tokens ?? 0,
+      false,
+      {
+        model,
+      }
+    ).catch(() => undefined);
+    return unwrapWorkersAiAnswer(out);
+  } finally {
+    await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
+  }
 }
 
 const clean = (v: unknown, max: number): string | null => {

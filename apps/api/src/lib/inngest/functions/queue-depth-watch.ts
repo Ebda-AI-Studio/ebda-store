@@ -249,7 +249,7 @@ const queueDepthWatchFn = inngest.createFunction(
       let quotaExhausted = false;
       if (resumeEvent && !guardTripped) {
         try {
-          await assertAiQuota({ storeId: job.storeId, bulk: true });
+          await assertAiQuota({ storeId: job.storeId, bulk: true, reserve: false });
         } catch (err) {
           if (isAiQuotaCapError(err)) quotaExhausted = true;
           else throw err;
