@@ -31,6 +31,7 @@ import {
   type ParsedReturn,
   type RefundRequest,
   type RefundResult,
+  type GatewayReversals,
 } from './types';
 import { hmacSha256Hex, safeEqual } from './signature';
 
@@ -183,6 +184,13 @@ export class StubBillingProvider implements BillingProvider {
     chargeId: string | null;
   }): Promise<ChargeResult | null> {
     return this.charges.get(req.idempotencyKey) ?? null;
+  }
+
+  /** Reversals the gateway "made outside Ebda", by charge id (tests set it; the reversal reconcile reads it, #837). */
+  outOfBandReversals = new Map<string, GatewayReversals>();
+
+  async listReversals(req: { chargeId: string }): Promise<GatewayReversals> {
+    return this.outOfBandReversals.get(req.chargeId) ?? { reversals: [], unknownOperations: [] };
   }
 
   async refund(req: RefundRequest): Promise<RefundResult> {

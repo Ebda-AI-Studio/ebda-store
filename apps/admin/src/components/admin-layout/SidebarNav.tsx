@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { navItemClasses } from '../ui/tokens';
 import type { NavItem } from './buildStoreAdminNav';
+import { AttentionBadge } from '../attention/AttentionBadge';
 
 interface SidebarNavProps {
   navItems: NavItem[];
@@ -15,9 +16,17 @@ interface SidebarNavProps {
    * /products.
    */
   activeHubKey?: string | null;
+  /** Action-needed count per hubKey (the Settings item shows the store's "needs attention" count). */
+  badges?: Record<string, number>;
 }
 
-export function SidebarNav({ navItems, pathname, onNavigate, activeHubKey }: SidebarNavProps) {
+export function SidebarNav({
+  navItems,
+  pathname,
+  onNavigate,
+  activeHubKey,
+  badges,
+}: SidebarNavProps) {
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-4">
       <ul className="space-y-1">
@@ -63,7 +72,10 @@ export function SidebarNav({ navItems, pathname, onNavigate, activeHubKey }: Sid
                     />
                   </svg>
                 </span>
-                <span>{item.name}</span>
+                <span className="flex-1">{item.name}</span>
+                {item.hubKey && badges?.[item.hubKey] ? (
+                  <AttentionBadge count={badges[item.hubKey]} />
+                ) : null}
               </Link>
             </li>
           );

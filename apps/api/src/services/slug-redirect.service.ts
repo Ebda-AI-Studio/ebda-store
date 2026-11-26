@@ -19,6 +19,12 @@ async function slugRedirectDb(
  * Record a slug rename so the old URL 301s to the new one.
  * Call inside the same transaction as the entity write. Ordering matters:
  * reuse-guard, then chain-collapse, then upsert.
+ *
+ * WHERE it is written follows `resolveSlugRedirect` (the storefront's reader): the platform D1 for a store served by its Durable
+ * Object, the caller's `tx` for every other store. Callers pass the Postgres `prisma`/`tx` unconditionally; on a DO store that
+ * handle is routed by the platform cutover marker, so with the `platform` family not on D1 the write went to retired Postgres
+ * (a POSTGRES_REMOVED throw on the Worker, swallowed by the bulk importer's catch) while the reader looked in D1: the old URL
+ * 404'd instead of 301. Resolving the target here fixes every call site at once.
  */
 export async function recordSlugRedirect(
   tx: DbClient,
@@ -28,18 +34,19 @@ export async function recordSlugRedirect(
   newSlug: string
 ): Promise<void> {
   if (!oldSlug || !newSlug || oldSlug === newSlug) return;
+  const db = (await storeWritesToDo(storeId)) ? await slugRedirectDb(storeId) : tx;
 
   // 1. Reuse guard — the new slug is live again, it must never redirect.
-  await tx.slugRedirect.deleteMany({ where: { storeId, entityType, fromSlug: newSlug } });
+  await db.slugRedirect.deleteMany({ where: { storeId, entityType, fromSlug: newSlug } });
 
   // 2. Chain-collapse — any redirect pointing at the old slug now points at the new one.
-  await tx.slugRedirect.updateMany({
+  await db.slugRedirect.updateMany({
     where: { storeId, entityType, toSlug: oldSlug },
     data: { toSlug: newSlug },
   });
 
   // 3. Upsert old -> new.
-  await tx.slugRedirect.upsert({
+  await db.slugRedirect.upsert({
     where: { storeId_entityType_fromSlug: { storeId, entityType, fromSlug: oldSlug } },
     create: { storeId, entityType, fromSlug: oldSlug, toSlug: newSlug },
     update: { toSlug: newSlug },

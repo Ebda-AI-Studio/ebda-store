@@ -212,6 +212,7 @@ export interface Copy {
     emailP: string;
     whatsappH: string;
     whatsappP: string;
+    socialH: string;
     helpH: string;
     helpP: string;
     helpLink: string;
@@ -684,6 +685,7 @@ export const COPY: Record<Locale, Copy> = {
       emailP: 'للأسئلة والاستفسارات والشراكات.',
       whatsappH: 'واتساب',
       whatsappP: 'لأسئلة قبل ما تبدأ متجرك.',
+      socialH: 'تابعنا',
       helpH: 'محتاج مساعدة في متجرك؟',
       helpP: 'الإجابات المكتوبة وحالة الخدمة أسرع من أي رد.',
       helpLink: 'مركز المساعدة',
@@ -1125,6 +1127,7 @@ export const COPY: Record<Locale, Copy> = {
       emailP: 'Questions, enquiries and partnerships.',
       whatsappH: 'WhatsApp',
       whatsappP: 'Questions before you start your store.',
+      socialH: 'Follow us',
       helpH: 'Need help with your store?',
       helpP: 'The written answers and the service status are faster than any reply.',
       helpLink: 'Help centre',

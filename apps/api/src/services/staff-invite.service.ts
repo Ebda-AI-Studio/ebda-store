@@ -38,3 +38,10 @@ export async function expireInvitesBeyondSeats(storeId: string): Promise<number>
     return r.count;
   });
 }
+
+/** Pending, unexpired invitations of a store (the "needs attention" count). Read-only, routed like every access read. */
+export async function countPendingInvites(storeId: string): Promise<number> {
+  return inAccessScope(storeId, tx =>
+    tx.staffInvite.count({ where: { storeId, status: 'pending', expiresAt: { gt: new Date() } } })
+  );
+}

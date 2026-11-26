@@ -33,9 +33,10 @@ export function intlLocaleForUi(english: 'en-US' | 'en-GB' = 'en-US'): string {
  * The admin renders Latin digits in both locales (issue 1971, Ruling
  * NUMERALS-1) — the same policy as its ICU messages (`i18n/formats.ts`). An
  * Arabic-locale price keeps its Arabic currency symbol (`1,500.00 ج.م`) but
- * not Arabic-Indic digits. The admin is an accounting surface, so it keeps
- * every decimal (`EGP 450.00`); the storefront trims a zero fraction.
- * The locale defaults to the UI language; a caller may still pass one.
+ * not Arabic-Indic digits. House style (QA 2026-11-17 O1/N3, one formatter everywhere): thousands grouped, the currency
+ * symbol in the UI language (`4,850 ج.م` / `EGP 4,850`), a whole-pound amount WITHOUT `.00` (same as the order pages and
+ * the storefront) while a real fraction keeps its piastres (`450.50`). The locale defaults to the UI language; a caller
+ * may still pass one. Pass `fixedDecimals: true` only for a ledger/invoice column that must align.
  */
 export function formatPrice(
   amount: number,
@@ -45,7 +46,6 @@ export function formatPrice(
     locale: uiLocale(),
     ...options,
     numerals: 'latn',
-    fixedDecimals: true,
   });
 }
 

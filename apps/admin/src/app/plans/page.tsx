@@ -99,6 +99,7 @@ function UnitField({
   unit,
   help,
   error,
+  dir,
   ...props
 }: {
   label: string;
@@ -113,7 +114,9 @@ function UnitField({
       <label htmlFor={id} className="mb-2 block text-sm font-medium text-foreground">
         {label}
       </label>
-      <div className="relative">
+      {/* `dir` goes on the wrapper, not the input: on the input alone it flips the logical `pe-14`
+          padding to the opposite side of the unit, which is placed by the parent's direction. */}
+      <div className="relative" dir={dir}>
         <Input
           id={id}
           className="pe-14 tabular-nums"
@@ -417,7 +420,13 @@ function PlansInner() {
       <Modal
         isOpen={editing !== null}
         onClose={() => setEditing(null)}
-        title={editing ? t('editTitle', { code: editing.code }) : ''}
+        title={
+          editing
+            ? t('editTitle', {
+                name: (locale === 'ar' ? editing.nameAr : editing.nameEn) || editing.code,
+              })
+            : ''
+        }
         closeLabel={t('form.close')}
         size="lg"
       >

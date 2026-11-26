@@ -83,6 +83,7 @@ import { defineCloudflareConfig } from '@opennextjs/cloudflare';
 // Ruling WEB-COLD-2: the stock R2 cache with fetch (data) entries keyed by the DATA CONTRACT instead of the build, so a
 // deploy keeps the storefront's API data cache unless the API data shape changed (apps/web/shared-fetch-cache.ts).
 import { createSharedFetchCache } from './shared-fetch-cache';
+import { TAG_CACHE_OPTIONS } from './tag-cache-options'; // staleness class + residual window documented there
 import doShardedTagCache from '@opennextjs/cloudflare/overrides/tag-cache/do-sharded-tag-cache';
 import doQueue from '@opennextjs/cloudflare/overrides/queue/do-queue';
 import queueCache from '@opennextjs/cloudflare/overrides/queue/queue-cache';
@@ -90,7 +91,7 @@ import queueCache from '@opennextjs/cloudflare/overrides/queue/queue-cache';
 // All four are DEFAULT exports in @opennextjs/cloudflare@1.19.11 (verified).
 export default defineCloudflareConfig({
   incrementalCache: createSharedFetchCache('__FETCH_CONTRACT__'),
-  tagCache: doShardedTagCache({ baseShardSize: 12, regionalCache: true }),
+  tagCache: doShardedTagCache(TAG_CACHE_OPTIONS),
   queue: queueCache(doQueue),
   enableCacheInterception: true,
 });

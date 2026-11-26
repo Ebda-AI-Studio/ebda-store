@@ -27,6 +27,7 @@ import { useLocale } from 'next-intl';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { useDndA11y } from '@/hooks/useDndA11y';
 
 interface ProductRow {
   id: string;
@@ -172,6 +173,7 @@ export default function CategoryProductOrderPage() {
   const [error, setError] = useState<string | null>(null);
   const { success: toastSuccess, error: showError } = useToast();
 
+  const dndA11y = useDndA11y();
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -357,6 +359,7 @@ export default function CategoryProductOrderPage() {
             </div>
           )}
           <DndContext
+            {...dndA11y}
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}

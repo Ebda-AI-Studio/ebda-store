@@ -12,8 +12,10 @@ vi.mock('../../apps/admin/src/components/AdminLayout', () => ({
 import { FeatureUpgradeGate } from '../../apps/admin/src/components/FeatureUpgradeGate';
 
 describe('STORE-QA-25 locked feature with no purchasable plan', () => {
-  it('bundles (in no sold plan): says so, no upgrade / see-plans CTA, contact only', () => {
-    render(<FeatureUpgradeGate featureKey="bundles" storeId="s1" />);
+  // Since "business has every feature" (#847) every registry feature is in a sold plan, so the no-sold-plan
+  // branch is only reachable for a key the registry does not map to a plan (a platform-only / unknown feature).
+  it('a feature in no sold plan: says so, no upgrade / see-plans CTA, contact only', () => {
+    render(<FeatureUpgradeGate featureKey="platform.not-in-any-sold-plan" storeId="s1" />);
     expect(screen.getByTestId('no-sold-plan')).toBeTruthy();
     expect(screen.queryByText('seePlansCta')).toBeNull();
     expect(screen.queryByText('upgradeCta')).toBeNull();

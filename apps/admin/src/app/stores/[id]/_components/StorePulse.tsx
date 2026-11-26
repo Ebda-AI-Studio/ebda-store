@@ -65,7 +65,7 @@ function DeltaPill({ delta, label }: { delta: Delta | null; label: string }) {
   const t = useT('stores.dashboard.pulse');
   if (!delta) return null;
   const tone =
-    delta.tone === 'up'
+    delta.tone === 'up' || delta.tone === 'new'
       ? 'bg-success/10 text-success-ink'
       : delta.tone === 'down'
         ? 'bg-destructive/10 text-destructive-ink'
@@ -79,7 +79,7 @@ function DeltaPill({ delta, label }: { delta: Delta | null; label: string }) {
         tone
       )}
     >
-      {delta.tone !== 'flat' && (
+      {delta.tone !== 'flat' && delta.tone !== 'new' && (
         <svg
           aria-hidden="true"
           className={cn('h-3 w-3', delta.tone === 'down' && 'rotate-180')}
@@ -93,7 +93,11 @@ function DeltaPill({ delta, label }: { delta: Delta | null; label: string }) {
           <path d="M6 10V2M2.5 5.5L6 2l3.5 3.5" />
         </svg>
       )}
-      <span dir="ltr">{delta.tone === 'flat' ? '0%' : `${delta.percent}%`}</span>
+      {delta.tone === 'new' ? (
+        <span>{t('newBadge')}</span>
+      ) : (
+        <span dir="ltr">{delta.tone === 'flat' ? '0%' : `${delta.percent}%`}</span>
+      )}
       <span className="sr-only">
         {t(`deltaSr.${delta.tone}`, { percent: delta.percent })} {label}
       </span>
@@ -172,7 +176,10 @@ export function SalesHero({
     );
   }
   const empty = stats.totalOrders === 0 && stats.totalRevenue === 0;
-  const delta = toDelta(stats.revenueChange);
+  const delta = toDelta(stats.revenueChange, {
+    previous: stats.previousRevenue,
+    current: stats.totalRevenue,
+  });
   const periodLabel = t(`period.${period}`);
   const points = Array.isArray(sales) ? sales : [];
   return (
@@ -199,6 +206,7 @@ export function SalesHero({
                 {t(`sentence.${delta?.tone ?? 'unknown'}`, {
                   percent: delta?.percent ?? 0,
                   orders: count(stats.totalOrders),
+                  ordersN: stats.totalOrders,
                 })}
               </span>
             </p>
@@ -281,7 +289,10 @@ export function KpiRow({
         testId="kpi-orders"
         label={t('orders')}
         value={count(stats.totalOrders)}
-        delta={toDelta(stats.ordersChange)}
+        delta={toDelta(stats.ordersChange, {
+          previous: stats.previousOrders,
+          current: stats.totalOrders,
+        })}
         href={`/stores/${storeId}/orders`}
       />
       <Kpi

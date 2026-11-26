@@ -2,6 +2,7 @@ import type { JobDef } from '../../jobs/types';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { stepRunUnlessEmpty } from '../empty-exit';
+import { logSweepRun } from '../sweep-run-log';
 import { sendAlert } from '../../../services/alerts.service';
 import { handleStuckRefundClaimSweep } from './refund-claim-stuck-sweep';
 import { sweepStoresDb } from '../../jobs/store-db';
@@ -358,11 +359,11 @@ export const refundReversalStuckSweep: JobDef = inngest.createFunction(
     // Same tick, same wake-up of the database — see refund-claim-stuck-sweep.ts.
     const partials = await handlePartialReturnReversalSweep(step, event);
     const claims = await handleStuckRefundClaimSweep(step, event);
-    return {
+    return logSweepRun('refund-reversal-stuck-sweep', {
       ...reversals,
       partialReturnsSwept: partials.swept,
       partialReturnsResent: partials.resent,
       stuckRefundClaims: claims.stuck,
-    };
+    });
   }
 );

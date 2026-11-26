@@ -53,6 +53,8 @@ interface WishlistProductRow {
   }>;
   options?: unknown;
   facts?: unknown;
+  /** Card "3D" chip: selected as `{ id }` by the wishlist reads. */
+  model3d?: { id: string } | null;
   /** Feeds the card "New" badge (isProductNew); the wishlist reads include every scalar. */
   createdAt?: Date | string | null;
 }
@@ -90,6 +92,7 @@ export function wishlistCardProduct(p: WishlistProductRow) {
     })),
     options: p.options,
     facts: p.facts,
+    has3d: Boolean(p.model3d),
     createdAt: p.createdAt ?? undefined,
   };
 }

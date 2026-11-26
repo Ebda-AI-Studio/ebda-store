@@ -31,6 +31,7 @@ import {
 import { SidebarHeader } from './admin-layout/SidebarHeader';
 import { CommandPalette } from './CommandPalette';
 import { SidebarNav } from './admin-layout/SidebarNav';
+import { useAttention } from '../hooks/useAttention';
 import { SidebarFooter } from './admin-layout/SidebarFooter';
 import { ContactEbdaDialog } from './support/ContactEbdaDialog';
 import { SuspensionNotice } from './support/SuspensionNotice';
@@ -313,6 +314,8 @@ export function AdminLayout({
   // Fall back to the resolved currentStoreId so a store_admin lands on
   // sensible nav links even on pages that don't pass `storeId` explicitly.
   const navStoreId = storeId ?? currentStoreId ?? '';
+  // One shared "needs attention" feed: the sidebar dot here, the section badges and the Settings list elsewhere.
+  const attention = useAttention(mode === 'store_admin' ? navStoreId : null);
   const allNavItems =
     mode === 'super_admin'
       ? buildSuperAdminNav(navLabels)
@@ -450,6 +453,11 @@ export function AdminLayout({
         pathname={pathname}
         onNavigate={() => setIsSidebarOpen(false)}
         activeHubKey={activeHubKey}
+        badges={
+          mode === 'store_admin'
+            ? { settings: attention.nav.settings, sales: attention.nav.orders }
+            : undefined
+        }
       />
       <SidebarFooter
         isDark={isDark}
@@ -604,7 +612,11 @@ export function AdminLayout({
       {/* The Ebda assistant: renders nothing until the server says it is on for this store (rollout switch, default off). */}
       {navStoreId && mode === 'store_admin' && <AssistantDock storeId={navStoreId} />}
       {navStoreId && (
-        <MobileBottomNav storeId={navStoreId} onOpenMore={() => setIsSidebarOpen(true)} />
+        <MobileBottomNav
+          storeId={navStoreId}
+          onOpenMore={() => setIsSidebarOpen(true)}
+          badges={{ orders: attention.nav.orders, more: attention.nav.settings }}
+        />
       )}
     </div>
   );

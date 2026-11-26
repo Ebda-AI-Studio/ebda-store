@@ -51,6 +51,7 @@ vi.mock('@ebda/database', async () => {
   });
 });
 vi.mock('@api/lib/repo-factory', () => ({
+  requestPlanMemo: (_id: string, fn: () => Promise<unknown>) => fn(),
   storeRepo: async (storeId: string) => ({
     storeId,
     backend: 'do',

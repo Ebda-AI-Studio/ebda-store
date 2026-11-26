@@ -38,6 +38,7 @@ import {
   isSectionPageKind,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
+import { useDndA11y } from '@/hooks/useDndA11y';
 import { useIsCanvasHovered } from '../_lib/canvas-hover-store';
 
 export interface Selection {
@@ -327,6 +328,7 @@ function Group({
   ...rest
 }: Omit<Props, 'doc'> & { list: SectionList; title: string; nodes: SectionNode[] }) {
   const t = useT('builder.tree');
+  const dndA11y = useDndA11y();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -341,7 +343,12 @@ function Group({
       <h2 className="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </h2>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <DndContext
+        {...dndA11y}
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={onDragEnd}
+      >
         <SortableContext items={nodes.map(n => n.id)} strategy={verticalListSortingStrategy}>
           <ul className="space-y-0.5">
             {nodes.map((n, i) => (
