@@ -7,6 +7,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const STORE = '09b5dbd1-1774-49b5-b781-e06d0ee7b0fe';
 const h = vi.hoisted(() => ({ calls: [] as Array<[string, unknown]> }));
 
+vi.mock('@api/lib/customer-groups-store', async () => {
+  const { CustomerGroups } = await import('@api/lib/customer-groups');
+  return { loadCustomerGroups: async () => new CustomerGroups([]) };
+});
 vi.mock('@ebda/database', async () =>
   (await import('./helpers/database-mock')).databaseMock({
     prisma: new Proxy(
@@ -31,12 +35,19 @@ vi.mock('@api/lib/customer-directory', () => ({
     ids.map(id => ({ id, email: `${id}@x.com`, firstName: 'Ann', lastName: id })),
 }));
 const money = {
+  // QA98-ALIAS-1: buyer identity rows; the API folds them with the one customer grouping (two registered buyers here).
+  analyticsBuyerIdentities: async (a: unknown) => (
+    h.calls.push(['identities', a]),
+    [
+      { customerId: 'c1', email: null, phone: null, n: 2 },
+      { customerId: 'c2', email: null, phone: null, n: 1 },
+    ]
+  ),
   analyticsPeriod: async (a: unknown) => (
     h.calls.push(['period', a]),
     {
       revenue: 5000,
       orders: 3,
-      customers: 2,
       profit: 700,
       costedLines: 2,
       missingLines: 0,
@@ -111,10 +122,10 @@ describe('AnalyticsService on a DO store (Postgres throws)', () => {
     expect(
       await AnalyticsService.countDistinctCustomers(STORE, range.startDate, range.endDate)
     ).toBe(2);
-    expect(h.calls[0][1]).toMatchObject({
-      startMs: range.startDate.getTime(),
-      nonRevenue: expect.any(Array),
-    });
+    expect(h.calls[0]).toEqual([
+      'identities',
+      { mode: 'all', startMs: range.startDate.getTime(), endMs: range.endDate.getTime() },
+    ]);
   });
 
   it('sales chart zero-fills the buckets around the DO rows', async () => {

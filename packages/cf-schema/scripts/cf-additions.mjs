@@ -53,6 +53,14 @@ export const LATE_COLUMN_MIGRATIONS = {
   3: 'late_columns',
   7: 'billing_eta_fields',
   10: 'store_template_original',
+  19: 'pending_billing_interval',
+};
+
+// Columns that ARE in schema.prisma but reached production D1 after 0001 was applied: the generator flags them `since: n`
+// (0001 is emitted without them, the numbered migration adds each once), exactly like an `extraColumns` entry. `{ Model: { field: n } }`.
+export const latePrismaColumns = {
+  // Ruling BILLING-INTERVAL-PENDING-1: the interval an active store picked at checkout, applied when its payment is recorded.
+  StoreSubscription: { pendingBillingInterval: 19 },
 };
 
 export const extraColumns = {

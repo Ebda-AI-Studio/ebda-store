@@ -87,7 +87,7 @@ export function SectionTypographyBlock({
   const t = useT('orders.layout');
   return (
     <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
-      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <h4 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
         {t('typography.sectionOverrideTitle')}
       </h4>
       <p className="mb-3 text-xs text-muted-foreground/80">{t('typography.sectionOverrideHint')}</p>

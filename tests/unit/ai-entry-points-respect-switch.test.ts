@@ -31,7 +31,7 @@ vi.mock('@api/lib/store-scoped-read', () => ({
 vi.mock('@api/lib/repo-factory', async importOriginal => ({
   ...(await importOriginal<typeof import('@api/lib/repo-factory')>()),
   storeDb: async () => ({
-    store: { findUnique: async () => ({ aiFeaturesEnabled: sw.enabled }) },
+    store: { findUnique: async () => ({ aiFeaturesEnabled: sw.enabled, status: 'active' }) },
   }),
 }));
 
@@ -119,7 +119,6 @@ describe('layer 2: anything that calls a model asks the switch (directly or thro
     'lib/ai/product-category-suggester.ts':
       'called by bulk-ai-categorize and ai-autofill, which budget (assertAiQuota) / read the switch (readFillPlan)',
     'lib/ai/product-excerpt-generator.ts': 'same: its callers budget through assertAiQuota',
-    'lib/ai/product-meta-aeo-generator.ts': 'same: its callers budget through assertAiQuota',
     'lib/ai/product-tag-suggester.ts': 'same: its callers budget through assertAiQuota',
     'lib/ai/product-alt-text-generator.ts': 'same: its callers budget through assertAiQuota',
   };

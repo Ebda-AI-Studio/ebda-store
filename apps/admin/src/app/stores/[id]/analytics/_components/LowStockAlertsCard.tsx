@@ -17,7 +17,7 @@ export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
   const t = useT('analytics.lowStock');
 
   return (
-    <div className="bg-card rounded-xl border p-6 shadow-sm">
+    <div className="bg-card rounded-md border p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h2>
       {products.length === 0 ? (
         <div className="text-center py-4">
@@ -46,10 +46,10 @@ export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
                   alt={product.name}
                   width={40}
                   height={40}
-                  className="w-10 h-10 rounded object-cover"
+                  className="w-10 h-10 rounded-md object-cover"
                 />
               ) : (
-                <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center">
                   <svg
                     className="w-5 h-5 text-muted-foreground"
                     fill="none"
@@ -71,17 +71,17 @@ export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
                 {/* Backorder enrichment — shown when Batch 2 data is present */}
                 <div className="flex flex-wrap gap-1 mt-1">
                   {(product.openBackorderCount ?? 0) > 0 && (
-                    <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-warning/10 text-warning-ink">
+                    <span className="px-1.5 py-0.5 text-xs font-medium rounded-md bg-warning/10 text-warning-ink">
                       {t('openBackorders', { count: product.openBackorderCount ?? 0 })}
                     </span>
                   )}
                   {product.acceptsBackorder && (
-                    <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    <span className="px-1.5 py-0.5 text-xs font-medium rounded-md bg-info/10 text-info-ink">
                       {t('acceptsBackorder')}
                     </span>
                   )}
                   {product.reorderRule && (
-                    <span className="px-1.5 py-0.5 text-xs text-muted-foreground rounded bg-muted">
+                    <span className="px-1.5 py-0.5 text-xs text-muted-foreground rounded-md bg-muted">
                       {t('reorderRule', {
                         min: product.reorderRule.minQty,
                         qty: product.reorderRule.reorderQty,
@@ -92,7 +92,7 @@ export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
                 </div>
               </div>
               <span
-                className={`px-2 py-1 text-xs font-semibold rounded shrink-0 ${
+                className={`px-2 py-1 text-xs font-semibold rounded-md shrink-0 ${
                   product.inventory === 0
                     ? 'bg-destructive/10 text-destructive-ink dark:bg-destructive/30 dark:text-destructive-ink'
                     : product.inventory <= 5

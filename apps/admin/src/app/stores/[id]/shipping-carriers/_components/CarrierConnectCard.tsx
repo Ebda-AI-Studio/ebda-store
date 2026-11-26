@@ -11,6 +11,7 @@ import {
   type CredentialMode,
   type ProviderCatalogEntry,
 } from '@ebda/shared';
+import { ProviderLogo } from '@/components/ProviderLogo';
 import { useT } from '@/i18n/useT';
 import { Alert } from '../../../../../components/Alert';
 import { apiPost, apiPut } from '../../../../../lib/api';
@@ -22,6 +23,7 @@ import {
   type CarrierConfigRow,
   type CarrierSettings,
 } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface TestOutcome {
   ok: boolean;
@@ -43,8 +45,7 @@ interface Props {
   onChanged: () => Promise<void> | void;
 }
 
-const inputClass =
-  'w-full rounded-lg border border-border bg-background px-3 py-1.5 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60';
+const inputClass = FIELD_CLASSES;
 const btnPrimary = buttonVariants({ size: 'sm' });
 const btnOutline = buttonVariants({ variant: 'outline', size: 'sm' });
 
@@ -248,7 +249,7 @@ export function CarrierConnectCard({ entry, config, storeId, onChanged }: Props)
 
   return (
     <div
-      className={`overflow-hidden rounded-xl border bg-card shadow-sm ${
+      className={`overflow-hidden rounded-md border bg-card shadow-sm ${
         config?.enabled ? 'border-s-4' : ''
       }`}
       style={config?.enabled ? { borderInlineStartColor: entry.logo.color } : undefined}
@@ -256,13 +257,7 @@ export function CarrierConnectCard({ entry, config, storeId, onChanged }: Props)
     >
       {/* header */}
       <div className="flex flex-wrap items-center gap-3 p-4">
-        <div
-          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-sm font-bold text-white"
-          style={{ backgroundColor: entry.logo.color }}
-          aria-hidden="true"
-        >
-          {entry.logo.monogram}
-        </div>
+        <ProviderLogo code={entry.code} name={entry.name[locale]} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-semibold text-foreground">{entry.name[locale]}</h3>
@@ -279,7 +274,7 @@ export function CarrierConnectCard({ entry, config, storeId, onChanged }: Props)
             {entry.capabilities.methods.map(m => (
               <span
                 key={m}
-                className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+                className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
               >
                 {t(`capabilities.${m}`)}
               </span>
@@ -533,7 +528,7 @@ export function CarrierConnectCard({ entry, config, storeId, onChanged }: Props)
                   onChange={e => toggle(e.target.checked)}
                   className="peer sr-only"
                 />
-                <div className="peer h-6 w-11 rounded-full bg-border after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-400/40 peer-disabled:opacity-50" />
+                <div className="peer h-6 w-11 rounded-full bg-border after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-success peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-focus-visible:ring-2 peer-focus-visible:ring-success/40 peer-disabled:opacity-50" />
               </label>
             </div>
           </div>
@@ -636,7 +631,7 @@ function CarrierSettingsForm({
         <div>
           <label
             htmlFor={`${entry.code}-weight`}
-            className="mb-1 block text-xs text-muted-foreground"
+            className="mb-1 block text-sm text-muted-foreground"
           >
             {t('settings.defaultWeight')}
           </label>
@@ -655,7 +650,7 @@ function CarrierSettingsForm({
           <div>
             <label
               htmlFor={`${entry.code}-size`}
-              className="mb-1 block text-xs text-muted-foreground"
+              className="mb-1 block text-sm text-muted-foreground"
             >
               {t('settings.packageSize')}
             </label>
@@ -678,7 +673,7 @@ function CarrierSettingsForm({
           <div>
             <label
               htmlFor="aramex-product-type"
-              className="mb-1 block text-xs text-muted-foreground"
+              className="mb-1 block text-sm text-muted-foreground"
             >
               {t('settings.productType')}
             </label>

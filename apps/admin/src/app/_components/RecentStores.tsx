@@ -7,6 +7,8 @@ import { formatDate } from '../../lib/format';
 import { useT } from '@/i18n/useT';
 import type { RecentStore } from './types';
 
+const STORE_STATUSES = new Set(['active', 'inactive', 'suspended']);
+
 interface RecentStoresProps {
   stores: RecentStore[];
   isLoading: boolean;
@@ -14,6 +16,7 @@ interface RecentStoresProps {
 
 export function RecentStores({ stores, isLoading }: RecentStoresProps) {
   const t = useT('dashboard.super');
+  const tStatus = useT('stores.list.status');
 
   return (
     // Slim variant matching RecentOrders — half the vertical
@@ -66,7 +69,7 @@ export function RecentStores({ stores, isLoading }: RecentStoresProps) {
                   variant={store.status === 'active' ? 'default' : 'secondary'}
                   className="text-xs px-2 py-0.5 capitalize"
                 >
-                  {store.status}
+                  {STORE_STATUSES.has(store.status) ? tStatus(store.status) : store.status}
                 </Badge>
                 <p className="text-xs text-muted-foreground">{formatDate(store.createdAt)}</p>
               </div>
@@ -74,7 +77,7 @@ export function RecentStores({ stores, isLoading }: RecentStoresProps) {
           ))
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
               <svg
                 className="h-8 w-8 text-muted-foreground"
                 fill="none"

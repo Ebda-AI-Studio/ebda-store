@@ -186,6 +186,7 @@ export async function handleOrderStatusChanged(
       notificationDispatcher.dispatch(storeId, 'order_delivered', {
         customerName,
         customerPhone,
+        customerId: order.customerId ?? undefined,
         orderNumber: order.orderNumber,
         total: order.total,
         storeId,
@@ -261,6 +262,7 @@ export async function handleOrderStatusChanged(
       notificationDispatcher.dispatch(storeId, 'order_shipped', {
         customerName,
         customerPhone,
+        customerId: order.customerId ?? undefined,
         orderNumber: order.orderNumber,
         total: order.total,
         storeId,
@@ -273,6 +275,7 @@ export async function handleOrderStatusChanged(
       notificationDispatcher.dispatch(storeId, 'order_cancelled', {
         customerName,
         customerPhone,
+        customerId: order.customerId ?? undefined,
         orderNumber: order.orderNumber,
         total: order.total,
         storeId,

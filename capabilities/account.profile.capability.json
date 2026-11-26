@@ -18,7 +18,7 @@
   },
   "helpArticle": "account-security",
   "questions": {
-    "ar": ["ازاي اغير اسمي او رقمي؟", "عايز اغير الايميل بتاعي"],
+    "ar": ["ازاي اغير اسمي او رقمي؟", "عايز اغير الايميل بتاعي", "فين صفحة بياناتي؟"],
     "en": ["How do I change my name or phone?"]
   },
   "steps": ["Account menu > profile."],
