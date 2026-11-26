@@ -53,6 +53,7 @@ export const LATE_COLUMN_MIGRATIONS = {
   3: 'late_columns',
   7: 'billing_eta_fields',
   10: 'store_template_original',
+  18: 'trust_requests_decided_at',
   19: 'pending_billing_interval',
 };
 
@@ -131,6 +132,15 @@ export const extraColumns = {
       optional: true,
       since: 10,
       note: 'the template before 0009 remapped a retired skin (revert path); NULL = never remapped or not recorded',
+    }),
+  ],
+  // G19: when a super admin (or the reactivation close) moved a request out of `open`. 0012 may already be applied, so the
+  // column arrives as its own numbered migration rather than by editing 0012. NULL = still open, or decided before 0018 (renumbered from 0013, Ruling D1-0013-2).
+  TrustRequest: [
+    f('decidedAt', 'DateTime', {
+      optional: true,
+      since: 18,
+      note: 'when the request left status open (resolved or rejected); NULL = open, or decided before this column existed',
     }),
   ],
   Customer: [

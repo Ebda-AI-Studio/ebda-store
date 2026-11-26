@@ -59,6 +59,7 @@ const TABLES: Record<string, string> = {
   Store: 'stores',
   BillingEvent: 'billing_events',
   StoreSubscription: 'store_subscriptions',
+  TrustRequest: 'trust_requests',
 };
 const tableOf = (model: string) => {
   const t = TABLES[model];

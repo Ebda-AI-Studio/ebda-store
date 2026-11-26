@@ -34,6 +34,8 @@ interface TrustRow {
   slug: string | null;
   evidenceUrl: string | null;
   createdAt: string;
+  /** When a super admin (or the reactivation close) decided it; null while open. */
+  decidedAt: string | null;
 }
 interface Filters {
   kind: '' | Kind;
@@ -204,11 +206,13 @@ function Inner() {
             <table className="w-full text-start text-sm">
               <thead>
                 <tr className="text-xs text-muted-foreground">
-                  {(['kind', 'status', 'store', 'summary', 'created'] as const).map(c => (
-                    <th key={c} scope="col" className="py-1 pe-3 text-start font-medium">
-                      {t(`col.${c}`)}
-                    </th>
-                  ))}
+                  {(['kind', 'status', 'store', 'summary', 'created', 'decided'] as const).map(
+                    c => (
+                      <th key={c} scope="col" className="py-1 pe-3 text-start font-medium">
+                        {t(`col.${c}`)}
+                      </th>
+                    )
+                  )}
                   <th scope="col" className="py-1 text-start font-medium">
                     <span className="sr-only">{t('col.open')}</span>
                   </th>
@@ -229,6 +233,9 @@ function Inner() {
                     </td>
                     <td className="pe-3 text-sm text-muted-foreground" dir="ltr">
                       {when(r.createdAt)}
+                    </td>
+                    <td className="pe-3 text-xs text-muted-foreground" dir="ltr">
+                      {r.decidedAt ? when(r.decidedAt) : '—'}
                     </td>
                     <td>
                       <Button variant="outline" onClick={() => void open(r.id)}>
@@ -275,6 +282,11 @@ function Inner() {
                 <Item label={t('detail.page')} value={detail.pageUrl} ltr />
                 <Item label={t('detail.evidence')} value={detail.evidenceUrl} ltr />
                 <Item label={t('col.created')} value={when(detail.createdAt)} ltr />
+                <Item
+                  label={t('col.decided')}
+                  value={detail.decidedAt ? when(detail.decidedAt) : null}
+                  ltr
+                />
               </dl>
               <p className="mt-3 text-sm text-muted-foreground">{t('detail.message')}</p>
               <p className="mt-1 whitespace-pre-wrap rounded-md border border-border bg-background p-3 text-sm">

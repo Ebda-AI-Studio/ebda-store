@@ -12458,6 +12458,7 @@
       "store": "Store",
       "summary": "Request",
       "created": "Created",
+      "decided": "Decided",
       "open": "Open"
     },
     "detail": {

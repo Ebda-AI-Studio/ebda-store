@@ -696,6 +696,7 @@ export const trustRequests = sqliteTable('trust_requests', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  decidedAt: integer('decided_at', { mode: 'timestamp_ms' }),
 });
 
 export const webhookEvents = sqliteTable('webhook_events', {
