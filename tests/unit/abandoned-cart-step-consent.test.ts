@@ -22,6 +22,15 @@ vi.mock('@ebda/database', () => ({
       },
     }),
 }));
+// the store record is read through the store's own backend (storeDb), as in notification-dispatcher-locale.test.ts
+vi.mock('@api/lib/repo-factory', () => ({
+  storeDb: async () => ({
+    store: {
+      findUnique: async () => ({ settings: null, slug: 's1', domain: null, name: 'متجر' }),
+    },
+  }),
+  storeRepo: async () => ({ backend: 'pg' }),
+}));
 vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: async () => true },
 }));

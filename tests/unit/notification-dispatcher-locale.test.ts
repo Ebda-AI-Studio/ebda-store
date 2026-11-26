@@ -22,6 +22,13 @@ vi.mock('@ebda/database', () => ({
       store: { findUnique: async () => ({ settings: h.storeSettings.value }) },
     }),
 }));
+// the store record is read through the store's own backend (storeDb); the event switches keep their withStore path (backend pg)
+vi.mock('@api/lib/repo-factory', () => ({
+  storeDb: async () => ({
+    store: { findUnique: async () => ({ settings: h.storeSettings.value }) },
+  }),
+  storeRepo: async () => ({ backend: 'pg' }),
+}));
 vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: async () => true },
 }));

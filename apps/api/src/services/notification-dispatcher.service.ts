@@ -16,7 +16,7 @@ import { smsQueue } from './sms-queue.service';
 import { pushService } from './push.service';
 import { redis } from './redis.service';
 import { prisma, withStore } from '@ebda/database';
-import { storeRepo } from '../lib/repo-factory';
+import { storeDb, storeRepo } from '../lib/repo-factory';
 import logger from '../lib/logger';
 import { config } from '../config';
 import { SmsConsentService } from './sms-consent.service';
@@ -368,8 +368,13 @@ class NotificationDispatcherService {
 export async function resolveShopperLocale(storeId: string, stored: unknown): Promise<'en' | 'ar'> {
   if (stored === 'en' || stored === 'ar') return stored;
   try {
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { settings: true } })
+    // The store's own backend (a Durable Object store's record is its DO: the Prisma read threw POSTGRES_REMOVED and the
+    // catch below silently answered the region default, so a store whose default language is `en` got Arabic SMS / push).
+    const store = await withStore(storeId, async () =>
+      (await storeDb(storeId)).store.findUnique({
+        where: { id: storeId },
+        select: { settings: true },
+      })
     );
     return resolveDefaultLanguage(
       (store?.settings as { defaultLanguage?: string } | null)?.defaultLanguage
@@ -404,8 +409,10 @@ const optOutBaseCache = new BoundedMap<string, { base: Promise<string>; expiresA
 
 async function readStorefrontBase(storeId: string): Promise<{ base: string; found: boolean }> {
   // `stores` is under RLS (R-EBDA-005): read in the store's own scope.
-  const store = await withStore(storeId, tx =>
-    tx.store.findUnique({
+  // Through the store's own backend: a Durable Object store's record is its DO (the Prisma read threw POSTGRES_REMOVED, so no
+  // promotional SMS could build its opt-out link).
+  const store = await withStore(storeId, async () =>
+    (await storeDb(storeId)).store.findUnique({
       where: { id: storeId },
       select: { domain: true, slug: true },
     })
