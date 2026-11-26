@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { bodyShapeViolation, type BodyShapeLimits } from '../lib/body-shape';
+import { bodyShapeViolation, type BodyShapeLimits } from '@ebda/shared/request-guard';
 
 /**
  * API-wide guard, mounted right after the JSON/urlencoded parsers and before any route or schema

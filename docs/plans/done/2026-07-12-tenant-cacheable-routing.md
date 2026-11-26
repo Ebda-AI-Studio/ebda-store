@@ -268,8 +268,8 @@ Every phase is reversible independently: the env-var gate means any phase can be
 
 ### Critical Files for Implementation
 
-- /Users/ahmadsharaf/Desktop/projects/ebda-store/apps/web/middleware.ts
-- /Users/ahmadsharaf/Desktop/projects/ebda-store/apps/web/src/lib/store-resolver.ts
-- /Users/ahmadsharaf/Desktop/projects/ebda-store/apps/web/src/app/layout.tsx
-- /Users/ahmadsharaf/Desktop/projects/ebda-store/apps/web/open-next.config.ts
-- /Users/ahmadsharaf/Desktop/projects/ebda-store/scripts/cf-setup-local.sh
+- ~/Desktop/projects/ebda-store/apps/web/middleware.ts
+- ~/Desktop/projects/ebda-store/apps/web/src/lib/store-resolver.ts
+- ~/Desktop/projects/ebda-store/apps/web/src/app/layout.tsx
+- ~/Desktop/projects/ebda-store/apps/web/open-next.config.ts
+- ~/Desktop/projects/ebda-store/scripts/cf-setup-local.sh

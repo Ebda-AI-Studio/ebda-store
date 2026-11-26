@@ -1,10 +1,21 @@
 {
   "common": {
+    "dndA11y": {
+      "instructions": "To pick up an item, press the space bar. While dragging, use the arrow keys to move it. Press space again to drop it, or Escape to cancel.",
+      "pickedUp": "Picked up the item.",
+      "movedOver": "The item is over position {position}.",
+      "dropped": "Dropped the item at position {position}.",
+      "droppedBack": "Dropped the item. It is back where it was.",
+      "cancelled": "Cancelled. The item is back where it was."
+    },
     "save": "Save",
     "cancel": "Cancel",
     "storeNotOperational": "This store is suspended, so Ebda AI Studio has paused messages to customers and payouts. Contact support to get it reactivated.",
     "storeNotOperationalTitle": "Store suspended",
     "storeNotOperationalAppeal": "Contact support to appeal",
+    "storeNotOperationalAppealForm": "Appeal this suspension",
+    "storeNotOperationalBilling": "This store is suspended for an unpaid invoice, so Ebda AI Studio has paused messages to customers and payouts. Pay the invoice and the store switches back on.",
+    "storeNotOperationalPay": "Pay the invoice",
     "delete": "Delete",
     "edit": "Edit",
     "close": "Close",
@@ -201,7 +212,9 @@
         "stockValue": "Stock value",
         "openBackorders": "Open backorders",
         "topRfmSegment": "Top Customer Segment",
-        "error": "Unable to load financial summary"
+        "error": "Unable to load financial summary",
+        "unknown": "Unknown",
+        "netPartial": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower."
       },
       "details": {
         "title": "Store Details",
@@ -345,7 +358,8 @@
         "reviews": "Reviews waiting for approval",
         "allClear": "Nothing is waiting for you right now.",
         "loadFailed": "We could not load what needs your attention right now.",
-        "retry": "Try again"
+        "retry": "Try again",
+        "seoMissing": "Store title and description for search engines are still empty"
       },
       "pulse": {
         "title": "Store pulse",
@@ -358,16 +372,19 @@
         },
         "salesLabel": "Sales",
         "vsPrevious": "vs the previous period",
+        "newBadge": "New",
         "deltaSr": {
           "up": "Up {percent}%",
           "down": "Down {percent}%",
-          "flat": "No change"
+          "flat": "No change",
+          "new": "New: no sales in the previous period"
         },
         "sentence": {
-          "up": "Up {percent}% on the previous period, from {orders} orders.",
-          "down": "Down {percent}% on the previous period, from {orders} orders.",
-          "flat": "Same as the previous period, from {orders} orders.",
-          "unknown": "From {orders} orders."
+          "up": "Up {percent}% on the previous period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "down": "Down {percent}% on the previous period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "new": "First sales in this period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "flat": "Same as the previous period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "unknown": "From {ordersN, plural, one {{orders} order} other {{orders} orders}}."
         },
         "sparkLabel": "Sales per day across this period, latest day highlighted",
         "emptyBody": "No sales in this period yet. Share your store link with your customers to get the first order.",
@@ -424,12 +441,23 @@
             "label": "Act",
             "meaning": "The merchant can apply changes with one press; sensitive ones still need their confirmation."
           }
+        },
+        "effectiveOff": "The store does not see the assistant right now: {reason}",
+        "effectiveCapped": "The store sees the assistant in \"{mode}\" mode only (lower than saved).",
+        "reasons": {
+          "global_kill": "The assistant is stopped platform-wide (kill switch).",
+          "product_kill": "The Store assistant is stopped platform-wide.",
+          "platform_cap_off": "The platform-wide cap is still \"off\". Open it in platform settings.",
+          "store_ai_off": "The merchant turned AI features off for their store.",
+          "store_mode_off": "The store's own mode is off.",
+          "unreadable": "We could not read the assistant settings, so it is off for now."
         }
       }
     },
     "list": {
       "title": "Stores",
       "subtitleCount": "{count} stores on the platform",
+      "subtitleFiltered": "{count} stores ({status})",
       "createStore": "Create Store",
       "searchPlaceholder": "Search by name, slug, or owner…",
       "search": "Search",
@@ -574,6 +602,11 @@
       "errSession": "Your session ended. Sign in again to continue.",
       "errNetwork": "No connection right now. Check your internet and try again.",
       "securityLink": "Open account security"
+    },
+    "notFound": {
+      "title": "This store was not found",
+      "body": "This link is not for a store you can open. It may have been deleted, or the link has a typo. Go back to your stores and pick yours from there.",
+      "backToStores": "Back to my stores"
     }
   },
   "products": {
@@ -599,7 +632,11 @@
         "draft": "Draft",
         "archived": "Archived",
         "allCategories": "All categories",
-        "categoryAriaLabel": "Filter products by category"
+        "categoryAriaLabel": "Filter products by category",
+        "model3dAriaLabel": "Filter products by 3D model",
+        "model3dAny": "Any 3D model",
+        "model3dWith": "With a 3D model",
+        "model3dWithout": "Without a 3D model"
       },
       "status": {
         "active": "Active",
@@ -869,7 +906,10 @@
         "searchTermsDropped": "Words that will not be saved (over the limit): {count}",
         "searchTermsAtLimit": "Limit reached",
         "searchTermsNearLimit": "Almost at the limit",
-        "priceMinError": "The price must be more than zero."
+        "priceMinError": "The price must be more than zero.",
+        "slug": "Link (slug)",
+        "slugHint": "Part of the product's web address. Changing it keeps the old link working: visitors are redirected to the new one.",
+        "slugInvalid": "Use lowercase letters, numbers, Arabic letters and hyphens only."
       },
       "statusOptions": {
         "draft": "Draft",
@@ -983,7 +1023,8 @@
       "createdBanner": "Product added. Next step: add sizes or colours if it has any.",
       "addVariants": "Add variants",
       "toast": {
-        "saved": "Product saved"
+        "saved": "Product saved",
+        "savedSlugChanged": "Product saved. That link was already taken, so it is now: {slug}"
       },
       "tabs": {
         "label": "Product page sections",
@@ -1371,7 +1412,7 @@
         "status": "Status",
         "date": "Date",
         "actions": "Actions",
-        "totalValue": "{amount} EGP",
+        "totalValue": "{amount}",
         "moreItems": "+{count} more",
         "agentBadge": "Agent"
       },
@@ -1407,6 +1448,7 @@
         "confirm": "Confirm",
         "cancel": "Cancel",
         "manualRefundTitle": "Mark Order as Refunded?",
+        "manualRefundPartialHint": "Refunding only some items, or want the goods back on the shelf? Close this and use “Refund part of the order” from the ⋯ menu on the order page.",
         "manualRefundDescription": "Confirm only after you have already given the customer their money back. This records the refund — it does not send any money. It restores stock, reverses the coupon and loyalty points, and the customer will be told their refund was issued.",
         "manualRefundDescriptionCancelled": "This order was cancelled, so its stock, coupon and loyalty points were already reversed. Confirm only after you have already given the customer their money back. This records the refund on the order — it does not send any money — and the customer will be told their refund was issued.",
         "refundMethodLabel": "How did you refund the customer?",
@@ -1560,6 +1602,10 @@
       "paid": "Paid",
       "unpaid": "Unpaid",
       "remain": "Remain {amount}",
+      "refunded": "Refunded",
+      "refundedAmount": "Refunded {amount}",
+      "partially_refunded": "Partially refunded",
+      "disputed": "Disputed",
       "paymentMethod": "Payment method",
       "methodCod": "Cash on delivery",
       "paymentTransactionId": "Transaction ID",
@@ -1752,6 +1798,56 @@
         "object": "Order {number}",
         "consequence": "The order is cancelled and its status cannot be restored.",
         "confirmLabel": "Cancel the order"
+      },
+      "partialRefund": {
+        "button": "Partial refund",
+        "title": "Refund part of order {orderNumber}",
+        "loading": "Loading the order's refund balance…",
+        "loadFailed": "Could not load the refund balance. Close this window and try again.",
+        "paid": "Paid",
+        "alreadyRefunded": "Already refunded",
+        "remaining": "Can still be refunded",
+        "blocked": {
+          "NOT_DELIVERED": "Only a delivered order can be partly refunded here. Mark it delivered first.",
+          "GUEST_ORDER": "This order was placed as a guest, so a partial refund by line is not available for it yet."
+        },
+        "nothingLeft": "This order has nothing left to refund.",
+        "methodLabel": "How is the money going back?",
+        "methods": {
+          "original_payment": "Original payment method",
+          "cash": "Cash",
+          "bank_transfer": "Bank transfer",
+          "manual": "Already refunded - record only"
+        },
+        "methodHint": {
+          "original_payment": "The refund is sent to the payment provider for this amount.",
+          "cash": "You hand the money back yourself. The store records it.",
+          "bank_transfer": "You send the money yourself. The store records it.",
+          "manual": "The money already went back some other way. The store only records it."
+        },
+        "reasonLabel": "Reason (required)",
+        "reasonPlaceholder": "Damaged in transit, wrong size, customer request…",
+        "pickLines": "Tick the lines you are refunding.",
+        "estimating": "Working out the amount…",
+        "estimate": "This refund pays back about {amount} {currency}, the items' share of any discount and tax.",
+        "toastSuccessTitle": "Refund done",
+        "toastSuccessBody": "{amount} {currency} was refunded.",
+        "refunding": "Refunding…",
+        "confirm": "Refund now",
+        "errors": {
+          "REFUND_EXCEEDS_ORDER": "This would refund more than the customer paid. Nothing was refunded.",
+          "NOTHING_REFUNDABLE": "This order has nothing left to refund.",
+          "INVALID_QUANTITY": "One of the quantities is more than what is still open on that line. Reopen this window and try again.",
+          "FULL_RETURN_RESTOCK_ALL": "Refunding every line puts every line back on the shelf. Leave one unit out, or keep restocking on.",
+          "RETURNS_FEATURE_REQUIRED_FOR_RESTOCK": "Putting refunded goods back on the shelf needs the Returns feature on your plan. Refund again without restocking: the money refund still goes through, only the stock is left alone.",
+          "GUEST_ORDER_RETURN_UNSUPPORTED": "This order was placed as a guest, so a refund by line is not available for it yet.",
+          "INVALID_ORDER": "This order cannot be refunded here. It must be delivered.",
+          "PROVIDER_REFUND_INDETERMINATE": "The refund reached the payment provider but could not be finished here. Do NOT refund again. Check the provider dashboard first.",
+          "PROVIDER_REFUND_FAILED": "The payment provider refused the refund. Nothing was refunded. Try again or pick another method.",
+          "IDEMPOTENCY_IN_PROGRESS": "This refund is already being processed. Check the order before trying again.",
+          "FORBIDDEN": "Your role cannot refund to the original payment. Pick cash, bank transfer or record-only.",
+          "UNKNOWN": "The refund did not go through. Nothing was refunded. Try again."
+        }
       }
     },
     "layout": {
@@ -1969,7 +2065,7 @@
         "repeatSub": "{repeat} of {buyers} buyers ordered again",
         "noBuyersSub": "No orders yet",
         "ordersSub": "{count, plural, one {Across {count, number, latn} order} other {Across {count, number, latn} orders}}",
-        "spentSub": "All orders except cancelled, refunded and failed payments (unpaid COD counts)"
+        "spentSub": "All orders except cancelled, refunded and failed payments (unpaid COD counts; abandoned online checkouts do not)"
       },
       "moreMenu": "More customer options"
     },
@@ -2132,6 +2228,7 @@
       "totalCustomers": "Total Customers",
       "avgOrderValue": "Avg Order Value",
       "vsLastPeriod": "vs last period",
+      "newVsPrevious": "New",
       "profitUnknown": "Unknown",
       "profitMissingCost": "Profit unknown — cost price missing on {count} sold items",
       "profitPartial": "Excludes {count} sold items with no cost price ({amount} in sales)",
@@ -2186,11 +2283,15 @@
       "netIncome": "Net income (GL)",
       "grossProfitUnknown": "Unknown",
       "noCogsBooked": "No cost of goods was booked for this period, so gross profit cannot be told apart from revenue. Cost is booked for orders whose products had a cost price when sold.",
+      "costsPartial": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower.",
       "window": "General-ledger figures for: {period}"
     },
     "inventorySnapshot": {
       "title": "Inventory snapshot (right now)",
       "stockValue": "Stock value",
+      "stockValueUnknown": "Unknown",
+      "stockValueMissingCost": "{count} stocked products have no cost price, so their value cannot be calculated.",
+      "stockValuePartial": "Calculated for {costed} of {stocked} stocked products — the rest have no cost price.",
       "openBackorders": "Open backorders",
       "backorderedDemandValue": "Backordered demand value",
       "reorderRules": "Reorder rules"
@@ -2310,6 +2411,10 @@
         "title": "Newsletter Subscribers",
         "description": "View and export the email list captured from your storefront"
       },
+      "activity": {
+        "title": "Activity log",
+        "description": "See who changed what in your store"
+      },
       "staff": {
         "title": "Team",
         "description": "Add staff with limited permissions"
@@ -2342,12 +2447,6 @@
         "title": "QR codes and barcodes",
         "description": "A QR for the store and barcodes for products and invoices"
       }
-    },
-    "metaCatalogCard": {
-      "provisionLabel": "Provision automatically · Ebda Store assisted",
-      "provisionDescription": "Creates a new Commerce Catalog under the Ebda Store parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
-      "provisionButton": "Provision automatically",
-      "provisioningButton": "Provisioning…"
     },
     "superAdmin": {
       "planLabel": "Store Plan",
@@ -3731,7 +3830,8 @@
       },
       "empty": {
         "title": "No Affiliates Yet",
-        "description": "Affiliates will appear here when they sign up or are invited."
+        "description": "Affiliates will appear here when they sign up or are invited.",
+        "invite": "Invite an affiliate"
       },
       "pagination": {
         "summary": "Page {page} of {totalPages} ({total} total)",
@@ -4098,13 +4198,14 @@
         "AI_QUOTA_DAILY_EXCEEDED": "Today's smart-tools limit is used up. Try again tomorrow.",
         "AI_QUOTA_MONTHLY_EXCEEDED": "This month's smart-tools limit is used up.",
         "AI_QUOTA_STORE_DAILY_EXCEEDED": "Today's smart-tools limit for your store is used up. Try again tomorrow.",
+        "AI_STORE_BILLING_SUSPENDED": "Smart tools are paused until your subscription is paid. Pay from the Billing page to turn them back on.",
         "AI_RATE_LIMITED": "Busy right now. Try this file again in a minute.",
         "AI_NOT_CONFIGURED": "Smart tools are not available right now.",
-        "AI_UPSTREAM_ERROR": "Could not read this file. Try again.",
-        "AI_BAD_RESPONSE": "Could not read this file. Try again.",
-        "BAD_RESPONSE": "Could not read this file. Try again.",
-        "FILE_UNREADABLE": "This file could not be opened.",
-        "EXTRACTION_FAILED": "Could not read this file. Try again.",
+        "AI_UPSTREAM_ERROR": "The reading service is busy right now. Try again in a minute (no pages were counted).",
+        "AI_BAD_RESPONSE": "We could not understand this file's content. Try a clearer photo (no pages were counted).",
+        "BAD_RESPONSE": "We could not understand this file's content. Try a clearer photo (its pages were counted).",
+        "FILE_UNREADABLE": "This file itself could not be opened. It may be damaged or in an unsupported format: try another file.",
+        "EXTRACTION_FAILED": "Reading this file failed. Try again (no pages were counted).",
         "TOO_MANY_RETRIES": "This file was tried too many times. Upload it again.",
         "DRAFTS_FAILED": "Some drafts could not be created. Check the items and try again.",
         "NETWORK": "No connection. Try again.",
@@ -4294,7 +4395,7 @@
       "recovered": "Ordered later",
       "recoveryRate": "Ordered-later rate",
       "recoveredRevenue": "Revenue from later orders",
-      "baseValue": "{amount} EGP",
+      "baseValue": "{amount}",
       "recoveryNotTracked": "Not tracked"
     },
     "status": {
@@ -4374,7 +4475,7 @@
     },
     "emailNudge": {
       "title": "Get abandoned carts back by email",
-      "body": "One reminder email per cart, sent as your store and only to shoppers who opted in. It is off until you turn it on.",
+      "body": "One email per cart, sent as your store and only to shoppers who opted in to your newsletter. The reminder steps below (up to 3 reminders by message and notification) are separate, and reach only shoppers who agreed to them. The email is off until you turn it on.",
       "review": "Review settings",
       "dismiss": "Not now"
     }
@@ -4382,7 +4483,8 @@
   "returns": {
     "page": {
       "title": "Returns & Exchanges",
-      "subtitle": "Manage return requests and refunds"
+      "subtitle": "Manage return requests and refunds",
+      "newReturn": "New return"
     },
     "stats": {
       "total": "Total Returns",
@@ -4470,6 +4572,7 @@
         "REFUND_ALREADY_ISSUED": "A refund for this return was already sent to the payment provider. Check the provider dashboard, then complete the return with \"Already refunded — record only\".",
         "RETURN_ALREADY_COMPLETING": "This return is already being completed. Refresh the page before trying again.",
         "PARTIAL_REFUND_EXCEEDS_PAYMENT": "Part of this payment was already refunded outside this return, so what is left is less than this return is worth. Complete it with store credit or bank transfer and settle the difference with the customer.",
+        "GUEST_STORE_CREDIT": "This is a guest return with no wallet to credit. Refund it to the original method or by bank transfer.",
         "PARTIAL_REFUND_NOTHING_TO_REFUND": "Every item in this return was already refunded by an earlier return.",
         "PAYMENT_FULLY_REFUNDED": "This payment has already been refunded in full.",
         "NO_COMPLETED_PAYMENT": "This order has no online payment to refund. Choose store credit or bank transfer.",
@@ -4487,7 +4590,10 @@
         "MANUAL_PROVIDER_REFUND": "This order was paid by InstaPay, which cannot refund through the system. Send the money back from your InstaPay app, then complete the return with \"Already refunded — record only\".",
         "OVERRIDE_NOT_APPLICABLE": "A refund override only applies to a partial return of a tier-priced item. Complete the return without it.",
         "OVERRIDE_OUT_OF_RANGE": "The override must be between 0 and the standard refund for that item.",
-        "OVERRIDE_UNKNOWN_ITEM": "The override names an item that is not on this return. Reopen the dialog and try again."
+        "OVERRIDE_UNKNOWN_ITEM": "The override names an item that is not on this return. Reopen the dialog and try again.",
+        "FULL_RETURN_RESTOCK_ALL": "Every line of this order is in this return, so every line goes back on the shelf. Open a new return that leaves one unit out if some goods are not coming back to stock.",
+        "GUEST_STORE_CREDIT": "Store credit needs a customer account. This order was placed as a guest, so refund it in cash, by bank transfer or manually.",
+        "RETURNS_FEATURE_REQUIRED_FOR_RESTOCK": "Putting refunded goods back on the shelf needs the Returns feature on your plan. Refund again without restocking: the money refund still goes through, only the stock is left alone."
       }
     },
     "modal": {
@@ -4562,7 +4668,42 @@
           "amount": "Enter an amount between 0 and {max}.",
           "reason": "Write a reason (at least 3 characters)."
         }
-      }
+      },
+      "storeCreditNeedsAccount": "Store credit needs a customer account. This order was placed as a guest, so refund it in cash, by bank transfer or manually."
+    },
+    "newReturn": {
+      "title": "New return",
+      "orderLabel": "Order number",
+      "orderPlaceholder": "For example ORD-1042",
+      "search": "Find order",
+      "noDeliveredOrder": "No delivered order matches that number.",
+      "pick": "Choose",
+      "loading": "Loading the order…",
+      "loadFailed": "Could not load the order. Close this window and try again.",
+      "blocked": {
+        "NOT_DELIVERED": "Only a delivered order can be returned. Mark it delivered first.",
+        "GUEST_ORDER": "This order was placed as a guest, so a return cannot be opened for it from here yet."
+      },
+      "forOrder": "Return for order {number}",
+      "reasonLabel": "Reason (required)",
+      "reasonPlaceholder": "Wrong size, damaged, changed their mind…",
+      "creating": "Opening the return…",
+      "create": "Open return",
+      "toastSuccessTitle": "Return opened",
+      "toastSuccessBody": "Return {number} is waiting for your approval.",
+      "errors": {
+        "INVALID_QUANTITY": "One of the quantities is more than what is still open on that line.",
+        "INVALID_ORDER": "This order cannot be returned. It must be delivered.",
+        "INVALID_ITEM": "One of the lines does not belong to this order.",
+        "GUEST_ORDER_RETURN_UNSUPPORTED": "This order was placed as a guest, so a return cannot be opened for it from here yet.",
+        "NO_ITEMS": "Tick at least one line.",
+        "bundle_returns_are_atomic": "A bundle can only be returned as a complete box.",
+        "FORBIDDEN": "Your role cannot open returns.",
+        "UNKNOWN": "The return was not opened. Try again."
+      },
+      "pickLines": "Tick the lines you are returning.",
+      "estimating": "Working out the amount…",
+      "estimate": "This return refunds about {amount} {currency}, the items' share of any discount and tax."
     }
   },
   "marketingPixels": {
@@ -4682,6 +4823,10 @@
       "subtitle": "Edit your About, Privacy, Terms and other long-form pages",
       "newPage": "Add a page",
       "newPagePrompt": "Page slug (lowercase letters, digits, dashes):",
+      "newPageTitle": "Add a page",
+      "newPageInvalid": "Use lowercase letters, digits and dashes only.",
+      "newPageConfirm": "Create page",
+      "newPageCancel": "Cancel",
       "openEditor": "Edit",
       "loadError": "Failed to load pages.",
       "publishedBadge": "Published",
@@ -4901,9 +5046,12 @@
     },
     "push": {
       "title": "Push Notifications",
-      "subtitle": "Standards-based Web Push (W3C Push API)",
+      "subtitle": "Send order updates and offers to shoppers who allow notifications in their browser.",
+      "statusAvailable": "Push is available",
+      "statusUnavailable": "Push is not available yet",
+      "unavailableHint": "We are setting push up for all stores. You do not need to do anything, we will let you know when it is ready.",
       "subscribers": "{count, number, latn} subscribers",
-      "platformNote": "Push notifications use the platform VAPID configuration. No per-store setup needed — just toggle Enabled."
+      "platformNote": "Nothing to set up on your side. Switch it on and shoppers who allow notifications will start receiving them."
     },
     "broadcast": {
       "title": "Send a broadcast",
@@ -4926,17 +5074,19 @@
       "send": "Send broadcast",
       "sending": "Sending…",
       "sentTitle": "Broadcast sent",
-      "sentDescription": "Targeted {count, number, latn} subscriber(s).",
+      "sentDescription": "Sent to {count, number, latn} subscriber(s).",
+      "channelOffTitle": "Push is switched off",
+      "channelOffDescription": "Turn on push notifications for this store above, then send again.",
       "sendFailed": "Failed to send broadcast.",
-      "notConfiguredTitle": "Push notifications are not available yet",
-      "notConfiguredDescription": "Push notifications are not available for your store yet. Try again later.",
+      "notConfiguredTitle": "Push is not available yet",
+      "notConfiguredDescription": "We are setting push up for all stores. This form unlocks as soon as it is ready. There is nothing for you to do.",
       "recentTitle": "Recent broadcasts",
       "recentEmpty": "No broadcasts sent yet.",
       "refresh": "Refresh",
       "refreshing": "Refreshing…",
       "untitled": "(untitled)",
       "deliveredCount": "{count, number, latn} delivered",
-      "clickedCount": "{count, number, latn} clicked"
+      "failedCount": "{count, number, latn} did not arrive"
     },
     "events": {
       "title": "Event Configuration",
@@ -5069,7 +5219,8 @@
         "totalEarned": "Total Earned",
         "totalRedeemed": "Total Redeemed",
         "actions": "Actions"
-      }
+      },
+      "owed": "Owes {count} points (spent before a refund)"
     },
     "award": {
       "title": "Award Points",
@@ -5523,7 +5674,7 @@
       "backToSettings": "Back to Settings",
       "manageRedirects": "Open redirects",
       "redirectsTitle": "Slug Redirects",
-      "redirectsSubtitle": "Old URLs that 301-redirect to a renamed product, category, or blog post.",
+      "redirectsSubtitle": "Old URLs that permanently (308) redirect to a renamed product, category, or blog post.",
       "redirectsFromSlug": "From",
       "redirectsToSlug": "To",
       "redirectsEntityType": "Type",
@@ -5980,7 +6131,8 @@
       "aiSaveResponseBody": "Your owner response has been saved to the review.",
       "aiSaveResponseFailed": "Failed to save response. Please try again.",
       "saving": "Saving...",
-      "searchPlaceholder": "Search reviews…"
+      "searchPlaceholder": "Search reviews…",
+      "emptyAction": "View your products"
     },
     "spam": "Spam"
   },
@@ -6013,6 +6165,7 @@
   },
   "auth": {
     "login": {
+      "stepUpRequired": "To confirm this change, sign in again. We will bring you back to the page afterwards.",
       "sessionEnded": "Your session ended because the password was changed or you signed out on another device. Please sign in again.",
       "title": "Sign in",
       "subtitle": "Sign in and get back to your store.",
@@ -6244,7 +6397,8 @@
       "markAllRead": "Mark all read",
       "clear": "Clear",
       "empty": "No notifications yet",
-      "reconnecting": "Reconnecting to notification server…"
+      "reconnecting": "Reconnecting to notification server…",
+      "needsAttention": "Needs your attention"
     },
     "connectionStatus": {
       "testing": "Testing…",
@@ -6337,6 +6491,7 @@
         "aiUsage": "Usage",
         "answerEngine": "Answer-Engine Insights",
         "marketingPixels": "Pixels",
+        "productFeeds": "Product feeds",
         "notifications": "Notifications",
         "newsletter": "Newsletter",
         "campaigns": "Campaigns",
@@ -6614,6 +6769,7 @@
     },
     "guestCheckout": {
       "notTracked": "Not tracked for guest checkout",
+      "abandonedExplainer": "Abandoned carts are not recorded for guest checkout, so these figures are unavailable. Only registered customers' carts appear here.",
       "registeredOnly": "Registered customers only",
       "checkoutsTableNote": "Checkouts started are not tracked for guest checkout — those days show “—” instead of 0."
     },
@@ -6798,7 +6954,7 @@
       "expenses": "Expenses",
       "net": "Net Income",
       "stockValue": "Stock Value",
-      "disabledVariantStockValue": "Held on disabled variants: {amount} EGP — not counted as stock",
+      "disabledVariantStockValue": "Held on disabled variants: {amount} — not counted as stock",
       "cash": "Cash by Account",
       "balanceSheet": "Balance Sheet",
       "assets": "Assets",
@@ -6810,11 +6966,19 @@
       "viewAll": "View all",
       "salesOrdersTitle": "Sales (from Orders)",
       "salesOrdersSource": "Orders",
-      "salesOrdersRevenue": "Paid Orders Revenue",
-      "salesOrdersCount": "Paid Orders",
+      "salesOrdersRevenue": "Net Sales (unpaid COD included)",
+      "salesOrdersCount": "Orders Counted",
       "salesOrdersCountUnit": "orders in period",
       "couldntLoad": "Couldn't load",
-      "loadFailedShort": "Could not load the finance dashboard."
+      "loadFailedShort": "Could not load the finance dashboard.",
+      "netUnknown": "Unknown",
+      "netNoCostsNote": "No cost of goods was booked for this period, so profit cannot be told apart from revenue.",
+      "netPartialNote": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower.",
+      "stockValueUnknown": "Unknown",
+      "stockValueMissingCost": "{count} stocked products have no cost price, so their value cannot be calculated.",
+      "stockValuePartial": "Calculated for {costed} of {stocked} stocked products — the rest have no cost price.",
+      "anomaliesNone": "No open anomalies.",
+      "anomaliesLoadFailed": "Could not load the anomalies."
     },
     "anomalies": {
       "title": "Profit Anomalies",
@@ -6963,7 +7127,7 @@
         "equity": "Equity",
         "totalEquity": "Total Equity",
         "balanced": "Balance sheet verified — Assets = Liabilities + Equity",
-        "unbalanced": "Out of balance by {amount} EGP — Assets ≠ Liabilities + Equity",
+        "unbalanced": "Out of balance by {amount} — Assets ≠ Liabilities + Equity",
         "currentEarnings": "Retained & current earnings",
         "currentEarningsHint": "Revenue minus expenses up to this date (not yet closed to an equity account)"
       },
@@ -7149,7 +7313,8 @@
       "couldntLoad": "Couldn't load",
       "lowStockScanNow": "Send low-stock alert now",
       "lowStockScanQueued": "Low-stock scan queued — the owner is emailed if any product newly dropped low",
-      "lowStockScanFailed": "Couldn't start the low-stock scan"
+      "lowStockScanFailed": "Couldn't start the low-stock scan",
+      "stockValueNoCost": "The value is zero because no cost price is entered for the products. Add the cost on each product so stock value can be calculated."
     },
     "inventory": {
       "title": "Inventory",
@@ -7251,14 +7416,16 @@
         "reconcileAction": "Approve differences"
       },
       "cameraPermission": "Allow camera access to scan barcodes, or enter manually below.",
-      "cameraNotSupported": "Camera scanning not supported in this browser. Use manual entry.",
+      "cameraNotSupported": "This device has no camera access for scanning. Use manual entry.",
+      "cameraEngineLoading": "Preparing the scanner…",
+      "cameraEngineFailed": "Could not load the scanner. Check your connection and try again, or enter the barcode manually.",
       "startCamera": "Start Camera",
       "stopCamera": "Stop Camera",
       "helpTitle": "What this page does",
       "helpReceive": "Scan a product barcode and enter a quantity to record incoming stock (a delivery from a supplier).",
       "helpPick": "Load an order by its number, then scan each item to mark it picked and track fulfillment.",
       "helpCount": "Run a cycle count: scan items on a shelf and enter the counted quantity — the system auto-adjusts any difference from the recorded stock.",
-      "helpCamera": "Camera scanning works in Chrome (Android/desktop) and Safari on iPhone (iOS 17+). On other browsers, type the barcode manually. Products must have a barcode set to be found.",
+      "helpCamera": "Camera scanning works on iPhone, Android and desktop, in the browser or the installed app. The first scan loads the scanner, which can take a few seconds. If the camera is blocked, allow it in your device settings, or type the barcode manually. Products must have a barcode set to be found.",
       "scanWithCamera": "Scan with camera",
       "pickChangeOrder": "Change",
       "colItem": "Item",
@@ -7515,6 +7682,10 @@
       "description": "AI-powered reorder suggestions based on velocity + lead time + open backorders.",
       "lastScanned": "Last scanned {time}",
       "rescanNow": "Re-scan now",
+      "scanQueued": "Scan queued and running in the background. We will refresh when it finishes.",
+      "scanDone": "Scan finished and Last scanned is updated.",
+      "scanNoChange": "The scan is still running or found nothing new. Refresh in a moment.",
+      "scanFailed": "Could not start the scan. Try again.",
       "empty": "No reorder suggestions right now. The next AI scan runs tomorrow at 06:00 Cairo time.",
       "comingSoon": "AI-powered reorder suggestions are coming in Batch 3.",
       "explainer": "We'll compute weekly velocity × supplier lead time + safety stock + open backorders to surface 'reorder N units of X' cards. One click to draft a PO pre-filled with quantities and the best supplier.",
@@ -7544,6 +7715,10 @@
       "description": "Slow-moving SKUs with AI-suggested clearance.",
       "lastScanned": "Last scanned {time}",
       "rescanNow": "Re-scan now",
+      "scanQueued": "Scan queued and running in the background. We will refresh when it finishes.",
+      "scanDone": "Scan finished and Last scanned is updated.",
+      "scanNoChange": "The scan is still running or found nothing new. Refresh in a moment.",
+      "scanFailed": "Could not start the scan. Try again.",
       "empty": "No dead stock found. A product is flagged when it is in stock, has not sold for 90+ days (a product that has never sold counts from the day it was added) and is worth at least EGP 5,000 at cost — or has no cost price set, in which case its value is shown as unknown.",
       "comingSoon": "AI-powered dead-stock detection is coming in Batch 3.",
       "explainer": "We'll flag products with 0 sales in 90 days and stock value above EGP 5,000, with AI-generated bilingual clearance copy and suggested discount %.",
@@ -8007,7 +8182,12 @@
     "seePlansCta": "See plans",
     "contactCta": "Talk to us",
     "requiresFeature": "Requires the “{feature}” feature.",
-    "alsoIncluded": "Also included in this plan"
+    "availableOnOrBuyOne": "Available on the {plan} plan. Upgrade, or add just this feature.",
+    "addJustThisCta": "Add just this feature",
+    "businessOffBody": "“{feature}” is part of your {plan} plan, but it is switched off for this store right now. Contact us and we will turn it on.",
+    "alsoIncluded": "Also included in this plan",
+    "noSoldPlan": "This feature is not part of a plan you can buy. Our team switches it on for a single store, so get in touch if you need it.",
+    "contactOnlyCta": "Talk to our team"
   },
   "aiTools": {
     "title": "AI tools",
@@ -8444,6 +8624,22 @@
       "firstFactorEmailHint": "To add your first sign-in method we e-mail a code to this account (enter your password, then press the button).",
       "signInAgainAfterEnrol": "You will be signed out now. Sign in again with your new sign-in method: that is what carries platform-admin access.",
       "savedSignInAgainButton": "Saved, sign me out",
+      "recovery": {
+        "title": "Recovery codes",
+        "description": "One-time codes that let you sign in if you lose your authenticator app. Each code works once. Making a new set cancels every old code, so save the new ones before you close this page.",
+        "remaining": "Unused codes left: {count}",
+        "passwordLabel": "Your password",
+        "codeLabel": "Authenticator code (6 digits)",
+        "regenerate": "Make new recovery codes",
+        "working": "Working…",
+        "done": "New recovery codes created. The old ones no longer work.",
+        "saveNow": "Save these codes now. They are shown only once.",
+        "saved": "I saved them",
+        "errorPassword": "That password is not right.",
+        "errorCode": "That authenticator code is not right. A recovery code cannot be used here.",
+        "errorThrottle": "Too many attempts. Wait a few minutes and try again.",
+        "errorGeneric": "Could not make new codes. Try again."
+      },
       "phone": {
         "title": "Phone number",
         "description": "The number on your account. It is where a password-reset code goes over WhatsApp when that is switched on, so changing it needs your password (and your authenticator code if 2FA is on).",
@@ -8461,8 +8657,102 @@
         "errorInvalid": "Enter a valid phone number, with the country code if it is not an Egyptian number.",
         "errorThrottle": "Too many attempts. Wait a few minutes and try again.",
         "errorGeneric": "Could not change the number. Try again."
+      },
+      "closeAccount": {
+        "title": "Close my account",
+        "description": "Permanently erases your personal data and closes your account. Stores you own must be transferred or closed first, and an account with a live paid store cannot be closed. Legally required order and tax records are kept without your identity. This cannot be undone.",
+        "confirmLabel": "Type {word} to confirm",
+        "confirmWord": "CLOSE",
+        "button": "Close my account permanently",
+        "closing": "Closing…",
+        "done": "Your account was closed.",
+        "errorGeneric": "Could not close the account. Try again, or contact support."
       }
     }
+  },
+  "productFeeds": {
+    "page": {
+      "title": "Product feeds",
+      "subtitle": "Send your whole catalogue, with sizes and colours, to Google Shopping, Facebook and Instagram, and TikTok."
+    },
+    "intro": "Each link below is a live feed of your products. Paste it once into the platform and it re-reads your prices and stock on its own schedule. Variants are sent as separate items, grouped under one product.",
+    "language": {
+      "ar": "Arabic feed",
+      "en": "English feed"
+    },
+    "copy": "Copy link",
+    "copied": "Link copied",
+    "copyFailed": "Could not copy. Select the link and copy it by hand.",
+    "parts": "Your catalogue is large, so it is split into {count} files. Add each one as its own source: the same link with &part=2, &part=3 and so on.",
+    "platforms": {
+      "google": {
+        "name": "Google Merchant Center",
+        "for": "Google Shopping ads and free product listings",
+        "format": "XML file",
+        "step1": "Open Merchant Center and go to Products, then Data sources.",
+        "step2": "Add a product source and choose to add products from a file.",
+        "step3": "Pick a scheduled fetch, then paste the link for your language.",
+        "step4": "Choose how often Google reads it. Daily is enough, because the feed is always current.",
+        "step5": "Finish by confirming your website and setting your shipping in Merchant Center, then check Diagnostics for any problems."
+      },
+      "meta": {
+        "name": "Meta Commerce Manager",
+        "for": "Facebook and Instagram catalogue ads and shops",
+        "format": "XML file",
+        "step1": "Open Commerce Manager, pick your catalogue, and go to Data sources.",
+        "step2": "Add items, then choose Data feed.",
+        "step3": "Choose a scheduled feed and paste the link for your language.",
+        "step4": "Set how often Meta reads it. Hourly or daily both work.",
+        "step5": "Open Diagnostics after the first run to see anything Meta rejected."
+      },
+      "tiktok": {
+        "name": "TikTok Catalog Manager",
+        "for": "TikTok catalogue ads",
+        "format": "CSV file",
+        "step1": "Open TikTok Ads Manager and go to Assets, then Catalog.",
+        "step2": "Create a catalogue, then add products from a data feed.",
+        "step3": "Choose a scheduled fetch and paste the CSV link for your language.",
+        "step4": "Pick your country and currency, and set how often TikTok reads it.",
+        "step5": "Check the upload report for rejected rows after the first run."
+      }
+    },
+    "steps": "Setup steps",
+    "health": {
+      "title": "Feed health",
+      "language": "Checking the {lang} feed",
+      "items": "Items in the feed",
+      "products": "Active products",
+      "excluded": "Left out",
+      "warnings": "To improve",
+      "allGood": "Every product is in the feed and nothing needs attention.",
+      "empty": "You have no active products yet, so the feeds are empty. Publish a product and it appears here.",
+      "notPublished": "Not in the feed on purpose: {draft} drafts, {archived} archived, {wholesale} wholesale-only.",
+      "shippingFlat": "Your shipping fee is the same everywhere, so it is included in the feed.",
+      "shippingVaries": "Your shipping fees differ by area, so they are not in the feed. Set shipping inside each platform instead.",
+      "truncatedIssues": "Showing the first {count} items. Fix these and refresh to see more.",
+      "scanTruncated": "Your catalogue is very large, so this report covers only part of it.",
+      "imageNote": "Platforms also check that every image is at least 500 x 500 pixels. We cannot measure that here, so upload large product photos.",
+      "refresh": "Refresh",
+      "issuesTitle": "Items that need attention",
+      "product": "Item",
+      "problem": "What to fix",
+      "excludedBadge": "Left out",
+      "warningBadge": "Improve",
+      "code": {
+        "no_image": "This item has no usable image, so it is left out. Add a product photo.",
+        "zero_price": "The price is zero, so the item is left out. Set a price.",
+        "variant_inactive": "This variant is switched off, so it is left out.",
+        "no_title": "The product has no name, so it is left out.",
+        "bundle_not_sellable": "This bundle cannot be bought right now, so it is left out.",
+        "description_missing": "No description. The title is used instead, but ads perform better with a real description.",
+        "gtin_invalid": "The barcode is not a valid product code (GTIN), so it is not sent. Enter the code printed on the package.",
+        "brand_is_store_name": "No brand is set, so your store name is used. Add a Brand row in the product facts to change it.",
+        "google_category_missing": "We could not match a Google category from your category names. Add a product fact named google_product_category if you need one.",
+        "apparel_missing_attrs": "Clothing and shoes need colour, size, gender and age group. Add them as options or product facts.",
+        "variant_options_missing": "This variant has no option values (size, colour), so platforms cannot tell it apart from its siblings."
+      }
+    },
+    "loadError": "Could not load the feed report."
   },
   "answerEngine": {
     "page": {
@@ -8523,7 +8813,7 @@
       "not_trialing": "Not on a trial",
       "no_order": "No order yet",
       "opted_out": "You unsubscribed",
-      "store_not_active": "Store not active",
+      "store_not_active": "The store was not live when this was due (not activated yet or suspended), so it was skipped",
       "no_recipient": "No owner email",
       "ENQUEUE_FAILED": "The email could not be queued",
       "unsubscribed_by_link": "Unsubscribed from an email link"
@@ -8555,8 +8845,23 @@
       "dateFrom": "From",
       "dateTo": "To",
       "dateApply": "Apply",
-      "guest": "Guest"
+      "guest": "Guest",
+      "emptyAction": "Check payment settings"
     }
+  },
+  "activity": {
+    "title": "Store activity",
+    "subtitle": "Who changed what in your store, newest first. Read only. Contact details are hidden.",
+    "tableLabel": "Store activity",
+    "colWhen": "When",
+    "colWho": "Who",
+    "colWhat": "What",
+    "colNetwork": "Network",
+    "system": "System",
+    "empty": "No activity yet.",
+    "error": "Could not load the activity. Try again in a moment.",
+    "loading": "Loading…",
+    "loadMore": "Load more"
   },
   "staff": {
     "page": {
@@ -8972,9 +9277,6 @@
     "common": {
       "loading": "Loading…"
     },
-    "premiumSubtitle": "Extra feature",
-    "featureNotEnabledTitle": "Feature not enabled",
-    "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Ebda Store to request access.",
     "mainSubtitle": "Fixed buttons your customer sees on every page, like WhatsApp and call",
     "showWidgetLabel": "Show widget on storefront",
     "showWidgetHint": "When off, no widget renders even though the feature is enabled.",
@@ -9212,7 +9514,7 @@
     "loading": "Loading plans…",
     "loadError": "Failed to load plans.",
     "edit": "Edit",
-    "editTitle": "Edit plan {code}",
+    "editTitle": "Edit plan {name}",
     "public": "Public",
     "hidden": "Hidden",
     "unlimited": "Unlimited",
@@ -9294,7 +9596,7 @@
     "usageTitle": "Usage",
     "ordersThisMonth": "Orders this month",
     "usedOf": "{used} of {limit}",
-    "storageNotTracked": "Up to {limit} MB (usage is not tracked yet)",
+    "storageUnknown": "Not known right now",
     "includedTitle": "Included in your plan",
     "included": "Included",
     "notIncluded": "Not included",
@@ -9309,7 +9611,8 @@
       "active": "Active",
       "past_due": "Payment overdue",
       "canceled": "Canceled",
-      "comped": "Complimentary"
+      "comped": "Complimentary",
+      "awaiting_payment": "Awaiting payment"
     },
     "overLimit": {
       "title": "You passed this month's order limit",
@@ -9343,6 +9646,12 @@
     "checkoutError": "Could not start the payment",
     "changeError": "Could not change the plan",
     "upgradedToast": "Plan upgraded",
+    "changePlanObject": "Change to the {plan} plan",
+    "confirmUpgradeProrated": "The new plan starts now. Your card is charged {amount} (VAT included): the difference for the {days} days left in the period you already paid. Your renewal date stays the same.",
+    "confirmUpgradeFull": "The new plan starts now. Your card is charged its full price, {amount} (VAT included), and a new billing period starts today. Nothing was paid for your current term, so there is no difference to credit.",
+    "confirmChangeAtPeriodEnd": "The new plan starts on {date}, at the end of the period you already paid. Nothing is charged now and nothing is refunded.",
+    "confirmUpgradeAction": "Upgrade and pay",
+    "confirmChangeAction": "Change plan",
     "upgradeDeclined": "The charge was declined. Your plan was not changed.",
     "upgradePending": "The payment is being confirmed.",
     "scheduledToast": "Change scheduled for the end of the current period.",
@@ -9391,15 +9700,19 @@
     "stubPay": "Simulate success",
     "stubDecline": "Simulate decline",
     "trial": {
-      "title": "Plan & trial",
+      "title": "Your plan and renewal",
       "chosenPlan": "Chosen plan",
       "nextCharge": "Next charge",
       "nextChargeLine": "{amount} ({interval}) for {plan} on {date}",
       "nextChargeNoAmount": "{plan} on {date}",
       "instapayDue": "Payment due",
       "instapayDueLine": "InstaPay payment due by {date}: {amount} ({interval}) for {plan}",
+      "switchingInterval": "Switching to {interval} billing from {date}, once your payment is confirmed",
       "instapayDueNoAmount": "InstaPay payment due by {date} for {plan}",
-      "returnsToFree": "Your plan returns to Free if it is not paid by then."
+      "returnsToFree": "Your plan returns to Free if it is not paid by then.",
+      "nextRenewal": "Next renewal",
+      "renewalLine": "Next renewal on {date}: {amount} {interval} for {plan}",
+      "renewalNoAmount": "Next renewal on {date} for {plan}"
     },
     "pay": {
       "title": "Payment method",
@@ -9427,7 +9740,8 @@
       "claimSent": "Thanks. The Ebda Store team will review your transfer and activate your plan once it is confirmed.",
       "instapayUnavailable": "InstaPay is not available right now",
       "instapayFailed": "We could not set up InstaPay",
-      "reviewerNote": "The Ebda Store team will review your transfer. Nothing changes until it is confirmed."
+      "reviewerNote": "The Ebda Store team will review your transfer. Nothing changes until it is confirmed.",
+      "instapayRenewalNote": "Nothing is due right now. We remind you before the renewal date, and the transfer details and receipt upload appear here then."
     },
     "claims": {
       "title": "Payment confirmations",
@@ -9494,7 +9808,18 @@
     "receiptProcessing": "Your payment went through. Your receipt will print here in a moment.",
     "cancelObject": "Cancelling your plan subscription",
     "cancelAction": "Cancel subscription",
-    "adminPlanHidden": "hidden"
+    "adminPlanHidden": "hidden",
+    "stateLine": {
+      "none": "Your free plan is running.",
+      "trialing": "You are on a trial and have not paid yet.",
+      "active": "Your plan is paid and running.",
+      "awaiting_payment": "Your plan is running now, but you have not paid yet. Pay before the date below so you do not drop back to the free plan.",
+      "past_due": "Your payment is late. Pay to keep your plan running.",
+      "canceled": "Your plan was canceled.",
+      "comped": "Your plan is free as a grant from the Ebda AI Studio team."
+    },
+    "trialDaysLeft": "{count, plural, one {{count} day left} other {{count} days left}}",
+    "trialDaysLeftLabel": "Trial days left"
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
@@ -9595,10 +9920,10 @@
         "store": "Name",
         "template": "Look",
         "product": "Product",
-        "payment": "Payment",
+        "payment": "Customer payments",
         "live": "Launch",
         "plan": "Plan",
-        "billing": "Billing"
+        "billing": "Plan payment"
       },
       "back": "Back",
       "next": "Continue",
@@ -9915,7 +10240,8 @@
       "ledger": "Ledger",
       "subscriptions": "Subscriptions",
       "claims": "Payment claims",
-      "grants": "Free months"
+      "grants": "Free months",
+      "held": "Held payments"
     },
     "manual": {
       "title": "Record manual payment for {store}",
@@ -9976,6 +10302,7 @@
         "nextCharge": "Next charge",
         "action": "Action"
       },
+      "switchingTo": "switching to {interval}",
       "interval": {
         "monthly": "monthly",
         "yearly": "annual"
@@ -10109,7 +10436,52 @@
       }
     },
     "refundObject": "Refund {amount}",
-    "refundAction": "Refund the payment"
+    "refundAction": "Refund the payment",
+    "held": {
+      "title": "Held payments",
+      "intro": "Subscription payments the provider reported as successful but that don't match what we billed. The merchant may have paid without being upgraded, so settle each one here.",
+      "loading": "Loading held payments...",
+      "failedToLoad": "Could not load the held payments.",
+      "empty": "No held payments.",
+      "statusFilter": "Show",
+      "statuses": {
+        "open": "Needs action",
+        "resolved": "Resolved"
+      },
+      "unknownAmount": "Not reported",
+      "columns": {
+        "date": "Received",
+        "reason": "Why it was held",
+        "expected": "We billed",
+        "got": "Provider reported",
+        "reference": "Reference",
+        "status": "Status",
+        "action": "Action"
+      },
+      "reasons": {
+        "unknown_order": "No matching bill",
+        "amount_mismatch": "Different amount",
+        "currency_mismatch": "Different currency",
+        "amount_missing": "No amount sent",
+        "currency_missing": "No currency sent",
+        "kind_mismatch": "Charge on a card-saving checkout",
+        "row_resolved": "Late payment on a row a person already resolved"
+      },
+      "resolve": "Resolve",
+      "resolveTitle": "Resolve this held payment",
+      "actionLabel": "What did you do?",
+      "creditedHelp": "Resolving as \"activated by hand\" only closes this hold. The original charge row stays failed, so the money reaches the books only when you also record the payment on the manual payment form (it creates its own ledger row).",
+      "actions": {
+        "credited": "Activated the plan by hand",
+        "refunded": "Refunded it at the provider",
+        "not_ours": "Not our payment"
+      },
+      "note": "Note (at least 3 characters)",
+      "noteRequired": "Write a short note about what you did.",
+      "resolveSubmit": "Mark resolved",
+      "resolveFailed": "Could not resolve it. It may have been resolved already; refresh the list.",
+      "resolved": "The held payment was marked resolved."
+    }
   },
   "codReconciliation": {
     "title": "COD reconciliation",
@@ -10194,7 +10566,7 @@
       "rejected": "Your submission was rejected: {reason}. Fix the details and submit again.",
       "revoked": "Your VAT verification was revoked: {reason}. VAT is switched off until you are verified again."
     },
-    "verifiedNote": "To change these details, use Contact Ebda Store.",
+    "verifiedNote": "These details are locked while your registration is verified. To change them, send a change request below. Your current verification stays active until it is approved.",
     "form": {
       "trn": "Tax registration number",
       "trnHint": "9 digits, as printed on your tax card. Spaces and dashes are fine.",
@@ -10242,7 +10614,27 @@
       "incomplete": "Add your tax registration number, legal name and at least one document first.",
       "disclaimer": "Ebda Store does not file taxes or issue e-receipts on your behalf. You stay responsible for your own VAT filings."
     },
-    "error": "Something went wrong. Please try again."
+    "error": "Something went wrong. Please try again.",
+    "change": {
+      "title": "Change your VAT registration details",
+      "hint": "Your current verification stays active, and VAT keeps working, until Ebda Store approves the new details.",
+      "open": "Request a change",
+      "newTrn": "New tax registration number",
+      "newLegalName": "New legal business name",
+      "newDocument": "New tax card or certificate",
+      "send": "Review and send",
+      "sending": "Sending…",
+      "cancel": "Cancel",
+      "confirmObject": "Change to tax number {trn}, \"{name}\"",
+      "confirmConsequence": "The request goes to Ebda AI Studio for review. Nothing changes on your store until it is approved.",
+      "confirmLabel": "Send the change request",
+      "sent": "Change request sent. We will review it and your current verification stays active meanwhile.",
+      "pendingTitle": "A change request is waiting for review",
+      "pendingBody": "Requested: tax number {trn}, \"{name}\". Your current verification is still active.",
+      "withdraw": "Withdraw the request",
+      "withdrawn": "Request withdrawn.",
+      "rejected": "Your last change request was rejected: {reason}. Your current verification is unchanged."
+    }
   },
   "invoices": {
     "title": "Invoices & credit notes",
@@ -10372,6 +10764,34 @@
       "revoked": "Revoked",
       "failed": "Decision failed: {message}",
       "revokeObject": "Tax verification for this store"
+    },
+    "changes": {
+      "title": "Change requests from verified merchants ({count})",
+      "subtitle": "The merchant stays verified until you decide. The automatic read of the document only helps you spot differences; you approve or reject.",
+      "precheck": {
+        "clean": "Pre-check: no differences found",
+        "flagged": "Pre-check: needs a look"
+      },
+      "flags": {
+        "trn_mismatch": "The number on the document differs from the one entered",
+        "name_mismatch": "The name on the document differs from the one entered",
+        "trn_unreadable": "The number could not be read from the document",
+        "name_unreadable": "The name could not be read from the document",
+        "looks_edited": "The document looks edited",
+        "low_confidence": "The automatic read was not confident",
+        "not_pre_checked": "Not pre-checked (a PDF, or the automatic read was unavailable): read the document yourself",
+        "trn_in_use_by_other_store": "The number is already held by another store (verified or pending): check before approving"
+      },
+      "read": "Read from the document: {trn}, {name}",
+      "viewDocument": "View the document",
+      "approve": "Approve the change",
+      "reject": "Reject",
+      "reasonLabel": "Reason for the merchant",
+      "confirmReject": "Send the rejection",
+      "approveObject": "Change to tax number {trn}, \"{name}\"",
+      "approveConsequence": "The new number and name replace the verified ones and appear on the merchant's later tax invoices.",
+      "approved": "Change approved.",
+      "rejected": "Change rejected."
     }
   },
   "platformSettings": {
@@ -11425,7 +11845,7 @@
       "editTitle": "Edit endpoint",
       "urlLabel": "Address (HTTPS)",
       "urlPlaceholder": "https://example.com/ebda-webhook",
-      "urlHelp": "It must be a public HTTPS address. Local and private addresses are not accepted.",
+      "urlHelp": "It must be a public HTTPS address on your own server. Local and private addresses and Ebda AI Studio domains (ebda.app) are not accepted.",
       "descriptionLabel": "Note (optional)",
       "eventsLabel": "Events to send",
       "customerLabel": "Include customer name, email and phone in order events",
@@ -11495,6 +11915,16 @@
     "error": {
       "WEBHOOK_URL_REJECTED": "This address cannot be used. Use a public HTTPS address.",
       "WEBHOOK_LIMIT": "You reached the maximum number of endpoints."
+    },
+    "urlError": {
+      "not_a_url": "That is not a valid link. Write the full address, like https://example.com/ebda-webhook.",
+      "https_required": "The address must start with https://. http addresses are not accepted.",
+      "credentials_not_allowed": "The address cannot contain a username or password.",
+      "port_not_allowed": "The address must use the standard HTTPS port (443), with no port number.",
+      "ip_literal_not_allowed": "Use a domain name, not an IP number.",
+      "public_hostname_required": "Use a public address with a full domain name, like example.com.",
+      "internal_hostname_not_allowed": "Local and internal addresses are not accepted. Use a public address on the internet.",
+      "platform_host_not_allowed": "The address cannot be on an Ebda AI Studio domain (ebda.app or any store of ours). Use your own server."
     }
   },
   "receiptBarcode": {
@@ -11838,7 +12268,7 @@
       "variant": "Variant",
       "price": "Price",
       "digits": "Digits under the bars",
-      "qr": "Store QR",
+      "qr": "Product page QR",
       "lang": "Label language",
       "langAr": "Arabic",
       "langEn": "English"
@@ -11866,6 +12296,7 @@
       "checking": "Checking that the barcode scans…",
       "ok": "Barcode scans correctly",
       "notPrintable": "The bars are too thin to print at this size. Choose a bigger label, plain bars, or a roll.",
+      "qrRefused": "Barcode and QR cannot both scan at this size. Choose a bigger label, or untick the QR to print the barcode only.",
       "unreadable": "The barcode could not be read back. Change the style or the size.",
       "dropped": "Left out because the label is small: {parts}.",
       "copies": "{labels} labels on {pages} pages"
@@ -12195,5 +12626,70 @@
         "error": "I could not apply it. Nothing was changed, try again."
       }
     }
+  },
+  "attention": {
+    "title": "Needs your attention",
+    "subtitle": "Fix these so your store keeps selling.",
+    "info": "For your information",
+    "fix": "Fix now",
+    "view": "Open",
+    "badge": "{count, plural, =1 {{count, number, latn} thing needs your attention} other {{count, number, latn} things need your attention}}",
+    "infoDot": "Has a note for you",
+    "section": "Section needing attention"
+  },
+  "refundLines": {
+    "legend": "Choose what is being refunded or returned",
+    "unitPrice": "{price} {currency} each",
+    "nothingLeft": "Nothing left to return on this line",
+    "remaining": "{remaining} of {ordered} still open",
+    "quantity": "Quantity",
+    "restock": "Put back on the shelf",
+    "notTracked": "Stock is not tracked for this product",
+    "wholeOrderRestockNote": "These lines cover the whole order, so every line is put back on the shelf. To skip restocking, leave one unit out."
+  },
+  "planLimits": {
+    "upgradeCta": "Upgrade plan",
+    "maxProducts": {
+      "warnTitle": "You are close to your product limit",
+      "warnBody": "{used} of {limit} products used. Upgrade before you hit the limit so you can keep adding products.",
+      "fullTitle": "You have reached your product limit",
+      "fullBody": "Your plan allows {limit} products and you are using all of them. Upgrade to add more."
+    },
+    "maxOrdersPerMonth": {
+      "warnTitle": "You are close to this month's order limit",
+      "warnBody": "{used} of {limit} orders this month. Upgrade to keep your store inside its plan.",
+      "fullTitle": "You have reached this month's order limit",
+      "fullBody": "{used} orders against a limit of {limit}. Orders still come through, but upgrade so your store stays within its plan."
+    },
+    "maxStaff": {
+      "warnTitle": "You are close to your team seat limit",
+      "warnBody": "{used} of {limit} team seats used. Upgrade to invite more people.",
+      "fullTitle": "All your team seats are used",
+      "fullBody": "Your plan includes {limit} team seats. Upgrade to invite more people."
+    },
+    "maxStorageMb": {
+      "warnTitle": "You are close to your storage limit",
+      "warnBody": "{used} of {limit} MB used. Upgrade before image uploads stop.",
+      "fullTitle": "Your storage is full",
+      "fullBody": "{used} of {limit} MB used. Upgrade to keep uploading images and files."
+    },
+    "ai": {
+      "warnTitle": "You are close to your AI allowance",
+      "warnBody": "{used} of {limit} AI requests used ({window, select, daily {today} other {this month}}). Upgrade for a bigger allowance.",
+      "fullTitle": "You have used your AI allowance",
+      "fullBody": "{used} of {limit} AI requests used ({window, select, daily {today} other {this month}}). Upgrade for a bigger allowance."
+    }
+  },
+  "launchChip": {
+    "stepsLabel": "{done} of {total} steps",
+    "ordersLabel": "{done} of {goal} orders paid or delivered",
+    "openAria": "Launch readiness: {label}. Open the checklist",
+    "stepsTitle": "Get ready to launch",
+    "stepsHint": "Finish these steps so customers can start ordering.",
+    "ordersTitle": "Your first {goal} orders",
+    "ordersHint": "Share your store link with customers. This badge goes away after {goal} orders are paid or delivered (cash on delivery counts once delivered).",
+    "viewOrders": "See orders",
+    "open": "Open",
+    "done": "Done"
   }
 }

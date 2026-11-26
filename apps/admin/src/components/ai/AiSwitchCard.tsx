@@ -47,7 +47,7 @@ export function AiSwitchCard({
   };
 
   return (
-    <section className="rounded-xl border border-border bg-card p-4" data-testid="ai-switch-card">
+    <section className="rounded-md border border-border bg-card p-4" data-testid="ai-switch-card">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 id="ai-switch-title" className="text-sm font-semibold">

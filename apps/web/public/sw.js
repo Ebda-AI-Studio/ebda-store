@@ -6,6 +6,10 @@
 // pages. We now take over existing clients, purge all old caches, and leave
 // network requests to the browser.
 
+// Every worker event listener is registered synchronously here, on the first evaluation of the script (browsers warn
+// about, and may drop, handlers added later from async code). `message` is a deliberate no-op: no page messages us.
+self.addEventListener('message', () => {});
+
 self.addEventListener('install', () => {
   self.skipWaiting();
 });
@@ -29,9 +33,17 @@ self.addEventListener('push', event => {
     payload = { title: event.data ? event.data.text() : 'Notification' };
   }
 
-  const title = payload.title || 'Notification';
+  // A merchant broadcast carries both languages in data.i18n: show the one that matches the browser, Arabic by default.
+  const i18n = payload.data && payload.data.i18n;
+  const lang = String((self.navigator && self.navigator.language) || 'ar')
+    .toLowerCase()
+    .startsWith('en')
+    ? 'en'
+    : 'ar';
+  const localized = i18n && (i18n[lang] || i18n.ar || i18n.en);
+  const title = (localized && localized.title) || payload.title || 'Notification';
   const options = {
-    body: payload.body || '',
+    body: (localized && localized.body) || payload.body || '',
     icon: payload.icon || '/icon-192.png',
     badge: payload.badge || '/icon-192.png',
     data: payload.data || {},

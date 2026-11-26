@@ -119,8 +119,8 @@ export default function CustomerIntelligencePage() {
         </p>
       ) : !data ? (
         <div className="space-y-4" aria-busy="true">
-          <div className="h-24 animate-pulse rounded-xl bg-muted" />
-          <div className="h-24 animate-pulse rounded-xl bg-muted" />
+          <div className="h-24 animate-pulse rounded-md bg-muted" />
+          <div className="h-24 animate-pulse rounded-md bg-muted" />
         </div>
       ) : (
         <div className="max-w-3xl space-y-5">
@@ -130,7 +130,7 @@ export default function CustomerIntelligencePage() {
             </p>
           )}
 
-          <section className="rounded-xl border bg-card p-5" aria-labelledby="ci-hints">
+          <section className="rounded-md border bg-card p-5" aria-labelledby="ci-hints">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <h2 id="ci-hints" className="text-base font-semibold text-foreground">
@@ -150,7 +150,7 @@ export default function CustomerIntelligencePage() {
             </p>
           </section>
 
-          <section className="rounded-xl border bg-card p-5" aria-labelledby="ci-sharing">
+          <section className="rounded-md border bg-card p-5" aria-labelledby="ci-sharing">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <h2 id="ci-sharing" className="text-base font-semibold text-foreground">
@@ -169,7 +169,7 @@ export default function CustomerIntelligencePage() {
 
           {data.hintsEnabled && (
             <>
-              <section className="rounded-xl border bg-card p-5" aria-labelledby="ci-fee">
+              <section className="rounded-md border bg-card p-5" aria-labelledby="ci-fee">
                 <h2 id="ci-fee" className="text-base font-semibold text-foreground">
                   {t('fee.title')}
                 </h2>
@@ -190,7 +190,7 @@ export default function CustomerIntelligencePage() {
               </section>
 
               {data.pausedForStore.length > 0 && (
-                <section className="rounded-xl border bg-card p-5" aria-labelledby="ci-paused">
+                <section className="rounded-md border bg-card p-5" aria-labelledby="ci-paused">
                   <h2 id="ci-paused" className="text-base font-semibold text-foreground">
                     {t('paused.title')}
                   </h2>
@@ -209,7 +209,7 @@ export default function CustomerIntelligencePage() {
                 </section>
               )}
 
-              <section className="rounded-xl border bg-card p-5" aria-labelledby="ci-status">
+              <section className="rounded-md border bg-card p-5" aria-labelledby="ci-status">
                 <h2 id="ci-status" className="text-base font-semibold text-foreground">
                   {t('status.title')}
                 </h2>

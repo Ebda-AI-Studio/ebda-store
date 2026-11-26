@@ -9,7 +9,7 @@ function StatCardSkeleton() {
           <div className="h-8 w-32 force-skeleton" />
           <div className="h-3 w-16 force-skeleton" />
         </div>
-        <div className="h-12 w-12 rounded-2xl force-skeleton" />
+        <div className="h-12 w-12 rounded-lg force-skeleton" />
       </div>
     </div>
   );
@@ -28,13 +28,13 @@ export function AnalyticsSkeleton() {
           <StatCardSkeleton key={i} />
         ))}
       </div>
-      <div className="bg-card rounded-xl border p-6 shadow-sm mb-8">
+      <div className="bg-card rounded-md border p-6 shadow-sm mb-8">
         <div className="h-6 w-40 force-skeleton mb-6" />
         <div className="h-40 force-skeleton rounded-lg" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="bg-card rounded-xl border p-6 shadow-sm space-y-4">
+          <div key={i} className="bg-card rounded-md border p-6 shadow-sm space-y-4">
             <div className="h-5 w-32 force-skeleton" />
             {Array.from({ length: 4 }).map((_, j) => (
               <div key={j} className="flex items-center gap-3">

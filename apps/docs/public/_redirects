@@ -1,0 +1,21 @@
+# Workers Static Assets redirects (the static export has no server).
+# QA-TRUST-1 (site trust standard): /legal, /privacy and /terms are real URLs on every Ebda site; the policies live on ebda.app.
+# One hop (308), the language kept: bare and /ar go to the Arabic page, /en to the English one. First match wins.
+/legal https://ebda.app/legal/ 308
+/legal/ https://ebda.app/legal/ 308
+/ar/legal https://ebda.app/legal/ 308
+/ar/legal/ https://ebda.app/legal/ 308
+/en/legal https://ebda.app/en/legal/ 308
+/en/legal/ https://ebda.app/en/legal/ 308
+/privacy https://ebda.app/privacy/ 308
+/privacy/ https://ebda.app/privacy/ 308
+/ar/privacy https://ebda.app/privacy/ 308
+/ar/privacy/ https://ebda.app/privacy/ 308
+/en/privacy https://ebda.app/en/privacy/ 308
+/en/privacy/ https://ebda.app/en/privacy/ 308
+/terms https://ebda.app/terms/ 308
+/terms/ https://ebda.app/terms/ 308
+/ar/terms https://ebda.app/terms/ 308
+/ar/terms/ https://ebda.app/terms/ 308
+/en/terms https://ebda.app/en/terms/ 308
+/en/terms/ https://ebda.app/en/terms/ 308

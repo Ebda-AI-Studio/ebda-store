@@ -47,6 +47,9 @@ vi.mock('./RefundButton', () => ({
     </button>
   ),
 }));
+vi.mock('./PartialRefundButton', () => ({
+  PartialRefundButton: () => <button data-testid="partial-refund-button">partial-refund</button>,
+}));
 vi.mock('./RefreshRefundStatusButton', () => ({
   RefreshRefundStatusButton: () => (
     <button data-testid="refresh-refund-status-button">refresh-refund-status</button>
@@ -291,6 +294,25 @@ describe('ActionFooter — refund-via-provider amount (#2069)', () => {
 });
 
 // SP6a — InstaPay: the merchant's one primary action while the transfer is unconfirmed.
+// STORE-QA-76: a partial refund (lines + per-line restock) is offered on a delivered, paid order to a refund-capable user only.
+describe('ActionFooter — partial refund (STORE-QA-76)', () => {
+  it('offers Partial refund on a delivered paid order', () => {
+    renderFooter(baseOrder({ status: 'delivered', paymentStatus: 'paid' }));
+    expect(screen.getByTestId('partial-refund-button')).toBeTruthy();
+  });
+
+  it('never offers it to staff (no orders:refund), on an unpaid order, or before delivery', () => {
+    renderFooter(baseOrder({ status: 'delivered', paymentStatus: 'paid' }), () => {}, false);
+    expect(screen.queryByTestId('partial-refund-button')).toBeNull();
+    cleanup();
+    renderFooter(baseOrder({ status: 'delivered', paymentStatus: 'pending' }));
+    expect(screen.queryByTestId('partial-refund-button')).toBeNull();
+    cleanup();
+    renderFooter(baseOrder({ status: 'confirmed', paymentStatus: 'paid' }));
+    expect(screen.queryByTestId('partial-refund-button')).toBeNull();
+  });
+});
+
 describe('ActionFooter — InstaPay awaiting confirmation', () => {
   const awaiting = () =>
     baseOrder({

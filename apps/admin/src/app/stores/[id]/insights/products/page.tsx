@@ -160,7 +160,7 @@ export default function InsightsProductsPage() {
           rowKey={row => row.productId}
           onRowClick={row => router.push(`/stores/${storeId}/products/${row.productId}`)}
           emptyState={
-            <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
+            <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
               {t('empty')}
             </div>
           }

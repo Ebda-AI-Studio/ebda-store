@@ -417,7 +417,7 @@ export function SimpleVariantsForm({
   }
 
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm">
+    <div className="rounded-md border bg-card p-5 shadow-sm">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
         <p className="mt-1 text-sm text-muted-foreground">

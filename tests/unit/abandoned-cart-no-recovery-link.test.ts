@@ -24,6 +24,8 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@ebda/database', () => ({
   prisma: { abandonedCart: { update: h.update, groupBy: h.groupBy }, $queryRaw: h.queryRaw },
+  // the recovered-revenue SQL splices the shared revenue definition through Prisma.raw (REVENUE-DEF-1)
+  Prisma: { raw: (sql: string) => ({ sql }) },
   withRlsBypass: vi.fn(),
 }));
 vi.mock('@api/services/notification-dispatcher.service', () => ({
@@ -71,6 +73,34 @@ describe('abandoned-cart reminders carry no recovery link (issue 2035)', () => {
     expect(data.cartUrl).not.toMatch(/recover=|sig=/);
   });
 
+  it('the cart total in the message is the real amount: 485000 minor units reads 4,850 (it read 485.000)', async () => {
+    vi.spyOn(abandonedCartService, 'getConfig').mockResolvedValue({
+      step1Enabled: true,
+      step1DelayMinutes: 60,
+      step2Enabled: false,
+      step2DelayMinutes: 240,
+      step3Enabled: false,
+      step3DelayMinutes: 1440,
+      autoCouponEnabled: false,
+    } as never);
+    const send = (cartTotal: number) =>
+      abandonedCartService.sendStep(
+        {
+          id: 'ac-1',
+          storeId: 'store-1',
+          cartTotal,
+          cartItemCount: 1,
+          customer: null,
+          store: { domain: 'shop.example', slug: 'shop', name: 'Shop' },
+        },
+        1
+      );
+    await send(485_000);
+    await send(485_050);
+    expect((h.dispatch.mock.calls[0][2] as { cartTotal: string }).cartTotal).toBe('4,850');
+    expect((h.dispatch.mock.calls[1][2] as { cartTotal: string }).cartTotal).toBe('4,850.50');
+  });
+
   it('the public recovery endpoint is no longer routed', async () => {
     vi.doMock('@api/middleware/auth', () => {
       const pass = (_q: unknown, _r: unknown, n: () => void) => n();
@@ -98,13 +128,27 @@ describe('abandoned-cart reminders carry no recovery link (issue 2035)', () => {
       recoveryRate: 12.5,
       recoveredRevenue: 12_500,
     });
-    const sql = (h.queryRaw.mock.calls[0][0] as TemplateStringsArray).join('?');
+    // the SQL text with every Prisma.raw fragment (the shared REVENUE-DEF-1 predicate and net-amount SQL) spliced in
+    const [strings, ...values] = h.queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+    const sql = strings.reduce((acc, part, i) => {
+      const v = values[i];
+      const frag =
+        v && typeof v === 'object' && 'sql' in v
+          ? (v as { sql: string }).sql
+          : i < values.length
+            ? '?'
+            : '';
+      return acc + part + frag;
+    }, '');
     expect(sql).toMatch(/JOIN public\.orders o ON o\.id = ac\.recovered_order_id/);
+    // the revenue-countable definition: cancelled / refunded / awaiting InstaPay orders and failed / refunded payments are out
     expect(sql).toMatch(
       /o\.status NOT IN \('cancelled', 'refunded', 'awaiting_payment_confirmation'\)/
     );
-    expect(sql).toMatch(/o\.payment_status <> 'failed'/);
-    expect(h.queryRaw.mock.calls[0].slice(1)).toEqual(['store-1', 'store-1']);
+    expect(sql).toMatch(/o\.payment_status NOT IN \('failed', 'refunded'\)/);
+    // and the amount is the NET of refunds (the shared refund joins are present)
+    expect(sql).toMatch(/LEFT JOIN \(SELECT order_id, SUM\(refund_amount\)/);
+    expect(values.filter(v => typeof v === 'string')).toEqual(['store-1', 'store-1']);
   });
 
   it('an empty store reads 0 (a real zero), not unknown', async () => {

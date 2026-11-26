@@ -2,7 +2,7 @@
   "name": "@ebda/help",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "scripts": {
     "build": "tsx scripts/build.mjs",

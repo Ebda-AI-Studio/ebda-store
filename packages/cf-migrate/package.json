@@ -2,7 +2,7 @@
   "name": "@ebda/cf-migrate",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "description": "Postgres to Cloudflare data migration for Ebda Store (INFRA-CF-1 phase 4): row canonicalisation, the StoreDO __import/__verify/__seal handler, the plan that maps Postgres tables to StoreDO and D1 tables.",
   "type": "module",
   "main": "./src/index.mjs"

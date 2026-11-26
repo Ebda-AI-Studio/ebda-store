@@ -31,11 +31,11 @@ interface CohortData {
 
 /** Returns a Tailwind bg class based on retention 0..1 */
 function retentionColor(rate: number): string {
-  if (rate >= 0.7) return 'bg-green-200 text-green-900';
-  if (rate >= 0.5) return 'bg-green-100 text-green-800';
+  if (rate >= 0.7) return 'bg-success/20 text-success-ink';
+  if (rate >= 0.5) return 'bg-success/10 text-success-ink';
   if (rate >= 0.3) return 'bg-warning/10 text-warning-ink';
-  if (rate >= 0.1) return 'bg-red-100 text-red-700';
-  return 'bg-red-50 text-red-500';
+  if (rate >= 0.1) return 'bg-destructive/10 text-destructive-ink';
+  return 'bg-destructive/10 text-destructive-ink';
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -138,14 +138,14 @@ export default function InsightsCohortsPage() {
       <div className="max-w-5xl space-y-6">
         {/* AI narration callout */}
         {narration && (
-          <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm italic text-muted-foreground">
+          <div className="rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-sm italic text-muted-foreground">
             <span className="not-italic font-semibold text-primary">{t('aiLabel')}</span>{' '}
             {narration}
           </div>
         )}
 
         {cohortMonths.length === 0 ? (
-          <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
+          <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
             {t('noDataYet')}
           </div>
         ) : (
@@ -161,7 +161,7 @@ export default function InsightsCohortsPage() {
                 reconciliation use, with the first column pinned. */}
             <section>
               <h2 className="text-base font-semibold mb-3">{t('retentionMatrixTitle')}</h2>
-              <div className="rounded-xl border border-border overflow-x-auto">
+              <div className="rounded-md border border-border overflow-x-auto">
                 <table className="min-w-max text-sm">
                   <thead className="bg-muted/30">
                     <tr>
@@ -204,7 +204,7 @@ export default function InsightsCohortsPage() {
                             return (
                               <td key={o} className="text-end px-3 py-2">
                                 <span
-                                  className={`inline-block rounded px-1.5 py-0.5 font-medium ${retentionColor(rate)}`}
+                                  className={`inline-block rounded-md px-1.5 py-0.5 font-medium ${retentionColor(rate)}`}
                                   title={t('cellTitle', { active: cell.customersActive, total })}
                                 >
                                   {(rate * 100).toFixed(0)}%

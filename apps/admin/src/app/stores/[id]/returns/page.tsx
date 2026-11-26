@@ -9,12 +9,14 @@ import { RefundMethodModal, type RefundOverrides } from './_components/RefundMet
 /** The method alone, or (B2B Task 8b) the method plus the merchant's per-item refund overrides. */
 type RefundChoice = string | { refundMethod: string; refundOverrides: RefundOverrides };
 import { RejectReasonModal } from './_components/RejectReasonModal';
+import { NewReturnModal } from './_components/NewReturnModal';
 import { ReturnDetailsDrawer } from './_components/ReturnDetailsDrawer';
 import { ReturnStatusFilter } from './_components/ReturnStatusFilter';
 import { ReturnsTable } from './_components/ReturnsTable';
 import { StatsGrid } from './_components/StatsGrid';
 import type { ReturnRecord } from './_components/types';
 import { useReturns } from './_hooks/useReturns';
+import { Button } from '@/components/ui/Button';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { useFeatures } from '../../../../hooks/useFeatures';
 
@@ -36,6 +38,7 @@ export default function ReturnsPage() {
   const [showDetails, setShowDetails] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
+  const [newReturnOpen, setNewReturnOpen] = useState(false);
   const [refundReturnId, setRefundReturnId] = useState<string | null>(null);
 
   // Promise resolvers held in refs so the modal flow can be modeled as an
@@ -97,6 +100,7 @@ export default function ReturnsPage() {
     complete,
     changeFilter,
     setPage,
+    refresh,
   } = useReturns({
     storeId,
     requestRejectReason,
@@ -129,6 +133,12 @@ export default function ReturnsPage() {
 
   return (
     <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
+      <div className="mb-4 flex justify-end">
+        <Button type="button" onClick={() => setNewReturnOpen(true)}>
+          {tPage('newReturn')}
+        </Button>
+      </div>
+
       <StatsGrid stats={stats} />
 
       <ReturnStatusFilter value={filter} onChange={changeFilter} />
@@ -159,6 +169,13 @@ export default function ReturnsPage() {
         onComplete={handleComplete}
       />
 
+      <NewReturnModal
+        open={newReturnOpen}
+        storeId={storeId}
+        onClose={() => setNewReturnOpen(false)}
+        onCreated={refresh}
+      />
+
       <RejectReasonModal
         open={rejectOpen}
         onConfirm={handleRejectConfirm}
@@ -172,6 +189,7 @@ export default function ReturnsPage() {
         onConfirm={handleRefundConfirm}
         onClose={handleRefundCancel}
         walletEnabled={walletEnabled}
+        guestReturn={returns.find(r => r.id === refundReturnId)?.customer?.isGuest === true}
       />
     </AdminLayout>
   );

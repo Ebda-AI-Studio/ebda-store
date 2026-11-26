@@ -58,7 +58,12 @@ export interface SetupGuideState {
   requiredDone: number;
   requiredTotal: number;
   dismissed: boolean;
+  /** Orders whose payment is `paid` (the launch chip's "first 5 paid orders" goal). Absent on an older API. */
+  paidOrders?: number;
 }
+
+/** Salla-style launch goal: the top-bar chip stays until the store has this many paid orders. */
+export const FIRST_PAID_ORDERS_GOAL = 5;
 
 export function isSetupGuideKey(v: unknown): v is SetupGuideKey {
   return typeof v === 'string' && (SETUP_GUIDE_KEYS as readonly string[]).includes(v);

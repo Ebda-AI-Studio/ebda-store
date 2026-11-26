@@ -75,6 +75,7 @@ export type HubLabels = {
   aiTools: string;
   aiUsage: string;
   marketingPixels: string;
+  productFeeds: string;
   notifications: string;
   newsletter: string;
   campaigns: string;
@@ -231,6 +232,7 @@ export const HUBS: HubDefinition[] = [
       '/ai-usage',
       '/marketing',
       '/marketing-pixels',
+      '/product-feeds',
       '/newsletter',
       '/notifications',
       '/campaigns',
@@ -257,11 +259,16 @@ export const HUBS: HubDefinition[] = [
       { label: labels.campaigns, href: `/stores/${storeId}/campaigns` },
       { label: labels.abandonedCarts, href: `/stores/${storeId}/abandoned-carts` },
       { label: labels.paymentAbandonments, href: `/stores/${storeId}/payment-abandonments` },
-      { label: labels.lifecycleEmails, href: `/stores/${storeId}/lifecycle-emails` },
+      {
+        label: labels.lifecycleEmails,
+        href: `/stores/${storeId}/lifecycle-emails`,
+        ownerOnly: true,
+      },
       // Staff may manage order alerts, and the Settings hub is owner-only, so Notifications stays here (Ruling T3-1).
       { label: labels.notifications, href: `/stores/${storeId}/notifications` },
       { label: labels.affiliates, href: `/stores/${storeId}/affiliates`, groupStart: true },
       { label: labels.marketingPixels, href: `/stores/${storeId}/marketing-pixels` },
+      { label: labels.productFeeds, href: `/stores/${storeId}/product-feeds` },
       { label: labels.aiTools, href: `/stores/${storeId}/ai-tools`, groupStart: true },
       { label: labels.aiUsage, href: `/stores/${storeId}/ai-usage` },
       { label: labels.answerEngine, href: `/stores/${storeId}/answer-engine` },
@@ -292,6 +299,7 @@ export const HUBS: HubDefinition[] = [
       '/billing',
       '/delivery',
       '/staff',
+      '/activity',
     ],
     // Settings pages share one hub for nav highlighting; they have no sub-tabs.
     buildTabs: () => [],
@@ -314,4 +322,16 @@ export function detectHub(pathname: string, storeId: string): HubDefinition | nu
 
   // Find first hub with a matching urlPrefix
   return HUBS.find(h => h.urlPrefixes.some(p => p !== '' && rest.startsWith(p))) ?? null;
+}
+
+/**
+ * Whether a hub tab (and its ⌘K palette entry) is shown: `ownerOnly` tabs are hidden from staff, and a
+ * feature-keyed tab only once the feature map has loaded and the feature is on (never on the loading default).
+ */
+export function isHubTabVisible(
+  tab: HubTab,
+  ctx: { role: string | undefined; featuresLoading: boolean; isEnabled: (key: string) => boolean }
+): boolean {
+  if (tab.ownerOnly && ctx.role === 'staff') return false;
+  return !tab.featureKey || (!ctx.featuresLoading && ctx.isEnabled(tab.featureKey));
 }

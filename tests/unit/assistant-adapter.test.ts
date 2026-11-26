@@ -564,7 +564,7 @@ describe('help index', () => {
 });
 
 describe('bundled assets', () => {
-  it('registry.generated.json and cf/modules/help-corpus.mjs are current (run node apps/api/scripts/build-help-corpus.mjs)', async () => {
+  it('registry.generated.json and cf/modules/help-corpus.mjs are generated and current (build-time assets: globalSetup runs node apps/api/scripts/build-help-corpus.mjs)', async () => {
     // @ts-expect-error plain .mjs script
     const { buildAssets } = (await import('../../apps/api/scripts/build-help-corpus.mjs')) as {
       buildAssets(): Promise<{ registry: string; corpus: string }>;

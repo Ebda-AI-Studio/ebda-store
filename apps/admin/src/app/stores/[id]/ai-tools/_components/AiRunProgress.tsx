@@ -214,7 +214,7 @@ function StatsRow({ totals, t }: { totals: Totals; t: TFn }) {
   );
 }
 
-const SHELL = 'rounded-xl border-2 border-primary/30 bg-primary/5 p-4 sm:p-5';
+const SHELL = 'rounded-md border-2 border-primary/30 bg-primary/5 p-4 sm:p-5';
 
 export function ActiveJobCard({
   job,
@@ -253,7 +253,7 @@ export function ActiveJobCard({
             {title}
             <StatusBadge status={job.status} t={t} />
           </h3>
-          {dateText && <p className="mt-0.5 text-xs text-muted-foreground">{dateText}</p>}
+          {dateText && <p className="mt-0.5 text-sm text-muted-foreground">{dateText}</p>}
         </div>
         <div className="flex items-center gap-2">
           {!done && onCancel && (
@@ -412,7 +412,7 @@ export function MasterSweepCard({
         {jobs.map(j => (
           <li
             key={j.id}
-            className="flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-xs"
+            className="flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-sm"
           >
             <span className="font-medium">{jobKindLabel(j.kind, j.direction, t)}</span>
             <StatusBadge status={j.status} t={t} />

@@ -16,7 +16,7 @@ const { queryRaw } = vi.hoisted(() => ({ queryRaw: vi.fn() }));
 
 vi.mock('@ebda/database', () => ({
   prisma: { $queryRaw: queryRaw },
-  Prisma: { sql: () => ({}) },
+  Prisma: { sql: () => ({}), raw: (s: string) => ({ sql: s }) },
 }));
 vi.mock('../../apps/api/src/services/redis.service', () => ({ redis: {} }));
 vi.mock('../../apps/api/src/services/accounting/reports.service', () => ({

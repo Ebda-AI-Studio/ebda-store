@@ -89,12 +89,13 @@ describe('plan limit `wholesalePricing`', () => {
 });
 
 describe('feature key `b2b.wholesale`', () => {
-  it('is registered with bilingual copy and is in NO legacy plan baseline (decided by the plan limit, like remove_branding)', () => {
+  it('is registered with bilingual copy and is in the Business baseline only (BIZ-ALL-1; the plan limit still decides, like remove_branding)', () => {
     expect(FEATURE_KEYS_ARRAY).toContain('b2b.wholesale');
     const def = FEATURE_REGISTRY['b2b.wholesale'];
     expect(def.name.length).toBeGreaterThan(0);
     expect(def.nameAr).toMatch(/[؀-ۿ]/);
-    for (const plan of STORE_PLANS) expect(PLAN_BASELINE[plan]).not.toContain('b2b.wholesale');
+    for (const plan of STORE_PLANS)
+      expect(PLAN_BASELINE[plan].includes('b2b.wholesale')).toBe(plan === 'enterprise');
   });
 
   it.each([

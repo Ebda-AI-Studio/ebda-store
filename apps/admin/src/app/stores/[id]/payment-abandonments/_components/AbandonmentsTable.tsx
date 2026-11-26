@@ -8,6 +8,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { formatPrice } from '@/lib/format';
 import { withNumerals } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/EmptyState';
 
 /** Converts piastres (integer) to an EGP display string (2 decimals). */
 const formatMajor = formatPrice;
@@ -141,28 +142,13 @@ export function AbandonmentsTable({
   ];
 
   const emptyState = (
-    <div className="bg-card rounded-xl border border-border overflow-hidden">
-      <div className="force-empty-state px-6">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-          <svg
-            className="h-8 w-8 text-muted-foreground"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-            />
-          </svg>
-        </div>
-        <p className="font-semibold text-foreground">{t('empty')}</p>
-        <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('emptyHint')}</p>
-      </div>
-    </div>
+    <EmptyState
+      card
+      icon="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+      title={t('empty')}
+      description={t('emptyHint')}
+      action={{ label: t('emptyAction'), href: `/stores/${storeId}/payment-settings` }}
+    />
   );
 
   return (
@@ -176,7 +162,7 @@ export function AbandonmentsTable({
       />
 
       {records.length > 0 && meta.totalPages > 1 && (
-        <div className="flex items-center justify-between px-6 py-4 rounded-xl border border-border bg-card">
+        <div className="flex items-center justify-between px-6 py-4 rounded-md border border-border bg-card">
           <p className="text-sm text-muted-foreground">
             {meta.page} / {meta.totalPages} ({meta.total})
           </p>

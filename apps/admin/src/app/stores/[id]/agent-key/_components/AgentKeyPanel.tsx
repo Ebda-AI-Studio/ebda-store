@@ -52,12 +52,12 @@ interface AgentKeyPanelProps {
 function StatusChip({ tone, label }: { tone: 'green' | 'gray' | 'amber'; label: string }) {
   const chip =
     tone === 'green'
-      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
+      ? 'bg-success/10 text-success-ink border-success/30'
       : tone === 'amber'
         ? 'bg-warning/10 text-warning-ink border-warning/40'
         : 'bg-muted text-muted-ink border-border';
   const dot =
-    tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-warning' : 'bg-muted-foreground';
+    tone === 'green' ? 'bg-success' : tone === 'amber' ? 'bg-warning' : 'bg-muted-foreground';
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${chip}`}
@@ -74,8 +74,8 @@ export function AgentKeyPanel({ status, busy, onIssue, onRevoke }: AgentKeyPanel
   if (!status) {
     return (
       <div className="space-y-3">
-        <div className="h-24 rounded-xl border bg-card animate-pulse" />
-        <div className="h-32 rounded-xl border bg-card animate-pulse" />
+        <div className="h-24 rounded-md border bg-card animate-pulse" />
+        <div className="h-32 rounded-md border bg-card animate-pulse" />
       </div>
     );
   }
@@ -92,7 +92,7 @@ export function AgentKeyPanel({ status, busy, onIssue, onRevoke }: AgentKeyPanel
           accepted without one. A merchant reading "no key issued" and
           concluding "so nothing can write" would be wrong. */}
       {status.openWrites && (
-        <div className="rounded-xl border border-warning/40 bg-warning/10 p-4">
+        <div className="rounded-md border border-warning/40 bg-warning/10 p-4">
           <p className="text-sm font-semibold text-warning-ink" dir="auto">
             {t('hatch.title')}
           </p>
@@ -103,7 +103,7 @@ export function AgentKeyPanel({ status, busy, onIssue, onRevoke }: AgentKeyPanel
       )}
 
       {/* ── Status ─────────────────────────────────────────────────────────── */}
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="rounded-md border bg-card p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-foreground" dir="auto">
             {t('status.heading')}
@@ -166,7 +166,7 @@ export function AgentKeyPanel({ status, busy, onIssue, onRevoke }: AgentKeyPanel
       </div>
 
       {/* ── How an agent uses it ───────────────────────────────────────────── */}
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="rounded-md border bg-card p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-foreground" dir="auto">
           {t('howto.heading')}
         </h2>

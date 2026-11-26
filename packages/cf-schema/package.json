@@ -2,7 +2,7 @@
   "name": "@ebda/cf-schema",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "description": "Cloudflare SQLite schema for Ebda Store (INFRA-CF-1 phase 1): StoreDO (Durable Object SQLite) and D1 ebda-platform, generated from packages/database/prisma/schema.prisma.",
   "type": "module",
   "main": "./src/index.ts",

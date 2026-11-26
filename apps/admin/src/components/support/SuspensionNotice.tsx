@@ -36,6 +36,7 @@ export function SuspensionNotice({ storeId }: { storeId: string }) {
   if (!s) return null;
   return (
     <section
+      id="suspension-notice"
       role="alert"
       className="border-b border-destructive/30 bg-destructive/10 px-4 py-3 text-sm lg:px-6"
     >

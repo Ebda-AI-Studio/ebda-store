@@ -1,5 +1,9 @@
 // Static-assets-only Worker for the marketing site. `next build` (output: 'export')
 // writes ./out; Cloudflare serves it directly — no OpenNext, no server code.
+// RSC (LANG-SWITCH-1, measured 2026-11-19): there is no server, so a request carrying `RSC: 1` to an HTML url gets that HTML (harmless: Next then
+// falls back to a full load). The client router never does that in a static export: it fetches per-segment flight files at their OWN urls
+// (`/en/__next._tree.txt`, `/__next.<seg>.txt`, text/plain), so RSC and HTML can never share an edge-cache key. Adding a `main` script or leaving
+// `output: export` breaks that; tests/unit/marketing-lang-switch.test.tsx pins it. The language switch is a plain <a> (Header.tsx).
 // Deploy wiring is intentionally NOT in CI yet (SP9 part 1 builds the site only).
 {
   "name": "ebda-marketing",

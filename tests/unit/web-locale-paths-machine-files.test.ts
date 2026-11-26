@@ -47,7 +47,7 @@ describe('localizeUrlsInText', () => {
     expect(out).toContain(`(${o}/ar/products/gold-ring)`);
     expect(out).toContain(`(${o}/ar/products?category=abayas)`);
     expect(out).toContain(`(${o}/llms.txt) and ${o}/sitemap.xml and ${o}/feeds/products.json`);
-    expect(out).toContain(`(${o}/cart)`);
+    expect(out).toContain(`(${o}/ar/cart)`);
     expect(out).toContain('https://p.example.evil/products and https://other.example/products');
   });
   it('locale null is the identity; a second origin is localized too', () => {

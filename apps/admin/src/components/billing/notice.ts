@@ -50,3 +50,18 @@ export function noticeText(
     }
   }
 }
+
+/**
+ * STORE-QA-24: an active (or granted) plan far from its renewal is NOT "due". The InstaPay amount / receipt upload / "returns to
+ * Free" warning belong only to a payment that is actually due: inside the renewal window (the same `dueSoon <= 7 days` rule
+ * `billingNotice` uses), overdue, past due, suspended, or a plan the merchant has just picked to pay for now.
+ */
+export function isRenewalOnly(
+  status: string | undefined,
+  b: BillingInfo | null | undefined,
+  hasFreshQuote: boolean
+): boolean {
+  if (status !== 'active' && status !== 'comped') return false;
+  if (hasFreshQuote || !b) return false;
+  return billingNotice(b) === null && !b.suspension;
+}

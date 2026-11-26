@@ -34,7 +34,7 @@ function IndeterminateCheckbox({
       type="checkbox"
       checked={checked}
       onChange={onChange}
-      className="rounded border-border accent-primary cursor-pointer"
+      className="rounded-md border-border accent-primary cursor-pointer"
       aria-label={ariaLabel}
     />
   );
@@ -78,7 +78,7 @@ export function ProductsTable({
     return (
       <div className="space-y-3">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div key={i} className="rounded-md border border-border bg-card p-4 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-lg force-skeleton" />
               <div className="flex-1 space-y-2">
@@ -147,7 +147,7 @@ export function ProductsTable({
           checked={selectedIds.has(product.id)}
           onChange={() => onToggleSelect(product.id)}
           onClick={e => e.stopPropagation()}
-          className="rounded border-border accent-primary cursor-pointer"
+          className="rounded-md border-border accent-primary cursor-pointer"
           aria-label={t('selectProduct', { name: product.name })}
         />
       ),

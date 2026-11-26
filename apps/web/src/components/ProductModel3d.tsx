@@ -104,6 +104,15 @@ export function ProductModel3dPanel({
           'اسحب عشان تلفّه · قرّب بإصبعين أو +/− · الأسهم'
         ),
         ar: t('View in your space', 'اعرضه في مكانك'),
+        arDesktop: {
+          open: t('View in your space', 'اعرضه في مكانك'),
+          title: t('Open it on your phone', 'افتحه على موبايلك'),
+          hint: t(
+            'Scan with your phone camera, then tap View in your space.',
+            'صوّر الكود بكاميرا موبايلك، وبعدين دوس اعرضه في مكانك.'
+          ),
+          close: t('Close', 'قفل'),
+        },
       }}
       ar={{
         enabled: model.arEnabled,

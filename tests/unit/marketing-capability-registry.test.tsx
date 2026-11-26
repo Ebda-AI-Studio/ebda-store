@@ -25,14 +25,12 @@ import { compareRows } from '../../apps/marketing/src/lib/compare';
 import { COMPARE_SLUGS } from '../../apps/marketing/src/lib/site';
 
 /** branch / PR -> the capability ids that go live when it merges */
-const FLIP_ON_MERGE: Record<string, CapabilityId[]> = {
-  'feat/search-p1c-hybrid (search PR4)': ['meaning'],
-};
+const FLIP_ON_MERGE: Record<string, CapabilityId[]> = {};
 
 const pub = (f: string) =>
   readFileSync(path.resolve(__dirname, '../../apps/marketing/public', f), 'utf8');
-/** `meaning` is a flag with no card of its own: it is the coming line of the search card. */
-const FLAG_IDS: CapabilityId[] = ['meaning'];
+/** Flags with no card of their own: none today. */
+const FLAG_IDS: CapabilityId[] = [];
 const coming = CAPABILITY_IDS.filter(id => REGISTRY[id].status === 'coming');
 const live = CAPABILITY_IDS.filter(id => REGISTRY[id].status === 'live');
 const comingAll = (Object.keys(REGISTRY) as CapabilityId[]).filter(
@@ -85,15 +83,6 @@ describe('a coming item says so everywhere; a live item never does', () => {
   it('every coming capability is on /features', () => {
     for (const id of coming) expect(pages['features en']).toContain(`data-capability="${id}"`);
   });
-  it('meaning search is the coming line of the search card, never a live claim', () => {
-    expect(REGISTRY.meaning.status).toBe('coming');
-    for (const l of ['ar', 'en'] as const) {
-      const html = pages[`features ${l}`];
-      const card = html.match(/<li class="cap-card" data-capability="search"[^>]*>.*?<\/li>/s)!;
-      expect(card[0]).toContain('data-status="coming"');
-      expect(card[0]).toContain(l === 'ar' ? 'قريبًا' : 'Coming soon');
-    }
-  });
   it('FAQ answers follow the registry', () => {
     const faq = featuresFaq('en')
       .map(f => f.a)
@@ -104,9 +93,8 @@ describe('a coming item says so everywhere; a live item never does', () => {
   it('compare: a coming item sits in the not-yet table with the badge, never as a strength', () => {
     const { strength, gap } = compareRows();
     const comingNeeds = new Set(comingAll);
-    for (const id of ['meaning', 'integrations', 'b2b', 'email']) {
+    for (const id of ['integrations', 'b2b', 'email']) {
       const needs = {
-        meaning: 'meaning',
         integrations: 'webhooks',
         b2b: 'b2b',
         email: 'campaigns',

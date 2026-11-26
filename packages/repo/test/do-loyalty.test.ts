@@ -358,7 +358,7 @@ describe('loyalty: redeem', () => {
 });
 
 describe('loyalty: reversals', () => {
-  it('reverses the earn once, floors at the balance, drops total_earned and the tier', () => {
+  it('reverses the FULL earn once (spent points become debt, #631), drops total_earned and the tier', () => {
     const f = fixture();
     const o = f.order('s1', 'c1', 100000); // 1000 pts
     earnPointsFromPurchase(f.db, { storeId: 's1', customerId: 'c1', orderId: o, ...F });
@@ -366,11 +366,11 @@ describe('loyalty: reversals', () => {
     // the customer spent 700 of them since
     f.x(`UPDATE loyalty_points SET points = 300, total_redeemed = 700 WHERE customer_id = 'c1'`);
     const r = reverseEarnedPointsFromOrder(f.db, { storeId: 's1', orderId: o });
-    expect(r).toEqual({ pointsReversed: 300, newBalance: 0, replayed: false });
-    expect(f.bal('s1', 'c1')).toMatchObject({ points: 0, total_earned: 0, tier: 'bronze' });
+    expect(r).toEqual({ pointsReversed: 1000, newBalance: -700, debt: 700, replayed: false });
+    expect(f.bal('s1', 'c1')).toMatchObject({ points: -700, total_earned: 0, tier: 'bronze' });
     const again = reverseEarnedPointsFromOrder(f.db, { storeId: 's1', orderId: o });
     expect(again).toMatchObject({ pointsReversed: 0, replayed: true });
-    expect(f.bal('s1', 'c1').points).toBe(0);
+    expect(f.bal('s1', 'c1').points).toBe(-700);
     expect(f.txCount(`type = 'adjust' AND description LIKE 'refund-revoke:%'`)).toBe(1);
     expect(f.txCount(`type = 'tier_changed' AND description LIKE '%refund reverse%'`)).toBe(1);
   });

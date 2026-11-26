@@ -284,6 +284,31 @@ describe('billing ledger: signup-funnel additions', () => {
     });
   });
 
+  it('BILLING-INTERVAL-PENDING-1: the table shows the pending switch and the record dialog defaults to it', async () => {
+    mockTabs([sub({ billingInterval: 'yearly', pendingBillingInterval: 'monthly' })]);
+    apiGet.mockImplementation(async (url: string) => {
+      if (url.includes('/manual-payment/suggest'))
+        return { data: { periodStart: null, periodEnd: null }, error: null };
+      if (url.includes('/billing/subscriptions'))
+        return {
+          data: {
+            subscriptions: [sub({ billingInterval: 'yearly', pendingBillingInterval: 'monthly' })],
+          },
+          error: null,
+        };
+      return { data: { events: [], claims: [] }, error: null };
+    });
+    render(<BillingEventsPage />);
+    openTab('tabs.subscriptions');
+    expect(await screen.findByText(/switchingTo/)).toBeTruthy();
+    fireEvent.click((await screen.findAllByRole('button', { name: 'record' }))[0]);
+    await waitFor(() =>
+      expect(apiGet).toHaveBeenCalledWith(
+        '/api/v1/admin/stores/s9/manual-payment/suggest?interval=monthly'
+      )
+    );
+  });
+
   it('manual payment: a 409 REFERENCE_USED_ELSEWHERE explains the voided-payment path', async () => {
     mockTabs();
     apiPost.mockResolvedValue({

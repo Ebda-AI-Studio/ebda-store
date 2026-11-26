@@ -9,7 +9,11 @@ import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { authenticate, authorize, optionalAuthenticate } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
-import { promotionPreviewLimiter, publicTenantLimiter } from '../middleware/security';
+import {
+  promotionBrowsePreviewLimiter,
+  promotionPreviewLimiter,
+  publicTenantLimiter,
+} from '../middleware/security';
 import { PromotionService } from '../services/promotion.service';
 import { resolveBestPromotion, resolveCustomerContext } from '../services/promotion-resolver';
 import { tenantContext } from '../middleware/tenant-context';
@@ -68,6 +72,9 @@ const previewSchema = z.object({
   phone: z.string().nullish(),
   email: z.string().nullish(),
 });
+// The browse (PDP / cart) preview takes ONLY items: a typed phone / email would let a 120/min caller probe which
+// phones are VIP / first-order customers. Unknown keys (phone, email, any identity field) are stripped, never read.
+const browsePreviewSchema = z.object({ items: z.array(previewItemSchema).max(500) });
 
 // GET /stores/:storeId/promotions - List all promotions
 router.get(
@@ -218,18 +225,13 @@ router.patch(
 // need this before/during checkout to preview which automatic promotion
 // applies. `router.param('storeId', tenantContext)` above still wraps this
 // route (it declares its own ':storeId'), same as coupons/validate.
-router.post(
-  '/public/:storeId/promotions/preview',
-  promotionPreviewLimiter,
-  // Per-tenant aggregate backstop (audit P3) — bounds distributed volume
-  // against one store's endpoint regardless of source-IP spread.
-  publicTenantLimiter,
-  // The signed-in customer (never a body-supplied identity) decides group membership and group prices.
-  optionalAuthenticate,
-  async (req: Request, res: Response, next: NextFunction) => {
+const makePreviewHandler =
+  (browse: boolean) => async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { items, phone, email } = previewSchema.parse(req.body);
+      const { items, phone, email } = browse
+        ? { ...browsePreviewSchema.parse(req.body), phone: undefined, email: undefined }
+        : previewSchema.parse(req.body);
 
       // Lines are priced by the ONE resolver for the signed-in buyer (product level: the preview carries no variant, so a
       // variant with its own price is previewed at the product price, display only). A line priced by a tier or a group
@@ -287,7 +289,27 @@ router.post(
     } catch (error) {
       next(error);
     }
-  }
+  };
+
+// Checkout's bucket (20/min/IP). The PDP and the cart use the browse route below, never this one.
+router.post(
+  '/public/:storeId/promotions/preview',
+  promotionPreviewLimiter,
+  // Per-tenant aggregate backstop (audit P3) — bounds distributed volume
+  // against one store's endpoint regardless of source-IP spread.
+  publicTenantLimiter,
+  // The signed-in customer (never a body-supplied identity) decides group membership and group prices.
+  optionalAuthenticate,
+  makePreviewHandler(false)
+);
+
+// Same preview for the PDP and the cart (its own, more generous bucket: see promotionBrowsePreviewLimiter).
+router.post(
+  '/public/:storeId/promotions/preview-browse',
+  promotionBrowsePreviewLimiter,
+  publicTenantLimiter,
+  optionalAuthenticate,
+  makePreviewHandler(true)
 );
 
 export default router;

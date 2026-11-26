@@ -220,6 +220,17 @@ describe('nextChargeOf', () => {
       vat: null,
     });
   });
+  it('BILLING-INTERVAL-PENDING-1: an active yearly store keeps the yearly renewal quote; the override prices the pending pick', () => {
+    const active = { ...sub, status: 'active', pendingPlanCode: null, billingInterval: 'yearly' };
+    expect(nextChargeOf(active, plans, PLATFORM_VAT_OFF)).toMatchObject({
+      at: later,
+      planCode: 'growth',
+      amountMinor: 3141000,
+    });
+    expect(nextChargeOf(active, plans, PLATFORM_VAT_OFF, 'monthly')).toMatchObject({
+      amountMinor: 349000,
+    });
+  });
   it('Ebda VAT exclusive: the next charge adds 14% and carries the VAT line', () => {
     const vat = {
       enabled: true,

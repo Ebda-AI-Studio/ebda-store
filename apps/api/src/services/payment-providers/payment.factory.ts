@@ -1,7 +1,6 @@
 import crypto from 'crypto';
-import { customersById, runInStoreCtx } from '../../lib/jobs/store-db';
+import { customersById, runInStoreCtx, withStoreDb } from '../../lib/jobs/store-db';
 import { currentStoreId, prisma, Prisma, runInTenantContext, withStore } from '@ebda/database';
-import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
 import { OrderService, assertValidTransition } from '../order.service';
@@ -24,6 +23,8 @@ import { alertOrphanedProviderInvoice } from './orphaned-invoice-alert';
 import { recordPaymentEvent } from '../payment-event.service';
 import { invalidateCustomersCache } from '../../lib/public-cache';
 import { buildPaymentLineItems } from '../../lib/payment-line-items';
+import { storefrontReturnUrls } from '../../lib/storefront-auth-link';
+import { resolveDefaultLanguage } from '@ebda/shared';
 import {
   IPaymentProvider,
   PaymentProvider,
@@ -3185,6 +3186,23 @@ export class PaymentService {
     // empty CustomerEmail applies on retry too — fall through to shippingAddress
     // fields before defaulting.
     const retryShipping = (order.shippingAddress ?? {}) as Record<string, string | undefined>;
+    // Back to the STORE's own host in the shopper's language (the account language, else the store default).
+    // `Store` is a platform row for either backend, as in the cart-recovery reader.
+    const retryStore = await withStoreDb(storeId, db =>
+      db.store.findUnique({
+        where: { id: storeId },
+        select: { slug: true, domain: true, settings: true },
+      })
+    );
+    if (!retryStore) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+    const accountLang = (retryCustomer as { language?: string | null } | null)?.language;
+    const retryLang: 'en' | 'ar' =
+      accountLang === 'en' || accountLang === 'ar'
+        ? accountLang
+        : resolveDefaultLanguage(
+            (retryStore.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+          );
+    const retryReturn = storefrontReturnUrls(retryStore, retryLang);
     return this.createPayment(
       {
         orderId: order.id,
@@ -3202,8 +3220,8 @@ export class PaymentService {
           phone: retryShipping.phone || undefined,
         },
         items: buildPaymentLineItems(order.items),
-        callbackUrl: `${config.webUrl}/checkout/success`,
-        errorUrl: `${config.webUrl}/checkout/error`,
+        callbackUrl: retryReturn.callbackUrl,
+        errorUrl: retryReturn.errorUrl,
         webhookUrl: paymentWebhookUrl(provider || payment.provider, order.storeId),
       },
       provider || (payment.provider as PaymentProvider),

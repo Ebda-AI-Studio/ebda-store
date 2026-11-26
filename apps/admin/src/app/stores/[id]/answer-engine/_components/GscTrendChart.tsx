@@ -25,7 +25,7 @@ export function GscTrendChart({ trend }: GscTrendChartProps) {
   const maxImpressions = Math.max(...trend.map(p => p.impressions), 1);
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
+    <div className="bg-card rounded-md border border-border p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground mb-4">{t('trendTitle')}</h2>
       <div className="flex items-end gap-2 h-32">
         {trend.map(point => {
@@ -41,7 +41,7 @@ export function GscTrendChart({ trend }: GscTrendChartProps) {
                 data-chart-bar
                 className="relative w-full bg-primary/20 rounded-t transition-all"
                 style={{ height: `${Math.max(impressionsHeight, 2)}%` }}
-                title={`${point.date}: ${point.impressions.toLocaleString(undefined, withNumerals())} ${t('impressions')}, ${point.clicks.toLocaleString(undefined, withNumerals())} ${t('clicks')}, ${formatPercent(point.ctr)} ${t('ctr')}, ${t('avgPosition')} ${formatPosition(point.position)}`}
+                title={`${point.date}: ${point.impressions.toLocaleString(undefined, withNumerals())} ${t('impressions')}, ${point.clicks.toLocaleString(undefined, withNumerals())} ${t('clicks')}, ${formatPercent(point.ctr)} ${t('ctr')}, ${t('avgPosition')} ${formatPosition(point.position, point.impressions)}`}
               >
                 <div
                   className="absolute bottom-0 w-full bg-primary rounded-t group-hover:bg-primary/90"

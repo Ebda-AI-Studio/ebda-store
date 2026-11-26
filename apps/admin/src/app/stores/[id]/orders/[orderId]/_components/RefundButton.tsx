@@ -7,6 +7,7 @@ import { apiRequest } from '../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
 import { minorToDecimalString } from '@ebda/shared';
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
 interface RefundButtonProps {
   storeId: string;
   orderId: string;
@@ -133,7 +134,7 @@ export function RefundButton({
         <p className="mt-2 text-sm text-muted-foreground">{t('modalBodySideEffects')}</p>
 
         <div className="mt-4">
-          <label htmlFor="refund-reason" className="block text-xs font-medium text-foreground mb-1">
+          <label htmlFor="refund-reason" className="block text-sm font-medium text-foreground mb-1">
             {t('reasonLabel')}
           </label>
           <textarea
@@ -144,7 +145,7 @@ export function RefundButton({
             rows={2}
             maxLength={500}
             placeholder={t('reasonPlaceholder')}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+            className={TEXTAREA_CLASSES}
           />
         </div>
 

@@ -1,12 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import {
   normalizeArabicSearch,
+  normalizeArabicHamza,
   searchTokens,
   escapeLike,
   AR_FOLD_FROM,
   AR_FOLD_TO,
 } from '../arabic-normalize';
+import hamzaVectors from '../../foundation/vectors/arabic-hamza.json';
 import { NORMALIZE_VECTORS } from '../normalize-vectors';
+
+describe('normalizeArabicHamza (fold A)', () => {
+  it.each(hamzaVectors.cases as Array<[string, string]>)('%j -> %j', (input, expected) => {
+    expect(normalizeArabicHamza(input)).toBe(expected);
+  });
+});
 
 describe('normalizeArabicSearch', () => {
   it.each(NORMALIZE_VECTORS)('%j -> %j', (input, expected) => {

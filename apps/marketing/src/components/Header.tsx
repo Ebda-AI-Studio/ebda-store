@@ -281,9 +281,9 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
                 </ul>
               </li>
               <li className="menu-lang">
-                <PageLink href={pagePath(other, page)} hrefLang={other} lang={other}>
+                <a href={pagePath(other, page)} hrefLang={other} lang={other}>
                   {c.nav.switchTo}
-                </PageLink>
+                </a>
               </li>
               <li className="menu-actions">
                 <NavA locale={locale} l={bar ? bar.cta : primary} className="nav-cta menu-start" />
@@ -294,7 +294,9 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
         </nav>
         <div className="header-actions">
           <HeaderSearch locale={locale} />
-          <PageLink
+          {/* Plain anchor on purpose (LANG-SWITCH-1): a locale change swaps <html lang/dir>, fonts and metadata, so it is
+              always a full document load and never depends on the client router (RSC fetch / prefetch cache). */}
+          <a
             href={pagePath(other, page)}
             hrefLang={other}
             lang={other}
@@ -302,7 +304,7 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
             aria-label={c.nav.switchLabel}
           >
             {c.nav.switchTo}
-          </PageLink>
+          </a>
           {login.items.length === 1 ? (
             <NavA
               locale={locale}

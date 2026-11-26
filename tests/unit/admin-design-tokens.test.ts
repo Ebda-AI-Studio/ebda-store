@@ -8,6 +8,15 @@
  *   G3  a hex colour literal: colours come from the CSS variables in styles/globals.css.
  *   G4  the bare `rounded` class (4px): control = rounded-md, surface = rounded-lg, pill = rounded-full.
  *   G5  letter-spacing (`tracking-*` other than tracking-normal): it breaks Arabic letter joining.
+ *   G7  a raw <input>/<select>/<textarea> (not checkbox/radio/hidden/file/range/color) that does not use FIELD_CLASSES /
+ *       TEXTAREA_CLASSES / the editor's fieldControlClasses() (or an explicit h-10/h-11): fields sit on the 44/40 control scale.
+ *   G8  `text-xs` (12px) on a content element (<p> <th> <td> <label> <li> <dt> <dd> <legend> <h3-6>): content is 14px or more;
+ *       12px is for counters and badges (<span>, <Badge>), never the sole carrier of meaning.
+ *   G9  `rounded-xl/2xl/3xl`: xl duplicates control (12px), 2xl/3xl are off-scale. Control = rounded-md, surface = rounded-lg, pill = rounded-full.
+ *   G10 `shadow-lg` / `shadow-2xl` / a coloured shadow (`shadow-primary/25`): elevation is flat (default), shadow-sm (cards),
+ *       shadow-md (menus), shadow-xl (modals), never coloured.
+ *   G11 a native checkbox/radio sized under 20px (h-3/h-3.5/h-4): the global rule in globals.css makes the default 20px (+ a 44px
+ *       label row on touch); this keeps a utility class from shrinking it back below the 24px WCAG 2.5.8 floor.
  *   G6  a `data-ui="nav"` item that does not take its classes from navItemClasses() / bottomNavClasses().
  *
  * G1-G5 are a RATCHET: tests/unit/admin-design-tokens.baseline.json holds the per-file count of pages not yet
@@ -16,25 +25,23 @@
  * tests/unit/admin-design-tokens.test.ts). The baseline reaching {} is the exit gate. G6 has no baseline.
  */
 import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import {
+  GUARD_RULES,
+  countRule,
+  navIssues,
+  openingTag,
+  stripComments,
+  type GuardRule,
+} from '@ebda/shared/design';
 
 const SRC = join(__dirname, '../../apps/admin/src');
 const BASELINE = join(__dirname, 'admin-design-tokens.baseline.json');
 const TOKENS = 'components/ui/tokens.ts';
 
-const PALETTE =
-  'gray|slate|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
-export const RULES: Record<string, RegExp> = {
-  G1: new RegExp(
-    `(?<![\\w-])(?:[a-z-]+:)*(?:text|bg|border|ring|from|to|via|fill|stroke|divide|outline|decoration|accent|caret|placeholder)-(?:${PALETTE})-\\d{2,3}(?:/\\d+)?(?![\\w-])`,
-    'g'
-  ),
-  G2: /(?<![\w-])(?:[a-z-]+:)*text-\[\d+(?:\.\d+)?(?:px|rem)\](?![\w-])/g,
-  G3: /#[0-9a-fA-F]{8}\b|#[0-9a-fA-F]{6}\b/g,
-  G4: /(?<=[\s'"`:])(?:[a-z-]+:)*rounded(?=[\s'"`])/g,
-  G5: /(?<![\w-])(?:[a-z-]+:)*tracking-(?:tighter|tight|wide|wider|widest)(?![\w-])/g,
-};
+const RULES = GUARD_RULES;
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap(n => {
@@ -44,69 +51,139 @@ function walk(dir: string): string[] {
   });
 }
 
-/** The source with line comments and block comments blanked (so prose never trips a rule). */
-export function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:'"`])\/\/[^\n]*/g, (m, a) => a + ' '.repeat(m.length - a.length));
+const FIELD_SKIP = /\btype=["'](?:checkbox|radio|hidden|file|range|color)["']/;
+const CONTENT_TAG =
+  /<(?:p|th|td|label|li|dd|dt|legend|h[3-6])(?=[\s>])[^<>]*?className=(?:"[^"]*"|\{`[^`]*`\})/g;
+const G9 =
+  /(?<![\w-])(?:[a-z-]+:)*rounded(?:-(?:t|b|s|e|l|r|ss|se|es|ee|tl|tr|bl|br))?-(?:xl|2xl|3xl)(?![\w-])/g;
+export function countOffScaleRadius(src: string): number {
+  return (stripComments(src).match(G9) ?? []).length;
 }
 
-export function countRule(rule: string, src: string): number {
-  return (stripComments(src).match(RULES[rule]) ?? []).length;
+const G10 =
+  /(?<![\w-])(?:[a-z-]+:)*shadow-(?:lg|2xl|(?:primary|black|gold|warning|success|destructive|info)(?:-\d+)?\/\d+)(?![\w-])/g;
+export function countOffScaleShadow(src: string): number {
+  return (stripComments(src).match(G10) ?? []).length;
 }
 
-/** The JSX opening tag starting at `i` (brace-balanced, so `=>` inside handlers does not end it). */
-function openingTag(src: string, i: number): string {
-  let depth = 0;
-  for (let j = i; j < src.length; j++) {
-    const c = src[j];
-    if (c === '{') depth++;
-    else if (c === '}') depth--;
-    else if (c === '>' && depth === 0 && src[j - 1] !== '=') return src.slice(i, j + 1);
+export function countTinyChecks(src: string): number {
+  const code = stripComments(src);
+  const re = /<input(?=[\s>/])/g;
+  let n = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(code))) {
+    const tag = openingTag(code, m.index);
+    if (
+      /\btype=["'](?:checkbox|radio)["']/.test(tag) &&
+      /(?<![\w:-])(?:h|w|size)-(?:3|3\.5|4)(?![\w.-])/.test(tag)
+    )
+      n++;
   }
-  return src.slice(i);
+  return n;
 }
 
-/** Everything the className attribute can resolve to (static string or the whole expression). */
-function classAttr(tag: string): string {
-  const s = tag.match(/\bclassName="([^"]*)"/);
-  if (s) return s[1];
-  const at = tag.search(/\bclassName=\{/);
-  if (at < 0) return '';
-  let depth = 0;
-  const start = tag.indexOf('{', at);
-  for (let j = start; j < tag.length; j++) {
-    if (tag[j] === '{') depth++;
-    else if (tag[j] === '}' && --depth === 0) return tag.slice(start + 1, j);
+/** G8: content elements set in 12px. */
+export function countSmallContent(src: string): number {
+  return (stripComments(src).match(CONTENT_TAG) ?? []).filter(t =>
+    /(?<![\w:-])text-xs(?![\w-])/.test(t)
+  ).length;
+}
+
+/** G7: raw field tags that are off the control scale. */
+export function countFields(src: string): number {
+  const code = stripComments(src);
+  const re = /<(?:input|select|textarea)(?=[\s>/])/g;
+  let n = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(code))) {
+    const tag = openingTag(code, m.index);
+    if (
+      FIELD_SKIP.test(tag) ||
+      /\b(?:FIELD_CLASSES|TEXTAREA_CLASSES|fieldControlClasses)\b/.test(tag) ||
+      /(?<![\w-])h-1[01](?![\w-])/.test(tag)
+    )
+      continue;
+    n++;
   }
-  return tag.slice(start + 1);
+  return n;
 }
 
 type Counts = Record<string, Record<string, number>>; // rule -> file -> n
 
 function scan(): { counts: Counts; nav: string[] } {
-  const counts: Counts = { G1: {}, G2: {}, G3: {}, G4: {}, G5: {} };
+  const counts: Counts = {
+    G1: {},
+    G2: {},
+    G3: {},
+    G4: {},
+    G5: {},
+    G7: {},
+    G8: {},
+    G9: {},
+    G10: {},
+    G11: {},
+  };
   const nav: string[] = [];
   for (const p of walk(SRC)) {
     const file = relative(SRC, p);
     if (file === TOKENS) continue;
     const src = readFileSync(p, 'utf8');
     for (const r of Object.keys(RULES)) {
-      const n = countRule(r, src);
+      const n = countRule(r as GuardRule, src);
       if (n) counts[r][file] = n;
     }
     if (p.endsWith('.tsx')) {
-      const re = /<[A-Za-z.]+(?=[\s>])/g;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(src))) {
-        const tag = openingTag(src, m.index);
-        if (!/\bdata-ui=["']nav["']/.test(tag)) continue;
-        if (!/\b(?:navItemClasses|bottomNavClasses)\(/.test(classAttr(tag)))
-          nav.push(`${file}:${src.slice(0, m.index).split('\n').length}`);
-      }
+      const f = countFields(src);
+      if (f) counts.G7![file] = f;
+      const sm = countSmallContent(src);
+      if (sm) counts.G8![file] = sm;
+      const rx = countOffScaleRadius(src);
+      if (rx) counts.G9![file] = rx;
+      const sh = countOffScaleShadow(src);
+      if (sh) counts.G10![file] = sh;
+      const tc = countTinyChecks(src);
+      if (tc) counts.G11![file] = tc;
     }
+    if (p.endsWith('.tsx'))
+      nav.push(...navIssues(file, src, ['navItemClasses', 'bottomNavClasses']));
   }
   return { counts, nav };
+}
+
+/** Base ref: BASE_REF, else the PR's base branch (GITHUB_BASE_REF; stacked PRs target their parent), else main. */
+function readBaseBaseline(
+  env: NodeJS.ProcessEnv = process.env
+): { ref: string; counts: Counts } | null {
+  const ref = env.BASE_REF ?? `origin/${env.GITHUB_BASE_REF || 'main'}`;
+  try {
+    const txt = execFileSync(
+      'git',
+      ['show', `${ref}:tests/unit/admin-design-tokens.baseline.json`],
+      {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }
+    );
+    return { ref, counts: JSON.parse(txt) as Counts };
+  } catch {
+    if (env.CI)
+      throw new Error(
+        `cannot read the base baseline from ${ref}: fetch it in the CI job ` +
+          `(git fetch --no-tags origin <base>:refs/remotes/origin/<base>)`
+      );
+    return null;
+  }
+}
+
+function loosenedAgainst(base: Counts, now: Counts): string[] {
+  const loosened: string[] = [];
+  for (const rule of Object.keys(now)) {
+    if (!base[rule]) continue; // a rule introduced by this PR has no base to compare with
+    for (const [f, n] of Object.entries(now[rule]!))
+      if (n > (base[rule]![f] ?? 0))
+        loosened.push(`${rule} ${f}: ${n} > base ${base[rule]![f] ?? 0}`);
+  }
+  return loosened;
 }
 
 describe('admin design tokens', () => {
@@ -127,6 +204,76 @@ describe('admin design tokens', () => {
     expect(countRule('G1', '/* bg-blue-500 */ const a = 1;')).toBe(0);
   });
 
+  it('negative control: a hand-styled nav item is caught (G6)', () => {
+    const bad = '<Link data-ui="nav" className="rounded px-3 bg-primary" href="/x">x</Link>';
+    const good =
+      '<Link data-ui="nav" className={navItemClasses({ kind: \'tab\', active })} href="/x">x</Link>';
+    expect(navIssues('a.tsx', bad, ['navItemClasses'])).toEqual(['a.tsx:1']);
+    expect(navIssues('a.tsx', good, ['navItemClasses'])).toEqual([]);
+  });
+
+  it('G7 self-test and negative control', () => {
+    expect(countFields('<input type="text" className="px-3 py-2 border" />')).toBe(1);
+    expect(countFields('<input type="text" className={FIELD_CLASSES} />')).toBe(0);
+    expect(countFields('<input type="checkbox" className="h-4 w-4" />')).toBe(0);
+    expect(countFields('<select className={`${FIELD_CLASSES} w-40`}>')).toBe(0);
+    expect(countFields('<input type="text" className={fieldControlClasses()} />')).toBe(0);
+    expect(countFields('<textarea className="rounded border" />')).toBe(1);
+    expect(countFields('<Input label="x" />')).toBe(0);
+  });
+
+  it('G8 self-test and negative control', () => {
+    expect(countSmallContent('<p className="text-xs text-muted-foreground">x</p>')).toBe(1);
+    expect(countSmallContent('<th className={`px-3 text-xs`}>x</th>')).toBe(1);
+    expect(countSmallContent('<p className="text-sm">x</p>')).toBe(0);
+    expect(countSmallContent('<span className="text-xs">3</span>')).toBe(0);
+    expect(countSmallContent('<p className="sm:text-xs text-sm">x</p>')).toBe(0);
+  });
+
+  it('G9 self-test', () => {
+    expect(countOffScaleRadius('className="rounded-xl md:rounded-2xl rounded-t-3xl"')).toBe(3);
+    expect(countOffScaleRadius('className="rounded-md rounded-lg rounded-full rounded-t-lg"')).toBe(
+      0
+    );
+  });
+
+  it('G10 self-test', () => {
+    expect(countOffScaleShadow('className="shadow-lg hover:shadow-2xl shadow-primary/25"')).toBe(3);
+    expect(countOffScaleShadow('className="shadow-sm shadow-md shadow-xl shadow-none"')).toBe(0);
+  });
+
+  it('G11 self-test, and the global 20px / 44px-row rules exist', () => {
+    expect(countTinyChecks('<input type="checkbox" className="h-4 w-4" />')).toBe(1);
+    expect(countTinyChecks('<input type="radio" className="size-3.5" />')).toBe(1);
+    expect(countTinyChecks('<input type="checkbox" className="h-5 w-5" />')).toBe(0);
+    expect(countTinyChecks('<input type="text" className="h-4" />')).toBe(0);
+    const css = readFileSync(join(SRC, 'styles/globals.css'), 'utf8');
+    expect(css).toMatch(
+      /input\[type='checkbox'\],\s*input\[type='radio'\] \{\s*width: 1\.25rem;\s*height: 1\.25rem;/
+    );
+    expect(css).toMatch(
+      /@media \(pointer: coarse\) \{\s*label:has\(> input\[type='checkbox'\]\)[\s\S]*?min-height: 2\.75rem;/
+    );
+  });
+
+  it('no count exceeds the BASE branch baseline (the ratchet only shrinks)', () => {
+    const base = readBaseBaseline();
+    if (base === null) return; // local checkout without a base ref; the local ratchet below still holds
+    const now: Counts = JSON.parse(readFileSync(BASELINE, 'utf8'));
+    expect(loosenedAgainst(base.counts, now), `baseline loosened against ${base.ref}`).toEqual([]);
+  });
+
+  it('under CI an unreadable base ref FAILS instead of passing (fail-closed)', () => {
+    expect(() =>
+      readBaseBaseline({ CI: 'true', BASE_REF: 'origin/does-not-exist-ratchet' })
+    ).toThrow(/cannot read the base baseline/);
+    expect(() =>
+      readBaseBaseline({ CI: 'true', GITHUB_BASE_REF: 'does-not-exist-ratchet' })
+    ).toThrow(/origin\/does-not-exist-ratchet/);
+    // locally (no CI) the same miss is a skip, not a failure
+    expect(readBaseBaseline({ BASE_REF: 'origin/does-not-exist-ratchet' })).toBeNull();
+  });
+
   it('nav items take their classes from the tokens (G6)', () => {
     expect(scan().nav).toEqual([]);
   });
@@ -142,7 +289,7 @@ describe('admin design tokens', () => {
     const base: Counts = JSON.parse(readFileSync(BASELINE, 'utf8'));
     const grew: string[] = [];
     const stale: string[] = [];
-    for (const rule of Object.keys(RULES)) {
+    for (const rule of [...Object.keys(RULES), 'G7', 'G8', 'G9', 'G10', 'G11']) {
       const files = new Set([...Object.keys(counts[rule]), ...Object.keys(base[rule] ?? {})]);
       for (const f of files) {
         const now = counts[rule][f] ?? 0;

@@ -246,6 +246,7 @@ describe.skipIf(!hasDb)('notification config on Postgres vs the DO', () => {
         'order_confirmed' as never,
         {
           orderNumber: 'ORD-1',
+          customerId: 'cust-1',
           customerPhone: '+201001234567',
           locale: 'en',
           storeName: 'S',

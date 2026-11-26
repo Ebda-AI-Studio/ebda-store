@@ -1,3 +1,16 @@
+---
+capabilities:
+  - packages.list-checkout@1
+  - packages.plan-status@1
+  - packages.yearly-switch@1
+  - wallet.card-topup@1
+  - wallet.instapay@1
+  - wallet.instapay-auto-confirm@2
+  - wallet.refund-request@2
+  - wallet.statement@1
+  - wallet.view@1
+---
+
 # Wallet, top-ups and refunds
 
 The wallet is a prepaid balance in Egyptian pounds. It pays Meta's cost on the **shared number**, and the cost of AI credits depending on your package.
@@ -24,6 +37,12 @@ While card payment is not switched on for your account, you pay by InstaPay tran
 
 *Notes:* the reference is valid for **48 hours**; after that the request expires and you start a new one. A receipt uploaded after it expired is refused. One reference is used for one payment only. Only the owner can pay.
 
+
+## Automatic confirmation of InstaPay payments
+When you upload a receipt that matches exactly (the amount due, our InstaPay address, a transfer from the last 48 hours, and a transaction number never used before), your payment can be confirmed **within minutes** with no one reviewing it. Anything that does not match waits for a person, as before.
+- The **first** automatic payment is limited to **one month** of the plan (for a top-up, one month of your current package). A bigger first payment, such as a yearly package, is reviewed by a person.
+- If our check shows the money **did not arrive**, the payment goes back to unpaid and you have **48 hours** to upload a correct receipt or pay by card before paid features pause. Credits that payment gave you and you have not used are removed; credits you already used stay used.
+
 ## Buy a package
 1. Open **Wallet** and find the **Packages** card (the owner sees it; it appears once package purchase is switched on for your account).
 2. Pick a package. The price and the monthly AI credits are shown; the price is set by us and is exactly what the card is charged (no extra card fee, unlike a top-up).
@@ -32,7 +51,7 @@ While card payment is not switched on for your account, you pay by InstaPay tran
 
 **Changing a yearly package.** With a yearly package running you can move **up** to a higher yearly package: you pay only the difference (new yearly price / 12 minus your current one / 12) for the months that are left, **this month included**, rounded down to a whole pound; the new package starts at once and ends on the same date, and this month's AI credits are topped up to the new amount (what you already used stays used). Moving to a **lower** yearly package, or to any **monthly** package, starts when your current package ends, with no refund. If a renewal is already queued behind your package, you cannot switch: write to us at ahlan@ebda.app.
 
-**Yearly packages** (Starter, Growth and Pro "yearly") cost 9 times the monthly price and run for **12 months**. They have the same features and the same AI credits per month as the monthly package; the credits are added **every month**, not all at once, and a month's unused credits end when the next month's arrive.
+**Yearly packages** ("Chat 300 AI replies (yearly)", "Chat 1,500 AI replies (yearly)" and "Chat 5,000 AI replies (yearly)") cost 9 times the monthly price and run for **12 months**. They have the same features and the same AI credits per month as the monthly package; the credits are added **every month**, not all at once, and a month's unused credits end when the next month's arrive.
 
 **There is no free plan.** Without a package in good standing you can still sign in, read your inbox, see the packages and buy one, but you cannot send any message (replies, order and COD confirmations and one-time codes included), use the AI agent, or connect a number. The app tells you "a package is required". If a renewal fails your package becomes **past due**: replies and confirmations keep working for up to **7 days** (or until the package period ends, whichever comes first), marketing campaigns stop at once, and then sending stops until you pay.
 
@@ -49,14 +68,13 @@ While card payment is not switched on for your account, you pay by InstaPay tran
 From **Wallet > Statement** choose a month to see every entry (top-up, message, credits, refund) with totals by category, and download it as CSV. Figures are shown as recorded at the time of the entry.
 
 ## Refunds
-*(Subject to the final terms of service.)*
 - The wallet balance is refundable for **12 months** after cancellation, after any debt is settled.
 - Refunds go to the original payment method through Kashier; otherwise by bank transfer or InstaPay after an identity check.
 - **The minimum refund is 50 EGP.**
 - **Not refundable:** card fees already paid, AI credits that came with the package, the current package period (it keeps working until the period ends), and purchased AI credits that were used or are older than 14 days.
 - Financial records are kept even after you cancel or ask for data deletion, as the law requires.
 
-To request one, write to the Ebda AI Studio team at ahlan@ebda.app, or use the refund request in your account if available. For a yearly package, the whole months left after the current one are refundable at the package's monthly price (the yearly price ÷ 12), up to what you paid for that year; the current month is not refunded.
+To request one, open **Wallet** and press **Request a refund**, enter the amount (at least 50 EGP and no more than your available balance) and an optional note, then send it. It appears under **Your requests** and the Ebda AI Studio team reviews it and gets back to you. You can ask after your plan ends or is cancelled, within 12 months. For help, write to ahlan@ebda.app. For a yearly package, the whole months left after the current one are refundable at the package's monthly price (the yearly price ÷ 12), up to what you paid for that year; the current month is not refunded.
 
 ## Troubleshooting
 - **I paid but the balance did not grow:** wait a few minutes. If it persists, email the transaction number to ahlan@ebda.app.
@@ -64,4 +82,4 @@ To request one, write to the Ebda AI Studio team at ahlan@ebda.app, or use the r
 - **I was charged for a message that did not arrive:** we only charge messages Meta counts as billable.
 
 ---
-Last checked: 2026-10-25. Refunds and fees are subject to the final terms of service. Meta's rules change.
+Last checked: 2026-10-25. Refunds and fees follow our terms of service. Meta's rules change.

@@ -279,7 +279,10 @@ type TrackingWindow = Window & {
  * Track View Content event (product view)
  */
 export function trackViewContent(params: {
+  /** THE catalogue item id (`catalogueItemId`), or the product id with `contentType: 'product_group'` for a variant product. */
   contentId: string;
+  /** `product_group` when `contentId` is a variant product's id (matches the feed's item_group_id); default `product`. */
+  contentType?: 'product' | 'product_group';
   contentName: string;
   contentCategory?: string;
   value?: number;
@@ -290,6 +293,7 @@ export function trackViewContent(params: {
 
   w.fbq?.('track', 'ViewContent', {
     content_ids: [params.contentId],
+    content_type: params.contentType ?? 'product',
     content_name: params.contentName,
     content_category: params.contentCategory,
     value: params.value,
@@ -298,6 +302,7 @@ export function trackViewContent(params: {
 
   w.ttq?.track('ViewContent', {
     content_id: params.contentId,
+    content_type: params.contentType ?? 'product',
     content_name: params.contentName,
     value: params.value,
     currency: params.currency || REGION.currency,
@@ -334,6 +339,7 @@ export function trackAddToCart(params: {
 
   w.fbq?.('track', 'AddToCart', {
     content_ids: [params.contentId],
+    content_type: 'product',
     content_name: params.contentName,
     value: params.value,
     currency: params.currency || REGION.currency,
@@ -341,6 +347,7 @@ export function trackAddToCart(params: {
 
   w.ttq?.track('AddToCart', {
     content_id: params.contentId,
+    content_type: 'product',
     quantity: params.quantity || 1,
     value: params.value,
     currency: params.currency || REGION.currency,
@@ -378,6 +385,7 @@ export function trackInitiateCheckout(params: {
 
   w.fbq?.('track', 'InitiateCheckout', {
     content_ids: params.contentIds,
+    content_type: 'product',
     num_items: params.numItems,
     value: params.value,
     currency: params.currency || REGION.currency,
@@ -440,6 +448,7 @@ export function trackPurchase(params: {
     'Purchase',
     {
       content_ids: params.contentIds,
+      content_type: 'product',
       num_items: params.numItems,
       value: params.value,
       currency: params.currency || REGION.currency,

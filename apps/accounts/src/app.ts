@@ -1,3 +1,4 @@
+import { logAuditEvent, logEvent } from './audit-log';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod/v3';
 import bcrypt from 'bcryptjs';
@@ -8,6 +9,7 @@ import {
   isSessionRevoked,
   resolveRefresh,
   revokeAllForUser,
+  revokeOtherSessions,
   revokeSession,
   SESSION_TTL_MS,
   type Resolved,
@@ -38,7 +40,9 @@ import {
   revokeClient,
   rotateClient,
 } from './clients';
-import { jwks } from './keys';
+import { jwks, retiredKeysWithoutExp } from './keys';
+import { isDisposableEmail } from '../../../packages/shared/src/abuse/disposable-email-domains';
+import { renderSignupPage, signupReturn, SIGNUP_JS, SIGNUP_PAGE_HEADERS } from './signup-page';
 import { DUMMY_HASH, hashPassword, passwordPolicy, verifyPassword } from './password';
 import {
   CODE_GUESS,
@@ -46,6 +50,7 @@ import {
   LOGIN,
   PER_EMAIL,
   PER_IP_ONLY,
+  CHAT_INVITE_MAIL,
   retryAfterSeconds,
   SECOND_FACTOR,
   type Budget,
@@ -441,6 +446,26 @@ async function bearerAuth(
   return { user, sid: verified.sid, aud: verifiedAud };
 }
 
+/** Unused recovery codes; a null or malformed column (legacy row, operator reset) reads as none instead of a 500. */
+function remainingRecoveryCodes(raw: string | null): number {
+  try {
+    const list: unknown = JSON.parse(raw ?? '[]');
+    return Array.isArray(list) ? list.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** 10 single-use recovery codes: the plain list is shown once, only bcrypt hashes are stored. */
+async function newRecoveryCodes(): Promise<{ plain: string[]; hashed: string[] }> {
+  const plain = Array.from({ length: 10 }, () =>
+    [...crypto.getRandomValues(new Uint8Array(5))]
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+  );
+  return { plain, hashed: await Promise.all(plain.map(x => bcrypt.hash(x, 10))) };
+}
+
 /** Step-up for sensitive changes: the account password again, throttled like a login (a bearer token alone must not allow free guessing). */
 async function requirePassword(c: C, user: UserRow, password: unknown): Promise<void> {
   const a = await hit(c.env.DB, user.id, clientIp(c), { ...LOGIN, name: 'pw', brake: false });
@@ -490,7 +515,7 @@ async function requireSecondFactor(c: C, user: UserRow, code: unknown): Promise<
 export async function issueAndMail(
   env: Env,
   user: UserRow,
-  kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol',
+  kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol' | 'chat_invite',
   type: OtpType,
   pending?: PendingSignup,
   opts: { ttlMinutes?: number; storeName?: string } = {}
@@ -522,6 +547,30 @@ export async function issueAndMail(
   })();
   // Neither channel waits for or can fail the other; sendCodeOverWhatsApp never rejects.
   await Promise.all([mail, whatsapp]);
+}
+
+/**
+ * ID-06: after MFA is turned off, a passkey is removed or the recovery phone changes, every OTHER session is signed out (a thief
+ * holding a stolen session loses it; the owner keeps the one they just used) and the mailbox owner is told. The mail is best
+ * effort and runs after the response; the revocation is not and happens before it.
+ */
+async function securityChanged(
+  c: C,
+  user: UserRow,
+  sid: string,
+  change: 'mfa_disabled' | 'passkey_removed' | 'phone_changed'
+): Promise<void> {
+  await revokeOtherSessions(c.env.DB, user.id, sid, change);
+  queueMail(
+    c,
+    c.env.MAILER?.sendNotice({
+      to: user.email,
+      kind: 'credential_changed',
+      change,
+      language: user.language === 'ar' ? 'ar' : 'en',
+      firstName: user.first_name,
+    }) ?? Promise.resolve()
+  );
 }
 
 /** Mail work runs after the response, so every branch of the caller answers in the same time (no registered-address oracle). */
@@ -563,6 +612,8 @@ export async function inviteFor(
     role: 'store_admin' | 'staff';
     language: 'en' | 'ar';
     storeName?: string;
+    /** Mail template for the one-time code (default: staff_invite when a storeName is given). */
+    mailKind?: 'chat_invite';
   }
 ): Promise<InviteResult> {
   let user = await findUserByEmail(env.DB, input.email);
@@ -595,7 +646,7 @@ export async function inviteFor(
   await issueAndMail(
     env,
     user,
-    input.storeName ? 'staff_invite' : 'password_reset',
+    input.mailKind ?? (input.storeName ? 'staff_invite' : 'password_reset'),
     'password_reset',
     undefined,
     {
@@ -604,6 +655,89 @@ export async function inviteFor(
     }
   );
   return { id: user.id, created: true };
+}
+
+/** Why a Chat invite was refused. Chat shows one generic message for it; the cause is never revealed to the inviter. */
+class InviteRefused extends Error {
+  constructor() {
+    super('INVITE_REFUSED');
+    this.name = 'InviteRefused';
+  }
+}
+
+/**
+ * Invite a person to a standalone Ebda Chat workspace by email (Ruling CHAT-SA-6). Returns ONLY `{ userId }`, identical
+ * whether the address already had an identity, so the inviter learns nothing about who is registered.
+ *  - no identity: an unverified, credential-less `staff` identity (role is irrelevant to Chat; membership lives in Chat's D1)
+ *    and the invitation mail (`chat_invite`: sign in to Chat and accept within 7 days) carrying the one-time set-password code (24 h, single use: the existing reset flow);
+ *  - ACTIVE verified identity: its id, plus an "invited to <workspace>" notice (no code, no credential touched; the invitation is accepted in Chat, 7 days);
+ *  - ACTIVE but never verified (a signup nobody completed): bound to its own id only; the set-password code is mailed
+ *    to the mailbox, so only that mailbox's owner can ever activate it (first verification purges anything attached earlier);
+ *  - inactive, suspended or erased identity: throws InviteRefused.
+ * Mail is capped at 5 per address per hour (the limiter window is at most 1 h); past it the call still resolves the same id, mail is skipped.
+ */
+export async function inviteChatMemberFor(
+  env: Env,
+  input: { email: string; firstName: string; language: 'en' | 'ar'; workspaceName: string }
+): Promise<{ userId: string }> {
+  const mailAllowed = (await hit(env.DB, input.email, 'n/a', CHAT_INVITE_MAIL)).ok;
+  const user = await findUserByEmail(env.DB, input.email);
+  if (user && user.status !== 'active') throw new InviteRefused();
+  // A soft-deleted (erased) identity still owns its address: never re-invite onto it.
+  if (
+    !user &&
+    (await env.DB.prepare(
+      `SELECT 1 AS x FROM users WHERE lower(email) = lower(?1) AND deleted_at IS NOT NULL`
+    )
+      .bind(input.email)
+      .first())
+  )
+    throw new InviteRefused();
+  let userId: string;
+  if (!user) {
+    // Unreachable in practice: 5 calls in an hour for an address that never got an identity. Refuse rather than mail past the cap.
+    if (!mailAllowed) throw new InviteRefused();
+    const r = await inviteFor(env, {
+      id: crypto.randomUUID(),
+      email: input.email,
+      firstName: input.firstName,
+      lastName: '',
+      role: 'staff',
+      language: input.language,
+      storeName: input.workspaceName,
+      mailKind: 'chat_invite',
+    });
+    userId = r.id;
+  } else {
+    userId = user.id;
+    if (mailAllowed && user.email_verified) {
+      try {
+        await env.MAILER?.sendNotice({
+          to: user.email,
+          kind: 'chat_member_added',
+          language: user.language === 'ar' ? 'ar' : input.language,
+          firstName: user.first_name,
+          workspaceName: input.workspaceName,
+        });
+      } catch (e) {
+        // eslint-disable-next-line no-console -- pq-allow(no-console): structured worker log; the invite itself already resolved
+        console.error(
+          JSON.stringify({ msg: 'chat invite notice failed', error: (e as Error).message })
+        );
+      }
+    } else if (mailAllowed) {
+      await issueAndMail(env, user, 'chat_invite', 'password_reset', undefined, {
+        ttlMinutes: 24 * 60,
+        storeName: input.workspaceName,
+      });
+    }
+  }
+  // Audit trail (structured log; the durable `member.added` row is Chat's). No address, no code.
+  // eslint-disable-next-line no-console -- pq-allow(no-console): audit line, the worker log is the sink (no address, no code)
+  console.log(
+    JSON.stringify({ msg: 'audit', event: 'chat_member_invited', userId, mailed: mailAllowed })
+  );
+  return { userId };
 }
 
 /** Mail a fresh code to an existing UNVERIFIED account; carries the credential of the latest signup (see verify). */
@@ -685,6 +819,11 @@ export function signInEntryUrl(product: string | undefined, ret: string | undefi
   if (product === 'chat' || product === 'store') url.searchParams.set('product', product);
   if (ret && ret.length <= 2048 && /^https:\/\//i.test(ret)) url.searchParams.set('return', ret);
   return url.toString();
+}
+
+/** Ebda Chat sign-up is open only when the deploy var says so (mirror of Chat's STANDALONE_WORKSPACES != off). Fails closed. */
+function chatSignupOpen(env: { CHAT_SIGNUP_OPEN?: string }): boolean {
+  return env.CHAT_SIGNUP_OPEN === 'true';
 }
 
 export function createApp() {
@@ -815,10 +954,36 @@ export function createApp() {
     // `return` is Ebda Chat's parameter; `return_to` is accepted as an alias. Validated here, by the Store's allowlist.
     const returnTo = signInReturn(c.req.query('return') ?? c.req.query('return_to'));
     return new Response(
-      c.req.method === 'HEAD' ? null : renderSignInPage({ lang, product, returnTo }),
+      c.req.method === 'HEAD'
+        ? null
+        : renderSignInPage({
+            lang,
+            product,
+            returnTo,
+            showChatSignup: chatSignupOpen(c.env),
+          }),
       { status: 200, headers: SIGN_IN_PAGE_HEADERS }
     );
   });
+  // Ebda Chat sign-up (Ruling CHAT-SA-1). Only `product=chat` has a page here; the Store keeps its own sign-up.
+  app.get('/signup', c => {
+    if (signInProduct(c.req.query('product')) !== 'chat')
+      return c.redirect('https://store.ebda.app/signup', 302);
+    // Closed (Chat's STANDALONE_WORKSPACES is off): nothing to sign up for, so no page and no form.
+    if (!chatSignupOpen(c.env)) return c.text('Not found', 404, { 'Cache-Control': 'no-store' });
+    const lang = pickStudioLang(c.req.header('accept-language'), c.req.query('lang'));
+    const returnTo = signupReturn(c.req.query('return') ?? c.req.query('return_to'));
+    return new Response(c.req.method === 'HEAD' ? null : renderSignupPage({ lang, returnTo }), {
+      status: 200,
+      headers: SIGNUP_PAGE_HEADERS,
+    });
+  });
+  app.get('/signup.js', c =>
+    c.body(SIGNUP_JS, 200, {
+      'Content-Type': 'text/javascript; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    })
+  );
   app.get('/sign-in.js', c =>
     c.body(SIGN_IN_JS, 200, {
       'Content-Type': 'text/javascript; charset=utf-8',
@@ -833,14 +998,25 @@ export function createApp() {
   );
 
   // ---- discovery ----
-  app.get('/health', c =>
-    c.json({
+  app.get('/health', c => {
+    const noExp = retiredKeysWithoutExp(c.env);
+    if (noExp.length)
+      logEvent('jwt_previous_public_jwks_entry_without_exp', { kids: noExp }, 'error');
+    return c.json({
       status: 'ok',
+      ...(noExp.length
+        ? {
+            warning: 'retired_jwk_without_exp',
+            warningDetail:
+              'a retired JWKS key has no exp, or an exp more than 30 days ahead: it is not published',
+            retiredKeysWithoutExp: noExp,
+          }
+        : {}),
       service: 'accounts',
       commit: c.env.BUILD_COMMIT_SHA || null,
       deploymentId: c.env.CF_VERSION_METADATA?.id ?? null,
-    })
-  );
+    });
+  });
   app.get('/.well-known/jwks.json', async c => {
     c.header('Cache-Control', 'public, max-age=300');
     return c.json(await jwks(c.env));
@@ -1061,15 +1237,23 @@ export function createApp() {
     lastName: z.string().trim().max(100).default(''),
     phone: z.string().trim().max(40).optional(),
     language: z.enum(['en', 'ar']).default('en'),
+    /** Honeypot (Chat sign-up page): a person never fills it. */
+    website: z.string().max(200).optional(),
   });
 
   app.post('/signup', async c => {
+    // Server-side gate, not just a hidden form: this endpoint's only HTTP caller is the Chat sign-up page (the Store signs up
+    // through the api's `createUser` RPC), so while Chat sign-up is closed no identity can be registered here.
+    if (!chatSignupOpen(c.env)) throw err(404, 'NOT_FOUND');
     const body = await json(c, signupBody);
     if (!(await hit(c.env.DB, 'all', clientIp(c), PER_IP_ONLY('signup', 10))).ok)
       throw err(429, 'TOO_MANY_ATTEMPTS');
     if (!(await hit(c.env.DB, body.email, 'n/a', PER_EMAIL('signup-email', 3))).ok)
       throw err(429, 'TOO_MANY_ATTEMPTS');
     const passwordHash = await hashPassword(body.password); // always paid, so every branch costs the same
+    // A bot (honeypot filled) or a throwaway mailbox gets the SAME 202 and nothing is created or mailed: no oracle, same cost.
+    if (body.website || isDisposableEmail(body.email))
+      return c.json({ success: true, data: { status: 'verification_sent' } }, 202);
     // Everything else runs after the response: "new", "pending" and "already verified" answer identically and in the same time.
     queueMail(
       c,
@@ -1226,12 +1410,7 @@ export function createApp() {
     if (!user.mfa_secret || !c.env.MFA_KEY || user.mfa_enabled) throw err(409, 'MFA_NOT_PENDING');
     if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
     const mode = await authorizeEnrolment(c, user, sid, body);
-    const plain = Array.from({ length: 10 }, () =>
-      [...crypto.getRandomValues(new Uint8Array(5))]
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('')
-    );
-    const hashed = await Promise.all(plain.map(x => bcrypt.hash(x, 10)));
+    const { plain, hashed } = await newRecoveryCodes();
     await c.env.DB.prepare(
       `UPDATE users SET mfa_enabled = 1, mfa_enrolled_at = ?2, mfa_backup_codes = ?3 WHERE id = ?1`
     )
@@ -1241,8 +1420,52 @@ export function createApp() {
     return c.json({ success: true, data: { enabled: true, backupCodes: plain, requiresSignIn } });
   });
 
-  app.post('/mfa/disable', async c => {
+  // Recovery codes (A23): how many are left (never the codes), and a regenerate that retires the whole old set.
+  app.get('/mfa/recovery-codes', async c => {
     const { user } = await bearerAuth(c);
+    if (!user.mfa_enabled) throw err(409, 'MFA_NOT_ENABLED');
+    return c.json({
+      success: true,
+      data: { remaining: remainingRecoveryCodes(user.mfa_backup_codes) },
+    });
+  });
+
+  // Step-up = the account password AND a live authenticator code (a recovery code is refused: it must not mint more of
+  // itself). Both go through the throttled paths. The new list REPLACES the old one in one statement, so every old code dies.
+  // Super-admin override: staff may still reset MFA via scripts/mfa-reset.ts (last resort, docs/runbooks/mfa-recovery.md).
+  app.post('/mfa/recovery-codes/regenerate', async c => {
+    const { user } = await bearerAuth(c);
+    const body = await json(c, z.object({ password: z.string(), code: z.string().max(20) }));
+    if (!user.mfa_enabled || !user.mfa_secret || !c.env.MFA_KEY) throw err(409, 'MFA_NOT_ENABLED');
+    await requirePassword(c, user, body.password);
+    if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
+    const { plain, hashed } = await newRecoveryCodes();
+    // The new set and its audit row land together (no code, no hash in the row; actor 'self').
+    await c.env.DB.batch([
+      c.env.DB.prepare(`UPDATE users SET mfa_backup_codes = ?2 WHERE id = ?1`).bind(
+        user.id,
+        JSON.stringify(hashed)
+      ),
+      c.env.DB.prepare(
+        `INSERT INTO admin_audit (event, user_id, email, actor, at, detail) VALUES ('mfa_recovery_codes_regenerated', ?1, ?2, 'self', ?3, '{}')`
+      ).bind(user.id, user.email.toLowerCase(), nowMs()),
+    ]);
+    // Tell the mailbox owner (best effort; the change already happened): a stolen session regenerating codes must not be silent.
+    queueMail(
+      c,
+      c.env.MAILER?.sendNotice({
+        to: user.email,
+        kind: 'recovery_codes_changed',
+        language: user.language === 'ar' ? 'ar' : 'en',
+        firstName: user.first_name,
+      }) ?? Promise.resolve()
+    );
+    logAuditEvent('mfa_recovery_codes_regenerated', user.id);
+    return c.json({ success: true, data: { backupCodes: plain } });
+  });
+
+  app.post('/mfa/disable', async c => {
+    const { user, sid } = await bearerAuth(c);
     const body = await json(c, z.object({ password: z.string(), code: z.string() }));
     await requirePassword(c, user, body.password);
     if (!user.mfa_secret || !c.env.MFA_KEY) throw err(409, 'MFA_NOT_ENABLED');
@@ -1260,6 +1483,7 @@ export function createApp() {
     )
       .bind(user.id)
       .run();
+    await securityChanged(c, user, sid, 'mfa_disabled');
     return c.json({ success: true, data: { enabled: false } });
   });
 
@@ -1269,7 +1493,7 @@ export function createApp() {
   // account has a second factor, and a per-user throttle. Interim: the new number is NOT proven by a code sent to it (the
   // WhatsApp channel is flag-off); the re-authentication is the proof. Send the code to the new number here when it is on.
   app.post('/phone', async c => {
-    const { user } = await bearerAuth(c);
+    const { user, sid } = await bearerAuth(c);
     const body = await json(
       c,
       z.object({
@@ -1289,6 +1513,7 @@ export function createApp() {
     await c.env.DB.prepare(`UPDATE users SET phone = ?2, updated_at = ?3 WHERE id = ?1`)
       .bind(user.id, body.phone, iso())
       .run();
+    await securityChanged(c, user, sid, 'phone_changed');
     return c.json({ success: true, data: { phone: body.phone } });
   });
 
@@ -1392,6 +1617,7 @@ export function createApp() {
     }
     if (!(await passkeys.removePasskey(c.env.DB, user.id, c.req.param('id'))))
       throw err(404, 'NOT_FOUND');
+    await securityChanged(c, user, sid, 'passkey_removed');
     return c.json({ success: true, data: { deleted: true } });
   });
 

@@ -103,10 +103,6 @@ export const CAPABILITIES: Record<Locale, Record<CardId, CapabilityCopy>> = {
     search: {
       t: 'بحث بيفهم المصري والفرانكو',
       d: 'عميلك بيكتب زي ما بيتكلم: بالعامية المصرية، أو بالفرانكو زي "gazma" و"kotshy"، أو بالإنجليزي، والبحث بيفهم أشكال الحروف زي أ وا وه وة، وبيلاقي المنتج حتى لو الكتابة مش مظبوطة. كل منتج بياخد لوحده كلمات بحث بالمصري والفرانكو والإنجليزي وأشهر أخطاء الكتابة، وتقدر تعدّلها. وتشوف عملاءك بحثوا عن إيه، وإيه اللي مالقوش له نتيجة، عشان تضيف المنتج الناقص.',
-      soon: {
-        needs: 'meaning',
-        text: 'بحث بالمعنى: العميل يكتب اللي في دماغه والبحث يفهم قصده. بنطرحه تدريجيًا، ومش بيتفعّل على متجرك غير لما نتأكد إن نتايجه ممتازة على منتجات حقيقية.',
-      },
     },
     assistant: {
       t: 'شغّل متجرك من مساعد ذكاء اصطناعي',
@@ -203,10 +199,6 @@ export const CAPABILITIES: Record<Locale, Record<CardId, CapabilityCopy>> = {
     search: {
       t: 'Search that understands Egyptian Arabic and Franco',
       d: 'Your shoppers type the way they talk: in Egyptian Arabic, in Franco like "gazma" or "kotshy", or in English. Search understands letter variants such as أ/ا and ه/ة, and still finds the product when the spelling is not exact. Every product gets its own search words in Egyptian Arabic, Franco and English plus the common misspellings, and you can edit them. You also see what shoppers searched for and found nothing, so you can add the missing product.',
-      soon: {
-        needs: 'meaning',
-        text: 'Search by meaning: shoppers type what they have in mind and search understands what they mean. We are rolling it out gradually, and it only switches on for your store once its results pass our quality check on a real catalogue.',
-      },
     },
     assistant: {
       t: 'Run your store from an AI assistant',
@@ -349,13 +341,6 @@ const FAQ_ITEMS: Record<Locale, FeaturesFaqItem[]> = {
       a: 'أيوه. العميل يكتب "gazma" أو "كوتشي" أو بالإنجليزي، والبحث بيفهم أشكال الحروف، وكل منتج بياخد كلمات بحث بالذكاء الاصطناعي تقدر تعدّلها.',
     },
     {
-      q: 'فيه بحث بالمعنى؟',
-      needs: 'meaning',
-      a: 'أيوه. العميل يكتب اللي في دماغه والبحث يفهم قصده.',
-      aSoon:
-        'بنطرحه تدريجيًا وبيتفعّل قريبًا. مش هنفعّله على متجرك غير لما نتأكد إن نتايجه ممتازة على منتجات حقيقية.',
-    },
-    {
       q: 'فيه استرجاع للسلات المتروكة؟',
       needs: 'cart',
       a: 'أيوه، في باقتَي النمو والأعمال. المتجر بيفكّر العميل على خطوات بالإيميل (لو وافق وهو بيدفع، حتى كزائر)، وبإشعار. والـSMS في باقة الأعمال، بحساب SMS خاص بيك، ولو العميل وافق عليها.',
@@ -404,7 +389,7 @@ const FAQ_ITEMS: Record<Locale, FeaturesFaqItem[]> = {
     },
     {
       q: 'إيه اللي لسه مش موجود؟',
-      a: 'مفيش متجر تطبيقات، ولا محرر أكواد مخصص، ولا نقطة بيع POS، ولا متجر بعملات متعددة. وفي صفحات المقارنة مع سلة وزد وشوبيفاي هتلاقي التفاصيل، وإيه اللي جاي قريبًا.',
+      a: 'مفيش متجر تطبيقات، ولا محرر أكواد مخصص، ولا نقطة بيع POS، ولا متجر بعملات متعددة. وفي صفحات المقارنة مع سلة وزد وشوبيفاي هتلاقي التفاصيل.',
     },
   ],
   en: [
@@ -419,13 +404,6 @@ const FAQ_ITEMS: Record<Locale, FeaturesFaqItem[]> = {
     {
       q: 'Does search understand Egyptian Arabic and Franco?',
       a: 'Yes. A shopper can type "gazma", "كوتشي" or English, search understands letter variants, and every product gets AI search words that you can edit.',
-    },
-    {
-      q: 'Is there search by meaning?',
-      needs: 'meaning',
-      a: 'Yes. Shoppers type what they have in mind and search understands what they mean.',
-      aSoon:
-        'It is rolling out gradually and coming soon. We will not switch it on for your store until its results pass our quality check on a real catalogue.',
     },
     {
       q: 'Does it recover abandoned carts?',
@@ -476,7 +454,7 @@ const FAQ_ITEMS: Record<Locale, FeaturesFaqItem[]> = {
     },
     {
       q: 'What is not there yet?',
-      a: 'There is no app marketplace, no custom code editor, no point-of-sale and no multi-currency store. The comparison pages for Zid and Shopify go through the details, and what is coming soon.',
+      a: 'There is no app marketplace, no custom code editor, no point-of-sale and no multi-currency store. The comparison pages for Zid and Shopify go through the details.',
     },
   ],
 };

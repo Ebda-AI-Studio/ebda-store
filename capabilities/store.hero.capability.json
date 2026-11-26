@@ -18,7 +18,7 @@
   },
   "helpArticle": "store-hero-and-menu",
   "questions": {
-    "ar": ["ازاي اغير صورة البانر؟", "ضيف سلايد"],
+    "ar": ["ازاي اغير صورة البانر؟", "ضيف سلايد", "ازاي احط فيديو في البانر؟"],
     "en": ["Change the hero banner"]
   },
   "steps": ["Hero page or editor hero section; background video supported per slide."],

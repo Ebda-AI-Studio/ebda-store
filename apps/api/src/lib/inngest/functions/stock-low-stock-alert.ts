@@ -57,10 +57,21 @@ export const stockLowStockAlertCron: JobDef = inngest.createFunction(
     const webhookPending: Array<{ storeId: string; items: LowStockAlertItem[] }> = [];
     let totalAlerted = 0;
     let totalCleared = 0;
+    // Stores to visit: entitlement read in one batched prefetch per run (selection only). The per-store gate below stays a
+    // LIVE read, so a downgrade mid-run is still honoured before any paid action (entitlements are NEVER-stale).
+    const enabledIds = new Set(
+      await step.run('select-enabled-stores', () =>
+        featureService.selectEnabled(
+          stores.map(s => s.id),
+          'inventory.stock_alerts'
+        )
+      )
+    );
+
     let totalSkipped = 0;
     let emailsSent = 0;
 
-    for (const store of stores) {
+    for (const store of stores.filter(s => enabledIds.has(s.id))) {
       // Step 1 — scan (sets the Redis dedup sentinels). Kept in its OWN
       // memoized step so a downstream email failure cannot cause it to re-run:
       // on retry Inngest replays this step's cached result, so the sentinels are

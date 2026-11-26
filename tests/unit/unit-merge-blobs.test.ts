@@ -19,8 +19,8 @@ import {
 } from '../../scripts/ci/unit-merge-blobs.mjs';
 
 const SCRIPT = join(__dirname, '../../scripts/ci/unit-merge-blobs.mjs');
-const A = '/Users/ahmadsharaf/actions-runner-ebda/_work/ebda-store/ebda-store';
-const B = '/Users/ahmadsharaf/actions-runner-ebda-2/_work/ebda-store/ebda-store';
+const A = '/home/ci/actions-runner-ebda/_work/ebda-store/ebda-store';
+const B = '/home/ci/actions-runner-ebda-2/_work/ebda-store/ebda-store';
 const HOSTED = '/home/runner/work/ebda-store/ebda-store'; // a GitHub-style layout: no `_work`, still `<prefix>/<repo>/<repo>`
 const ROOT = '/work/co/ebda-store/ebda-store';
 

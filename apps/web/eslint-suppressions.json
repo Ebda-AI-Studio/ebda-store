@@ -44,11 +44,6 @@
       "count": 3
     }
   },
-  "src/components/OneSignalStorefrontInit.tsx": {
-    "no-console": {
-      "count": 1
-    }
-  },
   "src/hooks/useTemplateComponents.ts": {
     "no-console": {
       "count": 1

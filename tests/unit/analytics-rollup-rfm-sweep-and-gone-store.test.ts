@@ -14,6 +14,10 @@ const h = vi.hoisted(() => ({
   repoError: null as unknown,
 }));
 
+vi.mock('@api/lib/customer-groups-store', async () => {
+  const { CustomerGroups } = await import('@api/lib/customer-groups');
+  return { loadCustomerGroups: async () => new CustomerGroups([]) };
+});
 vi.mock('@api/lib/savepoint', () => ({ withSavepoint: async <T>(fn: () => Promise<T>) => fn() }));
 vi.mock('@ebda/database', () => ({
   prisma: {},

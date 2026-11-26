@@ -44,7 +44,7 @@ export function EnableOrderAlertsButton({ onDone }: { onDone?: (r: EnableAlertsR
   return (
     <section
       aria-labelledby="order-alerts-title"
-      className="rounded-2xl border border-border bg-card p-5"
+      className="rounded-lg border border-border bg-card p-5"
     >
       <h2 id="order-alerts-title" className="text-base font-semibold text-foreground">
         {t('title')}

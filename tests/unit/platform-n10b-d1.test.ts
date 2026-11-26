@@ -2,6 +2,7 @@
  * NEON-ZERO-1 N-10b: the `platform` and `inbox` families on D1 (settings, features, legal, provider, merchant keys,
  * slug redirects, the payment-webhook inbox), the freeze behaviour of each, and the raw-SQL replacements.
  */
+import { PLATFORM_MIGRATION_SQL } from '../helpers/platform-migrations';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -40,14 +41,7 @@ import {
 } from '../../apps/api/src/services/platform/platform-d1';
 import { webhookInbox, withdrawLegalNoticeSend } from '../../apps/api/src/lib/definer';
 
-const MIG = ['0001_init.sql', '0002_invariants.sql']
-  .map(f =>
-    fs.readFileSync(
-      new URL(`../../packages/cf-schema/migrations/platform/${f}`, import.meta.url),
-      'utf8'
-    )
-  )
-  .join('\n');
+const MIG = PLATFORM_MIGRATION_SQL;
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
 

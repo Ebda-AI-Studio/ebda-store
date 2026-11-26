@@ -21,6 +21,8 @@ vi.mock('@google/generative-ai', () => ({
     }
   },
 }));
+// The generator budgets itself (#838); the quota is not under test here.
+vi.mock('@api/lib/ai-quota', () => ({ assertAiQuota: async () => undefined }));
 vi.mock('@api/services/ai.service', () => ({ recordUsage: mockRecordUsage }));
 
 import { suggestProductTags } from '@api/lib/ai/product-tag-suggester';

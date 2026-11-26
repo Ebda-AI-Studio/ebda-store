@@ -254,7 +254,7 @@ export function SettingsPanel({
         )}
         {!block && mode === 'design' && (
           <fieldset className="space-y-2">
-            <legend className="text-xs font-semibold text-muted-foreground">
+            <legend className="text-sm font-semibold text-muted-foreground">
               {t('visibility')}
             </legend>
             {VIEWPORTS.map(v => {
@@ -273,6 +273,7 @@ export function SettingsPanel({
                         hidden: on ? undefined : true,
                       })
                     }
+                    label={t(`viewport.${v}`)}
                   />
                 </label>
               );
@@ -607,7 +608,11 @@ export function Field({
       return (
         <label className="flex items-center justify-between text-sm">
           <span>{label}</span>
-          <Toggle checked={valueOf(def.id) === true} onChange={on => onChange(def.id, on)} />
+          <Toggle
+            checked={valueOf(def.id) === true}
+            onChange={on => onChange(def.id, on)}
+            label={label}
+          />
         </label>
       );
     case 'category':
@@ -821,7 +826,7 @@ function ProductListPicker({
         {value.map(id => (
           <li
             key={id}
-            className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs"
+            className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-sm"
           >
             {names[id] ?? id.slice(0, 8)}
             <button

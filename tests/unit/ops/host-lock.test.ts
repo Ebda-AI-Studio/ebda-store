@@ -86,7 +86,10 @@ describe('host-lock.sh', () => {
 
   it('MAC-LIGHT-1 / PREPUSH-8: the gate is light and unlocked; the vitest related run is a prepush slot, never the heavy host lock', () => {
     const hook = readFileSync(join(__dirname, '../../../.husky/pre-push'), 'utf8');
-    const gate = readFileSync(join(__dirname, '../../../scripts/ci/pre-push-gate.sh'), 'utf8');
+    // F10: the gate is the vendored foundation script (pins, gitleaks, prettier) plus the Store's own steps (scripts/ci/pre-push-extra.sh)
+    const gate =
+      readFileSync(join(__dirname, '../../../scripts/foundation/pre-push-gate.sh'), 'utf8') +
+      readFileSync(join(__dirname, '../../../scripts/ci/pre-push-extra.sh'), 'utf8');
     expect(hook).toContain('bash scripts/ci/pre-push-gate.sh');
     expect(hook).not.toContain('host-lock.sh bash scripts/ci/pre-push-gate.sh');
     // PREPUSH-8: the related run is capped AND runs in a prepush slot with 2 workers; self-hosted CI jobs hold the heavy lock back to

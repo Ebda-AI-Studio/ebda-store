@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { useState } from 'react';
 import { apiPut } from '../../lib/api';
 import { useT } from '@/i18n/useT';
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 /** The store's optional packing-slip footer text (`settings.packingSlipNote`, <= 300 chars). Saves only its key. */
 export function PackingSlipNoteField({
@@ -40,7 +41,7 @@ export function PackingSlipNoteField({
   };
 
   return (
-    <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+    <section className="space-y-3 rounded-md border bg-card p-4 shadow-sm">
       <div>
         <h2 className="text-sm font-semibold text-foreground">{t('noteTitle')}</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">{t('noteHint')}</p>
@@ -52,7 +53,7 @@ export function PackingSlipNoteField({
         rows={2}
         placeholder={t('notePlaceholder')}
         aria-label={t('noteTitle')}
-        className="w-full max-w-md rounded-lg border border-border bg-background px-3 py-2 text-sm"
+        className={`${TEXTAREA_CLASSES} max-w-md`}
       />
       <div className="flex items-center gap-3">
         <Button

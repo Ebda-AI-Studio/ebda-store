@@ -41,6 +41,8 @@ vi.mock('../../apps/web/src/lib/api', () => ({
   api: {
     get: (path: string) =>
       path === '/payments/config' ? ctx.payment() : Promise.resolve({ success: true, data: {} }),
+    // The cart's automatic-promotion preview (none here).
+    post: () => Promise.resolve({ success: true, data: { promotion: null } }),
   },
 }));
 vi.mock('../../apps/web/src/hooks/useTemplateComponents', () => ({

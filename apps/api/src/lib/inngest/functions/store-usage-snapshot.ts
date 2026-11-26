@@ -3,7 +3,8 @@ import { analyticsOnDo } from '../../analytics-backend';
 import { aiUsageTotals } from '../../../services/usage-aggregates.service';
 import { platformFamilyOnD1 } from '../../../services/platform/cutover';
 import { withStoreDb } from '../../jobs/store-db';
-import { prisma, withStore, acrossStoresFlat } from '@ebda/database';
+import { prisma, Prisma, withStore, acrossStoresFlat } from '@ebda/database';
+import { orderNetRevenueSql, refundJoinsSql, revenueOrderPredicateSql } from '../../revenue-sql';
 import { acrossOpts, alarmStoreId } from '../../jobs/store-scope';
 import { storeMoney, storeRepo } from '../../repo-factory';
 import logger from '../../logger';
@@ -224,10 +225,11 @@ export const storeUsageSnapshot: JobDef = inngest.createFunction(
             -- and counting those would inflate revenue for exactly the stores
             -- with the most reversals. Delivered-but-still-unpaid orders are
             -- excluded too; they are a bookkeeping gap, not revenue.
-            (SELECT COALESCE(SUM(o.total), 0) FROM orders o
+            -- The ONE revenue definition, paid-only (lib/revenue-sql.ts, STORE-QA-7): also nets partial refunds.
+            (SELECT COALESCE(SUM(${Prisma.raw(orderNetRevenueSql('o', 'pg'))}), 0) FROM orders o
+              ${Prisma.raw(refundJoinsSql('o', 'pg'))}
               WHERE o.store_id = s.id AND o.created_at >= ${start} AND o.created_at < ${end}
-                AND o.payment_status = 'paid'
-                AND o.status NOT IN ('cancelled', 'refunded')) AS revenue_fils,
+                AND ${Prisma.raw(revenueOrderPredicateSql('o', 'pg', { paidOnly: true }))}) AS revenue_fils,
             (SELECT COUNT(*) FROM customers cu
               WHERE cu.store_id = s.id AND cu.created_at >= ${start} AND cu.created_at < ${end}) AS customers,
 

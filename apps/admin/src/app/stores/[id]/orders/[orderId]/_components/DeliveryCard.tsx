@@ -48,7 +48,7 @@ export function DeliveryCard({ order, locale, onEdit }: DeliveryCardProps) {
   const mailHref = recipientEmail ? `mailto:${recipientEmail}` : null;
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section className="rounded-lg border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
           {t('delivery')}

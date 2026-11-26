@@ -64,7 +64,7 @@ export function AddSectionDialog({ list, doc, template, look, onPick, onClose }:
       onClose={onClose}
       onCancel={onClose}
       aria-labelledby="add-section-title"
-      className="w-[min(56rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card p-0 text-foreground backdrop:bg-black/60"
+      className="w-[min(56rem,calc(100vw-2rem))] rounded-lg border border-border bg-card p-0 text-foreground backdrop:bg-black/60"
       data-testid="add-section-dialog"
     >
       <div className="flex items-center justify-between border-b border-border px-5 py-3">
@@ -81,7 +81,7 @@ export function AddSectionDialog({ list, doc, template, look, onPick, onClose }:
             ? [
                 <li
                   key="more"
-                  className="col-span-full pt-2 text-xs font-semibold text-muted-foreground"
+                  className="col-span-full pt-2 text-sm font-semibold text-muted-foreground"
                   data-testid="add-section-more"
                 >
                   {t('more')}
@@ -98,7 +98,7 @@ export function AddSectionDialog({ list, doc, template, look, onPick, onClose }:
                   type="button"
                   disabled={full}
                   onClick={() => onPick(d.type, i)}
-                  className="w-full rounded-xl border border-border bg-background p-3 text-start hover:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-md border border-border bg-background p-3 text-start hover:border-primary disabled:cursor-not-allowed disabled:opacity-50"
                   data-testid={`preset-${d.type}-${i}`}
                 >
                   <SectionThumb type={d.type} settings={p.settings} />

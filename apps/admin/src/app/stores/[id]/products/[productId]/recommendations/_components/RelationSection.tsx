@@ -27,7 +27,7 @@ export function RelationSection({
   const tCounts = useT('products.recommendations');
 
   return (
-    <div className="rounded-xl border bg-card p-6 shadow-sm">
+    <div className="rounded-md border bg-card p-6 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface SearchInputProps {
   /** The committed (debounced) value owned by the parent. */
@@ -71,7 +72,7 @@ export function SearchInput({
         onChange={e => setLocalValue(e.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel ?? placeholder}
-        className="w-full rounded-lg border border-border bg-card py-2 pe-4 ps-9 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        className={FIELD_CLASSES}
       />
     </div>
   );

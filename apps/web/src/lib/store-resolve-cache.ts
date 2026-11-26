@@ -27,6 +27,7 @@
  * R2 bound but unreadable: a copy is served only while under 8 s old (the pre-PR window); older -> API, else 503.
  */
 import { entryEpochState, type R2Like } from '../../store-edge-cache';
+import { clearMissMemo, isRecentDefinitiveMiss } from '../../resolve-miss-memo';
 import { StoreTemporarilyUnavailableError } from './store-unavailable';
 
 export const HIT_TTL_MS = 60_000;
@@ -150,6 +151,9 @@ export async function resolveResilient<T>(
   if (mem && now - mem.at < freshFor(deps, mem) && (await usable(deps, host, mem)))
     return mem.value;
 
+  // QA-90: the edge verdict layers just got a definitive 404 for this host (<= 10 s ago): skip the R2 read + API call.
+  if (isRecentDefinitiveMiss(key, now)) return null;
+
   const pending = inflight.get(key) as Promise<T | null> | undefined;
   if (pending) return pending;
   const run = (async (): Promise<T | null> => {
@@ -217,6 +221,7 @@ export async function resolveResilient<T>(
 
 /** Drop this isolate's copies (all, or one key). The durable copy is guarded by the epochs, not by this. */
 export function clearResolveMemory(key?: string): void {
+  clearMissMemo(key);
   if (key) memory.delete(key);
   else memory.clear();
 }
@@ -224,6 +229,7 @@ export function clearResolveMemory(key?: string): void {
 /** Test seams. */
 export function __resetResolveCacheForTest(a?: Alerter): void {
   memory.clear();
+  clearMissMemo();
   inflight.clear();
   windowStart = 0;
   windowCount = 0;

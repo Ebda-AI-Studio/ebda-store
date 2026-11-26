@@ -75,7 +75,7 @@ export function MediaPicker({
       onClose={onClose}
       onCancel={onClose}
       aria-labelledby="media-title"
-      className="w-[min(48rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card p-0 text-foreground backdrop:bg-black/60"
+      className="w-[min(48rem,calc(100vw-2rem))] rounded-lg border border-border bg-card p-0 text-foreground backdrop:bg-black/60"
       data-testid="media-picker"
     >
       <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-3">

@@ -68,6 +68,7 @@ vi.mock('@api/middleware/security', () => ({
   couponValidateDistinctLimiter: (_req: any, _res: any, next: any) => next(),
   publicTenantLimiter: (_req: any, _res: any, next: any) => next(),
   writeLimiter: (_req: any, _res: any, next: any) => next(),
+  adminReadLimiter: (_req: any, _res: any, next: any) => next(),
   // tax.routes.ts mounts the VAT-evidence upload behind these (ruling TAX-4).
   uploadLimiter: (_req: any, _res: any, next: any) => next(),
   dailyUploadLimiter: (_req: any, _res: any, next: any) => next(),

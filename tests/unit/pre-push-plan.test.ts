@@ -149,6 +149,16 @@ describe('scanner tests are always in the pre-push run (PREPUSH-3)', () => {
     expect(found).toContain('tests/unit/rulings-index.test.ts');
   });
 
+  it('includes the whole-router walkers, which `related` cannot reach from a changed *.routes.ts (PREPUSH-7)', () => {
+    expect(found).toContain('tests/unit/route-table-manifest.test.ts');
+    expect(found).toContain('tests/unit/auth-sensitivity-routes.test.ts');
+    expect(found).toContain('tests/unit/public-mount-admin-route-guard.test.ts');
+    expect(SCANNER_RULE.test("const { default: apiRoutes } = await import('@api/routes');")).toBe(
+      true
+    );
+    expect(SCANNER_RULE.test("import { x } from '@api/routes/order.routes';")).toBe(false);
+  });
+
   it('is by content: the rule matches walkers and greps, not a plain fixture read', () => {
     expect(SCANNER_RULE.test('const files = readdirSync(dir)')).toBe(true);
     expect(SCANNER_RULE.test("execSync('git grep -n foo')")).toBe(true);
@@ -162,7 +172,8 @@ describe('scanner tests are always in the pre-push run (PREPUSH-3)', () => {
   });
 
   it('the gate runs them whatever the diff', () => {
-    const gate = readSrc('scripts/ci/pre-push-gate.sh', 'utf8');
+    // F10: the Store's own steps live in scripts/ci/pre-push-extra.sh, which the vendored gate runs last
+    const gate = readSrc('scripts/ci/pre-push-extra.sh', 'utf8');
     expect(gate).toContain('SCANNERS=$(field scanners)');
     expect(gate).toMatch(/npx vitest run [^\n]*\$SCANNERS/);
     // not nested inside the `affected` branch
@@ -197,7 +208,7 @@ describe('PREPUSH-6 change class', () => {
   });
 
   it('PREPUSH-8: EVERY related run uses a prepush slot with 2 workers and never the heavy host lock (CI jobs hold it back to back)', () => {
-    const gate = readSrc('scripts/ci/pre-push-gate.sh', 'utf8');
+    const gate = readSrc('scripts/ci/pre-push-extra.sh', 'utf8');
     expect(gate).toContain(
       'prepush-slot.sh npx vitest related --run --passWithNoTests --maxWorkers=2'
     );

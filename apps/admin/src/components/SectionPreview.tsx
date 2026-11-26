@@ -346,7 +346,7 @@ export function SectionPreview({
             {[1, 2, 3].map(i => (
               <div
                 key={i}
-                className={`flex flex-col items-stretch rounded ${widthClass} ${sizeClass} overflow-hidden`}
+                className={`flex flex-col items-stretch rounded-md ${widthClass} ${sizeClass} overflow-hidden`}
                 style={{ borderColor: resolvedFrame, backgroundColor: cardSurface }}
               >
                 <div
@@ -375,7 +375,7 @@ export function SectionPreview({
                     {t('samplePrice')}
                   </div>
                   <div
-                    className="mt-0.5 rounded-sm py-0.5 text-center text-[8px] font-medium uppercase tracking-wider"
+                    className="mt-0.5 rounded-sm py-0.5 text-center text-xs font-medium uppercase tracking-wider"
                     style={{
                       backgroundColor: resolvedFrame,
                       color:

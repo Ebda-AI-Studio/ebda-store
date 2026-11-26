@@ -25,7 +25,7 @@ export type PlanId = 'basic' | 'growth' | 'business';
 export interface Plan {
   id: PlanId;
   name: Record<Locale, string>;
-  /** null only if pricing is ever pulled again; the UI then shows the "pricing coming soon" placeholder. */
+  /** null only if pricing is ever pulled again; the UI then shows the "pricing not published yet" placeholder. */
   price: PlanPrice | null;
   annualMinor: number;
   tagline: Record<Locale, string>;
@@ -127,8 +127,8 @@ export const PLANS: readonly Plan[] = LOCKED_PUBLIC_PLANS.filter(
 }));
 
 export const PRICING_PLACEHOLDER: Record<Locale, string> = {
-  ar: 'السعر قريب',
-  en: 'Pricing coming soon',
+  ar: 'السعر لسه مش معلن',
+  en: 'Pricing not published yet',
 };
 
 type Cell = string | boolean;

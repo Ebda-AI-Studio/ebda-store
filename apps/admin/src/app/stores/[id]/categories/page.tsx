@@ -19,6 +19,7 @@ import { CategorySuggestionPanel } from './CategorySuggestionPanel';
 import { useT } from '@/i18n/useT';
 import { RowActions } from '../../../../components/RowActions';
 import type { SizeChartOption } from '../../../../components/SizeChartSelect';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 const emptyForm: CategoryFormData = {
   name: '',
@@ -447,7 +448,7 @@ export default function StoreCategoriesPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
+        <div className="mb-6 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
           {error}
           <button type="button" className="ms-4 font-medium underline" onClick={fetchCategories}>
             {t('retry')}
@@ -486,7 +487,7 @@ export default function StoreCategoriesPage() {
           should be able to give it the same visual treatment. The
           image persists on the Store row (not on a Category row),
           which is why this lives outside CategoryTable. */}
-      <div className="mb-4 rounded-xl border bg-card p-4 shadow-sm">
+      <div className="mb-4 rounded-md border bg-card p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h3 className="text-base font-semibold text-foreground">
@@ -523,6 +524,7 @@ export default function StoreCategoriesPage() {
             type="button"
             role="switch"
             aria-checked={showBestSellersTile}
+            aria-label={t('showBestSellersCardTitle')}
             disabled={savingShowBestSellersTile}
             onClick={() => saveShowBestSellersTile(!showBestSellersTile)}
             className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
@@ -540,7 +542,7 @@ export default function StoreCategoriesPage() {
 
       {/* Category count unit label — merchant-configurable word shown after the count
           on category cards (e.g. "4 pieces" / "4 قطعة"). Saved on StoreTheme JSON. */}
-      <div className="mb-4 rounded-xl border bg-card p-4 shadow-sm">
+      <div className="mb-4 rounded-md border bg-card p-4 shadow-sm">
         <div className="mb-3">
           <h3 className="text-base font-semibold text-foreground">{t('countUnitTitle')}</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">{t('countUnitHint')}</p>
@@ -548,7 +550,7 @@ export default function StoreCategoriesPage() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label
-              className="mb-1 block text-xs font-medium text-foreground"
+              className="mb-1 block text-sm font-medium text-foreground"
               htmlFor="count-unit-en"
             >
               {t('countUnitEnglishLabel')}
@@ -560,12 +562,12 @@ export default function StoreCategoriesPage() {
               onChange={e => setCountUnitEn(e.target.value)}
               placeholder={t('countUnitEnSample')}
               maxLength={30}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className={FIELD_CLASSES}
             />
           </div>
           <div>
             <label
-              className="mb-1 block text-xs font-medium text-foreground"
+              className="mb-1 block text-sm font-medium text-foreground"
               htmlFor="count-unit-ar"
               dir="rtl"
             >
@@ -579,7 +581,7 @@ export default function StoreCategoriesPage() {
               onChange={e => setCountUnitAr(e.target.value)}
               placeholder={t('countUnitArSample')}
               maxLength={30}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className={FIELD_CLASSES}
             />
           </div>
         </div>
@@ -602,7 +604,7 @@ export default function StoreCategoriesPage() {
       </div>
 
       {/* Categories List */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-md border bg-card shadow-sm overflow-hidden">
         <CategoryTable
           categories={filteredCategories}
           isLoading={isLoading}
@@ -619,7 +621,7 @@ export default function StoreCategoriesPage() {
       {/* Delete Confirmation Dialog */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl shadow-xl w-full max-w-sm p-6">
+          <div className="bg-card rounded-md shadow-xl w-full max-w-sm p-6">
             <h2 className="text-lg font-semibold text-foreground mb-2">{t('deleteTitle')}</h2>
             <p className="text-sm text-muted-foreground mb-6">
               {t('deleteConfirm', { name: deleteTarget.name })}

@@ -8,6 +8,7 @@ import { buttonVariants } from '@/components/ui/Button';
 import Link from 'next/link';
 import { resolveDefaultLanguage } from '@ebda/shared';
 import { AdminLayout } from '../../../components/AdminLayout';
+import { PlanLimitNotice } from '@/components/billing/PlanLimitNotice';
 import { useAuth } from '../../../lib/auth';
 import { getStoreDisplayUrl, getStoreHref } from '../../../lib/store-url';
 import { useT } from '@/i18n/useT';
@@ -16,7 +17,7 @@ import { useDashboardData } from './_hooks/useDashboardData';
 // every row derives from real store data and the merchant can hide it.
 import { SetupGuideCard } from './_components/SetupGuideCard';
 import { StorePulseBlock, TopProductsCard } from './_components/StorePulse';
-import { useStorePulse, type PulsePeriod } from './_hooks/useStorePulse';
+import { useStorePulse, usePulsePeriod } from './_hooks/useStorePulse';
 import { NeedsAction } from './_components/NeedsAction';
 import { NextStepSlot } from './_components/NextStepSlot';
 import { OrderAlertsPromptCard } from '../../../components/OrderAlertsPromptCard';
@@ -67,7 +68,7 @@ export default function StoreDetailPage() {
   } = useDashboardData(storeId);
 
   const [showSuspendModal, setShowSuspendModal] = useState(false);
-  const [period, setPeriod] = useState<PulsePeriod>('last_7');
+  const [period, setPeriod] = usePulsePeriod();
   const { pulse, reload: reloadPulse } = useStorePulse(storeId, period);
   const { requestDelete, dialog: deleteDialog } = useDeleteStore(
     useCallback(() => router.push('/stores'), [router])
@@ -107,6 +108,10 @@ export default function StoreDetailPage() {
         </Link>
       }
     >
+      <PlanLimitNotice
+        storeId={store.id}
+        keys={['maxProducts', 'maxOrdersPerMonth', 'maxStaff', 'maxStorageMb', 'ai']}
+      />
       <NeedsAction storeId={store.id} />
 
       {/* UX:D-5: one next step at a time: setup guide, else the order-alerts prompt, else the stale gold rate. */}

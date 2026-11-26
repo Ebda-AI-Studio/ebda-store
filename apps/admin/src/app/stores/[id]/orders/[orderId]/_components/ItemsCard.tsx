@@ -100,7 +100,7 @@ export function ItemsCard({ order, previewLimit = 5 }: ItemsCardProps) {
   const { entries, totalRows, hiddenRows } = previewRows(items, previewLimit, expanded);
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section className="rounded-lg border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
           {t('items')}
@@ -255,7 +255,7 @@ function ItemRow({ item, currency }: { item: OrderItemDetail; currency: string }
           {item.priceSource === 'tier' || item.priceSource === 'group' ? (
             <span
               data-testid="order-line-price-label"
-              className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary-ink"
+              className="rounded-md bg-primary/10 px-1.5 py-0.5 text-xs text-primary-ink"
             >
               {/* A public quantity break is open to every shopper: "Quantity price", not "Wholesale" (final review minor 4). */}
               {item.priceSource === 'tier' && item.priceTierMinQty != null

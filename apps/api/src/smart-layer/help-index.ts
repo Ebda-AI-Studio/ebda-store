@@ -22,7 +22,7 @@ export type HelpCorpus = { hash: string; docs: HelpCorpusDoc[] };
 
 /**
  * The corpus ships as its own Worker module (Ruling BUNDLE-BUDGET-12: apps/api/src/cf/modules/help-corpus.mjs, built by
- * scripts/build-help-corpus.mjs, uploaded by the `rules` entry of wrangler.jsonc), so its 435 KB is not part of worker.js. It is
+ * scripts/build-help-corpus.mjs at build time, git-ignored, never committed; uploaded by the `rules` entry of wrangler.jsonc), so its 435 KB is not part of worker.js. It is
  * loaded on first use (the hourly index job, or the first assistant turn) and cached per isolate. A variable specifier is left
  * alone by the bundler: on the Worker it resolves to the uploaded module (named relative to src/), in Node to the file next to the
  * sources. A missing module rejects loudly (the cron job logs it, the turn fails) - it is never an empty corpus.

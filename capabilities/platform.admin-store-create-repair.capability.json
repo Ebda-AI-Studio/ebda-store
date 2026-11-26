@@ -28,8 +28,12 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": [],
-    "en": []
+    "ar": [
+      "ازاي اعمل متجر لعميل من لوحة الادارة؟",
+      "اصلح اسماء المنتجات في متجر",
+      "اطلع تصدير شامل للمنصة"
+    ],
+    "en": ["How do I create a store for a merchant?"]
   },
   "steps": ["Super-admin console only."],
   "edgeCases": [

@@ -44,10 +44,10 @@ export function StoreMaintenance() {
   const localizedName = isRtl && store.nameAr ? store.nameAr : store.name;
   const logoSrc = isRtl && store.logoAr ? store.logoAr : store.logo;
 
-  const headline = t("We'll be back soon", 'سنعود قريباً');
+  const headline = t('This store is temporarily unavailable', 'المتجر غير متاح مؤقتًا');
   const bodyTail = t(
-    'is currently undergoing maintenance. Please check back later.',
-    'عليه صيانة دلوقتي. جرّب تاني بعدين.'
+    'is not taking orders right now. Please check back later.',
+    'مش بيستقبل طلبات دلوقتي. جرّب تاني بعدين.'
   );
   const contactHeading = t('Need to reach us?', 'تحتاج للتواصل معنا؟');
   const poweredByLabel = t(

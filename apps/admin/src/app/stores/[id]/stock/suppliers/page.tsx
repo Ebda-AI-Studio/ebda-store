@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { RowActions } from '@/components/RowActions';
 import { PageState } from '@/components/PageState';
 import { useConfirm } from '@/hooks/useConfirm';
+import { EmptyState } from '@/components/EmptyState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -202,7 +203,17 @@ export default function SuppliersPage() {
             ]}
             rows={filteredSuppliers ?? []}
             rowKey={s => s.id}
-            emptyState={<p className="text-muted-foreground text-sm">{t('emptyState')}</p>}
+            emptyState={
+              <EmptyState
+                card
+                icon="M3 7h18M5 7v12a1 1 0 001 1h12a1 1 0 001-1V7M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"
+                title={t('emptyState')}
+                action={{
+                  label: t('newButton'),
+                  href: `/stores/${storeId}/stock/suppliers/new`,
+                }}
+              />
+            }
           />
         </PageState>
       </div>

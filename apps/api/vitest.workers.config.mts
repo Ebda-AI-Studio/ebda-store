@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers';
 import { existsSync, readdirSync } from 'node:fs';
 import { generateKeyPairSync } from 'node:crypto';
+import webpush from 'web-push';
 import { fileURLToPath } from 'node:url';
 
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
@@ -13,7 +14,19 @@ if (!existsSync(BUNDLE)) {
   );
 }
 
+// Throwaway keys generated per run (never real secrets): with them set, the config-gated branches (web push, OneSignal) EXECUTE in the
+// route sweep instead of answering "not configured" before any store read (GET /admin/stores/:id/push/status hid a bare Prisma call
+// behind `isConfigured()` and 500ed in production, 2026-11-24).
+const sweepVapid = webpush.generateVAPIDKeys();
+
 const apiVars = {
+  VAPID_PUBLIC_KEY: sweepVapid.publicKey,
+  VAPID_PRIVATE_KEY: sweepVapid.privateKey,
+  VAPID_SUBJECT: 'mailto:sweep@example.invalid',
+  ONESIGNAL_APP_ID: '00000000-0000-4000-8000-000000000001',
+  ONESIGNAL_REST_API_KEY: 'sweep-fake-onesignal-rest-key',
+  ONESIGNAL_ADMIN_APP_ID: '00000000-0000-4000-8000-000000000002',
+  ONESIGNAL_ADMIN_REST_API_KEY: 'sweep-fake-onesignal-admin-key',
   NODE_ENV: 'development',
   JWT_SECRET: 'workers-test-jwt-secret-0123456789abcdef',
   SUITE_BUYER_KEY_SECRET: 'workers-test-suite-buyer-key-secret-0123456789',
@@ -288,6 +301,9 @@ export default defineConfig(async () => {
       // The test worker bundles workspace packages from source (as wrangler.jsonc's alias block does for the API
       // Worker); without it `@ebda/shared` resolves to ./dist/index.js, which exists only after a build.
       alias: [
+        { find: '@ebda/shared/observe', replacement: here('../../packages/shared/src/observe-kit.ts') },
+        { find: '@ebda/shared/wa-v1', replacement: here('../../packages/shared/src/foundation/contracts/wa-v1.ts') },
+        { find: '@ebda/shared/request-guard', replacement: here('../../packages/shared/src/foundation/request-guard.ts') },
         { find: '@ebda/shared', replacement: here('../../packages/shared/src/index.ts') },
         // the same swap as wrangler.jsonc's alias block: the SDK's DOM-free XML parser (a Worker has no DOMParser).
         // Exact match only: the stub itself imports @aws-sdk/xml-builder/dist-es/* subpaths.
@@ -295,6 +311,7 @@ export default defineConfig(async () => {
       ],
     },
     test: {
+      globalSetup: ['../../tests/global-setup-assistant-assets.ts'],
       include: ['workers-test/**/*.test.ts'],
       testTimeout: 60_000,
       hookTimeout: 60_000,

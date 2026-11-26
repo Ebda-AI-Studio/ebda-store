@@ -3,6 +3,7 @@ import authRoutes from './auth.routes';
 import merchantSignupRoutes from './merchant-signup.routes';
 import onboardingRoutes from './onboarding.routes';
 import setupGuideRoutes from './setup-guide.routes';
+import attentionRoutes from './attention.routes';
 import mfaRoutes from './mfa.routes';
 import passkeyRoutes from './passkey.routes';
 import {
@@ -20,6 +21,7 @@ import customersRoutes from './customers.routes';
 import reviewRoutes from './review.routes';
 import analyticsRoutes from './analytics.routes';
 import answerEngineRoutes from './answer-engine.routes';
+import productFeedsRoutes from './product-feeds.routes';
 import returnRoutes from './return.routes';
 import publicRoutes from './public.routes';
 import paymentRoutes from './payment.routes';
@@ -100,6 +102,7 @@ import expensesRoutes from './expenses.routes';
 import backordersRoutes from './backorders.routes';
 import slugRedirectsRoutes from './slug-redirects.routes';
 import staffRoutes from './staff.routes';
+import storeActivityRoutes from './store-activity.routes';
 import staffInviteRoutes from './staff-invite.routes';
 import billingRoutes from './billing.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
@@ -332,6 +335,7 @@ router.use('/stores/:storeId', tenantContext, customersRoutes);
 router.use('/stores/:storeId/reviews', tenantContext, reviewRoutes);
 router.use('/stores/:storeId/analytics', tenantContext, analyticsRoutes);
 router.use('/stores/:storeId/answer-engine', tenantContext, answerEngineRoutes);
+router.use('/stores/:storeId/product-feeds', tenantContext, productFeedsRoutes);
 router.use('/stores/:storeId/returns', tenantContext, returnRoutes);
 
 // Store-scoped routes mounted under /stores (storeId in sub-route params).
@@ -362,6 +366,7 @@ router.use('/stores/:storeId/returns', tenantContext, returnRoutes);
 // runInTenantContext is what still blocks this router.)
 router.use('/onboarding', onboardingRoutes);
 router.use('/stores', tenantContext, setupGuideRoutes);
+router.use('/stores', tenantContext, attentionRoutes);
 router.use('/stores', tenantContext, couponRoutes);
 router.use('/stores', tenantContext, shippingRoutes);
 router.use('/stores', tenantContext, taxRoutes);
@@ -570,6 +575,9 @@ router.use('/stores', tenantContext, slugRedirectsRoutes);
 
 // Staff management — store owners add / remove staff members
 router.use('/stores/:storeId/staff', tenantContext, staffRoutes);
+
+// Merchant activity log (A24): read-only view of the store's own audit rows
+router.use('/stores/:storeId/activity', tenantContext, storeActivityRoutes);
 
 // Merchant billing — plan, subscription, usage vs limits (SP5)
 router.use('/stores/:storeId/billing', billingRouteContext, billingRoutes);

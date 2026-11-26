@@ -36,11 +36,6 @@ export function getGeminiKeys(extraFirst?: string): string[] {
   return out;
 }
 
-/** Number of configured keys (>=1 when AI is configured); used to scale the daily cap. */
-export function geminiKeyCount(): number {
-  return getGeminiKeys().length;
-}
-
 // bench id -> epoch ms until which it is skipped. Keyed by key VALUE (not index) so
 // a re-ordered list keeps its memory; the value itself is never logged. A scoped call
 // (e.g. Google Search grounding, which has its own quota) benches `<scope>\0<key>`

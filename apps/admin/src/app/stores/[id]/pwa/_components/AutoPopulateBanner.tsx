@@ -17,7 +17,7 @@ export function AutoPopulateBanner({ storeInfo, onPopulate }: AutoPopulateBanner
   const t = useT('pwa.autoPopulate');
 
   return (
-    <div className="bg-info/5 border border-info/30 rounded-xl p-4 flex items-center justify-between">
+    <div className="bg-info/5 border border-info/30 rounded-md p-4 flex items-center justify-between">
       <div className="flex items-center gap-3">
         {storeInfo.logo && (
           <img

@@ -1,7 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { platformDb } from '../lib/platform-directory';
 import { z } from 'zod/v3';
-import { TAX_PROFILE_STATUSES, taxReviewDecisionSchema } from '@ebda/shared';
+import {
+  TAX_PROFILE_STATUSES,
+  taxChangeDecisionSchema,
+  taxReviewDecisionSchema,
+} from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import {
@@ -13,6 +17,12 @@ import { withPlatformUser } from '../lib/platform-scope';
 import { getPlatformVat, updatePlatformVat } from '../services/platform-vat.service';
 import { sendTaxDocument } from './tax.routes';
 import { parseInput } from '../lib/parse-input';
+import {
+  decideTaxChange,
+  discardTaxChange,
+  listTaxChangesForReview,
+  readTaxChangeEvidence,
+} from '../services/tax-change.service';
 
 /**
  * Super-admin tax surfaces (ruling TAX-2, TAX-6), mounted at `/admin` BEFORE
@@ -22,6 +32,9 @@ import { parseInput } from '../lib/parse-input';
  *   GET  /admin/tax-verification/:storeId             one store's profile + documents
  *   GET  /admin/tax-verification/:storeId/documents/:documentId/file
  *   POST /admin/tax-verification/:storeId/decision    approve | reject(reason) | revoke(reason)
+ *   GET  /admin/tax-verification/change-requests      pending changes of VERIFIED registrations + AI pre-check flags
+ *   GET  /admin/tax-verification/:storeId/change-request/file
+ *   POST /admin/tax-verification/:storeId/change-decision   approve | reject(reason)
  *   GET  /admin/platform-vat                          Ebda's own VAT setting
  *   PUT  /admin/platform-vat
  *
@@ -51,6 +64,48 @@ router.get(
         listProfilesForReview(status ?? null)
       );
       res.json({ success: true, data: { profiles } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.get(
+  '/tax-verification/change-requests',
+  ...superAdmin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({
+        success: true,
+        data: { requests: await listTaxChangesForReview(req.user!.userId) },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.get(
+  '/tax-verification/:storeId/change-request/file',
+  ...superAdmin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = parseInput(UUID, req.params.storeId);
+      sendTaxDocument(res, await readTaxChangeEvidence(storeId));
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/tax-verification/:storeId/change-decision',
+  ...superAdmin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = parseInput(UUID, req.params.storeId);
+      const decision = parseInput(taxChangeDecisionSchema, req.body);
+      res.json({ success: true, data: await decideTaxChange(storeId, decision, actorOf(req)) });
     } catch (error) {
       next(error);
     }
@@ -98,6 +153,10 @@ router.post(
       const storeId = parseInput(UUID, req.params.storeId);
       const decision = parseInput(taxReviewDecisionSchema, req.body);
       const profile = await TaxProfileService.review(storeId, decision, actorOf(req));
+      // Every review decision (approve / reject / revoke) drops a pending change request: it describes the registration as it was
+      // before this decision. A discard that fails FAILS the decision (no swallow); the request is also bound to the profile's
+      // reviewedAt, so a leftover could never be applied (applyApprovedTaxChange refuses with 409).
+      await discardTaxChange(storeId, actorOf(req));
       res.json({ success: true, data: { profile } });
     } catch (error) {
       next(error);

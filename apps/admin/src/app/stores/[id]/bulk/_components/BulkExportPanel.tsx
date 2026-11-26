@@ -5,6 +5,7 @@ import { Input, Label } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import type { ExportFilters } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface BulkExportPanelProps {
   isExporting: boolean;
@@ -31,7 +32,7 @@ export function BulkExportPanel({ isExporting, onExport, onExportXlsx }: BulkExp
   return (
     <div className="space-y-6">
       {/* Export Options */}
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
+      <div className="rounded-md border bg-card p-6 shadow-sm">
         <h3 className="font-semibold text-foreground mb-4">{t('optionsTitle')}</h3>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -41,7 +42,7 @@ export function BulkExportPanel({ isExporting, onExport, onExportXlsx }: BulkExp
               id="exportStatus"
               value={filters.status}
               onChange={e => setFilters(prev => ({ ...prev, status: e.target.value }))}
-              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={`${FIELD_CLASSES} mt-1`}
             >
               <option value="">{t('statusAll')}</option>
               <option value="active">{t('statusActive')}</option>
@@ -68,7 +69,7 @@ export function BulkExportPanel({ isExporting, onExport, onExportXlsx }: BulkExp
                 id="includeDeleted"
                 checked={filters.includeDeleted}
                 onChange={e => setFilters(prev => ({ ...prev, includeDeleted: e.target.checked }))}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
               />
               <Label htmlFor="includeDeleted" className="text-sm font-normal">
                 {t('includeDeleted')}
@@ -150,7 +151,7 @@ export function BulkExportPanel({ isExporting, onExport, onExportXlsx }: BulkExp
       </div>
 
       {/* Export Info */}
-      <div className="rounded-xl border bg-muted p-6">
+      <div className="rounded-md border bg-muted p-6">
         <h3 className="font-semibold text-foreground">{t('infoTitle')}</h3>
         <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
           {INFO_KEYS.map(key => (

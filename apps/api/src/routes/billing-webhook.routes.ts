@@ -13,6 +13,7 @@
  *   200 processed OR a replay (`duplicate: true`) OR ignored event/order
  */
 import { Router, Request, Response, NextFunction } from 'express';
+import { cfWaitUntil } from '../cf/bindings';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
 import { BillingSignatureError } from '../services/billing';
@@ -49,13 +50,15 @@ router.post('/:provider', async (req: Request, res: Response, next: NextFunction
     if (err instanceof BillingSignatureError) {
       logger.warn({ provider: req.params.provider, ip: req.ip }, '[billing-webhook] bad signature');
       if (allowBadSignatureAudit(req.ip ?? 'unknown')) {
-        void auditLog({
-          action: 'BILLING_WEBHOOK_BAD_SIGNATURE',
-          resourceType: 'billing',
-          details: { provider: req.params.provider },
-          ip: req.ip,
-          userAgent: req.headers['user-agent'],
-        });
+        cfWaitUntil(
+          auditLog({
+            action: 'BILLING_WEBHOOK_BAD_SIGNATURE',
+            resourceType: 'billing',
+            details: { provider: req.params.provider },
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+          })
+        );
       }
       res.status(401).json({
         success: false,

@@ -10,6 +10,7 @@ import { SearchInput } from '../../../../components/SearchInput';
 import { FiscalDocumentsTable } from '../../../../components/fiscal/FiscalDocumentsTable';
 import { apiGet } from '../../../../lib/api';
 import { FISCAL_DOC_TYPES, type FiscalDocument } from '../../../../lib/fiscal-documents';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 const PAGE_SIZE = 25;
 
@@ -92,7 +93,7 @@ export default function InvoicesPage() {
           <select
             value={docType}
             onChange={e => setDocType(e.target.value)}
-            className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+            className={FIELD_CLASSES}
           >
             <option value="">{t('allTypes')}</option>
             {FISCAL_DOC_TYPES.map(k => (

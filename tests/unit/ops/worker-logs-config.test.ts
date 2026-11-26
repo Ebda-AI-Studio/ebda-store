@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // G7: every Ebda Worker keeps Workers Logs (observability, 100% sampling except api/web at 10%) and Workers Trace Events
-// Logpush on. Logpush has no effect until the job exists (scripts/ops/cf-logs-setup.sh), but the
+// Logpush on. Logpush has no effect until the job exists (scripts/ops/cf-logs-setup.sh, which runs the vendored scripts/foundation/logpush-setup.sh), but the
 // per-script flag is the part a PR can lose silently, so it is pinned here.
 const ROOT = join(__dirname, '../../..');
 /** Public, high-traffic Workers: Workers Logs head-sample at 10% for launch (PERF-SAMPLING). The rest are operator tools or static. */
@@ -69,7 +69,7 @@ describe('Workers Logs + Logpush config (G7)', () => {
   });
 
   it('the Logpush job ships every app here plus ebda-wa and ebda-os-brain, with CPU + wall time', () => {
-    const sh = readFileSync(join(ROOT, 'scripts/ops/cf-logs-setup.sh'), 'utf8');
+    const sh = readFileSync(join(ROOT, 'scripts/foundation/logpush-setup.sh'), 'utf8');
     const workers = JSON.parse(/^WORKERS='(.+)'$/m.exec(sh)?.[1] ?? '[]') as string[];
     for (const app of WORKERS) expect(workers).toContain(`ebda-${app}`);
     expect(workers).toEqual(expect.arrayContaining(['ebda-wa', 'ebda-os-brain']));

@@ -66,7 +66,7 @@ export function DisagreementBanner({
   const current24 = rates.find(r => r.karat === 24)?.ratePerGram ?? null;
 
   return (
-    <section role="status" className="rounded-xl border border-warning/40 bg-warning/10 p-4 sm:p-6">
+    <section role="status" className="rounded-md border border-warning/40 bg-warning/10 p-4 sm:p-6">
       <h2 className="text-base font-semibold">{t('title')}</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         {t('body', { pct: (disagreement.diffBps / 100).toFixed(1) })}

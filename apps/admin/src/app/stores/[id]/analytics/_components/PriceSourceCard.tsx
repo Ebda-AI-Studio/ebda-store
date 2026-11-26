@@ -59,13 +59,13 @@ export function PriceSourceCard({ storeId, rangeQs }: { storeId: string; rangeQs
   return (
     <section
       data-testid="price-source-card"
-      className="bg-card rounded-xl border p-6 shadow-sm mt-6"
+      className="bg-card rounded-md border p-6 shadow-sm mt-6"
     >
       <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
       {failed ? (
         <p className="mt-3 text-xs text-muted-foreground">{t('loadFailed')}</p>
       ) : !data ? (
-        <div className="mt-3 h-16 animate-pulse rounded bg-muted" />
+        <div className="mt-3 h-16 animate-pulse rounded-md bg-muted" />
       ) : data.wholesale.units === 0 && data.retail.units === 0 ? (
         <p className="mt-3 text-xs text-muted-foreground">{t('empty')}</p>
       ) : (

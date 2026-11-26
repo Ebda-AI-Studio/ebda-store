@@ -18,7 +18,7 @@ import {
 } from '../_hooks/useStorePulse';
 import { sparkBars, toDelta, type Delta } from './pulse-format';
 
-const CARD = 'rounded-xl border bg-card shadow-sm';
+const CARD = 'rounded-md border bg-card shadow-sm';
 const count = (n: number) => n.toLocaleString('en-US');
 
 /* ---------- period switch ---------- */
@@ -36,7 +36,7 @@ export function PeriodSwitch({
     <div
       role="radiogroup"
       aria-label={t('periodLabel')}
-      className="inline-flex max-w-full overflow-x-auto rounded-xl border bg-muted/50 p-1"
+      className="inline-flex max-w-full overflow-x-auto rounded-md border bg-muted/50 p-1"
     >
       {PULSE_PERIODS.map(p => (
         <button
@@ -65,7 +65,7 @@ function DeltaPill({ delta, label }: { delta: Delta | null; label: string }) {
   const t = useT('stores.dashboard.pulse');
   if (!delta) return null;
   const tone =
-    delta.tone === 'up'
+    delta.tone === 'up' || delta.tone === 'new'
       ? 'bg-success/10 text-success-ink'
       : delta.tone === 'down'
         ? 'bg-destructive/10 text-destructive-ink'
@@ -79,7 +79,7 @@ function DeltaPill({ delta, label }: { delta: Delta | null; label: string }) {
         tone
       )}
     >
-      {delta.tone !== 'flat' && (
+      {delta.tone !== 'flat' && delta.tone !== 'new' && (
         <svg
           aria-hidden="true"
           className={cn('h-3 w-3', delta.tone === 'down' && 'rotate-180')}
@@ -93,7 +93,11 @@ function DeltaPill({ delta, label }: { delta: Delta | null; label: string }) {
           <path d="M6 10V2M2.5 5.5L6 2l3.5 3.5" />
         </svg>
       )}
-      <span dir="ltr">{delta.tone === 'flat' ? '0%' : `${delta.percent}%`}</span>
+      {delta.tone === 'new' ? (
+        <span>{t('newBadge')}</span>
+      ) : (
+        <span dir="ltr">{delta.tone === 'flat' ? '0%' : `${delta.percent}%`}</span>
+      )}
       <span className="sr-only">
         {t(`deltaSr.${delta.tone}`, { percent: delta.percent })} {label}
       </span>
@@ -134,7 +138,7 @@ function SliceError({ message, onRetry }: { message: string; onRetry: () => void
   return (
     <div
       role="alert"
-      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4"
     >
       <p className="text-sm text-destructive-ink">{message}</p>
       <Button variant="outline" size="sm" onClick={onRetry}>
@@ -172,7 +176,10 @@ export function SalesHero({
     );
   }
   const empty = stats.totalOrders === 0 && stats.totalRevenue === 0;
-  const delta = toDelta(stats.revenueChange);
+  const delta = toDelta(stats.revenueChange, {
+    previous: stats.previousRevenue,
+    current: stats.totalRevenue,
+  });
   const periodLabel = t(`period.${period}`);
   const points = Array.isArray(sales) ? sales : [];
   return (
@@ -199,6 +206,7 @@ export function SalesHero({
                 {t(`sentence.${delta?.tone ?? 'unknown'}`, {
                   percent: delta?.percent ?? 0,
                   orders: count(stats.totalOrders),
+                  ordersN: stats.totalOrders,
                 })}
               </span>
             </p>
@@ -230,7 +238,7 @@ function Kpi({
   const t = useT('stores.dashboard.pulse');
   const body = (
     <>
-      <p className="text-xs font-medium text-muted-foreground sm:text-sm">{label}</p>
+      <p className="text-sm font-medium text-muted-foreground sm:text-sm">{label}</p>
       <p className="mt-1 text-2xl font-bold text-foreground" dir="ltr">
         {value}
       </p>
@@ -267,7 +275,7 @@ export function KpiRow({
     return (
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-busy="true">
         {[0, 1, 2, 3].map(i => (
-          <div key={i} className="force-skeleton h-24 rounded-xl" />
+          <div key={i} className="force-skeleton h-24 rounded-md" />
         ))}
       </div>
     );
@@ -281,7 +289,10 @@ export function KpiRow({
         testId="kpi-orders"
         label={t('orders')}
         value={count(stats.totalOrders)}
-        delta={toDelta(stats.ordersChange)}
+        delta={toDelta(stats.ordersChange, {
+          previous: stats.previousOrders,
+          current: stats.totalOrders,
+        })}
         href={`/stores/${storeId}/orders`}
       />
       <Kpi
@@ -299,7 +310,7 @@ export function KpiRow({
       {unpaid === 'error' ? (
         <Kpi testId="kpi-unpaid" label={t('unpaid')} value="—" hint={t('unpaidFailed')} />
       ) : unpaid === null ? (
-        <div className="force-skeleton h-24 rounded-xl" />
+        <div className="force-skeleton h-24 rounded-md" />
       ) : (
         <Kpi
           testId="kpi-unpaid"

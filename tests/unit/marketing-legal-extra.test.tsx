@@ -98,8 +98,11 @@ describe('LEGAL-1 extra legal pages', () => {
     }
   });
 
-  it('Ruling VAT-0: the Terms and the Merchant Agreement carry docs/legal/VAT-0-clause.md word for word, in both languages', () => {
-    const md = readFileSync(path.resolve(__dirname, '../../docs/legal/VAT-0-clause.md'), 'utf8');
+  it('Ruling VAT-0: the Terms and the Merchant Agreement carry the vendored foundation legal/clauses/VAT-0-clause.md word for word, in both languages', () => {
+    const md = readFileSync(
+      path.resolve(__dirname, '../../packages/shared/src/foundation/legal/clauses/VAT-0-clause.md'),
+      'utf8'
+    );
     const en = /## English\n\n(.+)\n/.exec(md)![1];
     const ar = /## العربية\n\n(.+)\n/.exec(md)![1];
     // the Ebda Chat terms (clause 6.6, WA PR #25) carry the same clause verbatim
@@ -112,7 +115,10 @@ describe('LEGAL-1 extra legal pages', () => {
   });
 
   it('P12 / M-034: /refund restates the Terms, stands as final (LEGAL-FINAL-1), carries the VAT-0 clause, and BRAND points at it', () => {
-    const md = readFileSync(path.resolve(__dirname, '../../docs/legal/VAT-0-clause.md'), 'utf8');
+    const md = readFileSync(
+      path.resolve(__dirname, '../../packages/shared/src/foundation/legal/clauses/VAT-0-clause.md'),
+      'utf8'
+    );
     const en = /## English\n\n(.+)\n/.exec(md)![1];
     const ar = /## العربية\n\n(.+)\n/.exec(md)![1];
     for (const [l, clause] of [

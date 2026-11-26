@@ -83,7 +83,7 @@ export default function OrderInvoicePage() {
     <AdminLayout mode="store_admin" storeId={storeId} title={t('title')}>
       <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6">
         {/* Toolbar */}
-        <div className="sticky top-0 z-10 mb-4 flex items-center justify-between gap-2 rounded-2xl border border-border bg-background/95 p-2 backdrop-blur print:hidden">
+        <div className="sticky top-0 z-10 mb-4 flex items-center justify-between gap-2 rounded-lg border border-border bg-background/95 p-2 backdrop-blur print:hidden">
           <Button
             type="button"
             onClick={() => router.push(`/stores/${storeId}/orders/${orderId}`)}
@@ -167,19 +167,19 @@ export default function OrderInvoicePage() {
         </div>
 
         {error && (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center">
             <p className="text-sm text-destructive-ink">{error}</p>
           </div>
         )}
 
         {!error && !html && (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
             {t('loading')}
           </div>
         )}
 
         {!error && html && (
-          <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none">
+          <div className="overflow-hidden rounded-lg border border-border bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none">
             <iframe
               ref={iframeRef}
               title={t('title')}

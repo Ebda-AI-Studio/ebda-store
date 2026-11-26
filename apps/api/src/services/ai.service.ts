@@ -58,6 +58,8 @@ type Feature =
   | 'store-categories'
   // Visual builder Phase 5: a structured, reviewable patch to the store's page document.
   | 'builder-patch'
+  // Review tools (lib/ai/review-tools.ts): translate, spam check on submit, product summary, owner-response draft.
+  | 'reviews'
   // Smart Layer assistant turns (the Ebda assistant side panel): usage is labelled so the meter and the per-feature cost views can tell it apart.
   | 'assistant'
   // Accounting smart layer — called through accounting/gemini-ai.service.ts,
@@ -72,6 +74,8 @@ export type AccountingAiFeature =
   | 'expense-ocr'
   // InstaPay transfer receipts (money batch A): pre-fills the payer's proof form.
   | 'instapay-receipt'
+  // VAT registration change request pre-check (self-service A10): extracts two fields off a tax card image.
+  | 'tax-document'
   | 'profit-anomaly'
   | 'insights-narration-cohort'
   | 'insights-narration-funnel'

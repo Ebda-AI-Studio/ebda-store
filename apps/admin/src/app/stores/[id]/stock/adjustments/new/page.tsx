@@ -12,6 +12,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { apiGet, apiPost } from '@/lib/api';
 import { parseStockAdjustCsv, generateStockAdjustCsvTemplate } from '@ebda/shared';
 import type { StockAdjustParseResult, StockAdjustParsedRow } from '@ebda/shared';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -244,7 +245,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
   return (
     <div className="space-y-5">
       {/* Instructions card */}
-      <div className="rounded-xl border bg-info/5 p-5">
+      <div className="rounded-md border bg-info/5 p-5">
         <h3 className="font-semibold text-info-ink text-sm">{tNew('csvHelpTitle')}</h3>
         <ol className="mt-2 list-decimal list-inside space-y-1 text-sm text-info-ink">
           <li>{tNew('csvHelpStep1')}</li>
@@ -280,7 +281,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
         <select
           value={type}
           onChange={e => setType(e.target.value)}
-          className="w-full max-w-xs border border-border rounded px-3 py-2 text-base sm:text-sm"
+          className={`${FIELD_CLASSES} max-w-xs`}
         >
           {ADJUSTMENT_TYPES.map(at => (
             <option key={at} value={at}>
@@ -300,7 +301,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             value={reason}
             onChange={e => setReason(e.target.value)}
             rows={2}
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+            className={`${TEXTAREA_CLASSES} resize-none`}
             placeholder={t('reasonEnPlaceholder')}
           />
         </label>
@@ -311,7 +312,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             onChange={e => setReasonAr(e.target.value)}
             rows={2}
             dir="rtl"
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+            className={`${TEXTAREA_CLASSES} resize-none`}
             placeholder={t('reasonArPlaceholder')}
           />
         </label>
@@ -319,7 +320,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
 
       {/* File upload */}
       <div
-        className="border-2 border-dashed rounded-xl p-8 text-center hover:border-primary transition cursor-pointer"
+        className="border-2 border-dashed rounded-md p-8 text-center hover:border-primary transition cursor-pointer"
         onClick={() => fileInputRef.current?.click()}
       >
         <input
@@ -382,7 +383,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
           />
           {/* Row-level errors */}
           {errorRowCount > 0 && (
-            <div className="rounded-xl border border-border p-3 bg-destructive/5">
+            <div className="rounded-md border border-border p-3 bg-destructive/5">
               <p className="text-xs font-medium text-destructive-ink mb-1">
                 {tNew('csvRowErrorsLabel')}
               </p>
@@ -401,7 +402,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
 
       {/* Import result */}
       {importResult && (
-        <div className="rounded-xl border border-border p-4 bg-muted/20 space-y-2">
+        <div className="rounded-md border border-border p-4 bg-muted/20 space-y-2">
           <p className="text-sm font-semibold text-foreground">
             {tNew('csvImportComplete', { number: importResult.adjustmentNumber })}
           </p>
@@ -549,7 +550,7 @@ export default function NewStockAdjustmentPage() {
               updateItem(i, { productId: e.target.value, variantId: '' });
               void loadVariants(e.target.value);
             }}
-            className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+            className={FIELD_CLASSES}
           >
             <option value="">— {tNew('selectProduct')} —</option>
             {products.map(p => (
@@ -564,7 +565,7 @@ export default function NewStockAdjustmentPage() {
               value={item.variantId ?? ''}
               onChange={e => updateItem(i, { variantId: e.target.value })}
               aria-label={tNew('selectVariant')}
-              className="w-full border border-border rounded-md px-2 py-1 text-base sm:text-sm"
+              className={FIELD_CLASSES}
             >
               <option value="">— {tNew('selectVariant')} —</option>
               {variantsByProduct[item.productId]!.map(v => (
@@ -588,7 +589,7 @@ export default function NewStockAdjustmentPage() {
           step="1"
           value={item.newQty}
           onChange={e => updateItem(i, { newQty: e.target.value })}
-          className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+          className={`${FIELD_CLASSES} text-end font-mono`}
         />
       ),
     },
@@ -604,7 +605,7 @@ export default function NewStockAdjustmentPage() {
           disabled={items.length <= 1}
           variant="link"
           size="sm"
-          className="text-red-600"
+          className="text-destructive-ink"
         >
           ✕
         </Button>
@@ -770,7 +771,7 @@ export default function NewStockAdjustmentPage() {
               <select
                 value={type}
                 onChange={e => setType(e.target.value)}
-                className="w-full max-w-xs border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={`${FIELD_CLASSES} max-w-xs`}
               >
                 {ADJUSTMENT_TYPES.map(at => (
                   <option key={at} value={at}>
@@ -790,7 +791,7 @@ export default function NewStockAdjustmentPage() {
                   value={reason}
                   onChange={e => setReason(e.target.value)}
                   rows={3}
-                  className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+                  className={`${TEXTAREA_CLASSES} resize-none`}
                   placeholder={t('reasonEnPlaceholder')}
                 />
               </label>
@@ -801,7 +802,7 @@ export default function NewStockAdjustmentPage() {
                   onChange={e => setReasonAr(e.target.value)}
                   rows={3}
                   dir="rtl"
-                  className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+                  className={`${TEXTAREA_CLASSES} resize-none`}
                   placeholder={t('reasonArPlaceholder')}
                 />
               </label>
@@ -814,7 +815,7 @@ export default function NewStockAdjustmentPage() {
                 type="url"
                 value={evidenceUrl}
                 onChange={e => setEvidenceUrl(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={FIELD_CLASSES}
                 placeholder={tNew('evidencePlaceholder')}
               />
             </label>

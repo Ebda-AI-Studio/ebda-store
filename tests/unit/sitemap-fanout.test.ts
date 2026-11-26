@@ -37,7 +37,7 @@ import sitemap from '../../apps/web/src/app/sitemap';
 
 type MockWorld = {
   /** null → host is not a custom domain (master branch). */
-  tenant: { id: string; slug: string; isDemo?: boolean } | null;
+  tenant: { id: string; slug: string; isDemo?: boolean; status?: string } | null;
   stores: Array<{ id: string; slug: string; createdAt: string }>;
   /** productCounts[storeId] = published product count for that store. */
   productCounts: Record<string, number>;
@@ -54,7 +54,7 @@ function installFetchMock(world: MockWorld) {
 
     if (url.pathname.endsWith('/public/store/resolve')) {
       if (!world.tenant) return json({}, false);
-      return json({ data: { store: world.tenant } });
+      return json({ success: true, data: { store: world.tenant } });
     }
 
     if (url.pathname.endsWith('/public/stores')) {
@@ -144,8 +144,27 @@ describe('sitemap — could-not-ask vs genuinely empty', () => {
     );
   }
 
+  it('R1: a custom domain whose host resolve fails on a COLD hit once is served from the last-known-good copy, not a 500', async () => {
+    hostRef.host = 'warm-merchant.example';
+    const ok = (u: URL) =>
+      u.pathname.endsWith('/public/store/resolve')
+        ? {
+            ok: true,
+            status: 200,
+            body: { success: true, data: { store: { id: 'w1', slug: 'warm' } } },
+          }
+        : { ok: true, status: 200, body: { data: [], pagination: { totalPages: 1 } } };
+    stubWith(ok);
+    await sitemap(); // the host resolves and its copy is kept
+    // the API is now cold / limited: 429 on the resolve
+    stubWith(u =>
+      u.pathname.endsWith('/public/store/resolve') ? { ok: false, status: 429 } : ok(u)
+    );
+    await expect(sitemap()).resolves.toBeDefined();
+  });
+
   it('host resolve failing (not 404) does not fall through to the platform sitemap', async () => {
-    hostRef.host = 'merchant.example';
+    hostRef.host = 'merchant-down.example';
     stubWith(u =>
       u.pathname.endsWith('/public/store/resolve')
         ? { ok: false, status: 429 }
@@ -158,7 +177,11 @@ describe('sitemap — could-not-ask vs genuinely empty', () => {
     hostRef.host = 'merchant.example';
     stubWith(u => {
       if (u.pathname.endsWith('/public/store/resolve')) {
-        return { ok: true, status: 200, body: { data: { store: { id: 's1', slug: 'm' } } } };
+        return {
+          ok: true,
+          status: 200,
+          body: { success: true, data: { store: { id: 's1', slug: 'm' } } },
+        };
       }
       if (u.pathname.endsWith('/public/products')) return { ok: false, status: 503 };
       return { ok: false, status: 404 };
@@ -188,6 +211,17 @@ describe('sitemap — host routing', () => {
       productCounts: { s1: 3 },
     });
     await expect(sitemap()).rejects.toBe(NOT_FOUND);
+  });
+
+  it('S3: a suspended store (resolved with its status for the maintenance page) is a 404 sitemap and asks for no products', async () => {
+    hostRef.host = 'paused.ebda.app';
+    const fetchMock = installFetchMock({
+      tenant: { id: 's9', slug: 'paused', status: 'suspended' },
+      stores: [],
+      productCounts: { s9: 3 },
+    });
+    await expect(sitemap()).rejects.toBe(NOT_FOUND);
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('/public/products'))).toBe(false);
   });
 
   it('B1-14: the demo showroom host lists nothing and asks for no products', async () => {

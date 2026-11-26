@@ -21,7 +21,7 @@ export function TrackedEventsCard() {
   const t = useT('marketingPixels.events');
 
   return (
-    <div className="bg-card rounded-xl border p-6">
+    <div className="bg-card rounded-md border p-6">
       <h2 className="font-semibold text-lg mb-4">{t('title')}</h2>
       <p className="text-muted-foreground mb-4">{t('description')}</p>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

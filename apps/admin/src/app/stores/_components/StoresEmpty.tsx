@@ -16,7 +16,7 @@ export function StoresEmpty({ search, statusFilter }: StoresEmptyProps) {
   return (
     <div className="force-card py-16">
       <div className="flex flex-col items-center text-center">
-        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5">
+        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/5">
           <svg
             className="h-10 w-10 text-primary"
             fill="none"
@@ -36,7 +36,7 @@ export function StoresEmpty({ search, statusFilter }: StoresEmptyProps) {
           {hasFilters ? t('emptyHintSearch') : t('emptyHintDefault')}
         </p>
         <Link href="/stores/new">
-          <Button className="gap-2 shadow-lg shadow-primary/25">
+          <Button className="gap-2 shadow-md shadow-sm">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"

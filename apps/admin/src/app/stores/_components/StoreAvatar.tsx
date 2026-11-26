@@ -32,7 +32,7 @@ export function StoreAvatar({ name, logo, className = '' }: StoreAvatarProps) {
   if (logo && !errored) {
     return (
       <div
-        className={`flex items-center justify-center overflow-hidden rounded-2xl border border-border bg-white ${className}`}
+        className={`flex items-center justify-center overflow-hidden rounded-lg border border-border bg-white ${className}`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -48,7 +48,7 @@ export function StoreAvatar({ name, logo, className = '' }: StoreAvatarProps) {
 
   return (
     <div
-      className={`flex items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 font-bold text-primary ${className}`}
+      className={`flex items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 font-bold text-primary ${className}`}
     >
       {letter}
     </div>

@@ -14,6 +14,7 @@ import { formatPrice } from '@/lib/format';
 
 import { roundToMinor } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface SupplierOption {
@@ -157,7 +158,7 @@ export default function NewPurchaseOrderPage() {
         <select
           value={line.productId}
           onChange={e => selectProduct(i, e.target.value)}
-          className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+          className={FIELD_CLASSES}
         >
           <option value="">— {tNew('selectProduct')} —</option>
           {products.map(p => (
@@ -180,7 +181,7 @@ export default function NewPurchaseOrderPage() {
           <select
             value={line.variantId}
             onChange={e => updateLine(i, { variantId: e.target.value })}
-            className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+            className={FIELD_CLASSES}
             aria-invalid={!line.variantId}
           >
             <option value="">— {tNew('selectVariant')} —</option>
@@ -205,7 +206,7 @@ export default function NewPurchaseOrderPage() {
           step="1"
           value={line.qty}
           onChange={e => updateLine(i, { qty: e.target.value })}
-          className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+          className={`${FIELD_CLASSES} text-end font-mono`}
           placeholder="1"
         />
       ),
@@ -221,7 +222,7 @@ export default function NewPurchaseOrderPage() {
           step="0.01"
           value={line.unitCost}
           onChange={e => updateLine(i, { unitCost: e.target.value })}
-          className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+          className={`${FIELD_CLASSES} text-end font-mono`}
           placeholder="0.00"
         />
       ),
@@ -251,7 +252,7 @@ export default function NewPurchaseOrderPage() {
           disabled={lines.length <= 1}
           variant="link"
           size="sm"
-          className="text-red-600"
+          className="text-destructive-ink"
         >
           ✕
         </Button>
@@ -335,13 +336,13 @@ export default function NewPurchaseOrderPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="space-y-1">
               <span className="text-sm font-medium">
-                {t('supplier')} <span className="text-red-500">*</span>
+                {t('supplier')} <span className="text-destructive-ink">*</span>
               </span>
               <select
                 value={supplierId}
                 onChange={e => setSupplierId(e.target.value)}
                 required
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={FIELD_CLASSES}
               >
                 <option value="">— {tNew('selectSupplier')} —</option>
                 {suppliers.map(s => (
@@ -358,7 +359,7 @@ export default function NewPurchaseOrderPage() {
                 type="date"
                 value={expectedDate}
                 onChange={e => setExpectedDate(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={FIELD_CLASSES}
               />
             </label>
           </div>
@@ -371,7 +372,7 @@ export default function NewPurchaseOrderPage() {
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 rows={2}
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+                className={`${TEXTAREA_CLASSES} resize-none`}
                 placeholder={tNew('notesPlaceholder')}
               />
             </label>
@@ -382,7 +383,7 @@ export default function NewPurchaseOrderPage() {
                 onChange={e => setNotesAr(e.target.value)}
                 rows={2}
                 dir="rtl"
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+                className={`${TEXTAREA_CLASSES} resize-none`}
                 placeholder={t('notesArPlaceholder')}
               />
             </label>
@@ -398,7 +399,7 @@ export default function NewPurchaseOrderPage() {
             />
             {/* DataTable has no footer concept, so the subtotal is a summary bar
               right below the table — visible on both layouts. */}
-            <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
+            <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
               <span>{tNew('subtotal')}</span>
               <span className="font-mono font-semibold">{formatPrice(subtotalFils)}</span>
             </div>

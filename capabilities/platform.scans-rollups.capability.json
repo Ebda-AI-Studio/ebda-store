@@ -26,8 +26,12 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": [],
-    "en": []
+    "ar": [
+      "ازاي اشغل فحص المخزون دلوقتي؟",
+      "شغل تحديث التقارير يدوي",
+      "فين اشغل فحص البضاعة الراكدة؟"
+    ],
+    "en": ["How do I run the stock scans now?"]
   },
   "steps": ["Super-admin console only."],
   "edgeCases": [

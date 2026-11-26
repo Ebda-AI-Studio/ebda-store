@@ -2,7 +2,7 @@
   "name": "@ebda/admin",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
@@ -20,6 +20,7 @@
     "@ebda/ui": "*",
     "@sentry/nextjs": "^10.53.1",
     "@simplewebauthn/browser": "^14.0.0",
+    "barcode-detector": "3.2.4",
     "date-fns": "^4.1.0",
     "next": "^16.4.6",
     "next-intl": "^4.11.0",

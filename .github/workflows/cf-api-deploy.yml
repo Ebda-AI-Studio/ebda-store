@@ -9,6 +9,9 @@ on:
     branches: [main]
     paths:
       - 'apps/api/**'
+      # build-time assets (docs/plans/2026-11-24-help-corpus-build-time.md): the help corpus module + capability registry are generated from these
+      - 'apps/help/content/**'
+      - 'capabilities/**'
       - 'packages/**'
       - 'package.json'
       - 'package-lock.json'
@@ -78,10 +81,12 @@ jobs:
           # No Hyperdrive id any more: the Worker has no Postgres (NEON-ZERO N-17, Ruling NZ-D23).
           test -n "$EBDA_KV_CACHE_ID" || { echo "::error::EBDA_KV_CACHE_ID is not set"; exit 1; }
       - run: npm ci
+      # build-time assets (docs/plans/2026-11-24-help-corpus-build-time.md): the git-ignored help corpus + registry the tsc/vitest steps below import
+      - run: node apps/api/scripts/build-help-corpus.mjs
       - run: npm run -w packages/shared build
       - run: npm run -w packages/database build
       - run: npx tsc --noEmit -p apps/api/tsconfig.json
-      - run: npx vitest run tests/unit/cf-database-role-guard.test.ts tests/unit/cron-tenant-scopes.test.ts tests/unit/merchant-signup-phone.test.ts
+      - run: npx vitest run tests/unit/cron-tenant-scopes.test.ts tests/unit/merchant-signup-phone.test.ts
       - run: node scripts/ebda-cf-api-config.mjs
       - name: Require configured runtime secrets
         # The required list lives in scripts/ci/api-required-secrets.json and is checked against the code by

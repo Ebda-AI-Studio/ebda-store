@@ -114,7 +114,7 @@ export default function AnalyticsPage() {
               {stockSnapshot && <InventorySnapshotCard snapshot={stockSnapshot} />}
               {cashflowLocked ? (
                 <div
-                  className="rounded-xl border bg-card p-6 shadow-sm"
+                  className="rounded-md border bg-card p-6 shadow-sm"
                   role="status"
                   data-testid="cashflow-locked"
                 >

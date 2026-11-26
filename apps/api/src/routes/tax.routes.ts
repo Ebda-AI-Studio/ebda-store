@@ -8,11 +8,17 @@ import {
   TAX_DOCUMENT_MAX_BYTES,
   taxProfileDetailsSchema,
   taxProfileSubmitSchema,
+  taxChangeRequestSchema,
 } from '@ebda/shared';
 import { TaxService } from '../services/tax.service';
 import { TaxProfileService } from '../services/tax-profile.service';
+import {
+  getTaxChangeForMerchant,
+  requestTaxChange,
+  withdrawTaxChange,
+} from '../services/tax-change.service';
 import { tenantContext } from '../middleware/tenant-context';
-import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
+import { uploadLimiter, dailyUploadLimiter, adminReadLimiter } from '../middleware/security';
 import { AppError } from '../middleware/error-handler';
 import { parseInput } from '../lib/parse-input';
 
@@ -363,6 +369,76 @@ router.post(
       parseInput(taxProfileSubmitSchema, req.body);
       const profile = await TaxProfileService.submit(req.params.storeId, actorOf(req));
       res.json({ success: true, data: { profile } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ── Change of a VERIFIED registration (self-service A10) ─────────────────────
+// The verified profile stays as it is (VAT keeps charging) while a request waits for a super-admin.
+// Super-admin override stays: `super_admin` is allowed on every route here (support acts for the store), and the
+// decision itself is super-admin only (routes/platform-tax.routes.ts).
+
+// GET /stores/:storeId/tax/change-request - the pending request (no pre-check) + the last rejection reason
+router.get(
+  '/:storeId/tax/change-request',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  adminReadLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ success: true, data: await getTaxChangeForMerchant(req.params.storeId) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /stores/:storeId/tax/change-request - multipart: file + taxRegistrationNumber, legalName, kind [, confirmToken].
+// Without confirmToken: 200 { confirmationRequired, confirmToken, preview }. With it: 201 { request }.
+router.post(
+  '/:storeId/tax/change-request',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  uploadLimiter,
+  dailyUploadLimiter,
+  documentUpload.single('file'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) throw new AppError(400, 'NO_FILE', 'No file uploaded. Send field name: file');
+      const { confirmToken, ...input } = parseInput(taxChangeRequestSchema, {
+        taxRegistrationNumber: req.body?.taxRegistrationNumber,
+        legalName: req.body?.legalName,
+        kind: req.body?.kind,
+        confirmToken: req.body?.confirmToken || undefined,
+      });
+      const out = await requestTaxChange(
+        req.params.storeId,
+        actorOf(req),
+        input,
+        { buffer: req.file.buffer, originalname: req.file.originalname },
+        confirmToken
+      );
+      res.status(out.confirmationRequired ? 200 : 201).json({ success: true, data: out });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// DELETE /stores/:storeId/tax/change-request - withdraw your own pending request
+router.delete(
+  '/:storeId/tax/change-request',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await withdrawTaxChange(req.params.storeId, actorOf(req));
+      res.json({ success: true, data: { withdrawn: true } });
     } catch (error) {
       next(error);
     }

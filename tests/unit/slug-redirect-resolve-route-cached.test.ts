@@ -80,6 +80,8 @@ vi.mock('@api/middleware/security', () => {
     whenSearching: () => pass,
     cartLimiter: pass,
     couponAttemptLimiter: pass,
+    guestReturnIpLimiter: pass,
+    guestReturnOrderLimiter: pass,
     writeLimiter: pass,
     newsletterLimiter: pass,
     viewIngestLimiter: pass,

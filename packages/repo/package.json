@@ -2,7 +2,7 @@
   "name": "@ebda/repo",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "description": "Store data access for Ebda Store (INFRA-CF-1 phase 2): the StoreRepo interfaces, the Postgres implementation and the StoreDO implementation, plus the Prisma-shaped query layer over the StoreDO's SQLite.",
   "type": "module",
   "main": "./src/index.ts",

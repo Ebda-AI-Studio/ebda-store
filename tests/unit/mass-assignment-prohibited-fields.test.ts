@@ -573,6 +573,10 @@ const ROUTE_INVENTORY: Record<string, Coverage> = {
     exempt:
       'strict zod body `{ claimId, providerRefundId }` only; storeId/orderId from the URL; needs orders:refund',
   },
+  "order.routes.ts POST '/:orderId/partial-refund'": {
+    exempt:
+      'strict zod body `{ items: [{ orderItemId, quantity, restock? }], reason, refundMethod }` only; storeId/orderId from the URL; needs orders:refund',
+  },
   "order.routes.ts POST '/:orderId/refund-via-provider'": {
     exempt: 'body schema is `{ amount?, reason? }` only — no entity identity fields',
   },

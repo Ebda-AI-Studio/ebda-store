@@ -11,11 +11,11 @@ import path from 'node:path';
  */
 const DOCS = path.resolve(__dirname, '../../apps/docs');
 const PINNED_SHA256: Record<string, string> = {
-  'ar/api.mdx': '92238e84525e4af151dc576a2f9e063defbfafb770fd67ccb2f87eb7ac9a7c6c',
+  'ar/api.mdx': '3d36f3f490b5588858702b5fd3b69261aa2d6dc38dd1f2edac0f73cee8c399de',
   'ar/connect-your-number.mdx': '08ae3ec6abf3b5a60cfb44cc02b4cfbc718ec243a483fb9404fd5a2b65ed15ec',
   'ar/overview.mdx': '8b56c065ec55fabdf5e7a7eb58f301f5bdefcbd70ada336374ae1863fc7bd38f',
   'ar/webhooks.mdx': 'd002b89f7a7b019b70ddca09e3ee20159b9b0018e5587ff5890037594eb485e4',
-  'en/api.mdx': 'fad209f2aa8995a685038427c32590ddd063595ef45b374a90450d58a0e76760',
+  'en/api.mdx': '0c04d84a8f6256b9f53d1a83a01d96de796afe6498c353e9198c89c801677396',
   'en/connect-your-number.mdx': '94ae67eb9e43bf8cd4fe482604460b5a129c63cead2096b525557b3a0029d9e2',
   'en/overview.mdx': 'af31b0a9bc02396aad4d1afc3f77016ad086ce4fb94c4fd6a9001bfaa99d1e93',
   'en/webhooks.mdx': 'ae6add9b2e9b41bf71f31db1b581bdcc1198fecc1ebeebd0f33e8fd3cf3a52a0',

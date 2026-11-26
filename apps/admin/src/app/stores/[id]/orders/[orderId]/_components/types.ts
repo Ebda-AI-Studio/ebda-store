@@ -100,6 +100,8 @@ export interface OrderDetail {
   orderNumber: string;
   status: string;
   paymentStatus: string;
+  /** Piastres handed back across every recorded channel (API-computed; includes merchant-booked partial refunds). */
+  refundedTotal?: number | null;
   /**
    * Order provenance — 'web' (human checkout, default) | 'agent' (placed by
    * an AI agent via the MCP `place_order` tool). Nullable/optional because

@@ -18,10 +18,13 @@ function heavyJobs() {
     starts.forEach((a, k) => {
       const block = lines.slice(a, starts[k + 1] ?? lines.length);
       if (!block.some(l => l.includes('heavy-lock.sh acquire'))) return;
-      const t = block.map(l => /^ {4}timeout-minutes:\s*(\d+)/.exec(l)).find(Boolean);
+      // The timeout is a number, or (CI-FAILFAST-1) an expression `... && <hosted> || <self-hosted>`: the self-hosted
+      // value (the last number) is the one that must cover the lock wait; the hosted value skips the no-op lock.
+      const t = block.map(l => /^ {4}timeout-minutes:\s*(.+?)(?:\s+#.*)?$/.exec(l)).find(Boolean);
+      const nums = t ? t[1].match(/\d+/g) : null;
       out.push({
         job: `${file}:${lines[a].trim().replace(':', '')}`,
-        timeout: t ? Number(t[1]) : null,
+        timeout: nums ? Number(nums[nums.length - 1]) : null,
       });
     });
   }

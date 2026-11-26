@@ -2,7 +2,7 @@
   "name": "@ebda/accounts",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "description": "accounts.ebda.app: the shared Ebda AI Studio identity service (Ruling ID-1/ID-2). Its own Cloudflare Worker + D1 ebda-identity.",
   "scripts": {

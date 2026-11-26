@@ -214,9 +214,9 @@ export function TemplateGallery({
                 {busy ? t('previewing') : t('previewCta')}
               </Button>
               {picked === currentLook && (
-                <p className="text-xs text-muted-ink">{t('alreadyCurrent')}</p>
+                <p className="text-sm text-muted-ink">{t('alreadyCurrent')}</p>
               )}
-              <p className="text-xs leading-5 text-muted-ink">{t('previewNote')}</p>
+              <p className="text-sm leading-5 text-muted-ink">{t('previewNote')}</p>
             </>
           ) : (
             <p className="text-sm text-muted-ink">{t('pickPrompt')}</p>

@@ -28,6 +28,7 @@ import {
   type LegacyCronMessage,
 } from './start';
 import { cfBindings } from '../../cf/bindings';
+import { withSweepScope } from '../sweep-scope';
 import { sendAlert } from '../../services/alerts.service';
 import {
   applyAuditRetry,
@@ -68,7 +69,8 @@ export async function handleJobsBatch(batch: JobsBatchLike): Promise<void> {
       await handleDeadLetter(msg);
       continue;
     }
-    await handleOne(msg);
+    // One sweep scope per message (lib/sweep-scope.ts): a store-looping job reads the store directory once, not per store.
+    await withSweepScope(() => handleOne(msg));
   }
 }
 

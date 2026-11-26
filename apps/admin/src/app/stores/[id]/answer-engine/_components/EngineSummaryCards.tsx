@@ -11,7 +11,7 @@ function EngineCard({ engine }: { engine: AnswerEngineSummaryEngine }) {
   const t = useT('answerEngine.page');
 
   return (
-    <div className="bg-card rounded-xl border border-border p-5">
+    <div className="bg-card rounded-md border border-border p-5">
       <p className="text-sm font-medium text-foreground">{engineLabel(engine.engine)}</p>
       <p className="mt-2 text-2xl font-bold text-foreground">
         {engine.citedCount}

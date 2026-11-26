@@ -51,6 +51,8 @@ interface OwnerResponseDraft {
 }
 
 import { formatDate } from '@/lib/format';
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
+import { EmptyState } from '@/components/EmptyState';
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -58,7 +60,7 @@ function StarRating({ rating }: { rating: number }) {
       {Array.from({ length: 5 }).map((_, i) => (
         <svg
           key={i}
-          className={`h-4 w-4 ${i < rating ? 'text-warning-ink fill-yellow-400' : 'text-muted-foreground/60'}`}
+          className={`h-4 w-4 ${i < rating ? 'text-warning-ink fill-warning' : 'text-muted-foreground/60'}`}
           viewBox="0 0 20 20"
           fill="currentColor"
         >
@@ -331,29 +333,16 @@ export default function ReviewsPage() {
       </div>
 
       {/* Reviews List */}
-      <div className="rounded-xl border bg-card shadow-sm">
+      <div className="rounded-md border bg-card shadow-sm">
         {isLoading ? (
           <div className="p-8 text-center text-muted-foreground">{t('loading')}</div>
         ) : filteredReviews.length === 0 ? (
-          <div className="force-empty-state px-6">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-              <svg
-                className="h-8 w-8 text-muted-foreground"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L4.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
-                />
-              </svg>
-            </div>
-            <p className="font-semibold text-foreground">{t('empty')}</p>
-            <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('emptyDescription')}</p>
-          </div>
+          <EmptyState
+            icon="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L4.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+            title={t('empty')}
+            description={t('emptyDescription')}
+            action={{ label: t('emptyAction'), href: `/stores/${storeId}/products` }}
+          />
         ) : (
           <div className="divide-y">
             {filteredReviews.map(review => {
@@ -609,22 +598,22 @@ export default function ReviewsPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
+            <label className="block text-sm font-medium text-muted-foreground mb-1">
               {t('aiDraftEnLabel')}
             </label>
             <textarea
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className={`${TEXTAREA_CLASSES} resize-none`}
               rows={4}
               value={draftEn}
               onChange={e => setDraftEn(e.target.value)}
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
+            <label className="block text-sm font-medium text-muted-foreground mb-1">
               {t('aiDraftArLabel')}
             </label>
             <textarea
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className={`${TEXTAREA_CLASSES} resize-none`}
               rows={4}
               dir="rtl"
               value={draftAr}

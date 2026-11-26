@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import type { Pagination } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // 500 covers the largest catalog we've seen from a tenant (Demo Shop at
 // 264) on a single page. Server caps at 500 in product.service.ts; keep
@@ -43,7 +44,7 @@ export function ProductsPagination({
             <select
               value={pagination.limit}
               onChange={e => onLimitChange(Number(e.target.value))}
-              className="rounded-lg border border-border bg-card px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={FIELD_CLASSES}
               aria-label={t('perPage')}
             >
               {PER_PAGE_OPTIONS.map(n => (

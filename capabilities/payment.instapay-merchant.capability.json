@@ -18,7 +18,12 @@
   },
   "helpArticle": "instapay",
   "questions": {
-    "ar": ["ازاي افعل انستاباي في متجري؟", "عنوان IPA بتاعي"],
+    "ar": [
+      "ازاي افعل انستاباي في متجري؟",
+      "عنوان IPA بتاعي",
+      "العميل حول انستاباي والاوردر لسه معلق",
+      "ازاي اغير مدة حجز الدفع؟"
+    ],
     "en": ["Accept InstaPay in my store"]
   },
   "steps": ["Payment settings > InstaPay: IPA, hold hours."],

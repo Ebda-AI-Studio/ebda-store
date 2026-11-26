@@ -1,0 +1,3 @@
+# Root-checkout guard (2026-11-23): a merge that creates a commit in the main checkout on main is refused
+# (fast-forward merges run no pre-merge-commit and stay allowed). Vendored from ebda-foundation os/ops/.
+bash "$(git rev-parse --show-toplevel)/scripts/ci/root-checkout-guard.sh" pre-merge-commit || exit 1

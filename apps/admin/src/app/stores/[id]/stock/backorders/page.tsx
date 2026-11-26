@@ -10,6 +10,7 @@ import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 
 import { Button } from '@/components/ui/Button';
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BackorderLine {
@@ -83,7 +84,7 @@ function CancelModal({ backorderId, storeId, onClose, onSuccess, t }: CancelModa
   if (owed !== null) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-        <div className="bg-background rounded-xl border border-border shadow-lg w-full max-w-md mx-4 p-6 space-y-4">
+        <div className="bg-background rounded-md border border-border shadow-md w-full max-w-md mx-4 p-6 space-y-4">
           <h2 className="text-base font-semibold">{t('cancelModal.doneTitle')}</h2>
           <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive-ink">
             {t('cancelModal.owedNotice', { amount: formatPrice(owed) })}
@@ -100,7 +101,7 @@ function CancelModal({ backorderId, storeId, onClose, onSuccess, t }: CancelModa
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-background rounded-xl border border-border shadow-lg w-full max-w-md mx-4 p-6 space-y-4">
+      <div className="bg-background rounded-md border border-border shadow-md w-full max-w-md mx-4 p-6 space-y-4">
         <h2 className="text-base font-semibold">{t('cancelModal.title')}</h2>
         <p className="text-xs text-muted-foreground">{t('cancelModal.body')}</p>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -109,14 +110,14 @@ function CancelModal({ backorderId, storeId, onClose, onSuccess, t }: CancelModa
               {t('cancelModal.reasonLabel')}
             </label>
             <textarea
-              className="w-full rounded border border-border bg-muted/20 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+              className={`${TEXTAREA_CLASSES} resize-none`}
               rows={3}
               value={reason}
               onChange={e => setReason(e.target.value)}
               required
             />
           </div>
-          {error && <p className="text-red-600 text-xs">{error}</p>}
+          {error && <p className="text-destructive-ink text-xs">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button
               type="button"
@@ -179,7 +180,7 @@ export default function BackordersPage() {
   if (error) {
     return (
       <AdminLayout title={t('title')}>
-        <div className="p-6 text-red-600 text-sm">{error}</div>
+        <div className="p-6 text-destructive-ink text-sm">{error}</div>
       </AdminLayout>
     );
   }

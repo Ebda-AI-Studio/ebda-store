@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { API_URL } from '../../../lib/api';
 import { localizedMetadata } from '../../../lib/seo/localized-metadata';
+import { OrderStatusInstapay } from './OrderStatusInstapay';
 
 /**
  * The guest-safe order summary behind the COD WhatsApp button (Ruling WA-COD-V2-2). Server-rendered and read-only:
@@ -27,6 +28,8 @@ type Summary = {
   currency: string;
   locale: 'ar' | 'en';
   area: string | null;
+  /** G54: an InstaPay order waiting for the transfer; the page shows the payment instructions and the upload. */
+  instapayPayable?: boolean;
   items: { name: string; variant: string | null; quantity: number }[];
 };
 
@@ -89,6 +92,10 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ to
           </div>
         ) : null}
       </dl>
+      {data.instapayPayable ? (
+        // the token is `<storeId>.<orderId>.<exp>.<sig>`; the API re-verifies it on every InstaPay call
+        <OrderStatusInstapay orderId={token.split('.')[1] ?? ''} token={token} />
+      ) : null}
       <p className="mt-8 text-xs opacity-70">
         {L('لتفاصيل أكتر سجّل دخولك بحسابك.', 'Sign in to your account for full details.')}
       </p>

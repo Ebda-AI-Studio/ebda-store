@@ -20,6 +20,7 @@ import {
   stringText,
 } from './helpers/ast-query';
 import { countsTowardSpend } from '@api/services/customer-aggregate.service';
+import { revenueOrderPredicateSql } from '@api/lib/revenue-sql';
 
 const sf = parseFile(join(__dirname, '../../apps/api/src/services/analytics.service.ts'));
 const BREAKDOWN = 'getRevenueByPaymentStatus';
@@ -46,28 +47,31 @@ const sqlTemplates = () =>
 
 describe('revenue population excludes failed payments (issue 2235)', () => {
   it('every Prisma revenue filter outside the payment-status breakdown excludes failed', () => {
+    // REVENUE-DEF-1: the analytics reads moved onto the ONE definition (revenue.service / lib/revenue-sql.ts), so any filter
+    // that is still written inline here must keep the failed-payment exclusion beside it (there may be none left).
     const outside = revenueFilters().filter(o => enclosingFunctionName(o) !== BREAKDOWN);
-    expect(outside.length).toBeGreaterThanOrEqual(4);
     for (const o of outside) {
-      // the SAME where-object carries the sibling predicate
       expect(
         code(prop(o, 'paymentStatus')?.initializer ?? o),
         `revenue filter in ${enclosingFunctionName(o)}`
       ).toBe("{ not: 'failed' }");
     }
+    // and the service really reads revenue through the shared definition rather than a private copy
+    expect(code(sf)).toMatch(/from '\.\/revenue\.service'|from '\.\.\/lib\/revenue-sql'/);
   });
 
-  it('every raw-SQL revenue filter excludes failed', () => {
-    const sql = sqlTemplates().filter(t =>
-      /status NOT IN \('cancelled', 'refunded', 'awaiting_payment_confirmation'\)/.test(t)
-    );
-    expect(sql.length).toBe(2);
-    for (const t of sql) {
-      // ANDed directly after the status filter inside the same statement
-      expect(t).toMatch(
-        /status NOT IN \('cancelled', 'refunded', 'awaiting_payment_confirmation'\)\s+AND\s+(?:\w+\.)?payment_status <> 'failed'/
+  it('the shared SQL definition (every raw-SQL revenue read) excludes failed and refunded payments', () => {
+    for (const dialect of ['pg', 'sqlite'] as const) {
+      const pred = revenueOrderPredicateSql('o', dialect);
+      expect(pred).toContain(
+        "o.status NOT IN ('cancelled', 'refunded', 'awaiting_payment_confirmation') AND o.payment_status NOT IN ('failed', 'refunded')"
       );
     }
+    // no analytics.service raw-SQL statement keeps a private copy of the exclusion list
+    const privateCopies = sqlTemplates().filter(t =>
+      /status NOT IN \('cancelled', 'refunded', 'awaiting_payment_confirmation'\)/.test(t)
+    );
+    expect(privateCopies).toEqual([]);
   });
 
   // PR 2335 audit P3: the payment-status breakdown keeps failed payments ON

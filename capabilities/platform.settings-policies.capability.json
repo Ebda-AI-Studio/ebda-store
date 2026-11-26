@@ -36,8 +36,8 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": [],
-    "en": []
+    "ar": ["فين اعدادات المنصة؟", "ازاي انشر اشعار سياسة جديد؟", "ازاي اغير مزود محرك الاجابة؟"],
+    "en": ["Where are the platform settings?"]
   },
   "steps": ["Super-admin console only."],
   "edgeCases": [

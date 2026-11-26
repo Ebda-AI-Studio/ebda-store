@@ -17,7 +17,7 @@ import { firePurchasePixelOnce } from '../../../lib/purchase-pixel-guard';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useLastListing } from '../../../hooks/useLastListing';
 import { ReceiptPrinter, type PaymentState } from '../../../components/commerce/ReceiptPrinter';
-import { fromMinor, REGION } from '@ebda/shared';
+import { catalogueItemId, fromMinor, REGION } from '@ebda/shared';
 
 // Payment verification outcome that drives the truthful headline/icon.
 //   verifying → we're asking the API to confirm with the gateway
@@ -49,6 +49,8 @@ function SuccessContent() {
   const { t } = useLanguage();
 
   const [order, setOrder] = useState<Order | null>(null);
+  // STORE-QA-41: a guest has no account page; the API hands a signed view-only status link for THEIR order.
+  const [statusToken, setStatusToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   // S-02: the receipt repeats the delivery window of the order's own shipping
   // zone (clock starts at the order's date; the longest made-to-order lead time
@@ -113,6 +115,7 @@ function SuccessContent() {
         if (!cancelled && result.success && result.data) {
           const fetchedOrder = result.data.order;
           setOrder(fetchedOrder);
+          setStatusToken(result.data.statusToken ?? null);
 
           // Only fire the Purchase pixel for a CONFIRMED sale — COD orders
           // (committed) or online orders the provider reported paid. Don't
@@ -128,7 +131,9 @@ function SuccessContent() {
             firePurchasePixelOnce(fetchedOrder.id, () =>
               trackPurchase({
                 orderId: fetchedOrder.id,
-                contentIds: fetchedOrder.items.map(item => item.productId),
+                contentIds: fetchedOrder.items.map(item =>
+                  catalogueItemId({ productId: item.productId, variantId: item.variantId })
+                ),
                 numItems: fetchedOrder.items.reduce((sum, item) => sum + item.quantity, 0),
                 value: fromMinor(fetchedOrder.total),
                 currency: REGION.currency,
@@ -329,7 +334,12 @@ function SuccessContent() {
                 </Button>
               </Link>
             )}
-            <Link href={storeUrl('/account/orders')} className="w-full sm:w-64">
+            <Link
+              href={storeUrl(
+                statusToken ? `/o/${encodeURIComponent(statusToken)}` : '/account/orders'
+              )}
+              className="w-full sm:w-64"
+            >
               <Button size="lg" variant="outline" className="w-full">
                 {t(
                   'View order status',

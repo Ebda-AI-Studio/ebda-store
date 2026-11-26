@@ -1,5 +1,11 @@
 import { prisma, Prisma } from '@ebda/database';
-import { searchTokens, escapeLike, normalizeArabicSearch, isPersonalDataTerm } from '@ebda/shared';
+import {
+  searchTokens,
+  searchWordPairs,
+  escapeLike,
+  normalizeArabicSearch,
+  isPersonalDataTerm,
+} from '@ebda/shared';
 import { BoundedMap } from '../lib/bounded-map';
 import {
   EMBED_DIMS,
@@ -93,12 +99,29 @@ export function productSearchSql(
   // matches the START of a word instead (SEARCH-T14-3); anything with a longer word is unchanged.
   const wordStart = tokens.every(t => t.length < 3);
   const patterns = tokens.map(t => (wordStart ? `${escapeLike(t)}%` : `%${escapeLike(t)}%`));
+  const field = opts.field === 'name' ? 'name' : 'all';
+  const matchB = Prisma.sql`p.id IN (SELECT public.ebda_product_search_ids(
+        ${storeId}, ${field}, ${withSku}, ${storefront},
+        ${opts.includeDeleted === true}, ${wordStart}, ${patterns}::text[]))`;
+  // Ruling F7-HAMZA-2: each WORD matches under fold B OR under the hamza fold A (مسئول = مسؤول's seat variants), words ANDed: the `_h` function
+  // takes the B and A pattern of every word and builds (docB LIKE b OR docA LIKE a) per word, against the A docs' own trigram indexes
+  // (migration 20261123200000). A word whose two folds agree is tried against both docs. Skipped for a query with no Arabic letter
+  // (A and B agree on Latin text), which keeps English searches at one lookup on the original function.
+  let match: Prisma.Sql = matchB;
+  if (/[\u0600-\u06FF]/.test(raw)) {
+    const pairs = searchWordPairs(raw);
+    const bTok = pairs.map(p => p[0]!);
+    const aTok = pairs.map(p => p[1] ?? p[0]!);
+    const wordStartBoth = [...bTok, ...aTok].every(t => t.length < 3);
+    const like = (t: string) => (wordStartBoth ? `${escapeLike(t)}%` : `%${escapeLike(t)}%`);
+    match = Prisma.sql`p.id IN (SELECT public.ebda_product_search_ids_h(
+        ${storeId}, ${field}, ${withSku}, ${storefront},
+        ${opts.includeDeleted === true}, ${wordStartBoth}, ${bTok.map(like)}::text[], ${aTok.map(like)}::text[]))`;
+  }
   // limit + 1: the extra row only says "there were more" (truncated).
   return Prisma.sql`SELECT p.id FROM products p
     WHERE p.store_id = ${storeId} ${deleted} ${status} ${audience}
-      AND p.id IN (SELECT public.ebda_product_search_ids(
-        ${storeId}, ${opts.field === 'name' ? 'name' : 'all'}, ${withSku}, ${storefront},
-        ${opts.includeDeleted === true}, ${wordStart}, ${patterns}::text[]))
+      AND ${match}
     ORDER BY ${orderBy}
     LIMIT ${limit + 1}`;
 }

@@ -28,7 +28,7 @@ interface KpiCardProps {
 
 function KpiCard({ label, value, sub, unknown }: KpiCardProps) {
   return (
-    <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
+    <div className="rounded-md border border-border bg-card p-3 sm:p-4">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <p
         className={`mt-1 text-lg font-bold sm:text-xl ${
@@ -63,7 +63,7 @@ export function CustomersKpiStrip({ summary, isLoading, truncated }: CustomersKp
     return (
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-hidden="true">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="rounded-xl border border-border bg-card p-3 sm:p-4">
+          <div key={i} className="rounded-md border border-border bg-card p-3 sm:p-4">
             <div className="force-skeleton h-3 w-20" />
             <div className="force-skeleton mt-2 h-6 w-24" />
             <div className="force-skeleton mt-1.5 h-3 w-16" />

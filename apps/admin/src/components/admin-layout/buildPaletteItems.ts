@@ -82,6 +82,8 @@ const PAGE_KEYWORDS: Record<string, string> = {
   campaigns: 'email campaign newsletter marketing send حملات بريد تسويق نشرة إرسال',
   'abandoned-carts': 'cart recovery abandoned سلة متروكة استرداد',
   'marketing-pixels': 'facebook tiktok snapchat google ads tracking بكسل تتبع إعلانات',
+  'product-feeds':
+    'google merchant center shopping meta commerce catalog tiktok feed كتالوج خلاصة منتجات',
   affiliates: 'referral partners commission تسويق بالعمولة شركاء إحالة',
   whatsapp: 'wa chat messaging catalog واتساب رسائل دردشة',
   'agent-key':

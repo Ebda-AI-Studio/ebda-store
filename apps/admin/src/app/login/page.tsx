@@ -48,12 +48,14 @@ export default function LoginPage() {
 
   // A revoked session sends people here with ?ended=1 (and the flag): say why, calmly, once.
   const [sessionEnded, setSessionEnded] = useState(false);
+  const [stepUp, setStepUp] = useState(false);
   useEffect(() => {
     const flagged = consumeSessionEnded();
     const queried =
       typeof window !== 'undefined' &&
       new URLSearchParams(window.location.search).get('ended') === '1';
     if (flagged || queried) setSessionEnded(true);
+    if (new URLSearchParams(window.location.search).get('stepup') === '1') setStepUp(true);
   }, []);
 
   // On mount: prefill email + check box if a remembered email exists.
@@ -304,6 +306,14 @@ export default function LoginPage() {
                 {t('sessionEnded')}
               </div>
             )}
+            {stepUp && !sessionEnded && !error && (
+              <div
+                role="status"
+                className="rounded-lg border border-border bg-muted p-4 text-sm text-foreground"
+              >
+                {t('stepUpRequired')}
+              </div>
+            )}
             {error && (
               <div
                 role="alert"
@@ -358,7 +368,7 @@ export default function LoginPage() {
                 id="remember-me"
                 name="rememberMe"
                 type="checkbox"
-                className="h-4 w-4 rounded border-input accent-primary"
+                className="h-5 w-5 rounded-md border-input accent-primary"
                 checked={rememberMe}
                 onChange={e => setRememberMe(e.target.checked)}
               />

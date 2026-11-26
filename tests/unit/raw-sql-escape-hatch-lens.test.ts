@@ -181,6 +181,14 @@ const UNSAFE_INTERPOLATION_ALLOWED: Record<string, string> = {
 
 /** Files permitted to call `Prisma.raw`, with why the argument is not user text. */
 const PRISMA_RAW_ALLOWED: Record<string, string> = {
+  'apps/api/src/lib/inngest/functions/store-usage-snapshot.ts':
+    'module-constant SQL fragments from lib/revenue-sql.ts (REVENUE-DEF-1): fixed literals, no caller input; every value stays a bound parameter',
+  'apps/api/src/services/abandoned-cart.service.ts':
+    'module-constant SQL fragments from lib/revenue-sql.ts (REVENUE-DEF-1): fixed literals, no caller input; every value stays a bound parameter',
+  'apps/api/src/services/analytics.service.ts':
+    'module-constant SQL fragments from lib/revenue-sql.ts (REVENUE-DEF-1): fixed literals, no caller input; every value stays a bound parameter',
+  'apps/api/src/services/revenue.service.ts':
+    'module-constant SQL fragments from lib/revenue-sql.ts (REVENUE-DEF-1): fixed literals, no caller input; every value stays a bound parameter',
   'apps/api/src/services/inventory.service.ts':
     'sortBy/sortOrder mapped through a ternary allowlist to fixed literals',
 };

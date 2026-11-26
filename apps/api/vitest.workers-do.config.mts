@@ -39,6 +39,10 @@ export default defineConfig(async () => {
       alias: {
         // the engine subpath first: an alias is a prefix match, and `@ebda/shared` points at a FILE
         '@ebda/shared/smart-layer': here('../../packages/shared/src/smart-layer-kit.ts'),
+        '@ebda/shared/observe': here('../../packages/shared/src/observe-kit.ts'),
+        '@ebda/shared/wa-v1': here('../../packages/shared/src/foundation/contracts/wa-v1.ts'),
+        '@ebda/shared/request-guard': here('../../packages/shared/src/foundation/request-guard.ts'),
+        '@ebda/shared/web-search': here('../../packages/shared/src/web-search-kit.ts'),
         '@ebda/shared': here('../../packages/shared/src/index.ts'),
         // hub-fanout.test.ts imports lib/platform-hub (-> billing-d1 -> @ebda/database): from SOURCE, as wrangler.jsonc does,
         // never the CommonJS dist (whose `pg` cannot load on workerd).
@@ -51,6 +55,7 @@ export default defineConfig(async () => {
       },
     },
     test: {
+      globalSetup: ['../../tests/global-setup-assistant-assets.ts'],
       include: ['workers-do/**/*.test.ts'],
       testTimeout: 30_000,
       hookTimeout: 30_000,

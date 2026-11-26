@@ -82,7 +82,8 @@ describe('tenant-tree page metadata equals its legacy twin', () => {
       const legacy = (await import(`${WEB}/app/${route}/page`)) as PageModule;
       const tenant = (await import(`${TENANT_DIR}/${route}/page`)) as PageModule;
       const off = await resolveMetadata(legacy, {});
-      const on = await resolveMetadata(tenant, { tenant: 'demo-shop.example', locale: 'en' });
+      // The legacy twin resolves the page language from the store default (ar here); the tenant route reads it from the URL.
+      const on = await resolveMetadata(tenant, { tenant: 'demo-shop.example', locale: 'ar' });
       expect(on).toEqual(off);
     });
   }

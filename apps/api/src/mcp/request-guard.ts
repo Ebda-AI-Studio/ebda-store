@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { bodyShapeViolation } from '../lib/body-shape';
+import { bodyShapeViolation } from '@ebda/shared/request-guard';
 
 /**
  * Size guard for the MCP routes, buyer (`/mcp/:slug`) and merchant admin (`/mcp/admin/:slug`),
@@ -18,7 +18,7 @@ export const MCP_MAX_ARRAY_LENGTH = 100;
 export const MCP_MAX_DEPTH = 12;
 export const MCP_MAX_NODES = 5000;
 
-/** The first limit a parsed JSON value exceeds, or null (shared walker, `lib/body-shape.ts`). */
+/** The first limit a parsed JSON value exceeds, or null (shared walker, vendored `@ebda/shared/request-guard`). */
 export function mcpBodyViolation(body: unknown): string | null {
   return bodyShapeViolation(body, {
     maxArrayLength: MCP_MAX_ARRAY_LENGTH,

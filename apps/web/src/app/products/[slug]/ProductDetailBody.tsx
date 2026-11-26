@@ -4,7 +4,7 @@ import type { ResolvedStore } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
 import { StoreTemporarilyUnavailableError } from '../../../lib/store-unavailable';
 import { publicLayoutUrl } from '../../../lib/preview-draft';
-import { fetchSlugRedirect, storeRedirectUrl } from '../../../lib/slug-redirect';
+import { fetchSlugRedirect, localizedRedirectUrl } from '../../../lib/slug-redirect';
 import { fetchPublicShippingZones } from '../../../lib/shipping-public';
 import {
   resolveLayoutSettings,
@@ -237,7 +237,9 @@ export async function ProductDetailBody({
       // raw non-ASCII (Arabic) handle there throws
       // `TypeError: Invalid character in header content ["location"]`. The
       // ?category= redirect below already encoded; these path redirects did not.
-      permanentRedirect(storeRedirectUrl(store, `/products/${encodeURIComponent(toSlug)}`));
+      permanentRedirect(
+        await localizedRedirectUrl(store, `/products/${encodeURIComponent(toSlug)}`)
+      );
     }
     notFound();
   }

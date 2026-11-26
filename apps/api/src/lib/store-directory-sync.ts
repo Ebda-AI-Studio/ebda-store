@@ -16,6 +16,7 @@
  * D1 `storage_backend` is never written here (D1 owns it).
  * No-op when PLATFORM_DB is unbound (Node, unit tests, local dev).
  */
+import { tombstoneStoreDirectoryRow } from './store-directory-tombstone';
 import { withStore } from '@ebda/database';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
@@ -100,8 +101,8 @@ export async function syncStoreDirectoryFromPg(storeId: string): Promise<void> {
       tx.store.findUnique({ where: { id: storeId }, select })
     )) as Record<string, unknown> | null;
     if (!row) {
-      // gone from Postgres: it must not stay resolvable
-      await db.prepare('DELETE FROM "stores" WHERE "id" = ?').bind(storeId).run();
+      // gone from Postgres: it must not stay resolvable. TOMBSTONED, not deleted: Ebda's billing rows cascade from the row.
+      await tombstoneStoreDirectoryRow(db, storeId);
       return;
     }
     const cols = await columnOf();
@@ -125,7 +126,8 @@ export async function syncStoreDirectoryFromPg(storeId: string): Promise<void> {
  * stays resolvable.
  *   - `soft: true` (a DO store): the row is MARKED deleted (status inactive + deleted_at), never removed. Its data is retained and
  *     its slug stays reserved; lookups exclude it at once.
- *   - `soft: false` (a Postgres store, already hard-deleted there): the row is removed; D1 FKs cascade the platform rows.
+ *   - `soft: false` (a Postgres store, already hard-deleted there): the row is TOMBSTONED (identifying columns cleared, slug and
+ *     domain released), never removed: Ebda's billing and payment-proof rows reference it ON DELETE CASCADE.
  * No-op when unbound.
  */
 export async function retireStoreDirectoryRow(
@@ -142,7 +144,7 @@ export async function retireStoreDirectoryRow(
         )
         .bind(Date.now(), storeId)
         .run();
-    else await db.prepare('DELETE FROM "stores" WHERE "id" = ?').bind(storeId).run();
+    else await tombstoneStoreDirectoryRow(db, storeId);
   } catch (e) {
     throw unavailable(e);
   }

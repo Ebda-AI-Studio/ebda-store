@@ -1,3 +1,5 @@
+import { orderPaymentState } from './order-payment-summary';
+
 /**
  * Which money actions an order-detail screen may offer.
  *
@@ -66,7 +68,10 @@ export function orderActionVisibility(order: OrderActionInput): OrderActionVisib
   const awaitingInstapay =
     order.status === 'awaiting_payment_confirmation' &&
     payments.some(p => p.provider === 'instapay' && p.status === 'pending');
-  const showMarkPaid = order.paymentStatus !== 'paid' && !awaitingInstapay;
+  // Same question the payment card answers (orderPaymentState): only a genuinely unpaid order can be marked paid. A refunded
+  // order (paymentStatus OR status; the API 409s it) and a disputed one are settled the other way. A cancelled unpaid online
+  // order keeps the button: Refresh payment recovers one paid late on a still-live invoice.
+  const showMarkPaid = orderPaymentState(order) === 'unpaid' && !awaitingInstapay;
   // Paid status on an order with a provider-payment row MUST come from the
   // provider (webhook / verify), never a manual flip — financial integrity.
   // COD and InstaPay have no provider behind them: their paid status and any

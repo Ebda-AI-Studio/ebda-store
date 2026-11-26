@@ -73,7 +73,7 @@ socketService.initialize(httpServer);
 // open). Now it is awaited first; in production an unsafe OR unverifiable role
 // exits non-zero before a single request is accepted. ALLOW_BYPASSRLS_ROLE=true
 // is still honoured (loudly). See lib/database-role-guard.ts; the Workers shell
-// has its own guard (cf/database-role-guard.ts).
+// has no guard (the Worker has no Postgres).
 // Integration tier only (NODE_ENV=test + a test key): the identity-service stand-in. A no-op everywhere else.
 installTestIdentity();
 const server = httpServer;

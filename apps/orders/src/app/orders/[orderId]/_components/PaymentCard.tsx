@@ -1,5 +1,6 @@
 'use client';
 
+import { orderPaymentSummary } from '@ebda/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMoney, fmt } from '@/lib/format';
 import type { OrderDetail } from '@/lib/orders';
@@ -18,10 +19,9 @@ interface PaymentCardProps {
  */
 export function PaymentCard({ order }: PaymentCardProps) {
   const { t } = useLanguage();
-  const isPaid = order.paymentStatus === 'paid';
-  // What is still to be collected: the order value less any part paid from
-  // the customer wallet at checkout (D1). === order.total without a wallet.
-  const remain = isPaid ? 0 : Math.max(0, order.total - (order.walletAmount ?? 0));
+  // paid / refunded / unpaid. A refunded order is NOT unpaid: nothing is owed on it.
+  const { state, refunded, remain } = orderPaymentSummary(order);
+  const isUnpaid = state === 'unpaid';
   const link = order.payments?.find(p => p.paymentLink)?.paymentLink ?? null;
 
   const detailPayment =
@@ -51,7 +51,9 @@ export function PaymentCard({ order }: PaymentCardProps) {
       <div className="flex items-start gap-3">
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-            isPaid ? 'bg-success/10 text-success-ink' : 'bg-destructive/10 text-destructive-ink'
+            isUnpaid || state === 'disputed'
+              ? 'bg-destructive/10 text-destructive-ink'
+              : 'bg-success/10 text-success-ink'
           }`}
         >
           <svg
@@ -71,16 +73,19 @@ export function PaymentCard({ order }: PaymentCardProps) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <div className="font-semibold text-foreground">
-              {isPaid ? t.detail.paid : t.detail.unpaid}
-            </div>
+            <div className="font-semibold text-foreground">{t.detail[state]}</div>
             <div className="font-semibold text-foreground">
               {formatMoney(order.total, order.currency)}
             </div>
           </div>
-          {!isPaid && (
+          {isUnpaid && (
             <div className="mt-1 text-end text-sm text-muted-foreground">
               {fmt(t.detail.remain, { amount: formatMoney(remain, order.currency) })}
+            </div>
+          )}
+          {!isUnpaid && refunded > 0 && (
+            <div className="mt-1 text-end text-sm text-muted-foreground">
+              {fmt(t.detail.refundedAmount, { amount: formatMoney(refunded, order.currency) })}
             </div>
           )}
 

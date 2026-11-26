@@ -23,7 +23,11 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": ["اللينك ده اسم براند بتاعي"],
+    "ar": [
+      "اللينك ده اسم براند بتاعي",
+      "ازاي احجز اسم براند محمي؟",
+      "عايز ارفع حد انشاء المتاجر اليومي"
+    ],
     "en": ["This slug is my brand name"]
   },
   "steps": ["Super-admin console only."],

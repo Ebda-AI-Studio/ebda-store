@@ -11,7 +11,10 @@
     "GET /admin/tax-verification",
     "POST .../:storeId/decision",
     "GET/PUT /admin/platform-vat",
-    "/admin/fiscal-archive"
+    "/admin/fiscal-archive",
+    "GET /admin/tax-verification/change-requests",
+    "GET /admin/tax-verification/:storeId/change-request/file",
+    "POST /admin/tax-verification/:storeId/change-decision"
   ],
   "mcpTool": null,
   "planGate": null,
@@ -28,7 +31,7 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": ["اوراق الضريبة لسه بتتراجع"],
+    "ar": ["اوراق الضريبة لسه بتتراجع", "ازاي اوافق على اوراق الضريبة؟", "ازاي ارفض مستند ضريبة؟"],
     "en": ["VAT documents still under review"]
   },
   "steps": ["Super-admin console only."],

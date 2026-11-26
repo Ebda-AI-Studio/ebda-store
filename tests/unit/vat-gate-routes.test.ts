@@ -24,6 +24,7 @@ const h = vi.hoisted(() => ({
   profileFindUnique: vi.fn(),
   storeUpdate: vi.fn(),
   review: vi.fn(),
+  discard: vi.fn(),
   getProfile: vi.fn(),
   readDocument: vi.fn(),
   getPlatformVat: vi.fn(),
@@ -54,6 +55,13 @@ vi.mock('@api/lib/after-tenant-commit', () => ({
   deferAfterTenantCommit: (_n: string, run: () => Promise<unknown>) => run(),
 }));
 vi.mock('@api/lib/definer', () => ({ taxProfilesForReview: h.queue }));
+// A review decision also drops a stale pending change request (system_settings, not part of this file's database mock).
+vi.mock('@api/services/tax-change.service', () => ({
+  discardTaxChange: h.discard,
+  decideTaxChange: vi.fn(),
+  listTaxChangesForReview: vi.fn(),
+  readTaxChangeEvidence: vi.fn(),
+}));
 vi.mock('@api/services/platform-vat.service', () => ({
   getPlatformVat: h.getPlatformVat,
   updatePlatformVat: h.updatePlatformVat,
@@ -112,6 +120,7 @@ beforeEach(() => {
     defaultTaxRate: null,
   });
   h.review.mockResolvedValue({ status: 'verified' });
+  h.discard.mockResolvedValue(undefined);
   h.getProfile.mockResolvedValue({ status: 'pending', documents: [] });
   h.readDocument.mockResolvedValue({
     body: Buffer.from('%PDF-1.4'),
@@ -212,6 +221,31 @@ describe('super-admin tax surfaces answer ONLY to super_admin (rulings TAX-2, TA
   it.each(cases)('super_admin → 2xx on %s %s', async (method, url, body) => {
     const res = await request(app)[method](url).set('x-test-role', 'super_admin').send(body);
     expect(res.status).toBeLessThan(300);
+  });
+
+  it.each([
+    [{ decision: 'approve' }],
+    [{ decision: 'reject', reason: 'unreadable document' }],
+    [{ decision: 'revoke', reason: 'no longer registered' }],
+  ])('every review decision (%j) also discards a stale pending change request', async body => {
+    const res = await request(app)
+      .post(`/admin/tax-verification/${STORE}/decision`)
+      .set('x-test-role', 'super_admin')
+      .send(body);
+    expect(res.status).toBe(200);
+    expect(h.discard).toHaveBeenCalledWith(
+      STORE,
+      expect.objectContaining({ userId: expect.any(String) })
+    );
+  });
+
+  it('a failing discard fails the decision (500), it is not swallowed', async () => {
+    h.discard.mockRejectedValueOnce(new Error('settings down'));
+    const res = await request(app)
+      .post(`/admin/tax-verification/${STORE}/decision`)
+      .set('x-test-role', 'super_admin')
+      .send({ decision: 'approve' });
+    expect(res.status).toBe(500);
   });
 
   it('a reject without a reason is refused (400) before the service', async () => {

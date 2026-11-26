@@ -17,6 +17,8 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [CHANGELOG-2026-11-04-admin-fix-pass-t4.md](CHANGELOG-2026-11-04-admin-fix-pass-t4.md) - Admin fix pass, T4 store setup pages (2026-11-04)
 - [CHANGELOG-2026-11-04-admin-fix-pass-t6.md](CHANGELOG-2026-11-04-admin-fix-pass-t6.md) - Admin fix pass, T6 stock / finance / insights / platform / onboarding (2026-11-04)
 - [CHANGELOG-2026-11-09-admin-audit-closure-ux.md](CHANGELOG-2026-11-09-admin-audit-closure-ux.md) - Admin audit closure, UX rows (2026-11-09)
+- [CHANGELOG-2026-11-16-studio-social-links.md](CHANGELOG-2026-11-16-studio-social-links.md) - Ebda AI Studio social links on the marketing site (2026-11-16)
+- [CHANGELOG-2026-11-12-session-role-lifecycle.md](CHANGELOG-2026-11-12-session-role-lifecycle.md) - Session and role lifecycle fixes (ID-02/05/06/07/08, TEN-2/3/4)
 - [admin-routes-triage-2026-11-11.md](admin-routes-triage-2026-11-11.md) - Triage of the 89 routes with no admin caller (F-9-prune)
 - [CHANGELOG-2026-11-09-admin-audit-closure-p2-api-web.md](CHANGELOG-2026-11-09-admin-audit-closure-p2-api-web.md) - Admin audit closure, API and storefront rows (2026-11-09)
 - [CHANGELOG-2026-11-09-admin-audit-closure-p2-store-do.md](CHANGELOG-2026-11-09-admin-audit-closure-p2-store-do.md) - Atomic StoreDO settings patch (2026-11-09)
@@ -128,6 +130,10 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [contracts/identity-client-token-v1.3.example.json](contracts/identity-client-token-v1.3.example.json) - identity client token v1.3.example
 - [contracts/identity-token-v1.2.example.json](contracts/identity-token-v1.2.example.json) - identity token v1.2.example
 
+## design - Design and UI work
+
+- [design/DESIGNER-ONBOARDING.md](design/DESIGNER-ONBOARDING.md) - Designer onboarding: redesign branch workflow, running the marketing site, brand rules
+
 ## decisions - Decision logs
 
 - [decisions/2026-10-10-product-company-naming.md](decisions/2026-10-10-product-company-naming.md) - Product and company naming
@@ -205,7 +211,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 ## legal - Legal
 
-- [legal/VAT-0-clause.md](legal/VAT-0-clause.md) - VAT-0: the final clause (Ruling VAT-0, Ahmad 2026-10-26)
+- [VAT-0-clause.md](../packages/shared/src/foundation/legal/clauses/VAT-0-clause.md) - VAT-0: the final clause (Ruling VAT-0, Ahmad 2026-10-26); lives in the foundation (`legal/clauses/`, Ruling FDN-LEGAL-1), vendored here byte for byte
 
 ## merchant - Merchant-facing guides
 
@@ -218,6 +224,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [merchant/inventory.md](merchant/inventory.md) - Inventory: variant stock, adjustments & scanning — المخزون: مخزون التنويعات والتعديلات والمسح
 - [merchant/loyalty.md](merchant/loyalty.md) - Loyalty points
 - [merchant/orders.md](merchant/orders.md) - Orders (and the Orders app) — الطلبات (وتطبيق الطلبات)
+- [merchant/product-feeds.md](merchant/product-feeds.md) - Product feeds for Google, Meta and TikTok - خلاصات المنتجات للإعلانات
 - [merchant/product-details.md](merchant/product-details.md) - Product details: swatches, facts, personalisation, delivery time and size guides — تفاصيل المنتج
 - [merchant/provider-activation.md](merchant/provider-activation.md) - Connecting a payment or shipping service / ربط خدمة دفع أو شحن
 - [merchant/quickstart.md](merchant/quickstart.md) - Quickstart — البدء السريع
@@ -297,6 +304,8 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/done/2026-10-21-phase-b2-souq.md](plans/done/2026-10-21-phase-b2-souq.md) - Phase B2 — Souq (general retail & electronics) Implementation Plan
 - [plans/done/2026-10-21-phase-b3-jasmine.md](plans/done/2026-10-21-phase-b3-jasmine.md) - Phase B3 — Jasmine (beauty & skincare) Implementation Plan
 - [plans/done/2026-10-21-phase-b4-lamma.md](plans/done/2026-10-21-phase-b4-lamma.md) - Phase B4 — Lamma (home food & home kitchens) Implementation Plan
+- [plans/2026-11-24-ci-merge-queue-critical-path.md](plans/2026-11-24-ci-merge-queue-critical-path.md) - CI: shorten the merge-queue critical path (parallel + sharded heavy jobs), strict docs-only skip (2026-11-24)
+- [plans/2026-11-20-admin-partial-refund-and-returns.md](plans/2026-11-20-admin-partial-refund-and-returns.md) - STORE-QA-76: merchant partial refund by line (per-line restock) and merchant-opened returns from the admin (2026-11-20)
 - [plans/2026-11-15-gsc-custom-domain-verification.md](plans/2026-11-15-gsc-custom-domain-verification.md) - GSC data for custom merchant domains: automatic META verification via the Site Verification API, then sites.add (2026-11-15)
 - [plans/2026-11-05-nz-17-postgres-removal.md](plans/2026-11-05-nz-17-postgres-removal.md) - N-17: inventory of Postgres residue, what replaces the Postgres integration suite, CI footprint (2026-11-05)
 - [plans/done/2026-11-03-sharia-gold-bnpl-aup.md](plans/done/2026-11-03-sharia-gold-bnpl-aup.md) - Sharia decisions: gold prepaid, BNPL off by default, acceptable use (2026-11-03)
@@ -316,6 +325,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-10-25-templates-match-mockups.md](plans/2026-10-25-templates-match-mockups.md) - Make the real templates look like the Python mock-ups (2026-10-25)
 - [plans/done/2026-10-25-wa-store-contract-store-side.md](plans/done/2026-10-25-wa-store-contract-store-side.md) - Ebda Store side of the WhatsApp contract (producer, consumer, buyer key)
 - [plans/done/2026-10-26-search-as-you-type.md](plans/done/2026-10-26-search-as-you-type.md) - Search as you type, everywhere (2026-10-26)
+- [plans/2026-11-14-catalogue-feeds.md](plans/2026-11-14-catalogue-feeds.md) - Product catalogue feeds: Google, Meta, TikTok (2026-11-14)
 - [plans/2026-11-12-arabic-stemming.md](plans/2026-11-12-arabic-stemming.md) - Arabic light stemming for storefront search (2026-11-12)
 - [plans/2026-10-26-storefront-locale-paths.md](plans/2026-10-26-storefront-locale-paths.md) - Storefront English at its own URL (audit M-168, SEO-9)
 - [plans/done/2026-10-28-customer-intelligence.md](plans/done/2026-10-28-customer-intelligence.md) - Customer Intelligence (CI): capture, internal learning, merchant features
@@ -455,3 +465,4 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/done/2026-11-12-storage-limit-enforce.md](plans/done/2026-11-12-storage-limit-enforce.md) - S3-X8: enforce maxStorageMb on the four upload routes, usage from the R2 listing (60 s bounded-stale)
 - [plans/2026-11-11-batch-limiter-and-resolve-calls.md](plans/2026-11-11-batch-limiter-and-resolve-calls.md) - PERF-BATCH-1: batch the limiter calls, parallelise the cold store resolve
 - [plans/2026-11-12-auto-recommendations.md](plans/2026-11-12-auto-recommendations.md) - Automatic product recommendations: merchant picks, then bought-together, then similar items (Vectorize), cap 8, merchant switch
+- [plans/2026-11-24-help-corpus-build-time.md](plans/2026-11-24-help-corpus-build-time.md) - HELP-CORPUS-BUILD-1: the help corpus module and capability registry are build-time outputs, never committed; every consumer generates them first

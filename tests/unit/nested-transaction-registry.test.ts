@@ -137,7 +137,6 @@ const UNREVIEWED_PREDATING_THIS_REGISTRY = new Set([
   'lib/inngest/functions/order-refunded.ts',
   'services/accounting/purchase-order.service.ts',
   'services/accounting/stock-adjustment.service.ts',
-  'services/feature.service.ts',
   'services/order.service.ts',
   'services/product.service.ts',
   'services/provisioning.service.ts',

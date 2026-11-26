@@ -73,9 +73,6 @@ vi.mock('../../apps/web/src/components/SkipLink', () => ({ SkipLink: nothing }))
 vi.mock('../../apps/web/src/components/PushNotificationPrompt', () => ({
   PushNotificationPrompt: nothing,
 }));
-vi.mock('../../apps/web/src/components/OneSignalStorefrontInit', () => ({
-  OneSignalStorefrontInit: nothing,
-}));
 vi.mock('../../apps/web/src/components/TypographyProbe', () => ({ TypographyProbe: nothing }));
 vi.mock('../../apps/web/src/components/AffiliateTracker', () => ({ AffiliateTracker: nothing }));
 vi.mock('../../apps/web/src/components/StoreMaintenance', () => ({ StoreMaintenance: nothing }));

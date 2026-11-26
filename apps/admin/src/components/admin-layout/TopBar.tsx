@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button, buttonVariants } from '@/components/ui/Button';
 import { NotificationBell } from '../NotificationBell';
+import { LaunchReadinessChip } from './LaunchReadinessChip';
 import AdminLanguageSwitcher from '../AdminLanguageSwitcher';
 import { DocumentTitle } from '../DocumentTitle';
 import { useT } from '@/i18n/useT';
@@ -112,18 +113,17 @@ export function TopBar({
                 {parent.label}
               </Link>
             )}
-            <TitleTag className="truncate text-base font-bold text-foreground lg:text-lg">
-              {title}
-            </TitleTag>
+            <TitleTag className="truncate text-xl font-semibold text-foreground">{title}</TitleTag>
             {/* Subtitle hides on mobile — repeats info that's already
                 clear from the page context and ate header height when
                 actions had to share the row. */}
             {subtitle && (
-              <p className="hidden truncate text-xs text-muted-foreground lg:block">{subtitle}</p>
+              <p className="hidden truncate text-sm text-muted-foreground lg:block">{subtitle}</p>
             )}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 lg:gap-3">
+          <LaunchReadinessChip />
           <AdminLanguageSwitcher />
           <NotificationBell />
 

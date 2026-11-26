@@ -163,6 +163,7 @@ export async function runCompMigration(
           // Comped-era leftovers must not survive: a stale pending plan would be quoted and
           // applied instead of Growth (instapayDetails reads `pendingPlanCode ?? planCode`).
           pendingPlanCode: null,
+          pendingBillingInterval: null,
           trialEndsAt: null,
           nextRetryAt: null,
           dunningAttempts: 0,

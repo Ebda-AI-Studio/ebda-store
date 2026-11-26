@@ -49,7 +49,7 @@ export function OrderDocumentsCard({ storeId, orderId }: OrderDocumentsCardProps
 
   return (
     <section
-      className="rounded-2xl border border-border bg-card p-5"
+      className="rounded-lg border border-border bg-card p-5"
       aria-labelledby="order-documents-title"
     >
       <div className="mb-4 flex items-center justify-between gap-3">

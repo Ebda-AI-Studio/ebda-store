@@ -126,3 +126,31 @@ describe('PeriodSwitch', () => {
     expect(onChange).toHaveBeenCalledWith('this_month');
   });
 });
+
+describe('first sales (D1)', () => {
+  it('shows a "new" pill and the first-sales sentence instead of "Up 100%"', () => {
+    render(
+      <SalesHero
+        stats={{ ...stats, revenueChange: 100, previousRevenue: 0, previousOrders: 0 }}
+        sales={null}
+        period="last_7"
+        onRetry={noop}
+        onShare={noop}
+      />
+    );
+    const pill = screen.getByTestId('delta');
+    expect(pill.getAttribute('data-tone')).toBe('new');
+    expect(pill.textContent).not.toContain('100%');
+    expect(screen.getByText(/^sentence\.new\|/)).toBeTruthy();
+  });
+  it('shows no pill when neither period had sales on the orders KPI', () => {
+    render(
+      <KpiRow
+        stats={{ ...stats, totalOrders: 0, ordersChange: 0, previousOrders: 0 }}
+        unpaid={{ orders: 0, revenue: 0 }}
+        storeId="s1"
+      />
+    );
+    expect(screen.getByTestId('kpi-orders').querySelector('[data-testid="delta"]')).toBeNull();
+  });
+});

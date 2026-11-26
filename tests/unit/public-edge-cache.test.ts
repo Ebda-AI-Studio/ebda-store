@@ -339,6 +339,9 @@ describe('write-path wiring', () => {
   const src = (p: string) => readFileSync(join(__dirname, '../../apps/api/src', p), 'utf8');
   it('price/stock read routes opt in to the NEVER-stale class', () => {
     const routes = src('routes/public.routes.ts');
-    expect(routes.match(/neverStale: true/g)?.length).toBe(2);
+    // product list + PDP + the advertising catalogue feed (feedHandler, Ruling FEEDS-4: invalidated by the same
+    // product-cache write paths, never a TTL-only copy of price/stock).
+    expect(routes.match(/neverStale: true/g)?.length).toBe(3);
+    expect(routes).toMatch(/doc\.edgeSeconds, staleWhileRevalidate: 0, neverStale: true/);
   });
 });

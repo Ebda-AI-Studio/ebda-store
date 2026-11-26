@@ -176,7 +176,7 @@ export function NavMenuEditor({ storeId, variant, saveRef, stateRef }: NavMenuEd
         <div className="mb-6">
           <p className="text-sm text-muted-foreground">
             {t('helpBefore')}
-            <code className="rounded bg-muted px-1">{t('helpCode')}</code>
+            <code className="rounded-md bg-muted px-1">{t('helpCode')}</code>
             {t('helpAfter')}
           </p>
         </div>
@@ -186,7 +186,7 @@ export function NavMenuEditor({ storeId, variant, saveRef, stateRef }: NavMenuEd
         {items.map((item, index) => (
           <div
             key={index}
-            className={`rounded-xl border bg-card shadow-sm ${isEmbedded ? 'p-3' : 'p-4'}`}
+            className={`rounded-md border bg-card shadow-sm ${isEmbedded ? 'p-3' : 'p-4'}`}
           >
             <div className="mb-2 flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

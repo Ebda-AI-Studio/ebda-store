@@ -4,6 +4,7 @@ import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 import { stepRunUnlessEmpty } from '../empty-exit';
+import { logSweepRun } from '../sweep-run-log';
 
 /**
  * Stuck payment-webhook sweep — scheduled safety net (every 30 min, Ruling INNGEST-BUDGET-1).
@@ -80,7 +81,8 @@ export const paymentWebhookStuckSweep: JobDef = inngest.createFunction(
       webhookInbox.stuck(new Date(Date.now() - STUCK_WEBHOOK_MINUTES * 60_000), SWEEP_TAKE)
     );
 
-    if (stuck.length === 0) return { swept: 0, resent: 0, alerted: 0 };
+    if (stuck.length === 0)
+      return logSweepRun('payment-webhook-stuck-sweep', { swept: 0, resent: 0, alerted: 0 });
 
     const undelivered = stuck.filter(r => r.status === 'received' && r.attempts === 0);
     const wedged = stuck.filter(r => !(r.status === 'received' && r.attempts === 0));
@@ -143,6 +145,10 @@ export const paymentWebhookStuckSweep: JobDef = inngest.createFunction(
       );
     }
 
-    return { swept: stuck.length, resent, alerted: wedged.length };
+    return logSweepRun('payment-webhook-stuck-sweep', {
+      swept: stuck.length,
+      resent,
+      alerted: wedged.length,
+    });
   }
 );

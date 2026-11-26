@@ -5,13 +5,15 @@
  * picker, and (SP5 task 3) subscribe/checkout, dunning banner and charges list.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
-const { apiGet, apiPost, role } = vi.hoisted(() => ({
+const { apiGet, apiPost, role, askConfirm } = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
   role: { current: 'store_admin' },
+  askConfirm: vi.fn(),
 }));
+vi.mock('@/hooks/useConfirm', () => ({ useConfirm: () => askConfirm }));
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'store-1' }) }));
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
@@ -129,6 +131,39 @@ describe('merchant billing page', () => {
     expect(products.getAttribute('aria-valuenow')).toBe('45');
     // price not set -> "to be announced", never 0
     expect(screen.getByText('priceTbd')).toBeTruthy();
+  });
+
+  it('QA-STOR-1: storage shows "<used MB> of <limit>" from the usage counter, like the other limits', async () => {
+    mockApi(
+      billing({
+        usage: {
+          maxProducts: 45,
+          maxStaff: 1,
+          maxOrdersPerMonth: 120,
+          maxStorageMb: 120,
+          customDomain: 0,
+        },
+      })
+    );
+    render(<StoreBillingPage />);
+    await screen.findByText('Free', { selector: 'h2' });
+    const storage = screen
+      .getAllByRole('progressbar')
+      .find(b => b.getAttribute('aria-label') === 'maxStorageMb')!;
+    expect(storage.getAttribute('aria-valuenow')).toBe('120');
+    expect(storage.getAttribute('aria-valuemax')).toBe('500');
+    expect(screen.queryByTestId('storage-usage-unknown')).toBeNull();
+  });
+
+  it('QA-STOR-1: an unreadable storage counter says "not known right now", never 0', async () => {
+    mockApi(billing());
+    render(<StoreBillingPage />);
+    const row = await screen.findByTestId('storage-usage-unknown');
+    expect(row.textContent).toContain('storageUnknown');
+    expect(row.textContent).toContain('500');
+    expect(
+      screen.getAllByRole('progressbar').find(b => b.getAttribute('aria-label') === 'maxStorageMb')
+    ).toBeUndefined();
   });
 
   it('shows the over-limit banner only when flagged for the current month, and never hides orders', async () => {
@@ -317,6 +352,27 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     cancelAtPeriodEnd: false,
   };
 
+  it('awaiting payment: no "renews on" date for a plan nobody has paid for', async () => {
+    mockApi(
+      billing({
+        subscription: {
+          status: 'active',
+          currentPeriodEnd: '2027-11-12T00:00:00.000Z',
+          trialEndsAt: null,
+          cancelAtPeriodEnd: false,
+        },
+        availablePlans: plans,
+        billing: {
+          ...instapayChosen,
+          nextCharge: { at: '2026-11-20T00:00:00.000Z', planCode: 'growth', amountMinor: 3141000 },
+        },
+      })
+    );
+    render(<StoreBillingPage />);
+    expect((await screen.findAllByText('status.awaiting_payment')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('renewsOn')).toBeNull();
+  });
+
   it('Plan & trial: trial end, chosen plan + interval, next charge with amount and plan', async () => {
     mockApi(
       billing({
@@ -380,6 +436,30 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     render(<StoreBillingPage />);
     expect(await screen.findByText('trial.nextCharge')).toBeTruthy();
     expect(screen.getByText(/^trial\.nextChargeLine:.*"interval":"intervalMonthly"/)).toBeTruthy();
+  });
+
+  it('BILLING-INTERVAL-PENDING-1: renewal quote keeps the current interval; the pending switch is its own line', async () => {
+    mockApi(
+      billing({
+        subscription: trialing,
+        availablePlans: plans,
+        billing: {
+          ...billingFixture(),
+          billingMethod: null,
+          cardBilling: false,
+          billingInterval: 'yearly',
+          pendingBillingInterval: 'monthly',
+          nextCharge: { at: '2027-11-12T00:00:00.000Z', planCode: 'growth', amountMinor: 3141000 },
+        },
+      })
+    );
+    render(<StoreBillingPage />);
+    expect(
+      await screen.findByText(/^trial\.instapayDueLine:.*"interval":"intervalYearly"/)
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/^trial\.switchingInterval:.*"interval":"intervalMonthly"/)
+    ).toBeTruthy();
   });
 
   it('card on file: shows •••• 4242 and Replace card starts a billing-origin card setup', async () => {
@@ -474,11 +554,48 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     await waitFor(() =>
       expect(apiPost).toHaveBeenCalledWith('/api/v1/stores/store-1/billing/instapay-plan', {
         planCode: 'growth',
-        interval: 'monthly',
+        // the cards open on the store's own interval (this fixture is on yearly), no longer always monthly
+        interval: 'yearly',
       })
     );
     expect(await screen.findByTestId('instapay-quote')).toBeTruthy();
     expect(document.getElementById('plans')).toBeTruthy();
+  });
+
+  it('QA: a yearly store opens on Yearly and "Current plan" shows only under Yearly, never under both toggles', async () => {
+    mockApi(
+      billing({
+        subscription: { ...trialing, status: 'active' },
+        availablePlans: [
+          {
+            ...plans[0],
+            code: 'growth',
+            nameEn: 'Growth',
+            priceMonthlyMinor: 99_900,
+            priceYearlyMinor: 899_100,
+          },
+        ],
+        plan: { code: 'growth', nameEn: 'Growth', nameAr: 'نمو', subscribedPlanCode: 'growth' },
+        billing: { ...instapayChosen, pendingPlanCode: null, billingInterval: 'yearly' },
+      })
+    );
+    render(<StoreBillingPage />);
+    const yearly = await screen.findByRole('button', { name: 'intervalYearly' });
+    await waitFor(() => expect(yearly.getAttribute('aria-pressed')).toBe('true'));
+    const card = () =>
+      within(document.getElementById('plans')!)
+        .getByText('Growth')
+        .closest<HTMLElement>('.rounded-lg')!;
+    expect(card().textContent).toContain('currentBadge');
+    expect(within(card()).queryByRole('button', { name: 'chooseThisPlan' })).toBeNull();
+    // Monthly toggle: the same plan on the OTHER interval is an interval change, not "current"
+    fireEvent.click(screen.getByRole('button', { name: 'intervalMonthly' }));
+    expect(card().textContent).not.toContain('currentBadge');
+    expect(within(card()).getByRole('button', { name: 'chooseThisPlan' })).toBeTruthy();
+    // a later reload never undoes the merchant's own toggle (the sync runs once)
+    expect(
+      screen.getByRole('button', { name: 'intervalMonthly' }).getAttribute('aria-pressed')
+    ).toBe('true');
   });
 
   it('canceled store: "subscription ended" copy, never "Free plan limits apply", plan picker shown', async () => {
@@ -717,5 +834,86 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     );
     expect(await screen.findByText('pay.returnOk')).toBeTruthy();
     expect(await screen.findByText('•••• 4242 visa')).toBeTruthy();
+  });
+});
+
+describe('card plan change (Ruling G35-PRORATE-1)', () => {
+  const plans = [
+    {
+      code: 'basic',
+      nameEn: 'Basic',
+      nameAr: 'بيزيك',
+      priceMonthlyMinor: 149000,
+      priceYearlyMinor: null,
+      limits,
+    },
+    {
+      code: 'growth',
+      nameEn: 'Growth',
+      nameAr: 'النمو',
+      priceMonthlyMinor: 349000,
+      priceYearlyMinor: null,
+      limits,
+    },
+  ];
+  const cardStore = (quote: Record<string, unknown>) => {
+    const summary = billing({
+      plan: { code: 'basic', nameEn: 'Basic', nameAr: 'بيزيك', subscribedPlanCode: 'basic' },
+      subscription: {
+        status: 'active',
+        currentPeriodEnd: '2026-12-01T00:00:00.000Z',
+        trialEndsAt: null,
+        cancelAtPeriodEnd: false,
+      },
+      availablePlans: plans,
+      billing: billingFixture({ hasPaymentMethod: true, billingMethod: 'card', cardBilling: true }),
+    });
+    apiGet.mockImplementation(async (url: string) => {
+      if (url.includes('/change-plan/quote')) return { data: quote, error: null };
+      if (url.endsWith('/invoices')) return { data: { charges: [] }, error: null };
+      if (url.endsWith('/payment-claims')) return { data: { claims: [] }, error: null };
+      return { data: summary, error: null };
+    });
+  };
+
+  it('an upgrade shows the prorated amount before charging and sends the amount it showed', async () => {
+    cardStore({
+      kind: 'upgrade',
+      amountMinor: 100000,
+      remainingDays: 15,
+      effectiveAt: '2026-11-16T00:00:00.000Z',
+    });
+    askConfirm.mockResolvedValue(true);
+    apiPost.mockResolvedValue({ data: { mode: 'upgraded', status: 'succeeded' }, error: null });
+    render(<StoreBillingPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'switchTo' }));
+    await waitFor(() => expect(askConfirm).toHaveBeenCalled());
+    expect(apiGet).toHaveBeenCalledWith(
+      '/api/v1/stores/store-1/billing/change-plan/quote?planCode=growth'
+    );
+    const opts = askConfirm.mock.calls[0][0];
+    expect(opts.consequence).toMatch(/^confirmUpgradeProrated:.*"days":15/);
+    expect(opts.consequence).toContain('1,000');
+    expect(opts.confirmLabel).toBe('confirmUpgradeAction');
+    await waitFor(() =>
+      expect(apiPost).toHaveBeenCalledWith('/api/v1/stores/store-1/billing/change-plan', {
+        planCode: 'growth',
+        expectedAmountMinor: 100000,
+      })
+    );
+  });
+
+  it('declining the confirmation charges nothing', async () => {
+    cardStore({
+      kind: 'upgrade',
+      amountMinor: 100000,
+      remainingDays: 15,
+      effectiveAt: '2026-11-16T00:00:00.000Z',
+    });
+    askConfirm.mockResolvedValue(false);
+    render(<StoreBillingPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'switchTo' }));
+    await waitFor(() => expect(askConfirm).toHaveBeenCalled());
+    expect(apiPost).not.toHaveBeenCalled();
   });
 });

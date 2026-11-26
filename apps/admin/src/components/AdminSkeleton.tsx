@@ -45,7 +45,7 @@ export function AdminSkeletonCards({ count = 4, className }: AdminSkeletonCardsP
               <div className="force-skeleton h-3 w-16" />
             </div>
             {/* Icon placeholder */}
-            <div className="force-skeleton h-12 w-12 rounded-2xl" />
+            <div className="force-skeleton h-12 w-12 rounded-lg" />
           </div>
         </div>
       ))}
@@ -85,7 +85,7 @@ export function AdminSkeletonTable({
       {/* Desktop table — hidden below md (matches DataTable's md breakpoint,
           so the skeleton never shows the desktop shape on a viewport where
           the real, loaded table would already be cards). */}
-      <div className="hidden md:block rounded-xl border bg-card overflow-hidden shadow-sm">
+      <div className="hidden md:block rounded-md border bg-card overflow-hidden shadow-sm">
         <table className="w-full" aria-hidden="true">
           <thead className="bg-muted/50 border-b">
             <tr>
@@ -116,7 +116,7 @@ export function AdminSkeletonTable({
       {/* Mobile stacked cards — visible only below md */}
       <div className="space-y-3 md:hidden">
         {Array.from({ length: Math.min(rows, 4) }).map((_, i) => (
-          <div key={i} className="rounded-xl border bg-card p-4 shadow-sm space-y-3">
+          <div key={i} className="rounded-md border bg-card p-4 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
               <div className="force-skeleton h-4 w-2/5" />
               <div className="force-skeleton h-6 w-16 rounded-full" />
@@ -147,7 +147,7 @@ export function AdminSkeletonChart({
 }: AdminSkeletonChartProps) {
   return (
     <div
-      className={`rounded-xl border bg-card p-4 sm:p-6 shadow-sm space-y-4 ${className ?? ''}`}
+      className={`rounded-md border bg-card p-4 sm:p-6 shadow-sm space-y-4 ${className ?? ''}`}
       aria-hidden="true"
     >
       {/* Chart title */}
@@ -195,7 +195,7 @@ export function AdminSkeletonDetail({
         </div>
       )}
 
-      <div className="rounded-xl border bg-card p-4 sm:p-6 shadow-sm space-y-5">
+      <div className="rounded-md border bg-card p-4 sm:p-6 shadow-sm space-y-5">
         {Array.from({ length: fields }).map((_, i) => (
           <div key={i} className="space-y-2">
             {/* Field label */}

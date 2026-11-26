@@ -11,9 +11,11 @@ import { useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCart } from '../../../contexts/CartContext';
 import { api } from '../../../lib/api';
+import { useStoreUrl } from '../../../contexts/StoreContext';
 
 export default function WaCheckoutRedeem() {
   const router = useRouter();
+  const storeUrl = useStoreUrl();
   const params = useSearchParams();
   const { isReady, refetchCart } = useCart();
   const ranRef = useRef(false);
@@ -31,10 +33,10 @@ export default function WaCheckoutRedeem() {
       } catch {
         // expired or invalid: fall through to the normal cart
       } finally {
-        router.replace('/cart');
+        router.replace(storeUrl('/cart'));
       }
     })();
-  }, [isReady, params, refetchCart, router]);
+  }, [isReady, params, refetchCart, router, storeUrl]);
 
   return (
     <main className="mx-auto flex min-h-[40vh] w-full max-w-md items-center justify-center px-4">

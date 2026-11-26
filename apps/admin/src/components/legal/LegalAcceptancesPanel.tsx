@@ -71,7 +71,7 @@ export function LegalAcceptancesPanel({ userId }: { userId?: string }) {
   );
 
   return (
-    <section className="rounded-xl border bg-card shadow-sm" aria-labelledby="legal-acceptances">
+    <section className="rounded-md border bg-card shadow-sm" aria-labelledby="legal-acceptances">
       <div className="border-b p-4">
         <h2 id="legal-acceptances" className="font-semibold text-foreground">
           {userId ? t('adminTitle') : t('mineTitle')}

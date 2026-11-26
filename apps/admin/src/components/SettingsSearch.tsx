@@ -138,7 +138,7 @@ export function SettingsSearch({ storeId: storeIdProp }: { storeId?: string } = 
             if (query.trim()) setOpen(true);
           }}
           placeholder={t('placeholder')}
-          className={`w-full rounded-xl border border-border bg-card py-2.5 text-sm text-foreground placeholder:text-muted-foreground shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/50 ${isRtl ? 'pr-10 pl-4' : 'pl-10 pr-4'}`}
+          className={`w-full rounded-md border border-border bg-card py-2.5 text-sm text-foreground placeholder:text-muted-foreground shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/50 ${isRtl ? 'pr-10 pl-4' : 'pl-10 pr-4'}`}
           aria-autocomplete="list"
           aria-expanded={open}
           aria-controls="settings-search-results"
@@ -153,7 +153,7 @@ export function SettingsSearch({ storeId: storeIdProp }: { storeId?: string } = 
           id="settings-search-results"
           role="listbox"
           aria-label={t('placeholder')}
-          className="absolute z-50 mt-1.5 w-full rounded-xl border border-border bg-card shadow-lg overflow-hidden"
+          className="absolute z-50 mt-1.5 w-full rounded-md border border-border bg-card shadow-md overflow-hidden"
         >
           {results.length === 0 ? (
             <p className="px-4 py-3 text-sm text-muted-foreground">{t('noResults')}</p>

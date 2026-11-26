@@ -30,11 +30,8 @@ export type CardId =
   | 'webhooks'
   | 'commission';
 
-/**
- * A status flag with no card of its own: it is a part of a card (meaning search is the "coming" line of the
- * `search` card), so it must not be listed as a second search item.
- */
-export type FlagId = 'meaning';
+/** A status flag with no card of its own. None today (the "search by meaning" flag was removed 2026-11-11: public copy states only what exists). */
+export type FlagId = never;
 
 export type CapabilityId = CardId | FlagId;
 
@@ -51,9 +48,6 @@ export interface RegistryEntry {
 export const REGISTRY: Record<CapabilityId, RegistryEntry> = {
   ai: { status: 'live', ai: true },
   search: { status: 'live', ai: true },
-  // Search PR4. Built, but SEARCH_SEMANTIC_ENABLED is OFF in production and stays off per store until the real
-  // catalogue passes the quality test, so it is `coming` and is only the "coming" line of the search card.
-  meaning: { status: 'coming', dependsOn: 'feat/search-p1c-hybrid (search PR4)' },
   assistant: { status: 'live', ai: true },
   accounting: { status: 'live', ai: true },
   inventory: { status: 'live', ai: true },

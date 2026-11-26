@@ -43,6 +43,7 @@ import {
 import { idempotencyKeyOf } from '../lib/money-idempotency';
 import { postManualEntry } from '../services/accounting/journal.service';
 import { trialBalance, profitAndLoss, balanceSheet } from '../services/accounting/reports.service';
+import { AnalyticsService, cogsFromPnl, ledgerCostsFields } from '../services/analytics.service';
 import { dashboardStockValues } from '../services/accounting/dashboard-stock';
 import { generateTaxReport } from '../services/accounting/tax-report.service';
 import { streamXlsxResponse, summarizeExportFilters } from '../lib/exports/xlsx';
@@ -644,17 +645,27 @@ router.get(
           // stock (owner decision 2026-10-01, #2078), shown beside it rather than vanishing. Either backend.
           dashboardStockValues(req.params.storeId),
         ]);
-        const { stockValue, disabledVariantStockValue } = stock;
+        const { stockValue, disabledVariantStockValue, stockedProducts, uncostedProducts } = stock;
+        const costs = ledgerCostsFields(
+          pnl.totalRevenue,
+          cogsFromPnl(pnl),
+          await AnalyticsService.soldLineCostCoverage(req.params.storeId, from, to)
+        );
 
         return {
           thisMonth: {
             revenue: pnl.totalRevenue,
             expenses: pnl.totalExpenses,
             net: pnl.netIncome,
+            // unknown/partial: `net` is not a real profit (QA 2026-11-17 N1, M1); missing/total = sold lines without a cost.
+            ...costs,
           },
           cash: bs.assets.filter(a => a.code.startsWith('10')),
           stockValue,
           disabledVariantStockValue,
+          // Stocked products, and how many of them have no cost: stockValue skips those (partial/unknown, never a true 0).
+          stockedProducts,
+          uncostedProducts,
           balanceSheet: {
             totalAssets: bs.totalAssets,
             totalLiabilities: bs.totalLiabilities,

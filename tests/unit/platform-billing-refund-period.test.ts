@@ -2,6 +2,7 @@
  * R-REFUND-PERIOD-1: a FULL card refund of the charge that paid the current period rolls the period back
  * (the card twin of the InstaPay void); keepAccess and partial refunds leave it. Real billing code on the D1 path.
  */
+import { PLATFORM_MIGRATION_SQL } from '../helpers/platform-migrations';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -39,14 +40,7 @@ import { cutoverKey, resetCutoverCache } from '../../apps/api/src/services/platf
 import { registerPlatformRouter } from '../../apps/api/src/services/platform/router';
 import { refundCharge } from '../../apps/api/src/services/billing/subscription-billing.service';
 
-const MIG = ['0001_init.sql', '0002_invariants.sql']
-  .map(f =>
-    fs.readFileSync(
-      new URL(`../../packages/cf-schema/migrations/platform/${f}`, import.meta.url),
-      'utf8'
-    )
-  )
-  .join('\n');
+const MIG = PLATFORM_MIGRATION_SQL;
 
 const STORE = '11111111-1111-4111-8111-111111111111';
 const STORE2 = '22222222-2222-4222-8222-222222222222';

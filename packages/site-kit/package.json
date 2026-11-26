@@ -2,7 +2,7 @@
   "name": "@ebda/site-kit",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "description": "Shared build + gate tooling for the static Ebda sites (docs, help): MDX renderer, page shell, client-side search, axe and Lighthouse gates.",
   "exports": {

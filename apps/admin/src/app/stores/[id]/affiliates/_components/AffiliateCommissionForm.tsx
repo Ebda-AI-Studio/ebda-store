@@ -6,6 +6,7 @@ import type { AffiliateConfig } from './types';
 
 import { roundToMinor } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface AffiliateCommissionFormProps {
   config: AffiliateConfig;
   saving: boolean;
@@ -27,7 +28,7 @@ export function AffiliateCommissionForm({
 
   return (
     <div className="space-y-6">
-      <div className="bg-card rounded-xl border border-border p-6">
+      <div className="bg-card rounded-md border border-border p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">{t('commissionSection')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div>
@@ -46,7 +47,7 @@ export function AffiliateCommissionForm({
                   defaultCommissionRate: parseFloat(e.target.value) || 0,
                 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
           <div>
@@ -64,7 +65,7 @@ export function AffiliateCommissionForm({
                   cookieDurationDays: parseInt(e.target.value) || 30,
                 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
           <div>
@@ -82,13 +83,13 @@ export function AffiliateCommissionForm({
                   minPayoutAmount: roundToMinor(parseFloat(e.target.value) || 0),
                 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
         </div>
       </div>
 
-      <div className="bg-card rounded-xl border border-border p-6">
+      <div className="bg-card rounded-md border border-border p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">{t('optionsSection')}</h2>
         <div className="space-y-4">
           <div className="flex items-center justify-between">

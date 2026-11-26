@@ -30,7 +30,7 @@ export function CustomerCard({ order }: CustomerCardProps) {
   const callHref = digits ? `tel:${digits}` : null;
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section className="rounded-lg border border-border bg-card p-5">
       <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">
         {t('customer')}
       </h2>

@@ -35,6 +35,7 @@ import {
   type ParsedReturn,
   type RefundRequest,
   type RefundResult,
+  type GatewayReversals,
 } from './types';
 import { hmacSha256Hex, safeEqual } from './signature';
 import {
@@ -55,6 +56,25 @@ export interface KashierConfig {
 }
 
 export const KASHIER_SANDBOX_URL = 'https://test-api.kashier.io';
+/** Operations that take money back from a charge (refund family per the webhook docs, plus chargeback names). */
+const REVERSAL_OPS = new Set([
+  'refund',
+  'partial_refund',
+  'void',
+  'reversal',
+  'chargeback',
+  'dispute',
+]);
+/** Operations that move money forward or verify it (never a reversal). */
+const KNOWN_FORWARD_OPS = new Set([
+  'pay',
+  'payment',
+  'capture',
+  'authorize',
+  'authorization',
+  '3dsecure_verify',
+  'reject',
+]);
 const SESSIONS_PATH = '/v3/payment/sessions';
 /** A subscription checkout page stays payable this long. */
 const CHECKOUT_TTL_MS = 60 * 60_000;
@@ -324,7 +344,18 @@ export class KashierBillingProvider implements BillingProvider {
       throw new BillingProviderError(`Kashier reports a ${txn.kind}, not a charge`, false);
     }
     const raw = stripTokens(json);
-    if (txn.status === 'SUCCESS') return { status: 'succeeded', chargeId: req.chargeId, raw };
+    // #627: the amount / currency the gateway states for THIS transaction (absent -> the success is held, not settled)
+    const body = (json as { body?: Record<string, unknown> } | null)?.body ?? {};
+    const entry = (Array.isArray(body.transactions) ? body.transactions : []).find(
+      (t): t is Record<string, unknown> =>
+        !!t &&
+        typeof t === 'object' &&
+        String((t as Record<string, unknown>).transactionId) === req.chargeId
+    );
+    const amountMinor = parseGatewayAmount(entry?.amount ?? body.amount);
+    const currency = scalar(entry?.currency ?? body.currency) || null;
+    if (txn.status === 'SUCCESS')
+      return { status: 'succeeded', chargeId: req.chargeId, raw, amountMinor, currency };
     if (txn.status === 'PENDING') return { status: 'pending', chargeId: req.chargeId, raw };
     return {
       status: 'failed',
@@ -332,6 +363,55 @@ export class KashierBillingProvider implements BillingProvider {
       failureReason: 'declined (gateway lookup)',
       raw,
     };
+  }
+
+  /**
+   * The daily reversal reconcile's read (#837): the charge's transaction details (the same documented
+   * `getTransactionDetails` call that confirms webhooks) list every operation on it in `body.transactions[]`
+   * (`operation`, `status`, `transactionId`). A successful refund-type operation, or a chargeback/dispute if Kashier
+   * records one there, is a reversal. Kashier's webhook docs list `pay, authorize, capture, refund, partial_refund,
+   * void, reject, reversal` as event operations and no chargeback/dispute event, so a chargeback is only seen here
+   * (UNVERIFIED: the operation name Kashier would use; an unknown operation pages a person instead of being ignored).
+   */
+  async listReversals(req: {
+    chargeId: string;
+    merchantOrderId: string;
+  }): Promise<GatewayReversals> {
+    const { status, json } = await this.call(
+      'GET',
+      kashierTransactionDetailsPath(req.chargeId),
+      undefined
+    );
+    if (status >= 400) {
+      throw new BillingProviderError(`Kashier transaction details answered ${status}`, false);
+    }
+    const body = (json as { body?: unknown } | null)?.body as Record<string, unknown> | undefined;
+    if (!body || typeof body !== 'object' || scalar(body.transactionId) !== req.chargeId) {
+      throw new BillingProviderError('Kashier transaction details are not for this charge', false);
+    }
+    const order = scalar(body.merchantOrderId);
+    if (order && order !== req.merchantOrderId) {
+      throw new BillingProviderError('Kashier transaction belongs to a different order', false);
+    }
+    const out: GatewayReversals = { reversals: [], unknownOperations: [] };
+    for (const t of Array.isArray(body.transactions) ? body.transactions : []) {
+      if (!t || typeof t !== 'object') continue;
+      const e = t as Record<string, unknown>;
+      const op = scalar(e.operation).toLowerCase();
+      const ok = scalar(e.status).toUpperCase() === 'SUCCESS';
+      if (REVERSAL_OPS.has(op)) {
+        if (ok && scalar(e.transactionId)) {
+          out.reversals.push({
+            ref: scalar(e.transactionId),
+            operation: op,
+            amountMinor: parseGatewayAmount(e.amount),
+          });
+        }
+      } else if (!KNOWN_FORWARD_OPS.has(op)) {
+        out.unknownOperations.push(op || '(empty)');
+      }
+    }
+    return out;
   }
 
   async refund(req: RefundRequest): Promise<RefundResult> {

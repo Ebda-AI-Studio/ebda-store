@@ -21,7 +21,7 @@
   },
   "helpArticle": "store-content-faqs-pages-blog",
   "questions": {
-    "ar": ["ازاي اعمل جدول مقاسات؟"],
+    "ar": ["ازاي اعمل جدول مقاسات؟", "ازاي اربط جدول المقاسات بمنتج؟", "فين دليل المقاسات؟"],
     "en": ["Add a size chart"]
   },
   "steps": ["Create a chart, attach to products."],

@@ -405,7 +405,7 @@ class NotificationConfigService {
   async upsertEventConfig(
     storeId: string,
     event: string,
-    config: EventConfigData
+    config: Omit<EventConfigData, 'whatsapp'> & { whatsapp?: boolean }
   ): Promise<EventConfigData> {
     const row = await (
       await storeWriter(storeId)
@@ -414,12 +414,12 @@ class NotificationConfigService {
       create: {
         storeId,
         event,
-        whatsapp: config.whatsapp,
+        whatsapp: config.whatsapp ?? true, // the column default
         sms: config.sms,
         push: config.push,
       },
       update: {
-        whatsapp: config.whatsapp,
+        ...(config.whatsapp === undefined ? {} : { whatsapp: config.whatsapp }),
         sms: config.sms,
         push: config.push,
       },

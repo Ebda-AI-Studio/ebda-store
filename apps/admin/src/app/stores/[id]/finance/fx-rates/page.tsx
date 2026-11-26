@@ -13,6 +13,7 @@
  * Example: { currency: 'USD', rate: 50 } means 1 USD = 50 EGP.
  */
 
+import { formatDate } from '@/lib/format';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -24,6 +25,7 @@ import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FxRateEntry {
@@ -146,11 +148,7 @@ export default function FxRatesPage() {
     },
     {
       header: t('colDate'),
-      cell: r => (
-        <span className="text-muted-foreground">
-          {new Date(r.rateDate).toLocaleDateString(undefined, withNumerals())}
-        </span>
-      ),
+      cell: r => <span className="text-muted-foreground">{formatDate(r.rateDate)}</span>,
     },
     {
       header: t('colRecorded'),
@@ -171,7 +169,7 @@ export default function FxRatesPage() {
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       <div className="max-w-3xl space-y-6">
         {/* ── Add Rate Form ─────────────────────────────────────────────── */}
-        <div className="rounded-xl border border-border bg-muted/10 p-5 space-y-4">
+        <div className="rounded-md border border-border bg-muted/10 p-5 space-y-4">
           <p className="text-sm font-semibold">{t('recordNewRate')}</p>
           <p className="text-xs text-muted-foreground">
             {t('rateMeaning')}
@@ -185,7 +183,7 @@ export default function FxRatesPage() {
               <select
                 value={formCurrency}
                 onChange={e => setFormCurrency(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={FIELD_CLASSES}
               >
                 {NON_BASE_CURRENCIES.map(c => (
                   <option key={c} value={c}>
@@ -206,7 +204,7 @@ export default function FxRatesPage() {
                 value={formRate}
                 onChange={e => setFormRate(e.target.value)}
                 placeholder={t('rateExample2')}
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
+                className={`${FIELD_CLASSES} font-mono`}
               />
             </label>
 
@@ -216,7 +214,7 @@ export default function FxRatesPage() {
                 type="date"
                 value={formDate}
                 onChange={e => setFormDate(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={FIELD_CLASSES}
               />
             </label>
           </div>
@@ -232,8 +230,8 @@ export default function FxRatesPage() {
             </p>
           )}
 
-          {formError && <p className="text-red-600 text-sm">{formError}</p>}
-          {formSuccess && <p className="text-green-700 text-sm">{t('rateSaved')}</p>}
+          {formError && <p className="text-destructive-ink text-sm">{formError}</p>}
+          {formSuccess && <p className="text-success-ink text-sm">{t('rateSaved')}</p>}
 
           <Button type="button" onClick={handleSubmit} disabled={submitting} variant="default">
             {submitting ? t('saving') : t('saveRate')}
@@ -247,7 +245,7 @@ export default function FxRatesPage() {
             <select
               value={filterCurrency}
               onChange={e => setFilterCurrency(e.target.value)}
-              className="border border-border rounded px-2 py-1 text-xs"
+              className={FIELD_CLASSES}
             >
               <option value="">{t('allCurrencies')}</option>
               {NON_BASE_CURRENCIES.map(c => (

@@ -8,10 +8,9 @@ import {
   orderTaxPlacement,
   REGION,
   taxInvoiceInfo,
-  renderBarcodeSvg,
-  BARCODE_DISPLAY_PX,
 } from '@ebda/shared';
 import { emailMoney } from './email-templates/_util';
+import { orderBarcodeBlock } from './order-barcode';
 import {
   EMAIL_COLORS,
   EMAIL_THUMB_SIZE,
@@ -155,29 +154,6 @@ function isArabic(locale: string): locale is 'ar' {
  * The one order read both invoice renderers share (the printable page and the
  * email body), so the two can never disagree about what an invoice contains.
  */
-/**
- * The order barcode: a real, scannable Code 128 of the order number in the
- * store's chosen shape (`settings.receiptBarcodeShape`, default plain, `off`
- * hides it). Shape drawings: BARKOD studio (barkod.studio), used with permission.
- * An un-encodable number or an unknown shape degrades to plain / nothing, never
- * a broken invoice.
- */
-function orderBarcodeBlock(orderNumber: string, rawShape: unknown): string {
-  const shape = typeof rawShape === 'string' ? rawShape : 'plain';
-  if (shape === 'off') return '';
-  try {
-    const svg = renderBarcodeSvg({
-      value: orderNumber,
-      shape,
-      label: false,
-      displayPx: BARCODE_DISPLAY_PX.invoice,
-    });
-    return `<div class="doc-barcode"><bdi dir="ltr">${svg}</bdi><div class="doc-barcode-num" dir="ltr">${escapeHtml(orderNumber)}</div></div>`;
-  } catch {
-    return '';
-  }
-}
-
 const INVOICE_STORE_SELECT = {
   name: true,
   email: true,
@@ -350,7 +326,7 @@ export class InvoiceService {
     const taxInfo = taxInvoiceInfo(order);
     const heading = documentHeading(order, docs, labels, !!taxInfo);
     const docTitle = heading.title;
-    const formatPrice = (minor: number) => emailMoney(minor, currency, 'en');
+    const formatPrice = (minor: number) => emailMoney(minor, currency, lang);
     const shippingAddr = order.shippingAddress as Record<string, string> | null;
     // Bill To should reflect the buyer info entered in checkout, not the
     // authenticated account (a logged-in admin testing checkout would otherwise
@@ -973,7 +949,7 @@ export function renderInvoiceEmailContent(
   // Amounts stay an LTR run on the Arabic invoice so a leading minus stays in
   // front of the figure (same rule as the printable page).
   const money = (minor: number) =>
-    `<span dir="ltr" style="unicode-bidi:embed;white-space:nowrap;">${emailMoney(minor, currency, 'en')}</span>`;
+    `<span dir="ltr" style="unicode-bidi:embed;white-space:nowrap;">${emailMoney(minor, currency, ar ? 'ar' : 'en')}</span>`;
   const taxPlacement = orderTaxPlacement(order);
   const taxInfo = taxInvoiceInfo(order);
   const heading = documentHeading(order, docs, labels, !!taxInfo);

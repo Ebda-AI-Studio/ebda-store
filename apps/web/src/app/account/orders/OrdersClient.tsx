@@ -7,12 +7,14 @@ import Image from 'next/image';
 import { api, type Order } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import { formatDate as formatStoreDate } from '@/lib/format-date';
 import { groupOrderLinesForDisplay, storeNumerals } from '@ebda/shared';
 import { orderStatusLabel } from '@/lib/order-labels';
 
 export default function OrdersClient() {
   const storeUrl = useStoreUrl();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { store } = useStore();
   const { t, language } = useLanguage();
   const formatPrice = useLocalePrice();
@@ -21,8 +23,10 @@ export default function OrdersClient() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // STORE-QA-43: no authed call for a guest (the account layout sends them to sign-in).
+    if (authLoading || !isAuthenticated) return;
     fetchOrders();
-  }, []);
+  }, [authLoading, isAuthenticated]);
 
   async function fetchOrders() {
     setError(null);

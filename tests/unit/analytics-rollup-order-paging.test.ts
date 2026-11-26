@@ -30,6 +30,9 @@ function fakeDb(total: number) {
         return rows.slice(start, start + (a.take ?? rows.length));
       },
     },
+    // each page is netted of its refunds (REVENUE-DEF-1, lib/order-refunds.ts): none here
+    return: { groupBy: async () => [] },
+    payment: { groupBy: async () => [] },
   };
   return { db: db as never, calls };
 }

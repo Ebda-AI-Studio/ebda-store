@@ -14,6 +14,7 @@ import { egp } from '../../apps/marketing/src/lib/demo-stores';
 import {
   WHATSAPP_MONTHLY_PACKAGES,
   WHATSAPP_PACKAGES,
+  whatsappPackageName,
   whatsappYearlyOf,
   type WhatsAppBasePackageId,
 } from '../../packages/shared/src/brand';
@@ -154,4 +155,29 @@ describe('WHATSAPP_PACKAGES (Ruling WA-PRICE-1 / WA-PRICE-1a)', () => {
       ].sort()
     );
   });
+});
+
+/** Ahmad 2026-11-19: Chat packages are named BY SIZE (monthly AI replies); Starter / Growth / Pro collide with the Store's plan names. Mirrors ebda-whatsapp test/package-names.test.ts. */
+describe('Chat package names are by size', () => {
+  it('pins the exact names both products show (ids and prices unchanged)', () => {
+    expect(whatsappPackageName('starter', 'en')).toBe('Chat 300 AI replies');
+    expect(whatsappPackageName('growth', 'en')).toBe('Chat 1,500 AI replies');
+    expect(whatsappPackageName('pro-yearly', 'en')).toBe('Chat 5,000 AI replies (yearly)');
+    expect(whatsappPackageName('starter', 'ar')).toBe('شات 300 رد ذكي');
+    expect(whatsappPackageName('growth', 'ar')).toBe('شات 1500 رد ذكي');
+    expect(whatsappPackageName('pro-yearly', 'ar')).toBe('شات 5000 رد ذكي سنوي');
+    expect(whatsappPackageName('growth', 'ar')).not.toMatch(/[٠-٩]/); // Western digits (DIGITS-1)
+  });
+  for (const l of LOCALES) {
+    it(`${l}: the page shows the size names on the cards and the choice, and no tier name`, () => {
+      const html = renderToStaticMarkup(<WhatsAppPage locale={l} />);
+      for (const id of ['starter', 'growth', 'pro'] as const)
+        expect(html).toContain(esc(whatsappPackageName(id, l)));
+      expect(html).not.toMatch(/\b(Starter|Growth|Professional|Pro)\b/);
+      expect(html).not.toMatch(/المبتدئة|الاحترافية/);
+      const ld = JSON.stringify(whatsappJsonLd(l, WHATSAPP_PAGE[l].faq));
+      expect(ld).not.toMatch(/\b(Starter|Growth|Professional|Pro)\b/);
+      expect(ld).toContain(whatsappPackageName('growth', l));
+    });
+  }
 });

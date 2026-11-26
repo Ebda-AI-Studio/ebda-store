@@ -11,6 +11,7 @@ import { apiPost } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface Proposal {
   categories: Array<{
     name: string;
@@ -92,7 +93,7 @@ export function CategorySuggestionPanel({
   if (!drafts)
     return (
       <section
-        className="mb-6 rounded-xl border border-border bg-card p-4"
+        className="mb-6 rounded-md border border-border bg-card p-4"
         data-testid="category-suggest"
       >
         <h2 className="text-sm font-semibold">{t('title')}</h2>
@@ -118,7 +119,7 @@ export function CategorySuggestionPanel({
 
   return (
     <section
-      className="mb-6 rounded-xl border border-border bg-card p-4"
+      className="mb-6 rounded-md border border-border bg-card p-4"
       data-testid="category-suggest-review"
     >
       <h2 className="text-sm font-semibold">{t('reviewTitle')}</h2>
@@ -127,24 +128,24 @@ export function CategorySuggestionPanel({
         {drafts.map(d => (
           <li key={d.key} className="rounded-lg border border-border p-3">
             <div className="grid gap-2 sm:grid-cols-2">
-              <label className="block text-xs font-medium">
+              <label className="block text-sm font-medium">
                 {t('nameEn')}
                 <input
                   dir="ltr"
                   maxLength={60}
                   value={d.name}
                   onChange={e => patch(d.key, x => ({ ...x, name: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                  className={`${FIELD_CLASSES} mt-1`}
                 />
               </label>
-              <label className="block text-xs font-medium">
+              <label className="block text-sm font-medium">
                 {t('nameAr')}
                 <input
                   dir="rtl"
                   maxLength={60}
                   value={d.nameAr}
                   onChange={e => patch(d.key, x => ({ ...x, nameAr: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                  className={`${FIELD_CLASSES} mt-1`}
                 />
               </label>
             </div>

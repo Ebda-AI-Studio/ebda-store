@@ -57,7 +57,7 @@ import { StatsGrid } from '@admin/app/stores/[id]/abandoned-carts/_components/St
 import { storeTakesGuestOrders } from '@api/lib/guest-checkout';
 
 const ZERO = { totalAbandoned: 0, totalRecovered: 0, recoveryRate: 0, recoveredRevenue: 0 };
-const NOT_TRACKED = 'components.guestCheckout.notTracked';
+const NOT_TRACKED = 'components.guestCheckout.abandonedExplainer';
 
 describe('isUntrackedForGuests', () => {
   it('0 on a guest-checkout store is not tracked; anything else is a real count', () => {
@@ -71,7 +71,8 @@ describe('isUntrackedForGuests', () => {
 describe('abandoned-cart StatsGrid', () => {
   it('guest-checkout store with nothing recorded → "not tracked", no false 0', () => {
     const html = renderToStaticMarkup(<StatsGrid stats={ZERO} guestCheckout />);
-    expect(html.match(new RegExp(NOT_TRACKED, 'g'))).toHaveLength(4);
+    expect(html.match(new RegExp(NOT_TRACKED, 'g'))).toHaveLength(1);
+    expect(html.match(/>—</g)).toHaveLength(4);
     expect(html).not.toMatch(/>0<|>0%</);
   });
 

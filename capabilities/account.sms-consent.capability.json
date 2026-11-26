@@ -20,9 +20,9 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "sms-offers-consent",
   "questions": {
-    "ar": ["وقف رسايل SMS عني"],
+    "ar": ["وقف رسايل SMS عني", "ازاي ارجع استقبل رسايل SMS؟", "ليه بتوصلني رسايل من المتجر؟"],
     "en": ["Stop SMS to my number"]
   },
   "steps": ["Account settings."],

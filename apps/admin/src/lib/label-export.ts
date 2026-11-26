@@ -55,7 +55,7 @@ export async function renderLabelCanvas({
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(layout.widthMm * k);
   canvas.height = Math.round(layout.heightMm * k);
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) throw new Error('canvas unavailable');
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -138,7 +138,7 @@ export async function checkSvgBarcode(
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return false;
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, w, h);
@@ -152,7 +152,7 @@ export type LabelCheck = { ok: boolean; reason: 'ok' | 'not-printable' | 'unread
 /** Read the barcode back from the REAL canvas pixels (the bars region only). */
 export function checkLabelCanvas(canvas: HTMLCanvasElement, layout: LabelLayout): LabelCheck {
   if (!layout.printable) return { ok: false, reason: 'not-printable' };
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return { ok: false, reason: 'unreadable' };
   const k = PX_PER_MM;
   const a = layout.barcode.art;

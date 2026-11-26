@@ -1,9 +1,11 @@
 'use client';
 
+import { ProviderLogo } from '@/components/ProviderLogo';
 import { useT } from '@/i18n/useT';
 import { minorToMajor } from '@/lib/format';
 import { formatFils, type Affiliate } from './types';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 interface PayoutsHistoryProps {
   affiliate: Affiliate;
@@ -40,7 +42,7 @@ export function PayoutsHistory({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-card rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-card rounded-md shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h2 className="text-xl font-semibold text-foreground">{t('title')}</h2>
           <Button
@@ -80,7 +82,7 @@ export function PayoutsHistory({
               value={amount}
               onChange={e => onAmountChange(e.target.value)}
               placeholder="0.00"
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
               required
             />
           </div>
@@ -89,10 +91,15 @@ export function PayoutsHistory({
             <label className="block text-sm font-medium text-muted-foreground mb-2">
               {t('fields.method')}
             </label>
+            {method === 'instapay' && (
+              <div className="mb-2">
+                <ProviderLogo code="instapay" name={t('methods.instapay')} size="sm" />
+              </div>
+            )}
             <select
               value={method}
               onChange={e => onMethodChange(e.target.value)}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
             >
               {PAYOUT_METHODS.map(m => (
                 <option key={m} value={m}>
@@ -111,7 +118,7 @@ export function PayoutsHistory({
               onChange={e => onNotesChange(e.target.value)}
               placeholder={t('fields.notesPlaceholder')}
               rows={3}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none"
+              className={`${TEXTAREA_CLASSES} resize-none`}
             />
           </div>
 

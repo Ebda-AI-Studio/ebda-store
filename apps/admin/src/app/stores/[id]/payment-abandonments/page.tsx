@@ -11,6 +11,7 @@ import { usePaymentAbandonments } from './_hooks/usePaymentAbandonments';
 import { AbandonmentStatsGrid } from './_components/AbandonmentStatsGrid';
 import { AbandonmentsTable } from './_components/AbandonmentsTable';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 export default function PaymentAbandonmentsPage() {
   // Feature gate — shows an upsell card for store_admins without the Enterprise feature.
@@ -57,9 +58,9 @@ export default function PaymentAbandonmentsPage() {
           <AbandonmentStatsGrid stats={stats} />
 
           {/* Date range filter */}
-          <div className="bg-card rounded-xl border border-border p-4 flex flex-wrap items-end gap-3">
+          <div className="bg-card rounded-md border border-border p-4 flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1">
-              <label htmlFor="pa-from" className="text-xs text-muted-foreground">
+              <label htmlFor="pa-from" className="text-sm text-muted-foreground">
                 {t('dateFrom')}
               </label>
               <input
@@ -67,11 +68,11 @@ export default function PaymentAbandonmentsPage() {
                 type="date"
                 value={localFrom}
                 onChange={e => setLocalFrom(e.target.value)}
-                className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className={FIELD_CLASSES}
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label htmlFor="pa-to" className="text-xs text-muted-foreground">
+              <label htmlFor="pa-to" className="text-sm text-muted-foreground">
                 {t('dateTo')}
               </label>
               <input
@@ -79,7 +80,7 @@ export default function PaymentAbandonmentsPage() {
                 type="date"
                 value={localTo}
                 onChange={e => setLocalTo(e.target.value)}
-                className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className={FIELD_CLASSES}
               />
             </div>
             <Button
