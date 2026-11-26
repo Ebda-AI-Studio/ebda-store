@@ -82,7 +82,7 @@ export function QuickActions({ store, isSuperAdmin }: QuickActionsProps) {
   ];
 
   return (
-    <section className="rounded-xl border bg-card p-5 shadow-sm" aria-label={t('title')}>
+    <section className="rounded-md border bg-card p-5 shadow-sm" aria-label={t('title')}>
       <h2 className="mb-2 font-semibold text-foreground">{t('title')}</h2>
       <div className="flex flex-col">
         {jobs.map(j => (

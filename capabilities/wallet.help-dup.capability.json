@@ -18,7 +18,11 @@
   },
   "helpArticle": "customer-wallet-and-store-credit",
   "questions": {
-    "ar": ["ايه الفرق بين المحفظة ورصيد المتجر؟"],
+    "ar": [
+      "ايه الفرق بين المحفظة ورصيد المتجر؟",
+      "ازاي العميل يستخدم رصيد المحفظة؟",
+      "ازاي اشحن رصيد لعميل؟"
+    ],
     "en": ["Wallet vs store credit?"]
   },
   "steps": [

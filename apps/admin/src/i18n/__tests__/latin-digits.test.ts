@@ -69,9 +69,9 @@ describe('admin ICU numbers render Latin digits (issue 1971)', () => {
   it('admin prices keep the Arabic currency symbol but use Latin digits', () => {
     const ar = formatPrice(1500, { locale: 'ar' });
     expect(ARABIC_INDIC.test(ar), ar).toBe(false);
-    expect(ar).toMatch(/15[.,٫]00/);
+    expect(ar).toMatch(/^15 /); // whole pounds carry no ".00" (one house style)
     expect(ar).toContain('ج.م');
-    expect(formatPrice(1500)).toMatch(/15\.00/);
+    expect(formatPrice(1550, { locale: 'en' })).toMatch(/15\.50/);
   });
 
   it('the formats are wired into both the server request config and the client provider', () => {

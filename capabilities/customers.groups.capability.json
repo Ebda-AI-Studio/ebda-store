@@ -23,7 +23,7 @@
   },
   "helpArticle": "customer-groups",
   "questions": {
-    "ar": ["اعمل مجموعة VIP", "خصم لمجموعة معينة"],
+    "ar": ["اعمل مجموعة VIP", "خصم لمجموعة معينة", "ازاي اضيف عميل في مجموعة؟"],
     "en": ["Create a VIP group"]
   },
   "steps": ["Groups page."],

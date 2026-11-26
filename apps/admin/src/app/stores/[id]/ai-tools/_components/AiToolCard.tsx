@@ -73,7 +73,7 @@ export function AiToolCard(props: AiToolCardProps) {
       id={id}
       aria-labelledby={`${uid}-title`}
       data-testid={id}
-      className="flex scroll-mt-24 flex-col rounded-xl border bg-card p-5 shadow-sm"
+      className="flex scroll-mt-24 flex-col rounded-md border bg-card p-5 shadow-sm"
     >
       <h3 id={`${uid}-title`} className="text-base font-semibold leading-snug text-foreground">
         {title}
@@ -82,7 +82,7 @@ export function AiToolCard(props: AiToolCardProps) {
       <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{body}</p>
 
       <p
-        className="mt-3 inline-flex items-start gap-1.5 text-xs text-muted-foreground"
+        className="mt-3 inline-flex items-start gap-1.5 text-sm text-muted-foreground"
         data-testid="tool-cost"
       >
         <SparkleIcon className="mt-px h-3.5 w-3.5 text-primary-ink" />
@@ -100,14 +100,14 @@ export function AiToolCard(props: AiToolCardProps) {
               type="checkbox"
               checked={force}
               onChange={e => setForce(e.target.checked)}
-              className="h-4 w-4 shrink-0 cursor-pointer accent-primary"
+              className="h-5 w-5 shrink-0 cursor-pointer accent-primary"
             />
             <span>{replace.label}</span>
           </label>
           {force && (
             <p
               role="status"
-              className="mt-1 rounded-md bg-warning/10 px-3 py-2 text-xs leading-relaxed text-warning-ink"
+              className="mt-1 rounded-md bg-warning/10 px-3 py-2 text-sm leading-relaxed text-warning-ink"
               data-testid="replace-hint"
             >
               {replace.hint}
@@ -118,7 +118,7 @@ export function AiToolCard(props: AiToolCardProps) {
       )}
 
       {!replace && fillOnlyNote && (
-        <p className="mt-3 text-xs text-muted-foreground" data-testid="fill-only-note">
+        <p className="mt-3 text-sm text-muted-foreground" data-testid="fill-only-note">
           {fillOnlyNote}
         </p>
       )}
@@ -139,7 +139,7 @@ export function AiToolCard(props: AiToolCardProps) {
         {blockedReason && (
           <p
             id={reasonId}
-            className="mt-2 text-xs text-muted-foreground"
+            className="mt-2 text-sm text-muted-foreground"
             data-testid="blocked-reason"
           >
             {blockedReason}

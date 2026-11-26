@@ -13,6 +13,8 @@ import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useFeatures } from '../../contexts/FeatureContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '@/lib/api';
+import { useAutoPromotionPreview } from '@/hooks/useAutoPromotionPreview';
+import { primaryDiscount } from '@/lib/auto-promotion';
 import { CartRecommendations } from '../../components/CartRecommendations';
 import {
   PageMark,
@@ -71,6 +73,13 @@ export default function CartClient() {
   } = useCart();
   const [acknowledging, setAcknowledging] = useState(false);
   const { store, layout: liveLayout } = useStore();
+  // Loose items only, like the coupon basis: a bundle is already discounted.
+  const autoPromotion = useAutoPromotionPreview(
+    store.id,
+    cartItems.map(i => ({ productId: i.productId, quantity: i.quantity })),
+    {},
+    true
+  );
   // The cart page's section document (Ruling VE-3): which sections go around the cart itself.
   const pageDoc = usePageDocument('cart');
   // In the editor canvas the page's own settings come from the draft document, otherwise the live layout.
@@ -383,7 +392,12 @@ export default function CartClient() {
 
   // All amounts are in piastres (1 EGP = 100 piastres) so they can be passed directly to formatPrice
   const subtotal = cartTotal;
-  const discount = promoApplied ? promoDiscount : 0;
+  // An automatic promotion (server-evaluated, same resolver as checkout) does not stack with a coupon:
+  // the larger one applies, the promotion wins ties (mirrors checkout + OrderService.create).
+  const couponDiscount = promoApplied ? promoDiscount : 0;
+  const autoDiscount = autoPromotion?.discount ?? 0;
+  const { discount, promotionWins: autoWins } = primaryDiscount(couponDiscount, autoDiscount);
+  const autoLabel = t('Automatic offer', 'عرض تلقائي');
   // shippingLoaded guards against showing a phantom fee while the zones
   // fetch is in flight. Once loaded, `freeShippingThreshold === 0` is
   // treated as "no threshold set" and shipping just resolves to the
@@ -930,9 +944,11 @@ export default function CartClient() {
                           subtotal={subtotal}
                           discount={discount}
                           discountLabel={
-                            promoApplied
-                              ? `${t('Discount', 'الخصم')}${promoType === 'percentage' ? ` (${promoValue}%)` : promoName ? ` — ${promoName}` : ''}`
-                              : undefined
+                            autoWins
+                              ? autoLabel
+                              : promoApplied
+                                ? `${t('Discount', 'الخصم')}${promoType === 'percentage' ? ` (${promoValue}%)` : promoName ? ` — ${promoName}` : ''}`
+                                : undefined
                           }
                           shipping={shipping}
                           freeShipping={shipping === 0}
@@ -1015,7 +1031,7 @@ export default function CartClient() {
                                       d="M5 13l4 4L19 7"
                                     />
                                   </svg>
-                                  {promoCode.toUpperCase()} — {formatPrice(discount)}{' '}
+                                  {promoCode.toUpperCase()} — {formatPrice(couponDiscount)}{' '}
                                   {t('off', 'خصم')}
                                 </p>
                               )}
@@ -1110,8 +1126,8 @@ export default function CartClient() {
                                         d="M5 13l4 4L19 7"
                                       />
                                     </svg>
-                                    {promoCode.toUpperCase()} - {promoName} ({formatPrice(discount)}{' '}
-                                    off)
+                                    {promoCode.toUpperCase()} - {promoName} (
+                                    {formatPrice(couponDiscount)} off)
                                   </p>
                                 )}
                                 {promoApplied && cartBundles.length > 0 && (
@@ -1150,11 +1166,12 @@ export default function CartClient() {
                                   {formatPrice(subtotal)}
                                 </span>
                               </div>
-                              {promoApplied && (
+                              {(promoApplied || autoWins) && discount > 0 && (
                                 <div className="flex justify-between text-sm">
                                   <span className="text-success-ink">
-                                    {t('Discount', 'الخصم')} (
-                                    {promoType === 'percentage' ? `${promoValue}%` : promoName})
+                                    {autoWins
+                                      ? autoLabel
+                                      : `${t('Discount', 'الخصم')} (${promoType === 'percentage' ? `${promoValue}%` : promoName})`}
                                   </span>
                                   <span className="font-medium text-success-ink">
                                     <SignedAmount sign={MINUS} value={formatPrice(discount)} />

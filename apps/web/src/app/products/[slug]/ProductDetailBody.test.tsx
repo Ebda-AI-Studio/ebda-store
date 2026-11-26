@@ -23,6 +23,12 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
+// the language the middleware asserts on a prefixed storefront page
+let localeHeader: string | null = null;
+vi.mock('next/headers', () => ({
+  headers: async () => ({ get: (n: string) => (n === 'x-locale-path' ? localeHeader : null) }),
+}));
+
 vi.mock('../../../lib/slug-redirect', async importOriginal => {
   const actual = await importOriginal<typeof import('../../../lib/slug-redirect')>();
   return {
@@ -80,6 +86,31 @@ describe('ProductDetailBody — redirect-on-miss', () => {
     expect(mockedPermanentRedirect).toHaveBeenCalledTimes(1);
     expect(mockedPermanentRedirect).toHaveBeenCalledWith(expectedUrl);
     expect(mockedNotFound).not.toHaveBeenCalled();
+  });
+
+  it('rename → 308 from /ar or /en keeps the language prefix (live: /ar/products/<old> lost /ar)', async () => {
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+    global.fetch = makeFetchMock({ ok: false, status: 404 }) as unknown as typeof fetch;
+    mockedFetchSlugRedirect.mockResolvedValue('raw-pecan');
+    const store = {
+      id: 'store1',
+      slug: 'pecan',
+      domain: 'demo-store.example',
+    } as unknown as ResolvedStore;
+    try {
+      for (const lang of ['ar', 'en']) {
+        localeHeader = lang;
+        mockedPermanentRedirect.mockClear();
+        await expect(
+          ProductDetailBody({ store, slug: 'raw-pecan-2636297', draftToken: undefined })
+        ).rejects.toThrow('__PERMANENT_REDIRECT__');
+        expect(mockedPermanentRedirect).toHaveBeenCalledWith(
+          `https://demo-store.example/${lang}/products/raw-pecan`
+        );
+      }
+    } finally {
+      localeHeader = null;
+    }
   });
 
   it('rename → 308 on a custom-domain store: no /slug path prefix', async () => {

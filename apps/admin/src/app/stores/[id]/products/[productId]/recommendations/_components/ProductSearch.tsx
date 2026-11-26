@@ -102,7 +102,7 @@ export function ProductSearch({ storeId, onSelect, excludeIds, disabled }: Produ
       </div>
 
       {open && results.length > 0 && (
-        <div className="absolute z-10 mt-1 w-full rounded-lg border bg-card shadow-lg max-h-60 overflow-y-auto overscroll-contain">
+        <div className="absolute z-10 mt-1 w-full rounded-lg border bg-card shadow-md max-h-60 overflow-y-auto overscroll-contain">
           {results.map(product => (
             <button
               key={product.id}
@@ -144,7 +144,7 @@ export function ProductSearch({ storeId, onSelect, excludeIds, disabled }: Produ
       )}
 
       {open && !searching && query.trim() && results.length === 0 && (
-        <div className="absolute z-10 mt-1 w-full rounded-lg border bg-card shadow-lg px-3 py-4 text-center text-sm text-muted-foreground">
+        <div className="absolute z-10 mt-1 w-full rounded-lg border bg-card shadow-md px-3 py-4 text-center text-sm text-muted-foreground">
           {t('noResults')}
         </div>
       )}

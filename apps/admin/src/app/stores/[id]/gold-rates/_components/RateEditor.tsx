@@ -16,6 +16,7 @@ import { RateAttribution } from './RateAttribution';
 import type { RateView } from './types';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface ConfirmItem {
   karat: GoldKarat;
   jumpBps: number | null;
@@ -95,7 +96,7 @@ export function RateEditor({
   };
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+    <section className="rounded-md border bg-card p-4 shadow-sm sm:p-6">
       <h2 className="text-lg font-semibold">{t('title')}</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         {feedEnabled ? t('bodyAuto') : t('bodyManual')}
@@ -113,7 +114,7 @@ export function RateEditor({
                 disabled={!canEdit}
                 value={values[k]}
                 onChange={e => setValues(v => ({ ...v, [k]: e.target.value }))}
-                className="mt-1 block min-h-11 w-full rounded-md border bg-background px-3 text-base"
+                className={`${FIELD_CLASSES} mt-1 block`}
                 aria-describedby={`gold-current-${String(k)}`}
               />
               <span
@@ -157,7 +158,7 @@ export function RateEditor({
           aria-labelledby="gold-confirm-title"
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
         >
-          <div className="w-full max-w-md rounded-xl bg-card p-5 shadow-xl">
+          <div className="w-full max-w-md rounded-md bg-card p-5 shadow-xl">
             <h3 id="gold-confirm-title" className="text-base font-semibold">
               {t('confirmTitle')}
             </h3>

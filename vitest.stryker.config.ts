@@ -15,6 +15,7 @@ export default defineConfig({
   },
   plugins: [perAppAtAlias()],
   test: {
+    globalSetup: ['./tests/global-setup-assistant-assets.ts'],
     globals: true,
     environment: 'node',
     include: ['tests/unit/**/*.{test,spec}.{ts,tsx}'],

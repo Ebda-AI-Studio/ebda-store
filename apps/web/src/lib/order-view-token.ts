@@ -23,3 +23,18 @@ export function readOrderViewToken(orderId: string): string | null {
     return null;
   }
 }
+
+/**
+ * G54 (Ruling INSTAPAY-UPLOAD-1 part b): the signed order-status link the page /o/<token> was opened with also opens
+ * THAT order's InstaPay payment flow. Held in memory for the page's life only (it is already in the URL the shopper
+ * opened); sent as `X-Order-Status-Link` on the order's InstaPay calls when no view token is held.
+ */
+const statusLinks = new Map<string, string>();
+
+export function rememberOrderStatusLink(orderId: string, token: string): void {
+  if (orderId && token) statusLinks.set(orderId.toLowerCase(), token);
+}
+
+export function readOrderStatusLink(orderId: string): string | null {
+  return statusLinks.get(orderId.toLowerCase()) ?? null;
+}

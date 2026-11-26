@@ -10,7 +10,7 @@ const num = (n: number) => n.toLocaleString(undefined, withNumerals());
 function Stat({ label, value, tone }: { label: string; value: number; tone?: 'warn' }) {
   return (
     <div className="force-stat-card">
-      <p className="text-xs text-muted-foreground" dir="auto">
+      <p className="text-sm text-muted-foreground" dir="auto">
         {label}
       </p>
       <p
@@ -43,7 +43,7 @@ export function FeedHealthPanel({
           <h2 id="feed-health-title" className="text-base font-semibold text-foreground" dir="auto">
             {t('title')}
           </h2>
-          <p className="text-xs text-muted-foreground" dir="auto">
+          <p className="text-sm text-muted-foreground" dir="auto">
             {t('language', { lang: tTop(`language.${lang}`) })}
           </p>
         </div>
@@ -61,14 +61,14 @@ export function FeedHealthPanel({
 
       {health.products === 0 ? (
         <p
-          className="bg-card rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground"
+          className="bg-card rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground"
           dir="auto"
         >
           {t('empty')}
         </p>
       ) : clean ? (
         <p
-          className="bg-card rounded-xl border border-border p-4 text-sm text-foreground"
+          className="bg-card rounded-lg border border-border p-4 text-sm text-foreground"
           dir="auto"
         >
           {t('allGood')}
@@ -102,7 +102,7 @@ export function FeedHealthPanel({
       </ul>
 
       {health.issues.length > 0 && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
           <h3
             className="px-4 py-3 text-sm font-semibold text-foreground border-b border-border"
             dir="auto"
@@ -137,7 +137,7 @@ export function FeedHealthPanel({
           </ul>
           {health.issuesTruncated && (
             <p
-              className="px-4 py-3 text-xs text-muted-foreground border-t border-border"
+              className="px-4 py-3 text-sm text-muted-foreground border-t border-border"
               dir="auto"
             >
               {t('truncatedIssues', { count: health.issues.length })}

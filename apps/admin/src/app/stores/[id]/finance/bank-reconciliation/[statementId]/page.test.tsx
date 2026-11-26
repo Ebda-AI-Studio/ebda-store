@@ -30,6 +30,7 @@ vi.mock('@/hooks/useConfirm', () => ({ useConfirm: () => () => Promise.resolve(t
 vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));
 vi.mock('@/lib/format', () => ({
   minorToMajor: (n: number) => String(n),
+  formatPrice: (n: number) => String(n),
   intlLocaleForUi: () => 'en-GB',
 }));
 vi.mock('@/components/AdminLayout', () => ({

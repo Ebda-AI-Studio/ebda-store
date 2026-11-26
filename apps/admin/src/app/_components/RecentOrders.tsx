@@ -6,6 +6,19 @@ import { formatPrice } from '../../lib/format';
 import { useT } from '@/i18n/useT';
 import type { RecentOrder } from './types';
 
+const ORDER_STATUSES = new Set([
+  'pending',
+  'awaiting_payment_confirmation',
+  'confirmed',
+  'processing',
+  'shipped',
+  'delivered',
+  'cancelled',
+  'refunded',
+  'paid',
+  'unpaid',
+]);
+
 interface RecentOrdersProps {
   orders: RecentOrder[];
   isLoading: boolean;
@@ -14,6 +27,7 @@ interface RecentOrdersProps {
 
 export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps) {
   const t = useT('dashboard.super');
+  const tStatus = useT('orders.status');
 
   return (
     // Slimmer rows: half the vertical padding, smaller icon, status as
@@ -53,9 +67,9 @@ export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps
               className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-muted/30"
             >
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/10">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                   <svg
-                    className="h-4 w-4 text-violet-600"
+                    className="h-4 w-4 text-primary-ink"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -80,7 +94,9 @@ export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps
               <div className="flex shrink-0 items-center gap-2">
                 <Badge
                   variant={
-                    order.status === 'paid' || order.status === 'completed'
+                    order.status === 'paid' ||
+                    order.status === 'completed' ||
+                    order.status === 'delivered'
                       ? 'default'
                       : order.status === 'processing'
                         ? 'secondary'
@@ -88,7 +104,7 @@ export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps
                   }
                   className="text-xs px-2 py-0.5 capitalize"
                 >
-                  {order.status}
+                  {ORDER_STATUSES.has(order.status) ? tStatus(order.status) : order.status}
                 </Badge>
                 <p className="text-sm font-semibold text-primary">{formatPrice(order.total)}</p>
               </div>
@@ -96,7 +112,7 @@ export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps
           ))
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
               <svg
                 className="h-8 w-8 text-muted-foreground"
                 fill="none"

@@ -1,8 +1,7 @@
 /**
  * Node-shell boot-time DB role guard (Finding #5 MED, hardened by FIX-003
- * 2026-10-07). The Workers shell has its own per-request guard
- * (`cf/database-role-guard.ts`); this one covers `index.ts` (Railway, Docker,
- * `npm run dev`).
+ * 2026-10-07). The Workers shell has no guard (it has no Postgres); this one covers `index.ts` (Docker,
+ * `npm run dev`, the Node integration tier).
  *
  * If DATABASE_URL connects as a role that bypasses RLS (BYPASSRLS or a
  * superuser), every store can read every other store's data. The check used

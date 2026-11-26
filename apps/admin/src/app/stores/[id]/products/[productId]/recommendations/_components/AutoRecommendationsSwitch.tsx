@@ -40,7 +40,7 @@ export function AutoRecommendationsSwitch({ storeId }: { storeId: string }) {
         <h2 className="text-sm font-semibold text-foreground" dir="auto">
           {t('title')}
         </h2>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground" dir="auto">
+        <p className="mt-1 text-sm leading-relaxed text-muted-foreground" dir="auto">
           {t('body')}
         </p>
       </div>

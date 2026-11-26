@@ -14,10 +14,10 @@ export function AnswerEngineSkeleton() {
           </div>
         ))}
       </div>
-      <div className="bg-card rounded-xl border border-border p-6">
+      <div className="bg-card rounded-md border border-border p-6">
         <div className="h-32 force-skeleton" />
       </div>
-      <div className="bg-card rounded-xl border border-border p-6">
+      <div className="bg-card rounded-md border border-border p-6">
         <div className="h-48 force-skeleton" />
       </div>
     </div>

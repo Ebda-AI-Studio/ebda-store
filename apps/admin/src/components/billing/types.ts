@@ -32,6 +32,8 @@ export interface PlatformVatLine {
 
 export interface BillingInfo {
   billingInterval: BillingInterval;
+  /** Interval an ACTIVE store picked at InstaPay checkout; it replaces `billingInterval` only once that payment is recorded. */
+  pendingBillingInterval?: BillingInterval | null;
   /** Plan chosen at signup; billed when the trial ends. */
   pendingPlanCode: string | null;
   nextRetryAt: string | null;

@@ -35,7 +35,7 @@ export function renderToCanvas(
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(scene.width * k);
   canvas.height = Math.round(scene.height * k);
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) throw new Error('canvas unavailable');
   ctx.scale(k, k);
   for (const s of scene.shapes) {
@@ -83,7 +83,7 @@ export function renderToCanvas(
  */
 export function decodeCanvas(canvas: HTMLCanvasElement, scene: Scene): string | null {
   const k = canvas.width / scene.width;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return null;
   const { x, y, size } = scene.code;
   const img = ctx.getImageData(
@@ -110,7 +110,7 @@ export async function compressDeflate(data: Uint8Array): Promise<Uint8Array> {
 }
 
 export function canvasToRgb(canvas: HTMLCanvasElement): Uint8Array {
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) throw new Error('canvas unavailable');
   const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const rgb = new Uint8Array(width * height * 3);

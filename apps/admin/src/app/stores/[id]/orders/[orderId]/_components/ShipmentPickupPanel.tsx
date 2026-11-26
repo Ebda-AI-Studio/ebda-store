@@ -7,6 +7,7 @@ import { apiGet, apiPost } from '../../../../../../lib/api';
 import { ConfirmActionModal } from '../../../../../../components/ConfirmActionModal';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface PickupRow {
   id: string;
   status: 'requesting' | 'requested' | 'failed' | 'cancelled';
@@ -210,7 +211,7 @@ export function ShipmentPickupPanel({
               min={state.minDate}
               max={state.maxDate}
               onChange={e => setDate(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border border-border rounded-lg text-sm"
+              className={`${FIELD_CLASSES} mt-1`}
             />
           </label>
           {state.window === 'times' && (
@@ -221,7 +222,7 @@ export function ShipmentPickupPanel({
                   type="time"
                   value={from}
                   onChange={e => setFrom(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border border-border rounded-lg text-sm"
+                  className={`${FIELD_CLASSES} mt-1`}
                 />
               </label>
               <label className="block text-sm">
@@ -230,7 +231,7 @@ export function ShipmentPickupPanel({
                   type="time"
                   value={to}
                   onChange={e => setTo(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border border-border rounded-lg text-sm"
+                  className={`${FIELD_CLASSES} mt-1`}
                 />
               </label>
             </div>
@@ -242,7 +243,7 @@ export function ShipmentPickupPanel({
                 value={slotId}
                 onChange={e => setSlotId(e.target.value)}
                 disabled={slots === null}
-                className="mt-1 w-full px-3 py-2 border border-border rounded-lg text-sm"
+                className={`${FIELD_CLASSES} mt-1`}
               >
                 {slots === null && <option value="">{t('slotsLoading')}</option>}
                 {slots?.length === 0 && <option value="">{t('slotDefault')}</option>}

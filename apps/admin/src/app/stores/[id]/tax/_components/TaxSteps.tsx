@@ -18,7 +18,7 @@ export function TaxSteps({ steps }: { steps: TaxStep[] }) {
   const t = useT('tax.steps');
   const nextId = steps.find(s => !s.done)?.id;
   return (
-    <nav aria-label={t('label')} className="rounded-xl border border-border bg-card p-4">
+    <nav aria-label={t('label')} className="rounded-md border border-border bg-card p-4">
       <ol className="flex flex-wrap gap-x-6 gap-y-2">
         {steps.map((step, i) => (
           <li key={step.id}>

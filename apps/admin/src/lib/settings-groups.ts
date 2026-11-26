@@ -51,6 +51,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     key: 'team',
     items: [
       { card: 'staff', path: 'staff' },
+      { card: 'activity', path: 'activity' },
       { card: 'billing', path: 'billing' },
     ],
   },

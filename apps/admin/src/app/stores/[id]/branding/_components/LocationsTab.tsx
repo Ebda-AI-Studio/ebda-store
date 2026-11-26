@@ -7,6 +7,7 @@ import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../lib/api';
 import { textFieldValue } from '../../../../../lib/form-text';
 import type { StoreBranding } from './types';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface Location {
   id: string;
@@ -266,7 +267,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
       cell: loc => (
         <span
           className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${
-            loc.isPublished ? 'bg-emerald-100 text-emerald-800' : 'bg-warning/10 text-warning-ink'
+            loc.isPublished ? 'bg-success/10 text-success-ink' : 'bg-warning/10 text-warning-ink'
           }`}
         >
           {loc.isPublished ? t('statusPublished') : t('statusDraft')}
@@ -337,7 +338,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
   return (
     <div className="space-y-6">
       {/* Enable Locations toggle */}
-      <div className="flex items-center justify-between rounded-xl border bg-card p-4">
+      <div className="flex items-center justify-between rounded-md border bg-card p-4">
         <div>
           <p data-setting-id="branding.locations" className="text-sm font-semibold text-foreground">
             {t('enableTitle')}
@@ -348,6 +349,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
           type="button"
           role="switch"
           aria-checked={isEnabled}
+          aria-label={t('enableTitle')}
           disabled={isTogglingEnabled || store === null}
           onClick={handleToggleEnabled}
           className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -355,7 +357,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
           }`}
         >
           <span
-            className={`pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${
+            className={`pointer-events-none block h-5 w-5 rounded-full bg-background shadow-md ring-0 transition-transform ${
               isEnabled ? 'translate-x-5' : 'translate-x-0'
             }`}
           />
@@ -368,7 +370,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
           looks at this tab, not the color/theme one. Reads/writes
           theme.showBranchesInFooter on the shared branding state; the page's
           top "Save" button PUTs it via the existing theme PATCH. */}
-      <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border bg-card p-4">
+      <label className="flex cursor-pointer items-center justify-between gap-4 rounded-md border bg-card p-4">
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-foreground">
             {t('showInFooterTitle')}
@@ -420,7 +422,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
 
       {/* Inline form — Create / Edit */}
       {formMode !== null && (
-        <div className="rounded-xl border bg-card p-5 space-y-4">
+        <div className="rounded-md border bg-card p-5 space-y-4">
           <h3 className="text-base font-semibold text-foreground">
             {formMode === 'new' ? t('formNewTitle') : t('formEditTitle')}
           </h3>
@@ -434,7 +436,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Name EN */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldName')} <span className="text-destructive-ink">*</span>
               </label>
               <input
@@ -442,12 +444,12 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.name}
                 onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
                 placeholder={t('phName')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Name AR */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldNameAr')}
               </label>
               <input
@@ -456,12 +458,12 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.nameAr}
                 onChange={e => setFormData(p => ({ ...p, nameAr: e.target.value }))}
                 placeholder={t('phNameAr')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Country EN */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldCountry')} <span className="text-destructive-ink">*</span>
               </label>
               <input
@@ -469,12 +471,12 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.country}
                 onChange={e => setFormData(p => ({ ...p, country: e.target.value }))}
                 placeholder={t('phCountry')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Country AR */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldCountryAr')}
               </label>
               <input
@@ -483,12 +485,12 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.countryAr}
                 onChange={e => setFormData(p => ({ ...p, countryAr: e.target.value }))}
                 placeholder={t('phCountryAr')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Address EN */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldAddress')} <span className="text-destructive-ink">*</span>
               </label>
               <input
@@ -496,12 +498,12 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.address}
                 onChange={e => setFormData(p => ({ ...p, address: e.target.value }))}
                 placeholder={t('phAddress')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Address AR */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldAddressAr')}
               </label>
               <input
@@ -510,23 +512,23 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.addressAr}
                 onChange={e => setFormData(p => ({ ...p, addressAr: e.target.value }))}
                 placeholder={t('phAddressAr')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Phone */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">{t('fieldPhone')}</label>
+              <label className="block text-sm font-medium text-foreground">{t('fieldPhone')}</label>
               <input
                 type="tel"
                 value={formData.phone}
                 onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
                 placeholder={t('phPhone')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* WhatsApp */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldWhatsapp')}
               </label>
               <input
@@ -534,23 +536,23 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.whatsapp}
                 onChange={e => setFormData(p => ({ ...p, whatsapp: e.target.value }))}
                 placeholder={t('phWhatsapp')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Hours EN */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">{t('fieldHours')}</label>
+              <label className="block text-sm font-medium text-foreground">{t('fieldHours')}</label>
               <input
                 type="text"
                 value={formData.hours}
                 onChange={e => setFormData(p => ({ ...p, hours: e.target.value }))}
                 placeholder={t('phHours')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Hours AR */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldHoursAr')}
               </label>
               <input
@@ -559,12 +561,12 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.hoursAr}
                 onChange={e => setFormData(p => ({ ...p, hoursAr: e.target.value }))}
                 placeholder={t('phHoursAr')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Maps URL */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldMapsUrl')}
               </label>
               <input
@@ -572,12 +574,12 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.mapsUrl}
                 onChange={e => setFormData(p => ({ ...p, mapsUrl: e.target.value }))}
                 placeholder={t('phMapsUrl')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Maps Embed URL */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldMapsEmbedUrl')}
               </label>
               <input
@@ -585,12 +587,12 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.mapsEmbedUrl}
                 onChange={e => setFormData(p => ({ ...p, mapsEmbedUrl: e.target.value }))}
                 placeholder={t('phMapsEmbedUrl')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Position */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldPosition')}
               </label>
               <input
@@ -601,7 +603,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 onChange={e =>
                   setFormData(p => ({ ...p, position: parseInt(e.target.value, 10) || 0 }))
                 }
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
           </div>
@@ -613,7 +615,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
               type="checkbox"
               checked={formData.isPublished}
               onChange={e => setFormData(p => ({ ...p, isPublished: e.target.checked }))}
-              className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
+              className="h-5 w-5 rounded-md border-input text-primary focus:ring-ring"
             />
             <label htmlFor="loc-published" className="text-sm text-foreground">
               {t('fieldPublished')}
@@ -639,21 +641,21 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
 
       {/* Locations table */}
       {isLoading ? (
-        <div className="rounded-xl border bg-card">
+        <div className="rounded-md border bg-card">
           <ul className="divide-y">
             {Array.from({ length: 3 }).map((_, i) => (
               <li key={i} className="flex items-center gap-3 p-4 animate-pulse">
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-1/2 rounded bg-muted" />
-                  <div className="h-3 w-1/3 rounded bg-muted" />
+                  <div className="h-4 w-1/2 rounded-md bg-muted" />
+                  <div className="h-3 w-1/3 rounded-md bg-muted" />
                 </div>
-                <div className="hidden h-7 w-16 shrink-0 rounded bg-muted sm:block" />
+                <div className="hidden h-7 w-16 shrink-0 rounded-md bg-muted sm:block" />
               </li>
             ))}
           </ul>
         </div>
       ) : locations.length === 0 ? (
-        <div className="rounded-xl border bg-card">
+        <div className="rounded-md border bg-card">
           <div className="p-10 text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
               <svg

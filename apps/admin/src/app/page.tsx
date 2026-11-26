@@ -108,7 +108,7 @@ export default function DashboardPage() {
         // Provisioning new stores is a super-admin operation only.
         user?.role === 'super_admin' ? (
           <Link href="/stores/new">
-            <Button size="sm" className="gap-2 shadow-lg shadow-primary/25">
+            <Button size="sm" className="gap-2 shadow-md shadow-sm">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"

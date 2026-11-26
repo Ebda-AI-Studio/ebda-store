@@ -4,6 +4,7 @@ import { useT } from '@/i18n/useT';
 import type { LoyaltySettings } from './types';
 
 import { minorToDecimalString, roundToMinor } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface RedemptionFormProps {
   settings: LoyaltySettings;
   disabled: boolean;
@@ -19,7 +20,7 @@ export function RedemptionForm({ settings, disabled, onChange }: RedemptionFormP
   const t = useT('loyalty.redemption');
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6">
+    <div className="bg-card rounded-md border border-border p-6">
       <h2 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div>
@@ -32,7 +33,7 @@ export function RedemptionForm({ settings, disabled, onChange }: RedemptionFormP
             step="0.01"
             value={minorToDecimalString(settings.pointsValue)}
             onChange={e => onChange({ pointsValue: roundToMinor(parseFloat(e.target.value) || 0) })}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
             disabled={disabled}
           />
           <p className="text-xs text-muted-foreground mt-1">
@@ -48,7 +49,7 @@ export function RedemptionForm({ settings, disabled, onChange }: RedemptionFormP
             min="0"
             value={settings.minRedeemPoints}
             onChange={e => onChange({ minRedeemPoints: parseInt(e.target.value) || 0 })}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
             disabled={disabled}
           />
         </div>
@@ -62,7 +63,7 @@ export function RedemptionForm({ settings, disabled, onChange }: RedemptionFormP
             max="100"
             value={settings.maxRedeemPercentage}
             onChange={e => onChange({ maxRedeemPercentage: parseInt(e.target.value) || 0 })}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
             disabled={disabled}
           />
         </div>
@@ -75,7 +76,7 @@ export function RedemptionForm({ settings, disabled, onChange }: RedemptionFormP
             min="0"
             value={settings.expirationMonths}
             onChange={e => onChange({ expirationMonths: parseInt(e.target.value) || 0 })}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
             disabled={disabled}
           />
           <p className="text-xs text-muted-foreground mt-1">{t('expirationHint')}</p>

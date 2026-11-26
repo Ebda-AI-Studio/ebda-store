@@ -24,7 +24,6 @@ const ALLOWED_DOMAINS: Record<string, string> = {
   'demostore.com': 'demo seed data (never delivered: demo stores send nothing)',
   'store.com': 'sample value in a URL-validation doc comment',
   'x.com': 'sample value in comments / URL examples',
-  'b.com': 'sample value in a PII-masking example',
   'vercel.com': 'sender allow-list of the alert poller',
   'uptimerobot.com': 'sender allow-list of the alert poller',
   'github.com': 'sender allow-list of the alert poller',

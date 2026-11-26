@@ -26,6 +26,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { apiGet, apiPut } from '../../lib/api';
 import { useT } from '../../i18n/useT';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -93,7 +94,7 @@ export function ProviderRow({
   const hasKey = !!config.apiKeyMasked;
 
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm">
+    <div className="rounded-md border bg-card p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">{meta.label}</h3>
@@ -101,7 +102,7 @@ export function ProviderRow({
         </div>
         <span
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-            config.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'
+            config.enabled ? 'bg-success/10 text-success-ink' : 'bg-muted text-muted-foreground'
           }`}
         >
           {config.enabled ? t('statusActive') : t('statusOff')}
@@ -111,7 +112,7 @@ export function ProviderRow({
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
         <div>
           <label
-            className="mb-1 block text-xs font-medium text-muted-foreground"
+            className="mb-1 block text-sm font-medium text-muted-foreground"
             htmlFor={`apikey-${config.engine}`}
           >
             {t('apiKeyLabel')} {hasKey ? t('apiKeyMaskedHint') : ''}
@@ -124,7 +125,7 @@ export function ProviderRow({
             value={apiKey}
             onChange={e => setApiKey(e.target.value)}
             placeholder={hasKey ? t('apiKeyPlaceholderMasked') : t('apiKeyPlaceholderEmpty')}
-            className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className={FIELD_CLASSES}
           />
         </div>
 
@@ -133,7 +134,7 @@ export function ProviderRow({
             type="checkbox"
             checked={enabled}
             onChange={e => setEnabled(e.target.checked)}
-            className="h-4 w-4 rounded border-input"
+            className="h-5 w-5 rounded-md border-input"
           />
           {t('enabledLabel')}
         </label>
@@ -153,13 +154,13 @@ export function ProviderRow({
 function GeminiCard() {
   const t = useT('answerEngineProviders');
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm">
+    <div className="rounded-md border bg-card p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">{t('geminiTitle')}</h3>
           <p className="mt-1 text-xs text-muted-foreground">{t('geminiHint')}</p>
         </div>
-        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+        <span className="inline-flex items-center rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success-ink">
           {t('geminiActiveBadge')}
         </span>
       </div>
@@ -207,7 +208,7 @@ function AnswerEngineProvidersPageInner() {
 
   if (error || !configs) {
     return (
-      <div className="rounded-xl border bg-card p-8 text-center">
+      <div className="rounded-md border bg-card p-8 text-center">
         <p className="text-sm text-destructive-ink">{t('loadFailedBody')}</p>
         <Button variant="link" size="sm" type="button" onClick={fetchConfigs} className="mt-4">
           {t('retry')}

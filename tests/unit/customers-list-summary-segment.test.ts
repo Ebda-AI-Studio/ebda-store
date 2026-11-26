@@ -22,6 +22,10 @@ const h = vi.hoisted(() => ({
   caller: { role: 'store_admin' as string, userId: 'admin-a' },
 }));
 
+vi.mock('@api/lib/customer-groups-store', async () => {
+  const { CustomerGroups } = await import('@api/lib/customer-groups');
+  return { loadCustomerGroups: async () => new CustomerGroups([]) };
+});
 vi.mock('@ebda/database', async importOriginal => {
   const actual = await importOriginal<typeof import('@ebda/database')>();
   return {

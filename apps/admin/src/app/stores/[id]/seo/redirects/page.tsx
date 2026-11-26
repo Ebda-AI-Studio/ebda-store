@@ -9,6 +9,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { apiGet, apiDelete } from '@/lib/api';
 import { RedirectsTable, type SlugRedirectRow } from './RedirectsTable';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // #903: SlugRedirect had no admin UI surface at all — a merchant could not
 // see or remove a spuriously-captured bulk-import alias, or a stale
@@ -139,7 +140,7 @@ export default function SlugRedirectsPage() {
             placeholder={t('redirectsSearchPlaceholder')}
             aria-label={t('redirectsSearchPlaceholder')}
             maxLength={255}
-            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className={`${FIELD_CLASSES} flex-1`}
           />
           <Button variant="outline" size="md" type="submit">
             {t('redirectsSearch')}

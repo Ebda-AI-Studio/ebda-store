@@ -106,10 +106,11 @@ export const BASE_UNIT_PATHS = ['tests/unit'];
  */
 const WORKER_ENTRY = {
   'apps/web':
-    /^apps\/web\/((sentry-worker-entry|demo-edge-cache|store-edge-cache|edge-build-id|edge-html-lang|csp-nonce-renew|locale-redirect-edge|company-host-route|ssr-client-address|resolve-unavailable-edge)\.ts|src\/lib\/(demo-hosts|locale-paths)\.ts)$/,
+    /^apps\/web\/((sentry-worker-entry|demo-edge-cache|store-edge-cache|edge-build-id|edge-html-lang|csp-nonce-renew|locale-redirect-edge|company-host-route|ssr-client-address|resolve-unavailable-edge|resolve-miss-memo|suspended-store-edge)\.ts|src\/lib\/(demo-hosts|locale-paths)\.ts)$/,
   'apps/status': /^apps\/status\/src\//,
   'apps/accounts': /^apps\/accounts\/src\//,
-  'apps/api': /^apps\/api\//,
+  // help content + capabilities are inputs of the git-ignored help corpus / registry the API bundle is built with (docs/plans/2026-11-24-help-corpus-build-time.md)
+  'apps/api': /^(apps\/api\/|capabilities\/|apps\/help\/content\/)/,
   // marketing is a static export (a plain `next build`, no OpenNext): cheap enough to dry-run on any change that can
   // move its page weight, so the page-weight budget fails the PR that grows it, not a later unrelated one (#511/#525
   // pushed css over 16 KB unmeasured; Ruling MKT-LEGAL-HTML-BUDGET-2).

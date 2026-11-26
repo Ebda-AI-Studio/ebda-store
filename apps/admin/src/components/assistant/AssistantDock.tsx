@@ -60,7 +60,7 @@ export function AssistantDock({ storeId }: { storeId: string }) {
         aria-controls="assistant-panel"
         aria-keyshortcuts="Control+J Meta+J"
         onClick={() => setOpen(o => !o)}
-        className="fixed bottom-20 end-4 z-40 shadow-lg lg:bottom-6"
+        className="fixed bottom-20 end-4 z-40 shadow-md lg:bottom-6"
       >
         <CircleHelp className="h-[18px] w-[18px]" aria-hidden="true" />
         <span>{t('title')}</span>

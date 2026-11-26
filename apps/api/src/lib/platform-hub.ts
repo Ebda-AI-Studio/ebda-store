@@ -14,6 +14,7 @@ import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { getAccountsBrief } from './identity-client';
 import type { AccountBrief } from '../cf/bindings';
 import { searchCustomerRows } from './customer-directory';
+import { backendMemoKey, seedRequestMemo } from './request-memo';
 
 export const HUB_FANOUT_CAP = 500;
 export const HUB_FANOUT_CONCURRENCY = 8;
@@ -54,18 +55,23 @@ interface StoreRow {
   storage_backend: 'pg' | 'do';
 }
 const COLS = 'id, name, name_ar, slug, domain, status, plan, owner_id, created_at, storage_backend';
-const toStore = (r: StoreRow): HubStore => ({
-  id: r.id,
-  name: r.name,
-  nameAr: r.name_ar,
-  slug: r.slug,
-  domain: r.domain,
-  status: r.status,
-  plan: r.plan,
-  ownerId: r.owner_id,
-  createdAt: new Date(Number(r.created_at)),
-  storageBackend: r.storage_backend,
-});
+// Each directory row already carries the store's `storage_backend`: hand it to `backendFor` for the rest of THIS request, so the
+// per-store fan-out behind the list (counts, owners) never re-reads the flag one store at a time (Sentry N+1, list-stores).
+const toStore = (r: StoreRow): HubStore => {
+  seedRequestMemo(backendMemoKey(r.id), r.storage_backend);
+  return {
+    id: r.id,
+    name: r.name,
+    nameAr: r.name_ar,
+    slug: r.slug,
+    domain: r.domain,
+    status: r.status,
+    plan: r.plan,
+    ownerId: r.owner_id,
+    createdAt: new Date(Number(r.created_at)),
+    storageBackend: r.storage_backend,
+  };
+};
 
 const like = (s: string) => `%${s.replace(/[\\%_]/g, m => `\\${m}`).toLowerCase()}%`;
 

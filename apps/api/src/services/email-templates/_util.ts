@@ -34,3 +34,25 @@ export function emailMoney(
   }
   return formatPrice(minor, { currency: code });
 }
+
+/**
+ * A money amount as HTML for a printed document, with Arabic placement: the locale's symbol («ج.م», never
+ * "EGP" in Arabic) and, when `sign` is given, the sign isolated left-to-right WITH its number so an RTL
+ * paragraph cannot paint it after the digits ("20-"). Same rule as the storefront's `<SignedAmount>`:
+ * only the sign and the number are isolated; the currency keeps the position every unsigned price has.
+ * Escaped; safe to interpolate.
+ */
+export function moneyHtml(
+  minor: number,
+  currency: string | null | undefined,
+  locale: 'en' | 'ar',
+  sign?: '\u2212'
+): string {
+  const text = emailMoney(minor, currency, locale);
+  const m = /[0-9](?:[0-9.,]*[0-9])?/.exec(text);
+  if (!m) return `<span dir="ltr">${escapeHtml(text)}</span>`;
+  const before = escapeHtml(text.slice(0, m.index));
+  const after = escapeHtml(text.slice(m.index + m[0].length));
+  const num = `<bdi dir="ltr">${sign ?? ''}${escapeHtml(m[0])}</bdi>`;
+  return `<span style="white-space:nowrap">${before}${num}${after}</span>`;
+}

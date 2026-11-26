@@ -70,7 +70,7 @@ describe('registration', () => {
     'analyticsOrdersBy',
     'analyticsCustomers',
     'analyticsLowStock',
-    'analyticsRepeatBuyers',
+    'analyticsBuyerIdentities',
   ])('%s is a money op', n => expect(MONEY_OP_NAMES).toContain(n));
 });
 
@@ -91,7 +91,6 @@ describe('analyticsPeriod', () => {
     expect(r).toMatchObject({
       revenue: 3000 + 1000 + 500 + 500,
       orders: 4,
-      customers: 4, // u1, u2 (cancelled still counts as a customer), u3, one guest
       profit: 1200,
       costedLines: 1,
       missingLines: 1,
@@ -102,7 +101,6 @@ describe('analyticsPeriod', () => {
     ).toMatchObject({
       revenue: 0,
       orders: 0,
-      customers: 0,
       profit: null,
     });
   });
@@ -189,23 +187,6 @@ describe('analyticsCustomers', () => {
   });
 });
 
-describe('analyticsRepeatBuyers', () => {
-  it('keys buyers like customerKeyOf (id, lowercased email, verbatim phone), paid orders in the window only', () => {
-    const { op, order } = rig();
-    order('a1', T0, 'delivered', 'paid', 100, 'cust-1');
-    order('a2', T0, 'delivered', 'paid', 100, 'cust-1'); // repeat (registered)
-    order('g1', T0, 'pending', 'paid', 100, null, '{"email":"Guest@X.eg"}');
-    order('g2', T0, 'pending', 'paid', 100, null, '{"email":"guest@x.eg"}'); // repeat (email lowercased)
-    order('p1', T0, 'pending', 'paid', 100, null, '{"phone":"+201000000001"}'); // one order only
-    order('n1', T0, 'pending', 'paid', 100, null, '{"phone":123}'); // not a string: no key, skipped
-    order('u1', T0, 'pending', 'failed', 100, 'cust-2'); // unpaid: not counted
-    order('o1', T0 - 40 * D, 'delivered', 'paid', 100, 'cust-3'); // before the window
-    expect(op('analyticsRepeatBuyers', { sinceMs: T0 - D })).toEqual({ repeat: 2, buyers: 3 });
-    expect(op('analyticsRepeatBuyers', { sinceMs: T0 + D })).toEqual({ repeat: 0, buyers: 0 });
-    expect(() => op('analyticsRepeatBuyers', {})).toThrow();
-  });
-});
-
 describe('analyticsLowStock', () => {
   it('is variant-aware: active variants only, disabled ones are not stock', () => {
     const { op } = rig();
@@ -234,11 +215,15 @@ describe('analyticsStock', () => {
     // p1: 3 x 100, p2: 50 x 100, p3: only the ACTIVE variant v1: 2 x 70
     expect(op('analyticsStock', {})).toEqual({
       stockValue: 300 + 5000 + 140,
+      stockedProducts: 3,
+      uncostedProducts: 0,
       backorderCount: 1,
       backorderValue: 400,
     });
     expect(op('analyticsStock', {}, 's2')).toEqual({
       stockValue: 0,
+      stockedProducts: 0,
+      uncostedProducts: 0,
       backorderCount: 0,
       backorderValue: 0,
     });
@@ -509,5 +494,33 @@ describe('refunds are not revenue (STORE-QA-7)', () => {
       { revenue: 0, orders: 0 },
     ]);
     expect(op('analyticsNetRevenueDays', { windows: w })[1]).toEqual({ revenue: 1000, orders: 2 });
+  });
+});
+
+describe('analyticsBuyerIdentities (QA98-ALIAS-1)', () => {
+  it('returns (customer id, lowercased email, phone) buckets with order counts for both windows', () => {
+    const { op, order } = rig();
+    order('a1', T0, 'delivered', 'paid', 100, 'cust-1');
+    order('a2', T0, 'delivered', 'paid', 100, 'cust-1');
+    order('g1', T0, 'pending', 'paid', 100, null, '{"email":"Guest@X.eg","phone":"0100"}');
+    order('g2', T0, 'pending', 'paid', 100, null, '{"email":"guest@x.eg","phone":"0100"}');
+    order('p1', T0, 'pending', 'unpaid', 100, null, '{"phone":"+201000000001"}');
+    const all = op('analyticsBuyerIdentities', {
+      mode: 'all',
+      startMs: T0 - D,
+      endMs: T0 + D,
+    }) as Array<{
+      customerId: string | null;
+      email: string | null;
+      phone: string | null;
+      n: number;
+    }>;
+    const by = (f: (r: (typeof all)[number]) => boolean) => all.find(f)?.n;
+    expect(by(r => r.customerId === 'cust-1')).toBe(2);
+    expect(by(r => r.email === 'guest@x.eg')).toBe(2);
+    expect(by(r => r.phone === '+201000000001')).toBe(1);
+    const paid = op('analyticsBuyerIdentities', { mode: 'paid', sinceMs: T0 - D }) as typeof all;
+    expect(paid.find(r => r.phone === '+201000000001')).toBeUndefined(); // unpaid is not in the paid window
+    expect(() => op('analyticsBuyerIdentities', { mode: 'nope' })).toThrow();
   });
 });

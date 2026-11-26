@@ -55,9 +55,10 @@ const CLASSIFIED: Record<
       'productSearchSql (storefront scope) and the vector leg of the hybrid ranking both carry p.audience = public in the WHERE, before their LIMIT (the SECURITY DEFINER id function only returns candidate ids; the outer statement filters); the SKU variant lookup is warehouse-admin only',
   },
   'lib/effective-inventory-sql.ts': {
-    statements: 1,
+    statements: 2,
     kind: 'admin',
-    reason: 'stock valuation SQL fragment used by merchant inventory reports',
+    reason:
+      'stock valuation and its cost coverage (#890), merchant inventory/finance reports only, never storefront',
   },
   'services/inventory.service.ts': {
     statements: 5,
@@ -126,7 +127,14 @@ const EXEMPT_MIGRATIONS = new Set<string>(
     .map(f => f.migration)
     // everything before the audience column existed, plus the gold price guard (Ruling B5-13): its trigger
     // function reads ONE product's pricing_mode by id to guard a write and returns no product data
-    .filter(m => m < '20261028' || m === '20261102000200_gold_rate_pricing')
+    // 20261123200000_search_fold_hamza: ebda_product_search_ids_h returns candidate ids ONLY (like ebda_product_search_ids, which pre-dates audience);
+    // its sole caller, productSearchSql, joins products with `p.audience = 'public'` in the WHERE before the LIMIT (asserted below).
+    .filter(
+      m =>
+        m < '20261028' ||
+        m === '20261102000200_gold_rate_pricing' ||
+        m === '20261123200000_search_fold_hamza'
+    )
 );
 
 function evaluate(queries: readonly RawProductQuery[]): string[] {

@@ -18,7 +18,11 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": ["فين رسايل التواصل بتاعة العملاء؟"],
+    "ar": [
+      "فين رسايل التواصل بتاعة العملاء؟",
+      "العميل بعت رسالة من فورم التواصل وانا مش لاقيها",
+      "فين بيوصل ايميل التواصل؟"
+    ],
     "en": ["Where do customer contact messages go?"]
   },
   "steps": ["Delivered by email to the store contact; no inbox UI (inferred)."],

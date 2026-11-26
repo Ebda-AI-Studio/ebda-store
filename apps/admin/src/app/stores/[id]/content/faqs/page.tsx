@@ -14,6 +14,7 @@ import {
   unwrapObject,
 } from '../../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 // "أسئلة وأجوبة": the FAQ and how-to guides the storefront shows and Google/AI answers read. They moved here from the
 // SEO page (UX:SEO-3): they are content the merchant writes, not search settings.
@@ -263,8 +264,8 @@ export default function StoreFaqsPage() {
     return (
       <AdminLayout title={tPage('title')}>
         <div className="animate-pulse space-y-4">
-          <div className="h-64 rounded-xl bg-muted" />
-          <div className="h-64 rounded-xl bg-muted" />
+          <div className="h-64 rounded-md bg-muted" />
+          <div className="h-64 rounded-md bg-muted" />
         </div>
       </AdminLayout>
     );
@@ -274,7 +275,7 @@ export default function StoreFaqsPage() {
     <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
       <div className="space-y-6">
         {/* ===== Frequently Asked Questions ===== */}
-        <div id="faqs" className="scroll-mt-24 rounded-xl border bg-card p-6 shadow-sm space-y-4">
+        <div id="faqs" className="scroll-mt-24 rounded-md border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 data-setting-id="seo.faqs" className="font-semibold text-foreground">
@@ -306,18 +307,18 @@ export default function StoreFaqsPage() {
                 <div className="space-y-3">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         {t('faqQuestion')}
                       </label>
                       <input
                         type="text"
                         value={faqDraft.question}
                         onChange={e => setFaqDraft(d => ({ ...d, question: e.target.value }))}
-                        className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        className={FIELD_CLASSES}
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         {t('faqQuestionAr')}
                       </label>
                       <input
@@ -328,24 +329,24 @@ export default function StoreFaqsPage() {
                         onChange={e =>
                           setFaqDraft(d => ({ ...d, questionAr: e.target.value || null }))
                         }
-                        className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        className={FIELD_CLASSES}
                       />
                     </div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         {t('faqAnswer')}
                       </label>
                       <textarea
                         rows={3}
                         value={faqDraft.answer}
                         onChange={e => setFaqDraft(d => ({ ...d, answer: e.target.value }))}
-                        className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                        className={`${TEXTAREA_CLASSES} resize-none`}
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         {t('faqAnswerAr')}
                       </label>
                       <textarea
@@ -356,7 +357,7 @@ export default function StoreFaqsPage() {
                         onChange={e =>
                           setFaqDraft(d => ({ ...d, answerAr: e.target.value || null }))
                         }
-                        className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                        className={`${TEXTAREA_CLASSES} resize-none`}
                       />
                     </div>
                   </div>
@@ -458,19 +459,19 @@ export default function StoreFaqsPage() {
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     {t('faqQuestion')}
                   </label>
                   <input
                     type="text"
                     value={faqDraft.question}
                     onChange={e => setFaqDraft(d => ({ ...d, question: e.target.value }))}
-                    className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                     autoFocus
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     {t('faqQuestionAr')}
                   </label>
                   <input
@@ -479,24 +480,24 @@ export default function StoreFaqsPage() {
                     dir="rtl"
                     value={faqDraft.questionAr ?? ''}
                     onChange={e => setFaqDraft(d => ({ ...d, questionAr: e.target.value || null }))}
-                    className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   />
                 </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     {t('faqAnswer')}
                   </label>
                   <textarea
                     rows={3}
                     value={faqDraft.answer}
                     onChange={e => setFaqDraft(d => ({ ...d, answer: e.target.value }))}
-                    className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                    className={`${TEXTAREA_CLASSES} resize-none`}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     {t('faqAnswerAr')}
                   </label>
                   <textarea
@@ -505,7 +506,7 @@ export default function StoreFaqsPage() {
                     dir="rtl"
                     value={faqDraft.answerAr ?? ''}
                     onChange={e => setFaqDraft(d => ({ ...d, answerAr: e.target.value || null }))}
-                    className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                    className={`${TEXTAREA_CLASSES} resize-none`}
                   />
                 </div>
               </div>
@@ -535,7 +536,7 @@ export default function StoreFaqsPage() {
         </div>
 
         {/* ===== How-To Guides ===== */}
-        <div id="howtos" className="scroll-mt-24 rounded-xl border bg-card p-6 shadow-sm space-y-4">
+        <div id="howtos" className="scroll-mt-24 rounded-md border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 data-setting-id="seo.how-tos" className="font-semibold text-foreground">
@@ -683,7 +684,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">
+          <label className="block text-sm font-medium text-foreground mb-1">
             {t('howtoGuideTitle')}
           </label>
           <input
@@ -691,11 +692,11 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
             value={draft.title}
             autoFocus={autoFocus}
             onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
-            className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">
+          <label className="block text-sm font-medium text-foreground mb-1">
             {t('howtoGuideTitleAr')}
           </label>
           <input
@@ -704,24 +705,24 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
             dir="rtl"
             value={draft.titleAr ?? ''}
             onChange={e => setDraft(d => ({ ...d, titleAr: e.target.value || null }))}
-            className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">
+          <label className="block text-sm font-medium text-foreground mb-1">
             {t('howtoDescription')}
           </label>
           <textarea
             rows={2}
             value={draft.description}
             onChange={e => setDraft(d => ({ ...d, description: e.target.value }))}
-            className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+            className={`${TEXTAREA_CLASSES} resize-none`}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">
+          <label className="block text-sm font-medium text-foreground mb-1">
             {t('howtoDescriptionAr')}
           </label>
           <textarea
@@ -730,7 +731,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
             dir="rtl"
             value={draft.descriptionAr ?? ''}
             onChange={e => setDraft(d => ({ ...d, descriptionAr: e.target.value || null }))}
-            className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+            className={`${TEXTAREA_CLASSES} resize-none`}
           />
         </div>
       </div>
@@ -740,7 +741,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
           always touches both. */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-medium text-foreground">{t('howtoSteps')}</label>
+          <label className="text-sm font-medium text-foreground">{t('howtoSteps')}</label>
           <Button
             variant="link"
             size="sm"
@@ -776,7 +777,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
                         return { ...d, steps };
                       })
                     }
-                    className="rounded-lg border border-input px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   />
                   <input
                     type="text"
@@ -792,7 +793,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
                         return { ...d, stepsAr };
                       })
                     }
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   />
                 </div>
                 {draft.steps.length > 1 && (
@@ -825,7 +826,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
                       return { ...d, steps };
                     })
                   }
-                  className="rounded-lg border border-input px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                  className={`${TEXTAREA_CLASSES} resize-none`}
                 />
                 <textarea
                   rows={2}
@@ -841,7 +842,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
                       return { ...d, stepsAr };
                     })
                   }
-                  className="rounded-lg border border-border px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                  className={`${TEXTAREA_CLASSES} resize-none`}
                 />
               </div>
             </div>

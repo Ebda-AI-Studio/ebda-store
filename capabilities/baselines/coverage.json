@@ -349,7 +349,6 @@
     "route-dangling|storefront.shopper-features /wishlist",
     "route-dangling|storefront.testimonials-trust GET /public/:storeId/layout",
     "route-dangling|storefront.testimonials-trust testimonials",
-    "route-dangling|team.audit-log (super-admin /audit-logs only)",
     "route-dangling|team.staff DELETE .../invites/:inviteId",
     "route-dangling|team.staff DELETE .../staff/:userId",
     "route-dangling|team.staff GET .../staff/invites",

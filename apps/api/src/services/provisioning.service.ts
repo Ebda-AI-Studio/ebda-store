@@ -553,7 +553,7 @@ export class ProvisioningService {
           owner: owners.get(s.ownerId) ?? null,
           _count: byId.get(s.id) ?? { products: 0, orders: 0 },
         })),
-        meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
       } as never;
     }
 
@@ -608,7 +608,7 @@ export class ProvisioningService {
 
     return {
       stores,
-      meta: {
+      pagination: {
         page,
         limit,
         total,

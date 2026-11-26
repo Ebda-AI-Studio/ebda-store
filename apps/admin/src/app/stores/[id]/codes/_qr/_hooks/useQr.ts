@@ -2,6 +2,7 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { storeOrigin } from '@ebda/shared';
+import { liveDomain } from '@/lib/store-url';
 import {
   DEFAULT_QR_DESIGN,
   buildScene,
@@ -125,7 +126,8 @@ export function useQr(storeId: string) {
     };
   }, [design.logo, logoUrl]);
 
-  const origin = store ? (store.domain ? `https://${store.domain}` : storeOrigin(store.slug)) : '';
+  const liveHost = store ? liveDomain(store) : null;
+  const origin = store ? (liveHost ? `https://${liveHost}` : storeOrigin(store.slug)) : '';
 
   const payload = useMemo(() => {
     if (!store) return null;

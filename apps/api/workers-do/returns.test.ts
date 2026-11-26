@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import { decodeRpc, encodeRpc } from '@ebda-src/repo';
 import type { StoreDO } from '../src/cf/store-do/store-do';
+import { runMigrations } from '../src/cf/store-do/migrations';
 
 // INFRA-CF-1 last-mile R1 (Ruling CF-RETURNS-1): the Return lifecycle and the partial-return journal on real workerd. The DO is
 // single threaded, so the completion claim, the over-claim check, the wallet credit and the journal booking are each one step:
@@ -269,5 +270,79 @@ describe('StoreDO.moneyOp returns', () => {
     expect(
       await num(stub, `SELECT balance AS n FROM customer_wallets WHERE customer_id = 'cust'`)
     ).toBeGreaterThan(0);
+  });
+});
+
+// Ruling GUEST-RET-1: a guest order (customer_id NULL) can be returned; the row stores the `guest:<orderId>` marker (GUEST-RETURN-MARKER-1).
+describe('StoreDO guest returns (Ruling GUEST-RET-1)', () => {
+  it('creates a real return row for a guest order, only for a guest order, and moves no money', async () => {
+    const store = 'guest-ret-1';
+    const stub = await seed(store);
+    await runInDurableObject(stub, (_i, s) =>
+      s.storage.sql.exec(`UPDATE orders SET customer_id = NULL`)
+    );
+    // a named customer does not reach a guest order
+    const wrong = await op(stub, store, 'returnCreate', {
+      orderId: 'o1',
+      guest: false,
+      customerId: 'cust',
+      type: 'return',
+      reason: 'x',
+      items: [tee(1)],
+    });
+    expect(wrong.ok ? 'ok' : wrong.code).toBe('INVALID_ORDER');
+    const made = val<{ returnId: string }>(
+      await op(stub, store, 'returnCreate', {
+        orderId: 'o1',
+        guest: true,
+        type: 'return',
+        reason: 'changed my mind',
+        items: [tee(1)],
+      })
+    );
+    const row = await runInDurableObject(
+      stub,
+      (_i, s) =>
+        s.storage.sql
+          .exec(
+            'SELECT customer_id, status, refunded_at, refund_amount FROM returns WHERE id = ?',
+            made.returnId
+          )
+          .one() as Record<string, unknown>
+    );
+    expect(row).toMatchObject({
+      customer_id: 'guest:o1',
+      status: 'pending',
+      refunded_at: null,
+      refund_amount: 10000,
+    });
+    expect(await num(stub, 'SELECT count(*) AS n FROM wallet_transactions')).toBe(0);
+    // a customer's order is not reachable as a guest order
+    const s2 = await seed('guest-ret-2');
+    const refused = await op(s2, 'guest-ret-2', 'returnCreate', {
+      orderId: 'o1',
+      guest: true,
+      type: 'return',
+      reason: 'x',
+      items: [tee(1)],
+    });
+    expect(refused.ok ? 'ok' : refused.code).toBe('INVALID_ORDER');
+    // and it cannot complete to store credit
+    await op(stub, store, 'returnStatus', {
+      returnId: made.returnId,
+      status: 'approved',
+      userId: 'u',
+    });
+    await op(stub, store, 'returnStatus', {
+      returnId: made.returnId,
+      status: 'received',
+      userId: 'u',
+    });
+    const claim = await op(stub, store, 'returnClaim', {
+      returnId: made.returnId,
+      refundMethod: 'store_credit',
+      walletFeature: true,
+    });
+    expect(claim.ok ? 'ok' : claim.code).toBe('GUEST_STORE_CREDIT');
   });
 });

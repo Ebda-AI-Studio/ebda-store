@@ -5,7 +5,7 @@
  *
  * WHO RECEIVES IT (services/notification-dispatcher.service.ts, read 2026-11-15): every event in this table is a message to the merchant's
  * CUSTOMERS, not to the merchant. SMS goes to `recipientPhone: data.customerPhone` and each SMS is billed to the merchant (segments are logged);
- * push goes through `pushService.sendToStore` to every device subscribed to the store (the shoppers' browsers and the merchant's orders app).
+ * push goes through `pushService.sendToStore` to the addressed shopper's own storefront devices only (Ruling PUSH-AUDIENCE-1; never a store-wide broadcast).
  * The cart-abandoned and back-in-stock events are promotional: their SMS also needs the shopper's recorded SMS consent. So the tool is a
  * confirm-class `messagesCustomers` tool and every card row says who gets the message and who pays. The one merchant-facing exception is the
  * new-order phone alert: the orders app is pinged when `order_confirmed` push is on (services/push.service.ts sendToOrdersApp).
@@ -68,7 +68,7 @@ const base = shape<Args>(
             'true sends an SMS for this event (needs the SMS plan feature and a connected SMS provider).'
           ),
           push: f.bool(
-            'true sends a push alert to the devices subscribed to the store (shoppers and the orders app) for this event.'
+            "true sends a push alert to the customer's own devices (the shopper the message is for) for this event."
           ),
         },
         ['event']
@@ -93,7 +93,7 @@ const notificationSettings = change<Args>({
   name: 'notification_settings',
   capabilityId: 'notify.channels-events',
   description:
-    "Choose, per event, whether the store sends an SMS and / or a push alert. These are messages to the merchant's CUSTOMERS: an SMS goes to the customer's phone and EVERY SMS is charged to the merchant; push goes to the devices subscribed to the store (shoppers and the orders app). Events: order_confirmed, payment_success, order_shipped, order_delivered, order_cancelled, refund_processed, cart_abandoned_step1-3 and back_in_stock (these four also need the shopper's SMS consent). push on order_confirmed also pings the merchant's orders app. A missing setting means SMS on and push on. It never takes SMS or WhatsApp credentials (entered on the secure screen) and cannot register a phone. The merchant always confirms.",
+    "Choose, per event, whether the store sends an SMS and / or a push alert. These are messages to the merchant's CUSTOMERS: an SMS goes to the customer's phone and EVERY SMS is charged to the merchant; push goes only to the devices of the customer the message is for. Events: order_confirmed, payment_success, order_shipped, order_delivered, order_cancelled, refund_processed, cart_abandoned_step1-3 and back_in_stock (these four also need the shopper's SMS consent). A missing setting means SMS on and push on. It never takes SMS or WhatsApp credentials (entered on the secure screen) and cannot register a phone. The merchant always confirms.",
   policy: 'confirm',
   messagesCustomers: true,
   schema,
@@ -130,7 +130,7 @@ const notificationSettings = change<Args>({
         rows.push(
           row(
             `${ar}: تنبيه فوري على الأجهزة المشتركة في متجرك (العملاء وتطبيق الطلبات)`,
-            `${en}: push alert to devices subscribed to your store (shoppers and the orders app)`,
+            `${en}: push alert to the customer's own devices`,
             before.push,
             e.push
           )

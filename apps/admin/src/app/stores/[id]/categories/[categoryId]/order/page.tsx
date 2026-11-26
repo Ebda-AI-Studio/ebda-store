@@ -27,6 +27,7 @@ import { useLocale } from 'next-intl';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { useDndA11y } from '@/hooks/useDndA11y';
 
 interface ProductRow {
   id: string;
@@ -136,7 +137,7 @@ function SortableProductRow({ product, idx, isRtl, isSaving, t }: SortableProduc
         {altName && <p className="truncate text-xs text-muted-foreground">{altName}</p>}
         <div className="mt-0.5 flex items-center gap-2">
           {product.sku && (
-            <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+            <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
               {t('sku', { sku: product.sku })}
             </span>
           )}
@@ -172,6 +173,7 @@ export default function CategoryProductOrderPage() {
   const [error, setError] = useState<string | null>(null);
   const { success: toastSuccess, error: showError } = useToast();
 
+  const dndA11y = useDndA11y();
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -287,7 +289,7 @@ export default function CategoryProductOrderPage() {
       }
     >
       {error && (
-        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
+        <div className="mb-6 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
           {error}
           <button type="button" className="ms-4 font-medium underline" onClick={fetchProducts}>
             {t('backToCategories')}
@@ -302,7 +304,7 @@ export default function CategoryProductOrderPage() {
               type="checkbox"
               checked={activeOnly}
               onChange={e => setActiveOnly(e.target.checked)}
-              className="h-4 w-4 rounded border-border accent-primary"
+              className="h-5 w-5 rounded-md border-border accent-primary"
             />
             {t('activeOnly')}
           </label>
@@ -315,21 +317,21 @@ export default function CategoryProductOrderPage() {
       )}
 
       {isLoading ? (
-        <div className="space-y-3 rounded-xl border bg-card p-6 shadow-sm">
+        <div className="space-y-3 rounded-md border bg-card p-6 shadow-sm">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex items-center gap-4 animate-pulse">
-              <div className="h-4 w-4 rounded bg-muted" />
+              <div className="h-4 w-4 rounded-md bg-muted" />
               <div className="h-12 w-12 rounded-lg bg-muted" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 w-40 rounded bg-muted" />
-                <div className="h-3 w-24 rounded bg-muted" />
+                <div className="h-4 w-40 rounded-md bg-muted" />
+                <div className="h-3 w-24 rounded-md bg-muted" />
               </div>
             </div>
           ))}
         </div>
       ) : products.length === 0 ? (
-        <div className="rounded-xl border bg-card p-12 shadow-sm text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+        <div className="rounded-md border bg-card p-12 shadow-sm text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
             <svg
               className="h-8 w-8 text-muted-foreground"
               fill="none"
@@ -350,13 +352,14 @@ export default function CategoryProductOrderPage() {
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        <div className="rounded-md border bg-card shadow-sm overflow-hidden">
           {isDirty && (
             <div className="border-b border-warning/40 bg-warning/10 px-4 py-2 text-sm text-warning-ink">
               {t('unsavedChanges')}
             </div>
           )}
           <DndContext
+            {...dndA11y}
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}

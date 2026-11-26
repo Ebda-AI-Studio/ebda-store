@@ -40,6 +40,7 @@ interface Pagination {
 }
 
 import { formatDateTime } from '@/lib/format';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 const actionColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
   create: 'default',
@@ -148,7 +149,7 @@ export default function AuditLogsPage() {
           value={entityFilter}
           onChange={e => setEntityFilter(e.target.value)}
           aria-label={t('filterEntityLabel')}
-          className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className={FIELD_CLASSES}
         >
           <option value="all">{t('allEntities')}</option>
           <option value="store">{t('entityStore')}</option>
@@ -162,7 +163,7 @@ export default function AuditLogsPage() {
           value={actionFilter}
           onChange={e => setActionFilter(e.target.value)}
           aria-label={t('filterActionLabel')}
-          className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className={FIELD_CLASSES}
         >
           <option value="all">{t('allActions')}</option>
           <option value="create">{t('actionCreate')}</option>
@@ -174,17 +175,17 @@ export default function AuditLogsPage() {
       </div>
 
       {/* Logs List */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-md border bg-card shadow-sm overflow-hidden">
         <div className="divide-y">
           {isLoading ? (
             Array.from({ length: 10 }).map((_, i) => (
               <div key={i} className="p-4 flex items-start gap-4">
                 <div className="h-10 w-10 bg-muted rounded-lg animate-pulse" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-3/4 bg-muted rounded animate-pulse" />
-                  <div className="h-3 w-1/2 bg-muted rounded animate-pulse" />
+                  <div className="h-4 w-3/4 bg-muted rounded-md animate-pulse" />
+                  <div className="h-3 w-1/2 bg-muted rounded-md animate-pulse" />
                 </div>
-                <div className="h-4 w-32 bg-muted rounded animate-pulse" />
+                <div className="h-4 w-32 bg-muted rounded-md animate-pulse" />
               </div>
             ))
           ) : logs.length > 0 ? (

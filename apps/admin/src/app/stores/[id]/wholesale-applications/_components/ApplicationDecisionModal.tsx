@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 export type DecisionKind = 'approve' | 'reject' | 'revoke';
 
@@ -44,7 +45,7 @@ export function ApplicationDecisionModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="wholesale-decision-title"
-        className="w-full max-w-md rounded-lg bg-background p-5 shadow-lg"
+        className="w-full max-w-md rounded-lg bg-background p-5 shadow-md"
       >
         <h2 id="wholesale-decision-title" className="mb-1 text-lg font-semibold">
           {t(`${kind}Title`)}
@@ -64,7 +65,7 @@ export function ApplicationDecisionModal({
               <select
                 value={groupId}
                 onChange={e => setGroupId(e.target.value)}
-                className="min-h-11 w-full rounded-md border px-3 text-sm"
+                className={FIELD_CLASSES}
               >
                 {groups.map(g => (
                   <option key={g.id} value={g.id}>
@@ -86,7 +87,7 @@ export function ApplicationDecisionModal({
               onChange={e => setNote(e.target.value)}
               maxLength={500}
               rows={3}
-              className="w-full rounded-md border px-3 py-2 text-sm"
+              className={TEXTAREA_CLASSES}
             />
             {kind === 'reject' ? (
               <span className="mt-1 block text-xs text-muted-foreground">

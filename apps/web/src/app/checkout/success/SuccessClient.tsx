@@ -49,6 +49,8 @@ function SuccessContent() {
   const { t } = useLanguage();
 
   const [order, setOrder] = useState<Order | null>(null);
+  // STORE-QA-41: a guest has no account page; the API hands a signed view-only status link for THEIR order.
+  const [statusToken, setStatusToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   // S-02: the receipt repeats the delivery window of the order's own shipping
   // zone (clock starts at the order's date; the longest made-to-order lead time
@@ -113,6 +115,7 @@ function SuccessContent() {
         if (!cancelled && result.success && result.data) {
           const fetchedOrder = result.data.order;
           setOrder(fetchedOrder);
+          setStatusToken(result.data.statusToken ?? null);
 
           // Only fire the Purchase pixel for a CONFIRMED sale — COD orders
           // (committed) or online orders the provider reported paid. Don't
@@ -331,7 +334,12 @@ function SuccessContent() {
                 </Button>
               </Link>
             )}
-            <Link href={storeUrl('/account/orders')} className="w-full sm:w-64">
+            <Link
+              href={storeUrl(
+                statusToken ? `/o/${encodeURIComponent(statusToken)}` : '/account/orders'
+              )}
+              className="w-full sm:w-64"
+            >
               <Button size="lg" variant="outline" className="w-full">
                 {t(
                   'View order status',

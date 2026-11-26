@@ -84,6 +84,8 @@ export interface Order {
   currency?: string;
   status: string;
   paymentStatus: string;
+  /** Piastres handed back across every recorded channel (API-computed; includes merchant-booked partial refunds). */
+  refundedTotal?: number | null;
   createdAt: string;
   /** InstaPay hold deadline (ISO) while the order awaits the merchant's confirmation. */
   paymentConfirmationExpiresAt?: string | null;

@@ -23,6 +23,21 @@
  */
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { vi as viGrouped } from 'vitest';
+const grouped = viGrouped.hoisted(() => ({
+  orders: [] as Array<{ customerId: string | null; shippingAddress: unknown }>,
+}));
+viGrouped.mock('@api/lib/buyer-counts', async () => ({
+  repeatBuyersGrouped: async () => {
+    const { computeRepeatPurchase } = await import('@api/routes/insights.routes');
+    const r = computeRepeatPurchase(grouped.orders);
+    return {
+      buyers: r.identifiedBuyers,
+      repeat: Math.round((r.repeatPurchaseRate ?? 0) * r.identifiedBuyers),
+    };
+  },
+  countDistinctCustomersGrouped: async () => 0,
+}));
 import express, { type Express } from 'express';
 import request from 'supertest';
 import { productVelocityResponseSchema } from '../../packages/shared/src/schemas/analytics';
@@ -212,20 +227,10 @@ describe('GET /insights/dashboard — derived rates', () => {
     mockPrisma.funnelSnapshot.findFirst.mockResolvedValue(funnel);
     mockPrisma.orderItem.groupBy.mockResolvedValue([]);
     mockPrisma.product.findMany.mockResolvedValue([]);
-    // Issue 2260: the repeat rate is aggregated in Postgres now. The unit
-    // harness answers the SQL with the JS reference (`computeRepeatPurchase`,
-    // which the SQL mirrors key-for-key); the SQL itself is proven against a
-    // real database in tests/integration/insights-product-velocity.test.ts.
-    mockPrisma.$queryRaw.mockImplementation(async () => {
-      const { computeRepeatPurchase } = await import('@api/routes/insights.routes');
-      const r = computeRepeatPurchase(orders);
-      return [
-        {
-          buyers: r.identifiedBuyers,
-          repeat: Math.round((r.repeatPurchaseRate ?? 0) * r.identifiedBuyers),
-        },
-      ];
-    });
+    // Issue 2260 / QA98-ALIAS-1: the repeat rate is aggregated in the store's backend and grouped by the ONE customer grouping
+    // (lib/buyer-counts.ts). The unit harness answers it with the JS reference (`computeRepeatPurchase`, which uses the same
+    // CustomerGroups); the real queries are proven against a real database in tests/integration/insights-product-velocity.test.ts.
+    grouped.orders = orders;
     // Issue 2257: guestCheckout is the SAME any-guest-order probe the funnel
     // uses, over ALL orders in the window (paid or not).
     mockPrisma.order.findFirst.mockResolvedValue(
@@ -305,7 +310,6 @@ describe('GET /insights/dashboard — derived rates', () => {
     stubDashboard({ funnel: null, orders: [{ customerId: 'c1', shippingAddress: {} }] });
     await request(app).get(`/stores/${STORE}/insights/dashboard`);
     expect(mockPrisma.order.findMany).not.toHaveBeenCalled();
-    expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
 
   it('repeatPurchaseRate is null (unknown) when no buyer is identifiable', async () => {

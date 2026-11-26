@@ -25,6 +25,8 @@ const h = vi.hoisted(() => ({
   anonymised: [] as string[],
   paymentsScrubbed: [] as string[],
   pgProbes: 0,
+  trialUsed: new Set<string>(),
+  emailUnreadable: false,
 }));
 
 vi.mock('@ebda/database', () => {
@@ -109,6 +111,26 @@ vi.mock('../../apps/api/src/lib/identity-client', () => ({
   deleteStoreClients: async (id: string) => void h.clientsDeleted.push(id),
   isIdentityManagedUser: async () => false,
 }));
+// R-TRIAL-ONCE-1: the durable used-trial marker (system_settings in prod) as an in-memory set keyed by owner email
+vi.mock('../../apps/api/src/services/billing/trial-eligibility', () => ({
+  ownerEmailOf: async (id: string) =>
+    h.emailUnreadable
+      ? { unknown: true }
+      : { email: id.startsWith('race-') ? 'shared@x.co' : `${id}@x.co`, unknown: false },
+  // a tick between the read and the claim, so two concurrent creates both pass the read (the race this PR closes)
+  ownerHasUsedTrial: async (email: string) => {
+    const used = h.trialUsed.has(email);
+    await new Promise(r => setTimeout(r, 5));
+    return used;
+  },
+  // ONE synchronous insert-or-skip, like the unique `system_settings.key` insert: only the creator is `owned` / `grant`
+  claimOwnerTrial: async (email: string) => {
+    const first = !h.trialUsed.has(email);
+    h.trialUsed.add(email);
+    return { grant: first, owned: first };
+  },
+  releaseOwnerTrial: async (email: string) => void h.trialUsed.delete(email),
+}));
 vi.mock('../../apps/api/src/services/redis.service', () => ({
   redis: { delete: vi.fn(), get: vi.fn(), set: vi.fn(), acquireLock: vi.fn() },
 }));
@@ -147,6 +169,8 @@ const fakeD1 = () => ({
 });
 
 beforeEach(() => {
+  h.trialUsed.clear();
+  h.emailUnreadable = false;
   sqlite = new DatabaseSync(':memory:');
   sqlite.exec(
     ['0001_init.sql', '0002_invariants.sql']
@@ -198,6 +222,85 @@ describe('StoreService.create on D1 + DO', () => {
     expect(sqlite.prepare('SELECT slug FROM stores WHERE id=?').get(again.id)).toEqual({
       slug: 'nour-shop-1',
     });
+  });
+});
+
+describe('R-TRIAL-ONCE-1: one signup trial per owner on the DO create path', () => {
+  const sub = (id: string) =>
+    sqlite
+      .prepare('SELECT plan_code, status FROM store_subscriptions WHERE store_id=?')
+      .get(id) as { plan_code: string; status: string };
+
+  it('the first store marks the owner trial as used (the DO branch returns early, the marker is still written)', async () => {
+    expect(h.trialUsed.size).toBe(0);
+    await StoreService.create('owner-1', { name: 'First Shop' } as never);
+    expect([...h.trialUsed]).toEqual(['owner-1@x.co']);
+  });
+
+  it('delete + recreate: no trial AND no paid tier (not trialing, not Growth/Business, not Professional/Enterprise)', async () => {
+    const first = (await StoreService.create('owner-1', { name: 'Again Shop' } as never)) as Record<
+      string,
+      any
+    >;
+    await StoreService.delete(first.id);
+    const second = (await StoreService.create('owner-1', {
+      name: 'Again Shop 2',
+    } as never)) as Record<string, any>;
+    expect(second.plan).toBe('starter');
+    const s = sub(second.id);
+    expect(s.status).not.toBe('trialing');
+    expect(['growth', 'business']).not.toContain(s.plan_code);
+  });
+});
+
+describe('R-TRIAL-ONCE-1: the claim is atomic (race) and given back when the create fails', () => {
+  const planOf = (id: string) =>
+    (
+      sqlite
+        .prepare('SELECT plan_code, status FROM store_subscriptions WHERE store_id=?')
+        .get(id) as {
+        plan_code: string;
+        status: string;
+      }
+    ).status;
+
+  it('two concurrent first-store creates by the same person (two accounts, one address): exactly ONE trial', async () => {
+    const [a, b] = (await Promise.all([
+      StoreService.create('race-1', { name: 'Race A' } as never),
+      StoreService.create('race-2', { name: 'Race B' } as never),
+    ])) as Array<Record<string, any>>;
+    const trials = [a, b].filter(st => planOf(st.id) === 'trialing');
+    expect(trials).toHaveLength(1);
+    expect([a.plan, b.plan].sort()).toEqual(['professional', 'starter']);
+  });
+
+  it('a create that fails after the claim gives the marker back, so a retry still gets the trial', async () => {
+    await expect(
+      StoreService.create('owner-retry', { name: 'Bad Slug', slug: 'a' } as never)
+    ).rejects.toBeTruthy();
+    expect(h.trialUsed.size).toBe(0);
+    const ok = (await StoreService.create('owner-retry', { name: 'Good Shop' } as never)) as Record<
+      string,
+      any
+    >;
+    expect(planOf(ok.id)).toBe('trialing');
+  });
+});
+
+describe('R-TRIAL-ONCE-1: an unreadable owner email fails CLOSED for the trial', () => {
+  it('the store is still created, with no trial and no paid tier', async () => {
+    h.emailUnreadable = true;
+    const store = (await StoreService.create('owner-1', { name: 'Blind Shop' } as never)) as Record<
+      string,
+      any
+    >;
+    expect(store.plan).toBe('starter');
+    const s = sqlite
+      .prepare('SELECT plan_code, status FROM store_subscriptions WHERE store_id=?')
+      .get(store.id) as { plan_code: string; status: string };
+    expect(s.status).not.toBe('trialing');
+    expect(['growth', 'business']).not.toContain(s.plan_code);
+    expect(h.trialUsed.size).toBe(0);
   });
 });
 

@@ -137,7 +137,7 @@ export function ConfirmCard({
       data-testid="confirm-card"
       data-policy="confirm"
       aria-label={t('confirm.label')}
-      className="grid gap-2 rounded-xl border border-primary/60 bg-background p-3 text-sm"
+      className="grid gap-2 rounded-md border border-primary/60 bg-background p-3 text-sm"
     >
       <p className="font-medium" dir="auto">
         {card.summary[lang]}
@@ -145,14 +145,14 @@ export function ConfirmCard({
       {reasons.length > 0 && (
         <ul aria-label={t('confirm.why')} className="m-0 flex list-none flex-wrap gap-1.5 p-0">
           {reasons.map(r => (
-            <li key={r} className="rounded-full bg-muted px-2 py-0.5 text-xs">
+            <li key={r} className="rounded-full bg-muted px-2 py-0.5 text-sm">
               {t(`confirm.reasons.${r}`)}
             </li>
           ))}
         </ul>
       )}
       {stale && (
-        <p role="status" className="text-xs text-muted-foreground">
+        <p role="status" className="text-sm text-muted-foreground">
           {t('card.stale')}
         </p>
       )}
@@ -177,18 +177,18 @@ export function ConfirmCard({
         ))}
       </ul>
       {card.costCredits !== undefined && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {t('confirm.cost', { credits: card.costCredits })}
         </p>
       )}
       {irreversible && !decided && (
-        <p role="note" className="text-xs font-medium">
+        <p role="note" className="text-sm font-medium">
           {t('confirm.irreversible')}
         </p>
       )}
 
       {phase.k === 'applied' && (
-        <p role="status" className="text-xs text-muted-foreground">
+        <p role="status" className="text-sm text-muted-foreground">
           {canUndo
             ? t('card.applied')
             : irreversible
@@ -197,22 +197,22 @@ export function ConfirmCard({
         </p>
       )}
       {phase.k === 'rejected' && (
-        <p role="status" className="text-xs text-muted-foreground">
+        <p role="status" className="text-sm text-muted-foreground">
           {t('confirm.rejected')}
         </p>
       )}
       {phase.k === 'undone' && (
-        <p role="status" className="text-xs text-muted-foreground">
+        <p role="status" className="text-sm text-muted-foreground">
           {t('card.undone')}
         </p>
       )}
       {phase.k === 'failed' && (
-        <p role="alert" className="text-xs text-destructive-ink">
+        <p role="alert" className="text-sm text-destructive-ink">
           {t(`confirm.failed.${phase.why}`)}
         </p>
       )}
       {!token && !decided && (
-        <p role="note" className="text-xs text-muted-foreground">
+        <p role="note" className="text-sm text-muted-foreground">
           {t('confirm.noToken')}
         </p>
       )}

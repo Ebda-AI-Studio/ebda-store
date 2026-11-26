@@ -1,6 +1,8 @@
 import { API_URL } from './api';
 import { storeAbsoluteUrl } from './structured-data';
 import type { ResolvedStore } from './store-resolver';
+import { headers } from 'next/headers';
+import { LOCALE_PATH_HEADER, localizeHref } from './locale-paths';
 
 /**
  * Resolve a renamed storefront slug (product/category/page/blog) to its
@@ -53,4 +55,21 @@ export async function fetchSlugRedirect(
  */
 export function storeRedirectUrl(store: ResolvedStore, path: string): string {
   return storeAbsoluteUrl(store, path);
+}
+
+/**
+ * The 308 target of a renamed slug, KEEPING the language prefix of the request (Ruling LOCALE-PATHS-4: a redirect never strips a
+ * prefix). `/ar/products/<old>` goes to `/ar/products/<new>`, not to `/products/<new>` (live: ameliaaurum.com dropped `/ar`).
+ * The middleware asserts the page's language in `x-locale-path` on a prefixed page; on any other page the path is unchanged.
+ * `path` is the unprefixed in-store path, query string included (`/products?category=<new>`).
+ */
+export async function localizedRedirectUrl(store: ResolvedStore, path: string): Promise<string> {
+  let lang: 'ar' | 'en' | null = null;
+  try {
+    const v = (await headers()).get(LOCALE_PATH_HEADER);
+    lang = v === 'ar' || v === 'en' ? v : null;
+  } catch {
+    // no request context (a build-time render): no prefix to keep
+  }
+  return storeRedirectUrl(store, localizeHref(path, lang));
 }

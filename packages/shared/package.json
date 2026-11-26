@@ -28,6 +28,10 @@
       "import": "./dist/constants/index.js",
       "default": "./src/constants/index.ts"
     },
+    "./design": {
+      "types": "./src/design.ts",
+      "default": "./src/design.ts"
+    },
     "./smart-layer": {
       "types": "./src/smart-layer-kit.ts",
       "require": "./dist/smart-layer-kit.js",
@@ -76,6 +80,28 @@
       "types": "./src/qr/links.ts",
       "require": "./dist/qr/links.js",
       "default": "./src/qr/links.ts"
+    },
+    "./request-guard": {
+      "types": "./src/foundation/request-guard.ts",
+      "import": "./dist/foundation/request-guard.js",
+      "require": "./dist/foundation/request-guard.js",
+      "default": "./src/foundation/request-guard.ts"
+    },
+    "./wa-v1": {
+      "types": "./src/foundation/contracts/wa-v1.ts",
+      "import": "./dist/foundation/contracts/wa-v1.js",
+      "require": "./dist/foundation/contracts/wa-v1.js",
+      "default": "./src/foundation/contracts/wa-v1.ts"
+    },
+    "./observe": {
+      "types": "./src/observe-kit.ts",
+      "import": "./dist/observe-kit.js",
+      "require": "./dist/observe-kit.js",
+      "default": "./src/observe-kit.ts"
+    },
+    "./web-search": {
+      "types": "./src/web-search-kit.ts",
+      "default": "./src/web-search-kit.ts"
     }
   },
   "files": [

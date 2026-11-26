@@ -1,4 +1,5 @@
 import { resolveDefaultLanguage } from '@ebda/shared';
+import { noteDefinitiveMiss } from './resolve-miss-memo';
 import { renewNonce } from './csp-nonce-renew';
 import { buildScopedKey } from './edge-build-id';
 import {
@@ -452,6 +453,7 @@ export async function storeVerdict(
       verdicts.set(host, { v, until: now + 60_000, at: known?.at ?? 0 });
       return v;
     }
+    if (res.status === 404) noteDefinitiveMiss(host, now); // QA-90: the render path reuses this (never for 429/5xx)
     if (res.ok) {
       const store = (
         (await res.json()) as {

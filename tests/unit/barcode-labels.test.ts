@@ -4,14 +4,26 @@ import {
   DEFAULT_LABEL_SETTINGS,
   LABEL_PRESETS,
   MIN_MODULE_MM,
+  MIN_QR_MODULE_MM,
+  QR_QUIET_MODULES,
   humanDigits,
   labelPresetById,
+  qrModuleCount,
   labelSettingsSchema,
   layoutLabel,
   sheetCell,
   type LabelItem,
   type LabelSettings,
 } from '../../packages/shared/src/barcode';
+import {
+  qrLink,
+  buildScene,
+  DEFAULT_QR_DESIGN,
+  rasterizeScene,
+  decodeBitmap,
+  MODULE,
+} from '../../packages/shared/src/qr';
+import { storeOrigin } from '../../packages/shared/src/brand';
 
 const ITEM: LabelItem = {
   name: 'Gold ring',
@@ -20,6 +32,7 @@ const ITEM: LabelItem = {
   variantTitleAr: 'مقاس ٧',
   priceMinor: 125000,
   barcode: '2000000000015',
+  qrUrl: qrLink('product', storeOrigin('amelia'), 'gold-ring'),
 };
 const ALL: LabelSettings = {
   ...DEFAULT_LABEL_SETTINGS,
@@ -102,8 +115,13 @@ describe('layoutLabel', () => {
   });
 
   it('drops what does not fit, in a fixed order, and says so; the barcode is never dropped', () => {
-    const tiny = layoutLabel(labelPresetById('a4-5x13')!, ITEM, ALL);
-    expect(tiny.dropped).toContain('qr');
+    const tiny = layoutLabel(labelPresetById('a4-5x13')!, ITEM, {
+      ...ALL,
+      content: { ...ALL.content, qr: false, variant: false, name: false, price: false },
+    });
+    expect(tiny.dropped).toEqual([]);
+    const noUrl = layoutLabel(labelPresetById('a4-3x7')!, { ...ITEM, qrUrl: null }, ALL);
+    expect(noUrl.dropped).toContain('qr');
     expect(tiny.barcode.h).toBeGreaterThanOrEqual(5);
     const big = layoutLabel(labelPresetById('a4-3x7')!, ITEM, ALL);
     expect(big.dropped).toEqual([]);
@@ -112,7 +130,11 @@ describe('layoutLabel', () => {
 
   it('plain EAN-13 prints on every preset; a shaped Code 128 of 13 digits is refused on the small ones', () => {
     for (const p of LABEL_PRESETS) {
-      const l = layoutLabel(p, ITEM, { ...ALL, shape: 'plain' });
+      const l = layoutLabel(p, ITEM, {
+        ...ALL,
+        shape: 'plain',
+        content: { ...ALL.content, qr: false },
+      });
       expect(l.barcode.symbology).toBe('ean13');
       expect(l.barcode.moduleMm, p.id).toBeGreaterThanOrEqual(MIN_MODULE_MM);
       expect(l.printable, p.id).toBe(true);
@@ -172,5 +194,81 @@ describe('humanDigits + settings schema', () => {
     expect(labelSettingsSchema.safeParse({ ...DEFAULT_LABEL_SETTINGS, extra: 1 }).success).toBe(
       false
     );
+  });
+});
+
+describe('combined barcode + QR label', () => {
+  const url = (origin: string) => qrLink('product', origin, 'gold-ring');
+  const SUPPORTED = ['a4-3x7', 'a4-4x10', 'roll-58', 'roll-80', 'roll-40x30', 'roll-50x25'];
+  const REFUSED = ['a4-5x13'];
+
+  it('every preset is either supported or refused: nothing is silently squeezed', () => {
+    expect([...SUPPORTED, ...REFUSED].sort()).toEqual(LABEL_PRESETS.map(p => p.id).sort());
+  });
+
+  for (const id of SUPPORTED)
+    for (const origin of ['https://amelia.ebda.app', 'https://shop.example-store.com'])
+      it(`${id} (${origin}): QR + barcode both stay at scannable minimums`, () => {
+        const l = layoutLabel(labelPresetById(id)!, { ...ITEM, qrUrl: url(origin) }, ALL);
+        expect(l.qrRefused).toBe(false);
+        expect(l.qr).not.toBeNull();
+        expect(l.printable).toBe(true);
+        expect(l.qr!.moduleMm).toBeGreaterThanOrEqual(MIN_QR_MODULE_MM);
+        expect(l.barcode.moduleMm).toBeGreaterThanOrEqual(MIN_MODULE_MM);
+        expect(l.barcode.h).toBeGreaterThanOrEqual(5);
+        // the QR drawn at that size really decodes (rasterised at the dots-per-module of a 300 dpi print)
+        const scene = buildScene(l.qr!.url, {
+          ...DEFAULT_QR_DESIGN,
+          logo: false,
+          frame: 'none',
+          cta: null,
+        });
+        expect(scene.modules + 2 * QR_QUIET_MODULES).toBe(l.qr!.modules + 2 * QR_QUIET_MODULES);
+        expect(scene.width / MODULE).toBe(l.qr!.modules + 2 * QR_QUIET_MODULES);
+        const px = Math.max(1, Math.round((l.qr!.moduleMm * 300) / 25.4));
+        expect(decodeBitmap(rasterizeScene(scene, px))).toBe(l.qr!.url);
+        // no overlap between the QR and the bars
+        expect(l.qr!.y + l.qr!.size).toBeLessThanOrEqual(l.barcode.y + 1e-6);
+      });
+
+  for (const id of REFUSED)
+    it(`${id}: too small for both codes: refused with qrRefused, no QR drawn`, () => {
+      const l = layoutLabel(labelPresetById(id)!, ITEM, ALL);
+      expect(l.qrRefused).toBe(true);
+      expect(l.qr).toBeNull();
+      expect(l.printable).toBe(false);
+      // one code only (QR off) prints fine on the same label
+      const one = layoutLabel(labelPresetById(id)!, ITEM, {
+        ...ALL,
+        content: { ...ALL.content, qr: false },
+      });
+      expect(one.qrRefused).toBe(false);
+      expect(one.printable).toBe(true);
+    });
+
+  it('a very long custom-domain URL that needs a bigger QR is refused on a label that fits a short one', () => {
+    const long = `https://${'a'.repeat(60)}.com/q/p/${'b'.repeat(60)}`;
+    const p = labelPresetById('roll-40x30')!;
+    expect(layoutLabel(p, ITEM, ALL).qrRefused).toBe(false);
+    expect(layoutLabel(p, { ...ITEM, qrUrl: long }, ALL).qrRefused).toBe(true);
+  });
+
+  it('the QR encodes the store-domain product page: custom domain when set, else <slug>.ebda.app', () => {
+    expect(qrLink('product', storeOrigin('amelia'), 'gold-ring')).toBe(
+      'https://amelia.ebda.app/q/p/gold-ring'
+    );
+    expect(qrLink('product', 'https://shop.example.com', 'gold-ring')).toBe(
+      'https://shop.example.com/q/p/gold-ring'
+    );
+    const l = layoutLabel(labelPresetById('a4-3x7')!, ITEM, ALL);
+    expect(l.qr!.url).toBe('https://amelia.ebda.app/q/p/gold-ring');
+  });
+
+  it('qrModuleCount matches the real encoder across URL lengths', () => {
+    for (const n of [20, 40, 60, 100, 150, 200]) {
+      const u = `https://x.ebda.app/q/p/${'a'.repeat(n)}`;
+      const scene = buildScene(u, { ...DEFAULT_QR_DESIGN, logo: false, frame: 'none', cta: null });
+      expect(qrModuleCount(u), String(n)).toBe(scene.modules);
+    }
   });
 });

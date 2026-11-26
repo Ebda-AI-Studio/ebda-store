@@ -45,7 +45,7 @@ export function WebPushToggleCard({ storeId }: { storeId: string }) {
   }
 
   return (
-    <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
+    <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-md border border-border bg-card p-4">
       <span className="min-w-0 flex-1">
         <span
           data-setting-id="branding.web-push"

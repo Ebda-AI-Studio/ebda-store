@@ -2,6 +2,7 @@
 // apps/api/src/services/analytics.service.ts are raw SQL aggregates (distinct customer keys, profit lines, date_trunc buckets,
 // the on-hand twin); each op here is the SQLite spelling of ONE of them, scoped by the `store_id` the DO holds. All are reads.
 import { MoneyError, type SyncSql } from './sync-sql';
+import { STOCK_COST_COVERAGE_SQLITE } from './finance-ops';
 import {
   netLinesInnerSql,
   netLinesWrapSql,
@@ -23,17 +24,9 @@ const statuses = (v: unknown): string[] => {
 const marks = (n: number, from = 1): string =>
   Array.from({ length: n }, (_, i) => `?${from + i}`).join(', ');
 
-/** SQLite twin of CUSTOMER_KEY_SQL (lib/customer-key-sql.ts); the orders table is aliased `o`. Keep the two in lockstep. */
-const CUSTOMER_KEY = `COALESCE(
-  NULLIF(o.customer_id, ''),
-  NULLIF(LOWER(CASE WHEN json_type(o.shipping_address, '$.email') = 'text' THEN json_extract(o.shipping_address, '$.email') END), ''),
-  NULLIF(CASE WHEN json_type(o.shipping_address, '$.phone') = 'text' THEN json_extract(o.shipping_address, '$.phone') END, ''),
-  'guest:' || o.id
-)`;
-
 const num = (v: unknown): number => Number(v ?? 0);
 
-/** getPeriodStats: revenue + order count + distinct customers + profit lines for [start, end]. */
+/** getPeriodStats: revenue + order count + profit lines (distinct customers: `analyticsBuyerIdentities`, grouped by the API) for [start, end]. */
 export function analyticsPeriodOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
   const start = intArg(a.startMs, 'startMs');
   const end = intArg(a.endMs, 'endMs');
@@ -46,11 +39,6 @@ export function analyticsPeriodOp(db: SyncSql, storeId: string, a: Record<string
       WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.created_at >= ?2 AND o.created_at <= ?3
         AND ${counts}`,
     win
-  )[0] as Record<string, unknown>;
-  const cust = db.all(
-    `SELECT COUNT(DISTINCT ${CUSTOMER_KEY}) AS n FROM orders o
-      WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.created_at >= ?2 AND o.created_at <= ?3`,
-    [storeId, start, end]
   )[0] as Record<string, unknown>;
   const p = db.all(
     `SELECT
@@ -66,7 +54,6 @@ export function analyticsPeriodOp(db: SyncSql, storeId: string, a: Record<string
   return {
     revenue: num(agg.revenue),
     orders: num(agg.orders),
-    customers: num(cust.n),
     profit: p.profit === null || p.profit === undefined ? null : num(p.profit),
     costedLines: num(p.costed_lines),
     missingLines: num(p.missing_lines),
@@ -197,26 +184,39 @@ export function analyticsCustomersOp(db: SyncSql, storeId: string, a: Record<str
 }
 
 /**
- * repeatPurchaseInDb (insights.routes.ts): paid orders since `sinceMs` grouped by the buyer key the dashboard uses (customer
- * id, else the shipping email LOWERCASED, else the shipping phone verbatim; each only a non-empty JSON string). An order with
- * none of the three is skipped (no `'guest:' || id` fallback, unlike CUSTOMER_KEY). Returns two counts, never the rows.
+ * Buyer identities (QA98-ALIAS-1): orders grouped by (customer id, lowercased shipping email, shipping phone) with a count each,
+ * so the API can fold guests into the ONE customer grouping (`CustomerGroups`) and count customers the way the list does.
+ * `all` = not deleted, created in [startMs, endMs] (distinct customers); `paid` = paid since `sinceMs` (repeat buyers, the
+ * the repeat-buyer population). Returns identity rows, never order rows.
  */
-export function analyticsRepeatBuyersOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
-  const since = intArg(a.sinceMs, 'sinceMs');
-  const row = db.all(
-    `SELECT COALESCE(SUM(CASE WHEN n >= 2 THEN 1 ELSE 0 END), 0) AS repeat, COUNT(*) AS buyers FROM (
-       SELECT COALESCE(
-         NULLIF(o.customer_id, ''),
-         NULLIF(LOWER(CASE WHEN json_type(o.shipping_address, '$.email') = 'text' THEN json_extract(o.shipping_address, '$.email') END), ''),
-         NULLIF(CASE WHEN json_type(o.shipping_address, '$.phone') = 'text' THEN json_extract(o.shipping_address, '$.phone') END, '')
-       ) AS buyer_key, COUNT(*) AS n
-       FROM orders o
-       WHERE o.store_id = ?1 AND o.payment_status = 'paid' AND o.created_at >= ?2
-       GROUP BY 1
-     ) per_buyer WHERE buyer_key IS NOT NULL`,
-    [storeId, since]
-  )[0] as Record<string, unknown> | undefined;
-  return { repeat: num(row?.repeat), buyers: num(row?.buyers) };
+export function analyticsBuyerIdentitiesOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+) {
+  const email = `LOWER(CASE WHEN json_type(o.shipping_address, '$.email') = 'text' THEN json_extract(o.shipping_address, '$.email') END)`;
+  const phone = `CASE WHEN json_type(o.shipping_address, '$.phone') = 'text' THEN json_extract(o.shipping_address, '$.phone') END`;
+  let where: string;
+  let params: unknown[];
+  if (a.mode === 'paid') {
+    where = `o.store_id = ?1 AND o.payment_status = 'paid' AND o.created_at >= ?2`;
+    params = [storeId, intArg(a.sinceMs, 'sinceMs')];
+  } else if (a.mode === 'all') {
+    where = `o.store_id = ?1 AND o.deleted_at IS NULL AND o.created_at >= ?2 AND o.created_at <= ?3`;
+    params = [storeId, intArg(a.startMs, 'startMs'), intArg(a.endMs, 'endMs')];
+  } else throw new MoneyError('BAD_ARGS', 'mode', 400);
+  return db
+    .all(
+      `SELECT NULLIF(o.customer_id, '') AS customerId, ${email} AS email, ${phone} AS phone, COUNT(*) AS n
+         FROM orders o WHERE ${where} GROUP BY 1, 2, 3`,
+      params
+    )
+    .map(r => ({
+      customerId: (r.customerId as string | null) ?? null,
+      email: (r.email as string | null) ?? null,
+      phone: (r.phone as string | null) ?? null,
+      n: num(r.n),
+    }));
 }
 
 /** getLowStockProducts: active, inventory-tracked products whose on-hand (variant-aware, active variants only) is <= threshold. */
@@ -253,7 +253,8 @@ export function analyticsStockOp(db: SyncSql, storeId: string) {
         WHEN EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id)
         THEN COALESCE((SELECT SUM(pv.inventory * COALESCE(pv.cost_price, p.cost_price, 0))
                          FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = 1), 0)
-        ELSE p.inventory * COALESCE(p.cost_price, 0) END), 0) AS total
+        ELSE p.inventory * COALESCE(p.cost_price, 0) END), 0) AS total,
+       ${STOCK_COST_COVERAGE_SQLITE}
        FROM products p WHERE p.store_id = ? AND p.deleted_at IS NULL`,
     [storeId]
   )[0] as Record<string, unknown>;
@@ -267,6 +268,8 @@ export function analyticsStockOp(db: SyncSql, storeId: string) {
   )[0] as Record<string, unknown>;
   return {
     stockValue: num(value.total),
+    stockedProducts: num(value.stocked),
+    uncostedProducts: num(value.uncosted),
     backorderCount: num(bo.count),
     backorderValue: num(bo.value),
   };

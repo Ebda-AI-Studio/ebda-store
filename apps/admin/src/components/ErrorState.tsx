@@ -22,7 +22,7 @@ export function ErrorState({ title, message, onRetry, retryText }: ErrorStatePro
   return (
     <div className="force-card py-16">
       <div className="flex flex-col items-center text-center">
-        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-destructive/5">
+        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-lg bg-destructive/5">
           <svg
             className="h-10 w-10 text-destructive"
             fill="none"

@@ -15,6 +15,7 @@ import { ColorField } from '../../../../components/ColorField';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import type { StoreTheme } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // Field names mirror the canonical AnnouncementBar shape from @ebda/shared
 // and the API's announcementSchema (`bgColor`, `link`). The previous local
@@ -119,8 +120,8 @@ export default function AnnouncementPage() {
     return (
       <AdminLayout title={t('title')} subtitle={t('subtitle')}>
         <div className="animate-pulse space-y-4" aria-busy="true">
-          <div className="h-20 rounded-xl bg-muted" />
-          <div className="h-64 rounded-xl bg-muted" />
+          <div className="h-20 rounded-md bg-muted" />
+          <div className="h-64 rounded-md bg-muted" />
         </div>
       </AdminLayout>
     );
@@ -152,7 +153,7 @@ export default function AnnouncementPage() {
 
       <div className="space-y-6 pb-24">
         {/* Content */}
-        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+        <div className="rounded-md border bg-card p-6 shadow-sm space-y-4">
           <h2 className="font-semibold text-foreground">{t('content')}</h2>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -165,7 +166,7 @@ export default function AnnouncementPage() {
                 value={settings.text}
                 onChange={e => setSettings(prev => ({ ...prev, text: e.target.value }))}
                 placeholder={t('textEnglishPlaceholder')}
-                className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               />
             </div>
             <div>
@@ -179,7 +180,7 @@ export default function AnnouncementPage() {
                 value={settings.textAr}
                 onChange={e => setSettings(prev => ({ ...prev, textAr: e.target.value }))}
                 placeholder={t('textArabicPlaceholder')}
-                className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               />
             </div>
           </div>
@@ -191,7 +192,7 @@ export default function AnnouncementPage() {
               value={settings.link}
               onChange={e => setSettings(prev => ({ ...prev, link: e.target.value }))}
               placeholder={t('linkUrlPlaceholder')}
-              className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={FIELD_CLASSES}
             />
             <p className="mt-1 text-xs text-muted-foreground">{t('linkUrlHint')}</p>
           </div>
@@ -206,7 +207,7 @@ export default function AnnouncementPage() {
                 value={settings.linkText}
                 onChange={e => setSettings(prev => ({ ...prev, linkText: e.target.value }))}
                 placeholder={t('linkTextEnglishPlaceholder')}
-                className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               />
             </div>
             <div>
@@ -220,7 +221,7 @@ export default function AnnouncementPage() {
                 value={settings.linkTextAr}
                 onChange={e => setSettings(prev => ({ ...prev, linkTextAr: e.target.value }))}
                 placeholder={t('linkTextArabicPlaceholder')}
-                className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               />
             </div>
           </div>
@@ -228,7 +229,7 @@ export default function AnnouncementPage() {
 
         {/* Text color. The background color is set in the visual editor
             (announcement section) — see the pointer above. */}
-        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+        <div className="rounded-md border bg-card p-6 shadow-sm space-y-4">
           <h2 className="font-semibold text-foreground">{t('colors')}</h2>
 
           <div className="grid gap-6 sm:grid-cols-2">

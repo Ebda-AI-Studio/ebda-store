@@ -12,7 +12,7 @@ export function StoreOwnerCard({ owner }: StoreOwnerCardProps) {
   const t = useT('stores.dashboard.owner');
   if (!owner) return null;
   return (
-    <div className="rounded-xl border bg-card shadow-sm">
+    <div className="rounded-md border bg-card shadow-sm">
       <div className="border-b p-4">
         <h2 className="font-semibold text-foreground">{t('title')}</h2>
       </div>

@@ -18,35 +18,35 @@ export function LoyaltyStatsCards({ stats }: LoyaltyStatsCardsProps) {
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-      <div className="bg-card rounded-xl border border-border p-4">
+      <div className="bg-card rounded-md border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('totalMembers')}</p>
         <p className="text-2xl font-bold text-foreground">{stats.totalMembers}</p>
       </div>
-      <div className="bg-card rounded-xl border border-border p-4">
+      <div className="bg-card rounded-md border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('pointsIssued')}</p>
         <p className="text-2xl font-bold text-success-ink">
           {stats.totalPointsIssued.toLocaleString(undefined, withNumerals())}
         </p>
       </div>
-      <div className="bg-card rounded-xl border border-border p-4">
+      <div className="bg-card rounded-md border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('pointsRedeemed')}</p>
         <p className="text-2xl font-bold text-primary">
           {stats.totalPointsRedeemed.toLocaleString(undefined, withNumerals())}
         </p>
       </div>
-      <div className="bg-card rounded-xl border border-border p-4">
+      <div className="bg-card rounded-md border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('outstanding')}</p>
         <p className="text-2xl font-bold text-info-ink">
           {stats.outstandingPoints.toLocaleString(undefined, withNumerals())}
         </p>
       </div>
-      <div className="bg-card rounded-xl border border-border p-4">
+      <div className="bg-card rounded-md border border-border p-4">
         <p className="text-sm text-muted-foreground mb-2">{t('tierBreakdown')}</p>
         <div className="flex gap-1">
           {Object.entries(stats.tierBreakdown).map(([tier, count]) => (
             <div
               key={tier}
-              className={`flex-1 h-2 rounded ${TIER_COLORS[tier]?.icon || 'bg-muted-foreground'}`}
+              className={`flex-1 h-2 rounded-md ${TIER_COLORS[tier]?.icon || 'bg-muted-foreground'}`}
               style={{ flex: count || 0.1 }}
               title={`${tier}: ${count}`}
             />

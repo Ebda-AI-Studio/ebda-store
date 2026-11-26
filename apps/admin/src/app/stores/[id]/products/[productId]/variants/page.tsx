@@ -52,8 +52,8 @@ export default function ProductVariantsPage() {
     return (
       <AdminLayout title={t('loading')} subtitle={t('loadingSubtitle')}>
         <div className="animate-pulse space-y-6">
-          <div className="h-24 bg-muted rounded-xl" />
-          <div className="h-64 bg-muted rounded-xl" />
+          <div className="h-24 bg-muted rounded-md" />
+          <div className="h-64 bg-muted rounded-md" />
         </div>
       </AdminLayout>
     );
@@ -102,7 +102,7 @@ export default function ProductVariantsPage() {
         </Button>
       }
     >
-      <div className="rounded-xl border bg-card p-6 shadow-sm mb-6">
+      <div className="rounded-md border bg-card p-6 shadow-sm mb-6">
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="font-semibold text-foreground">{product.name}</h2>

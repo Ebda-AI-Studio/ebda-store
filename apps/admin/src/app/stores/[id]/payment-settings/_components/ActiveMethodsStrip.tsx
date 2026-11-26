@@ -24,7 +24,7 @@ export function ActiveMethodsStrip({ rows }: { rows: ActiveMethodRow[] }) {
   return (
     <section
       aria-labelledby="payment-active-title"
-      className="mb-6 rounded-xl border border-border bg-card p-4 shadow-sm"
+      className="mb-6 rounded-md border border-border bg-card p-4 shadow-sm"
       data-testid="payment-active-strip"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">

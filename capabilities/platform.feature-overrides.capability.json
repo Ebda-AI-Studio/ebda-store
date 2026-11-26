@@ -5,7 +5,7 @@
   "version": 1,
   "versionDate": "2026-11-14",
   "titleAr": "تفعيل ميزات لمتجر",
-  "titleEn": "Per-store feature/plan overrides and add-on grants",
+  "titleEn": "Per-store feature/plan overrides and feature grants",
   "screens": ["/stores/[id]/features"],
   "api": ["GET/PUT/DELETE /admin/stores/:storeId/features(/:featureKey)", "PUT .../plan"],
   "mcpTool": null,
@@ -18,12 +18,12 @@
   },
   "operatorReason": {
     "code": null,
-    "text": "commercial exception / add-on grant",
+    "text": "commercial exception / feature grant",
     "validUnderRule": false
   },
   "helpArticle": null,
   "questions": {
-    "ar": ["الميزة دي مقفولة", "عايز افعل ..."],
+    "ar": ["الميزة دي مقفولة", "عايز افعل ...", "ازاي افعل ميزة لمتجر معين؟"],
     "en": ["Enable this feature for me"]
   },
   "steps": ["Super-admin console only."],

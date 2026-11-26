@@ -30,7 +30,7 @@ export function ZeroResultSearchesCard({ storeId }: { storeId: string }) {
       {failed ? (
         <p className="mt-3 text-xs text-muted-foreground">{t('loadFailed')}</p>
       ) : !data ? (
-        <div className="mt-3 h-16 animate-pulse rounded bg-muted" />
+        <div className="mt-3 h-16 animate-pulse rounded-md bg-muted" />
       ) : data.terms.length === 0 ? (
         <>
           <p className="mt-3 text-xs text-muted-foreground">{t('cardEmpty')}</p>

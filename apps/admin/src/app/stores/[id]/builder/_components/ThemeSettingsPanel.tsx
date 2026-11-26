@@ -224,7 +224,7 @@ export function ThemeSettingsPanel({
         <div key={s.id} className="space-y-0.5">
           <label className="flex items-center justify-between text-sm">
             <span>{label}</span>
-            <Toggle checked={v === true} onChange={on => set(s.id, on)} />
+            <Toggle checked={v === true} onChange={on => set(s.id, on)} label={label} />
           </label>
           {(locale === 'ar' ? s.hintAr : s.hintEn) && (
             <p className="text-xs text-muted-foreground">{locale === 'ar' ? s.hintAr : s.hintEn}</p>

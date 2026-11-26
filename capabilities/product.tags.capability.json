@@ -18,7 +18,7 @@
   },
   "helpArticle": "product-tags-faqs-and-variants",
   "questions": {
-    "ar": ["ازاي اضيف تاج للمنتج؟"],
+    "ar": ["ازاي اضيف تاج للمنتج؟", "ازاي امسح تاج؟", "فين صفحة الوسوم؟"],
     "en": ["Add tags"]
   },
   "steps": ["Tags page."],

@@ -8,10 +8,12 @@ import { api, type Order } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useFeatures } from '../../contexts/FeatureContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { formatDate as formatStoreDate } from '@/lib/format-date';
 
 export default function AccountDashboardClient() {
   const storeUrl = useStoreUrl();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { store } = useStore();
   const { t, language } = useLanguage();
   const { isEnabled } = useFeatures();
@@ -23,6 +25,9 @@ export default function AccountDashboardClient() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // STORE-QA-43: a guest is redirected to sign-in by the account layout; do not call the authed endpoints
+    // first (two red 401s in the console). Wait for the session answer, then fetch only when signed in.
+    if (authLoading || !isAuthenticated) return;
     fetchOrders();
     // Wishlist count — real data from the wishlist API (was hardcoded 0).
     api
@@ -31,7 +36,7 @@ export default function AccountDashboardClient() {
         if (r.success && Array.isArray(r.data?.items)) setWishlistCount(r.data.items.length);
       })
       .catch(() => undefined);
-  }, []);
+  }, [authLoading, isAuthenticated]);
 
   async function fetchOrders() {
     setError(null);

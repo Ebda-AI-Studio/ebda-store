@@ -71,6 +71,45 @@ export const taxReviewDecisionSchema = z.discriminatedUnion('decision', [
 ]);
 export type TaxReviewDecision = z.infer<typeof taxReviewDecisionSchema>;
 
+// ── Change of a VERIFIED registration (self-service A10) ─────────────────────
+// A verified merchant asks to change its TRN / legal name. The old verified
+// profile keeps working (VAT keeps charging under the old identity) until a
+// super-admin approves. The AI pre-check only reads fields off the uploaded
+// document; plain code compares them; a human decides (legal stays human).
+
+export const TAX_CHANGE_SETTING_PREFIX = 'tax.change.';
+
+export const taxChangeRequestSchema = z
+  .object({
+    taxRegistrationNumber: taxRegistrationNumberSchema,
+    legalName: z.string().trim().min(2).max(200),
+    kind: z.enum(TAX_DOCUMENT_KINDS),
+    /** Absent on the first call (the server answers with a preview + token); present on the confirming call. */
+    confirmToken: z.string().min(20).max(4096).optional(),
+  })
+  .strict();
+
+/**
+ * A decision names the EXACT request the reviewer looked at (the id, the document sha256 and the number the queue showed): a
+ * merchant who replaces the request between the list and the click gets a 409, never an approval of the new, unreviewed one.
+ */
+const taxChangeBinding = {
+  requestId: z.string().uuid(),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  taxRegistrationNumber: z.string().regex(/^\d{9}$/),
+};
+export const taxChangeDecisionSchema = z.discriminatedUnion('decision', [
+  z.object({ decision: z.literal('approve'), ...taxChangeBinding }).strict(),
+  z
+    .object({
+      decision: z.literal('reject'),
+      reason: z.string().trim().min(3).max(1000),
+      ...taxChangeBinding,
+    })
+    .strict(),
+]);
+export type TaxChangeDecision = z.infer<typeof taxChangeDecisionSchema>;
+
 /** The `409` code the settings route returns when VAT is enabled on an unverified store. */
 export const TAX_NOT_VERIFIED_CODE = 'TAX_NOT_VERIFIED';
 

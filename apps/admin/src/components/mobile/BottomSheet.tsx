@@ -64,7 +64,7 @@ export function BottomSheet({
   if (!open) return null;
 
   const desktopWrapperClass = fullSheet ? 'sm:items-end' : 'sm:items-center';
-  const desktopSheetClass = fullSheet ? 'sm:rounded-t-2xl' : 'sm:max-w-lg sm:rounded-2xl';
+  const desktopSheetClass = fullSheet ? 'sm:rounded-t-lg' : 'sm:max-w-lg sm:rounded-lg';
 
   return (
     <div
@@ -74,7 +74,7 @@ export function BottomSheet({
       aria-modal="true"
     >
       <div
-        className={`relative flex w-full flex-col rounded-t-2xl bg-card shadow-2xl ${desktopSheetClass}`}
+        className={`relative flex w-full flex-col rounded-t-lg bg-card shadow-xl ${desktopSheetClass}`}
         style={{ maxHeight: `${maxHeightVh}vh` }}
         onClick={e => e.stopPropagation()}
       >

@@ -14,6 +14,7 @@ import Image from 'next/image';
 import type { Product } from '@/lib/api';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { Model3dChip } from '../../components/commerce/Model3dChip';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { getProductPricing, getDiscountBadgeText } from '@/lib/product-pricing';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
@@ -258,6 +259,7 @@ export function ProductListItem({
             )}
             <SwatchDots product={product} max={5} />
             <FactChips product={product} className="mt-1" />
+            <Model3dChip product={product} className="mt-1" />
           </div>
           <div className="flex items-center gap-2">
             {/* Compare button for list view */}

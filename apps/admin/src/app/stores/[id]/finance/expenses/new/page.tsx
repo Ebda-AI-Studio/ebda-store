@@ -6,7 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { FormFooter } from '@/components/FormFooter';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, getApiUrl, localizedApiMessage } from '@/lib/api';
-import { minorToMajor } from '@/lib/format';
+import { formatPrice } from '@/lib/format';
 import { resolveUploadErrorMessage } from '@/lib/expense-upload-error';
 import {
   isCashOrBankAccount,
@@ -19,6 +19,7 @@ import {
 } from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AccountNode {
@@ -350,7 +351,7 @@ export default function NewExpensePage() {
     >
       <div className="max-w-2xl space-y-5">
         {/* ── OCR Upload Section ──────────────────────────────────────────── */}
-        <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+        <div className="rounded-md border border-border bg-muted/20 p-4 space-y-3">
           <p className="text-sm font-semibold">{t('ocr.title')}</p>
 
           <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
@@ -369,7 +370,7 @@ export default function NewExpensePage() {
                 }}
                 className="block w-full text-sm text-muted-foreground
                   file:mr-3 file:py-1.5 file:px-3
-                  file:rounded file:border file:border-border
+                  file:rounded-md file:border file:border-border
                   file:text-xs file:font-medium file:bg-background
                   file:cursor-pointer hover:file:bg-muted/50
                   disabled:opacity-50"
@@ -407,9 +408,9 @@ export default function NewExpensePage() {
             <p
               className={`text-xs ${
                 ocrStatus === 'error' || ocrStatus === 'timeout'
-                  ? 'text-red-600'
+                  ? 'text-destructive-ink'
                   : ocrStatus === 'success'
-                    ? 'text-green-600'
+                    ? 'text-success-ink'
                     : 'text-muted-foreground'
               }`}
             >
@@ -425,13 +426,13 @@ export default function NewExpensePage() {
         {/* Expense Date */}
         <label className="block space-y-1">
           <span className="text-sm font-medium">
-            {t('expenseDate')} <span className="text-red-500">*</span>
+            {t('expenseDate')} <span className="text-destructive-ink">*</span>
           </span>
           <input
             type="date"
             value={expenseDate}
             onChange={e => setExpenseDate(e.target.value)}
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={FIELD_CLASSES}
             required
           />
         </label>
@@ -442,7 +443,7 @@ export default function NewExpensePage() {
           <select
             value={supplierId}
             onChange={e => setSupplierId(e.target.value)}
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={FIELD_CLASSES}
           >
             <option value="">{t('selectSupplier')}</option>
             {suppliers.map(s => (
@@ -456,12 +457,12 @@ export default function NewExpensePage() {
         {/* Expense Account */}
         <label className="block space-y-1">
           <span className="text-sm font-medium">
-            {t('expenseCategoryLabel')} <span className="text-red-500">*</span>
+            {t('expenseCategoryLabel')} <span className="text-destructive-ink">*</span>
           </span>
           <select
             value={expenseAccountId}
             onChange={e => setExpenseAccountId(e.target.value)}
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={FIELD_CLASSES}
             required
           >
             <option value="">{t('selectExpenseAccount')}</option>
@@ -476,12 +477,12 @@ export default function NewExpensePage() {
         {/* Paid From Account */}
         <label className="block space-y-1">
           <span className="text-sm font-medium">
-            {t('paidFromAccountLabel')} <span className="text-red-500">*</span>
+            {t('paidFromAccountLabel')} <span className="text-destructive-ink">*</span>
           </span>
           <select
             value={paidFromAccountId}
             onChange={e => setPaidFromAccountId(e.target.value)}
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={FIELD_CLASSES}
             required
           >
             <option value="">{t('selectPaidFromAccount')}</option>
@@ -504,7 +505,7 @@ export default function NewExpensePage() {
                   setCurrency(e.target.value);
                   setFxRate('');
                 }}
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={FIELD_CLASSES}
               >
                 {ALLOWED_CURRENCIES.map(c => (
                   <option key={c} value={c}>
@@ -517,7 +518,7 @@ export default function NewExpensePage() {
             {requiresFxRate(currency) && (
               <label className="block space-y-1">
                 <span className="text-sm font-medium">
-                  {t('fxRateLabel', { currency })} <span className="text-red-500">*</span>
+                  {t('fxRateLabel', { currency })} <span className="text-destructive-ink">*</span>
                 </span>
                 <input
                   type="number"
@@ -525,7 +526,7 @@ export default function NewExpensePage() {
                   step="0.000001"
                   value={fxRate}
                   onChange={e => setFxRate(e.target.value)}
-                  className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
+                  className={`${FIELD_CLASSES} font-mono`}
                   placeholder={t('fxRatePlaceholder')}
                   required
                 />
@@ -540,7 +541,7 @@ export default function NewExpensePage() {
           <label className="block space-y-1">
             <span className="text-sm font-medium">
               {t('amount')} {isNonBase ? t('minorUnitsSuffix', { currency }) : ''}{' '}
-              <span className="text-red-500">*</span>
+              <span className="text-destructive-ink">*</span>
             </span>
             <input
               type="number"
@@ -548,14 +549,12 @@ export default function NewExpensePage() {
               step={isNonBase ? '1' : '0.01'}
               value={amount}
               onChange={e => setAmount(e.target.value)}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
+              className={`${FIELD_CLASSES} font-mono`}
               placeholder="0"
               required
             />
             {isNonBase && rawAmount > 0 && fxRateNum > 0 && (
-              <p className="text-xs text-muted-foreground">
-                = {minorToMajor(baseAmountFils)} {tc('egp')}
-              </p>
+              <p className="text-xs text-muted-foreground">= {formatPrice(baseAmountFils)}</p>
             )}
           </label>
           <label className="block space-y-1">
@@ -568,12 +567,10 @@ export default function NewExpensePage() {
               step={isNonBase ? '1' : '0.01'}
               value={taxAmount}
               onChange={e => setTaxAmount(e.target.value)}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
+              className={`${FIELD_CLASSES} font-mono`}
             />
             {isNonBase && rawTax > 0 && fxRateNum > 0 && (
-              <p className="text-xs text-muted-foreground">
-                = {minorToMajor(baseTaxFils)} {tc('egp')}
-              </p>
+              <p className="text-xs text-muted-foreground">= {formatPrice(baseTaxFils)}</p>
             )}
           </label>
         </div>
@@ -607,7 +604,7 @@ export default function NewExpensePage() {
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={3}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+              className={`${TEXTAREA_CLASSES} resize-none`}
             />
           </label>
           <label className="block space-y-1" dir="rtl">
@@ -616,7 +613,7 @@ export default function NewExpensePage() {
               value={notesAr}
               onChange={e => setNotesAr(e.target.value)}
               rows={3}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+              className={`${TEXTAREA_CLASSES} resize-none`}
               dir="rtl"
             />
           </label>
@@ -629,7 +626,7 @@ export default function NewExpensePage() {
             type="url"
             value={receiptUrl}
             onChange={e => setReceiptUrl(e.target.value)}
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={FIELD_CLASSES}
             placeholder="https://..."
           />
           <p className="text-xs text-muted-foreground">{t('receiptHint')}</p>

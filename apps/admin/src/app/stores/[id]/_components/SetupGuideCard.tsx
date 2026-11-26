@@ -81,7 +81,7 @@ export function SetupGuideCard({
     <div
       role="alert"
       data-testid="shipping-missing-warning"
-      className="mb-6 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-foreground"
+      className="mb-6 rounded-md border border-warning/40 bg-warning/10 p-4 text-sm text-foreground"
     >
       <p className="font-medium">{t('shippingWarning.title')}</p>
       <p className="mt-1 text-muted-foreground">{t('shippingWarning.body')}</p>
@@ -122,7 +122,7 @@ export function SetupGuideCard({
       {shippingWarning}
       <section
         aria-labelledby="setup-guide-title"
-        className="mb-6 rounded-xl border border-border bg-card p-4 md:p-5"
+        className="mb-6 rounded-md border border-border bg-card p-4 md:p-5"
       >
         <div className="flex items-start justify-between gap-4">
           <div>

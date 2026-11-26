@@ -19,9 +19,11 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useT } from '@/i18n/useT';
+import { useDndA11y } from '@/hooks/useDndA11y';
 import { RowActions } from '@/components/RowActions';
 
 import { Button, buttonVariants } from '@/components/ui/Button';
+import { EmptyState } from '@/components/EmptyState';
 interface Category {
   id: string;
   name: string;
@@ -162,7 +164,7 @@ function SortableCategoryRow({
         </div>
       </td>
       <td className="px-6 py-4">
-        <span className="font-mono text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+        <span className="font-mono text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
           {cat.slug}
         </span>
       </td>
@@ -238,6 +240,7 @@ export function CategoryTable({
   const locale = useLocale();
   const isRtl = locale === 'ar';
 
+  const dndA11y = useDndA11y();
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -255,12 +258,12 @@ export function CategoryTable({
       <div className="space-y-4 p-6">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="flex items-center gap-4 animate-pulse">
-            <div className="h-10 w-10 rounded-xl bg-muted" />
+            <div className="h-10 w-10 rounded-md bg-muted" />
             <div className="flex-1 space-y-2">
-              <div className="h-4 w-32 rounded bg-muted" />
-              <div className="h-3 w-20 rounded bg-muted" />
+              <div className="h-4 w-32 rounded-md bg-muted" />
+              <div className="h-3 w-20 rounded-md bg-muted" />
             </div>
-            <div className="h-8 w-20 rounded bg-muted" />
+            <div className="h-8 w-20 rounded-md bg-muted" />
           </div>
         ))}
       </div>
@@ -269,28 +272,12 @@ export function CategoryTable({
 
   if (categories.length === 0) {
     return (
-      <div className="force-empty-state px-6">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-          <svg
-            className="h-8 w-8 text-muted-foreground"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-            />
-          </svg>
-        </div>
-        <p className="font-semibold text-foreground">{t('empty')}</p>
-        <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('emptyDescription')}</p>
-        <Button type="button" onClick={onAddFirst} variant="default" className="mt-4 font-semibold">
-          {t('addFirst')}
-        </Button>
-      </div>
+      <EmptyState
+        icon="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+        title={t('empty')}
+        description={t('emptyDescription')}
+        action={{ label: t('addFirst'), onClick: onAddFirst }}
+      />
     );
   }
 
@@ -362,31 +349,31 @@ export function CategoryTable({
           <tr>
             <th
               scope="col"
-              className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
+              className="px-6 py-3 text-start text-sm font-medium text-muted-foreground uppercase tracking-wider"
             >
               {t('category')}
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
+              className="px-6 py-3 text-start text-sm font-medium text-muted-foreground uppercase tracking-wider"
             >
               {t('slug')}
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
+              className="px-6 py-3 text-start text-sm font-medium text-muted-foreground uppercase tracking-wider"
             >
               {t('products')}
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell"
+              className="px-6 py-3 text-start text-sm font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell"
             >
               {t('status')}
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider"
+              className="px-6 py-3 text-end text-sm font-medium text-muted-foreground uppercase tracking-wider"
             >
               {t('actions')}
             </th>
@@ -425,7 +412,12 @@ export function CategoryTable({
   return (
     <>
       {mobileCards}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <DndContext
+        {...dndA11y}
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={onDragEnd}
+      >
         <SortableContext items={categories.map(c => c.id)} strategy={verticalListSortingStrategy}>
           {tableBody}
         </SortableContext>

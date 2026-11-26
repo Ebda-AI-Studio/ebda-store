@@ -41,14 +41,6 @@ export interface Meta {
 
 export type AffiliateStatusAction = 'approve' | 'reject' | 'suspend';
 
-export const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-warning/10 text-warning-ink dark:bg-warning/30 dark:text-warning-ink',
-  approved: 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success-ink',
-  rejected:
-    'bg-destructive/10 text-destructive-ink dark:bg-destructive/30 dark:text-destructive-ink',
-  suspended: 'bg-muted text-foreground',
-};
-
 export const STATUS_FILTERS = ['all', 'pending', 'approved', 'rejected', 'suspended'] as const;
 
 export const DEFAULT_CONFIG: AffiliateConfig = {

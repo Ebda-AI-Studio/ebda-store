@@ -23,6 +23,7 @@ import { cfBindings } from '../../cf/bindings';
 import { AppError } from '../../middleware/error-handler';
 import { sendAlert } from '../alerts.service';
 import { postgresRemovedOnThisWorker } from '../../lib/postgres-present';
+import { sweepMemo } from '../../lib/sweep-scope';
 
 export type PlatformFamily =
   | 'billing'
@@ -162,7 +163,7 @@ function evaluateCutoverRows(
   return { moved: rows.some(r => k.markers.includes(r.key)), frozen };
 }
 
-const selectKeys = async (d1: MarkerD1, keys: readonly string[]): Promise<CutoverRow[]> =>
+const selectKeysLive = async (d1: MarkerD1, keys: readonly string[]): Promise<CutoverRow[]> =>
   (
     await d1
       .prepare(
@@ -172,12 +173,26 @@ const selectKeys = async (d1: MarkerD1, keys: readonly string[]): Promise<Cutove
       .all<CutoverRow>()
   ).results ?? [];
 
+/**
+ * MEMOISED read, ONLY for `readCutoverKeysMany` (the per-store customer-auth marker sweep, Sentry N+1: the same key set read once
+ * per store in one run). STALENESS CLASS: BOUNDED-stale; RESIDUAL WINDOW: at most OFF_TTL_MS (10 s) per key set, per cron job run /
+ * queue message (lib/sweep-scope.ts), never across invocations. Why safe: those keys are route markers, the same 10 s the in-process
+ * "off" verdict already tolerates. NEVER used by `readCutoverKeys`, `isFamilyFrozen` or `assertNotFrozen`: a freeze guards writes
+ * against a move snapshot, so it is always a fresh read (a freeze set mid-run must be seen on the very next guard call).
+ */
+const selectKeysMemo = (d1: MarkerD1, keys: readonly string[]): Promise<CutoverRow[]> =>
+  sweepMemo(
+    `cutover-keys:${[...keys].sort().join('|')}`,
+    () => selectKeysLive(d1, keys),
+    OFF_TTL_MS
+  );
+
 export async function readCutoverKeys(
   d1: MarkerD1,
   k: CutoverKeys
 ): Promise<{ moved: boolean; frozen: boolean }> {
   try {
-    return evaluateCutoverRows(await selectKeys(d1, [...k.markers, ...k.freezes]), k);
+    return evaluateCutoverRows(await selectKeysLive(d1, [...k.markers, ...k.freezes]), k);
   } catch {
     throw k.unreadable();
   }
@@ -200,7 +215,7 @@ export async function readCutoverKeysMany(
   const rows: CutoverRow[] = [];
   try {
     for (let i = 0; i < unique.length; i += MAX_KEYS_PER_READ)
-      rows.push(...(await selectKeys(d1, unique.slice(i, i + MAX_KEYS_PER_READ))));
+      rows.push(...(await selectKeysMemo(d1, unique.slice(i, i + MAX_KEYS_PER_READ))));
   } catch {
     throw sets[0]!.unreadable();
   }

@@ -7,6 +7,7 @@ import { apiGet } from '../../../../../../lib/api';
 import type { QrKind } from '@ebda/shared/qr';
 import { Segmented } from './Segmented';
 import type { QrTarget } from '../_hooks/useQr';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 type Option = { id: string; name: string; nameAr?: string | null; slug: string };
 
@@ -96,7 +97,7 @@ export function TargetPicker({ storeId, target, onChange, hasWhatsapp, link }: P
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder={t('productPlaceholder')}
-                className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
+                className={FIELD_CLASSES}
               />
               {results.length > 0 && (
                 <ul className="max-h-56 overflow-auto rounded-lg border border-border divide-y divide-border">
@@ -134,7 +135,7 @@ export function TargetPicker({ storeId, target, onChange, hasWhatsapp, link }: P
               c ? { kind: 'category', slug: c.slug, label: nameOf(c) } : { kind: 'category' }
             );
           }}
-          className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
+          className={FIELD_CLASSES}
         >
           <option value="">{t('categoryPlaceholder')}</option>
           {categories.map(c => (

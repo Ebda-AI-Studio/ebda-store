@@ -209,7 +209,9 @@ describe('store layout mounts the banner (M13)', () => {
     }));
     vi.doMock('../../hooks/useFeatures', () => ({
       AdminFeatureProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+      useFeatures: () => ({ storeMissing: false }),
     }));
+    vi.doMock('../StoreNotFound', () => ({ StoreNotFound: () => <p>store-not-found</p> }));
     vi.doMock('../../contexts/NotificationContext', () => ({
       useNotifications: () => ({ subscribeToStore: vi.fn(), unsubscribeFromStore: vi.fn() }),
     }));

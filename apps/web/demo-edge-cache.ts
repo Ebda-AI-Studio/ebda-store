@@ -35,7 +35,9 @@
  */
 import { getLook } from '@ebda/shared';
 import { retryableUnavailable } from './resolve-unavailable-edge';
+import { suspendedStore503 } from './suspended-store-edge';
 import { DEMO_HOSTS } from './src/lib/demo-hosts';
+import { noteDefinitiveMiss } from './resolve-miss-memo';
 import { renewNonce } from './csp-nonce-renew';
 import { buildScopedKey } from './edge-build-id';
 import {
@@ -154,6 +156,7 @@ export async function isDemoStoreHost(
       demoVerdict.set(host, { demo: false, until: now + 60_000, at: known?.at ?? 0 });
       return false;
     }
+    if (res.status === 404) noteDefinitiveMiss(host, now); // QA-90 (never for 429/5xx)
     if (res.ok) {
       const store = (
         (await res.json()) as { data?: { store?: { isDemo?: unknown; status?: unknown } } }
@@ -225,7 +228,9 @@ export async function serveDemoEdge(
 ): Promise<Response> {
   // Ruling RESOLVE-BULLETPROOF-1: a store-unresolvable render leaves as 503 + Retry-After, never 500 (and never stored).
   const origin = (r: Request) =>
-    render(r).then(res => retryableUnavailable(res, new URL(r.url).pathname));
+    render(r)
+      .then(res => retryableUnavailable(res, new URL(r.url).pathname))
+      .then(suspendedStore503);
   const requestKey = build ? demoEdgeKey(request) : null;
   if (!requestKey || !build) return origin(request);
   const key = buildScopedKey(requestKey, build);

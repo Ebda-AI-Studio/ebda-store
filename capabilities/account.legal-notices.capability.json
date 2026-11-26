@@ -16,9 +16,13 @@
     "class": "irreversible",
     "note": "no"
   },
-  "helpArticle": null,
+  "helpArticle": "policy-update-notices",
   "questions": {
-    "ar": ["جالي اشعار سياسة جديدة اعمل ايه؟"],
+    "ar": [
+      "جالي اشعار سياسة جديدة اعمل ايه؟",
+      "فين الاشعار القانوني اللي ظهرلي؟",
+      "لازم اوافق على السياسة الجديدة؟"
+    ],
     "en": ["I got a policy update notice, what do I do?"]
   },
   "steps": ["Banner/modal in admin shell."],

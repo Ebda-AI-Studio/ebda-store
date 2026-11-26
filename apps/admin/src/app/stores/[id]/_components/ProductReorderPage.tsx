@@ -164,7 +164,7 @@ export function ProductReorderPage({
       }
     >
       {error && (
-        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
+        <div className="mb-6 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
           {error}
           <button type="button" className="ms-4 font-medium underline" onClick={fetchProducts}>
             {t.retry}
@@ -173,13 +173,13 @@ export function ProductReorderPage({
       )}
 
       {isLoading ? (
-        <div className="space-y-3 rounded-xl border bg-card p-6 shadow-sm">
+        <div className="space-y-3 rounded-md border bg-card p-6 shadow-sm">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex items-center gap-4 animate-pulse">
               <div className="h-12 w-12 rounded-lg bg-muted" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 w-40 rounded bg-muted" />
-                <div className="h-3 w-24 rounded bg-muted" />
+                <div className="h-4 w-40 rounded-md bg-muted" />
+                <div className="h-3 w-24 rounded-md bg-muted" />
               </div>
               <div className="flex gap-1">
                 <div className="h-7 w-7 rounded-lg bg-muted" />
@@ -189,8 +189,8 @@ export function ProductReorderPage({
           ))}
         </div>
       ) : products.length === 0 ? (
-        <div className="rounded-xl border bg-card p-12 shadow-sm text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+        <div className="rounded-md border bg-card p-12 shadow-sm text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
             {emptyIcon}
           </div>
           <p className="font-semibold text-foreground">{t.empty}</p>
@@ -206,7 +206,7 @@ export function ProductReorderPage({
           )}
         </div>
       ) : (
-        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        <div className="rounded-md border bg-card shadow-sm overflow-hidden">
           {isDirty && (
             <div className="border-b border-warning/30 bg-warning/10 px-4 py-2 text-sm text-warning-ink">
               {t.unsavedChanges}
@@ -267,7 +267,7 @@ export function ProductReorderPage({
                   )}
                   <div className="mt-0.5 flex items-center gap-2">
                     {product.sku && (
-                      <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                      <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
                         {t.sku(product.sku)}
                       </span>
                     )}

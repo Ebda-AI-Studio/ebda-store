@@ -5,6 +5,11 @@
  * sessions are invalidated. Use as a last resort when an admin loses access
  * to their authenticator and has no backup codes.
  *
+ * LAST RESORT (self-service A23): a user who still has an authenticator or unused
+ * recovery codes makes a new set themselves (Account -> Security -> Recovery codes,
+ * step-up = password + live code). Run this only after verifying identity, when both
+ * are lost. See docs/runbooks/mfa-recovery.md. Super-admin/operator override: kept.
+ *
  * Usage:
  *   DIRECT_URL=<prod-direct-url> npx tsx scripts/mfa-reset.ts <email>
  *

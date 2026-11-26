@@ -116,13 +116,13 @@ export function PreviewCard({
       data-testid="preview-card"
       data-policy={card.policy}
       aria-label={t('card.label')}
-      className="grid gap-2 rounded-xl border border-border bg-background p-3 text-sm"
+      className="grid gap-2 rounded-md border border-border bg-background p-3 text-sm"
     >
       <p className="font-medium" dir="auto">
         {card.summary[lang]}
       </p>
       {stale && (
-        <p role="status" className="text-xs text-muted-foreground">
+        <p role="status" className="text-sm text-muted-foreground">
           {t('card.stale')}
         </p>
       )}
@@ -148,24 +148,24 @@ export function PreviewCard({
       </ul>
 
       {phase.k === 'applied' && (
-        <p role="status" className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <p role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <CircleCheck className="h-4 w-4" aria-hidden="true" />
           {canUndo ? t('card.applied') : t('card.appliedNoUndo')}
         </p>
       )}
       {phase.k === 'undone' && (
-        <p role="status" className="text-xs text-muted-foreground">
+        <p role="status" className="text-sm text-muted-foreground">
           {t('card.undone')}
         </p>
       )}
       {phase.k === 'failed' && (
-        <p role="alert" className="text-xs text-destructive-ink">
+        <p role="alert" className="text-sm text-destructive-ink">
           {t(`card.failed.${phase.why}`)}
         </p>
       )}
 
       {confirmClass ? (
-        <p role="note" className="text-xs text-muted-foreground">
+        <p role="note" className="text-sm text-muted-foreground">
           {t('card.needsConfirm')}
         </p>
       ) : (
@@ -190,7 +190,7 @@ export function PreviewCard({
         </div>
       )}
       {!confirmClass && mode !== 'act' && phase.k !== 'applied' && (
-        <p id={`${card.previewId}-mode`} className="text-xs text-muted-foreground">
+        <p id={`${card.previewId}-mode`} className="text-sm text-muted-foreground">
           {t('card.suggestionMode')}
         </p>
       )}

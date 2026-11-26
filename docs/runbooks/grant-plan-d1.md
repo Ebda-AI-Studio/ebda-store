@@ -17,7 +17,7 @@ CLOUDFLARE_ACCOUNT_ID=<personal acct> PLATFORM_DB_ID=<ebda-platform uuid> \
 - Decisions: `grant`, `noop` (already on that plan/interval, active, nothing pending), `refuse` (missing/deleted store,
   unknown plan, no subscription, active instapay store with paid history).
 - Writes on apply, in order: `store_subscriptions` (compare-and-set on `updated_at`; plan, `active`, interval, period now
-  to +1 interval, `instapay`; `pending_plan_code`, `trial_ends_at`, dunning cleared), `stores.plan` = the plan's feature
+  to +1 interval, `instapay`; `pending_plan_code`, `pending_billing_interval`, `trial_ends_at`, dunning cleared), `stores.plan` = the plan's feature
   tier, one `platform_audit_log` row `billing.plan_granted_no_payment` (with `--reason`). Statements 2 and 3 only write
   if statement 1 landed. No `billing_events` row, no amount, no VAT.
 - Cache residual (BOUNDED-stale, not busted by the script): the feature cache expires within 5 minutes (CACHE_TTL 300 s)

@@ -62,19 +62,20 @@ describe('money operations', () => {
     const r = rig();
     expect(r.code('loyaltyEarn', { ...earn, customerId: 'c2' })).toBe('ORDER_NOT_FOUND/404');
   });
-  it('a reversal after a spend floors at the balance and still records the full reversal row', () => {
+  it('a reversal after a spend takes back the FULL earn: the spent part is debt, never forgiven (#631)', () => {
     const r = rig();
     r.op('loyaltyEarn', earn);
     r.raw.exec(`UPDATE loyalty_points SET points = 30 WHERE customer_id = 'c1'`);
     expect(r.op('loyaltyReverseEarned', { orderId: 'o1' })).toMatchObject({
-      pointsReversed: 30,
-      newBalance: 0,
+      pointsReversed: 100,
+      newBalance: -70,
+      debt: 70,
     });
     expect(r.op('loyaltyReverseEarned', { orderId: 'o1' })).toMatchObject({
       pointsReversed: 0,
       replayed: true,
     });
-    expect(r.q('SELECT points FROM loyalty_points')[0].points).toBe(0);
+    expect(r.q('SELECT points FROM loyalty_points')[0].points).toBe(-70);
   });
 });
 

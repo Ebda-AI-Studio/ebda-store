@@ -72,12 +72,16 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+      - name: Ratchet files at the merge-base (per-entry rule and staleness cap live in merge-base-tree.sh)
+        run: |
+          # the script reaches the base branch only when its adoption PR merges; until then the guard compares against the tip alone
+          if [ -f base/.github/pr-quality/merge-base-tree.sh ]; then bash base/.github/pr-quality/merge-base-tree.sh base "$GITHUB_WORKSPACE/mb"; fi
       - name: no-any, no-console, todo-no-issue, emoji-copy, duplicate-helper, unused-export (baseline may only shrink, judged against the base)
-        run: node base/.github/pr-quality/slop-guard.mjs --root pr --base-root base
+        run: node base/.github/pr-quality/slop-guard.mjs --root pr --base-root base --merge-base-root "$GITHUB_WORKSPACE/mb"
 
       - name: Remove the checkouts (a shared runner keeps its workspace between jobs; never leave a fork's files on it)
         if: always()
-        run: rm -rf "$GITHUB_WORKSPACE/pr" "$GITHUB_WORKSPACE/base"
+        run: rm -rf "$GITHUB_WORKSPACE/pr" "$GITHUB_WORKSPACE/base" "$GITHUB_WORKSPACE/mb"
 
   capability-ratchet:
     name: Capability baselines
@@ -98,10 +102,17 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - name: Capability baselines may only shrink (judged against the base branch)
+      - name: Capability baselines may only shrink (judged against the merge-base, else the base branch tip)
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           if [ -f base/.github/pr-quality/capability-ratchet.mjs ]; then
-            node base/.github/pr-quality/capability-ratchet.mjs --base base --pr pr
+            # a main that shrank a baseline after this PR branched must not fail it: unchanged entries may keep their merge-base value
+            git -C base fetch --no-tags origin "+refs/pull/$PR/head:refs/pr/head"
+            [ "$(git -C base rev-parse refs/pr/head)" = "$HEAD" ] || { echo "::error::PR head moved while the job started; re-run"; exit 1; }
+            if [ -f base/.github/pr-quality/merge-base-tree.sh ]; then bash base/.github/pr-quality/merge-base-tree.sh base "$GITHUB_WORKSPACE/mb"; fi
+            node base/.github/pr-quality/capability-ratchet.mjs --base base --pr pr --merge-base-root "$GITHUB_WORKSPACE/mb"
           else
             # the adoption PR: the script reaches the base branch only when this PR merges; every later PR is judged by it
             echo "::notice::capability-ratchet.mjs is not on the base branch yet (adoption PR): nothing to compare"
@@ -109,4 +120,4 @@ jobs:
 
       - name: Remove the checkouts (a shared runner keeps its workspace between jobs; never leave a fork's files on it)
         if: always()
-        run: rm -rf "$GITHUB_WORKSPACE/pr" "$GITHUB_WORKSPACE/base"
+        run: rm -rf "$GITHUB_WORKSPACE/pr" "$GITHUB_WORKSPACE/base" "$GITHUB_WORKSPACE/mb"

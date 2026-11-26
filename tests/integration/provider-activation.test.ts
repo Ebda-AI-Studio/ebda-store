@@ -47,6 +47,7 @@ import { serveStub, type ServedStub } from '../stubs/serve';
 // The admin routes require MFA enrolment; the gate itself is covered elsewhere.
 vi.mock('@api/middleware/require-mfa', () => ({
   requireMfaEnrolled: (_q: unknown, _s: unknown, next: () => void) => next(),
+  requireRecentLogin: (_q: unknown, _s: unknown, next: () => void) => next(),
 }));
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';

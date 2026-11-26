@@ -14,6 +14,7 @@ import { isWorkers } from './lib/runtime';
 import { config } from './config';
 import { errorHandler, AppError } from './middleware/error-handler';
 import { requestLogger } from './middleware/request-logger';
+import { requestBudget } from './lib/request-budget';
 import {
   securityHeaders,
   requestId,
@@ -176,6 +177,8 @@ app.use(writeFreeze);
 // Operator-only per-hop timing LOG (x-hop-timing must equal the HOP_TIMING_TOKEN secret; never a
 // response header), see lib/hop-timing.ts.
 app.use(hopTiming);
+// FOLD-COUNTERS: per-route counter + latency to Analytics Engine, before every router so a new route is counted.
+app.use(requestBudget());
 // Server-Timing: auth / identity / db-wait / handler (BE:E-1) next to request-tx.
 app.use(serverTiming);
 // RATE_LIMITED bodies from every limiter carry details.messageAr/messageEn (BE:E-3).

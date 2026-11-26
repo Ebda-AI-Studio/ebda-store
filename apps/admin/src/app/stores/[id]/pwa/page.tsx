@@ -69,7 +69,7 @@ export default function PWASettingsPage() {
         </div>
       ) : (
         <div className="space-y-6 pb-24">
-          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
+          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-md border border-border bg-card p-4">
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold text-foreground">
                 {tActions('switchTitle')}
@@ -110,7 +110,7 @@ export default function PWASettingsPage() {
             theme={storeInfo?.theme as StoreTheme | undefined}
           />
 
-          <details className="rounded-xl border border-border bg-card p-4">
+          <details className="rounded-md border border-border bg-card p-4">
             <summary className="cursor-pointer text-sm font-semibold text-foreground">
               {tPage('advanced')}
             </summary>

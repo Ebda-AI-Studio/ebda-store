@@ -28,7 +28,7 @@ export function AcquisitionCard({ acquisition }: AcquisitionCardProps) {
     : [];
   const shown = rows.filter(([, v]) => !!v);
   return (
-    <div className="rounded-xl border bg-card shadow-sm" data-testid="acquisition-card">
+    <div className="rounded-md border bg-card shadow-sm" data-testid="acquisition-card">
       <div className="border-b p-4">
         <h2 className="font-semibold text-foreground">{t('title')}</h2>
       </div>

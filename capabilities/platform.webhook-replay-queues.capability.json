@@ -28,8 +28,12 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": [],
-    "en": []
+    "ar": [
+      "ازاي اعيد تشغيل حدث فشل؟",
+      "رسايل الايميل الفاشلة اعمل فيها ايه؟",
+      "فين طابور الرسايل الفاشلة؟"
+    ],
+    "en": ["How do I replay a failed webhook?"]
   },
   "steps": ["Super-admin console only."],
   "edgeCases": [

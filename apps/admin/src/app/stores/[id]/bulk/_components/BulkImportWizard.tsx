@@ -14,6 +14,7 @@ import type {
 } from './types';
 import { BulkImportPreview } from './BulkImportPreview';
 import { BulkImportResults } from './BulkImportResults';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface ImportArgs {
   fileKind: FileKind;
@@ -147,7 +148,7 @@ export function BulkImportWizard({
   return (
     <div className="space-y-6">
       {/* Instructions */}
-      <div className="rounded-xl border bg-info/5 p-6">
+      <div className="rounded-md border bg-info/5 p-6">
         <h3 className="font-semibold text-info-ink">{t('instructionsTitle')}</h3>
         <ol className="mt-3 list-decimal list-inside space-y-2 text-sm text-info-ink">
           <li>{t('step1')}</li>
@@ -175,7 +176,7 @@ export function BulkImportWizard({
       </div>
 
       {/* File Upload */}
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
+      <div className="rounded-md border bg-card p-6 shadow-sm">
         <h3 className="font-semibold text-foreground mb-4">{t('uploadTitle')}</h3>
 
         <div className="space-y-4">
@@ -225,7 +226,7 @@ export function BulkImportWizard({
               id="updateExisting"
               checked={updateExisting}
               onChange={e => setUpdateExisting(e.target.checked)}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
             />
             <Label htmlFor="updateExisting" className="text-sm font-normal">
               {t('updateExisting')}
@@ -272,7 +273,7 @@ export function BulkImportWizard({
                     id="defaultStatus"
                     value={defaultStatus}
                     onChange={e => setDefaultStatus(e.target.value as DefaultStatus)}
-                    className="mt-2 block h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    className={`${FIELD_CLASSES} mt-2 block`}
                   >
                     <option value="active">{t('statusActive')}</option>
                     <option value="draft">{t('statusDraft')}</option>
@@ -284,7 +285,7 @@ export function BulkImportWizard({
                     id="trackInventory"
                     checked={trackInventory}
                     onChange={e => setTrackInventory(e.target.checked)}
-                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                    className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
                   />
                   <Label htmlFor="trackInventory" className="text-sm font-normal">
                     {t('trackInventory')}

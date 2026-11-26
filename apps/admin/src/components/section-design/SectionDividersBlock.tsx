@@ -7,6 +7,7 @@
 import { useT } from '@/i18n/useT';
 import { ColorField } from '../ColorField';
 import { Toggle } from '../Toggle';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 export function RowToggle({
   label,
@@ -20,7 +21,7 @@ export function RowToggle({
   return (
     <label className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm">
       <span className="text-foreground">{label}</span>
-      <Toggle checked={checked} onChange={onChange} />
+      <Toggle checked={checked} onChange={onChange} label={label} />
     </label>
   );
 }
@@ -291,11 +292,7 @@ export function DividerStyleSelect({
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
-      >
+      <select value={value} onChange={e => onChange(e.target.value)} className={FIELD_CLASSES}>
         {options.map(([v, l]) => (
           <option key={v} value={v}>
             {l}

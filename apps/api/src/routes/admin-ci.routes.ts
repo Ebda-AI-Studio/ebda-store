@@ -1,4 +1,8 @@
 import { runBuyerKeyBackfill, MAX_BUDGET } from '../lib/wa/buyer-key-backfill';
+import {
+  runSaleJournalBackfill,
+  SALE_BACKFILL_MAX_BUDGET,
+} from '../lib/accounting/sale-journal-backfill';
 import { backfillImageVariants } from '../services/image-variants.service';
 import { AppError } from '../middleware/error-handler';
 import { Router, Request, Response, NextFunction } from 'express';
@@ -212,6 +216,46 @@ router.post(
       const r = await runBuyerKeyBackfill({ ...body, secret });
       await auditLog({
         action: 'wa.buyer_key_backfill',
+        userId: req.user!.userId,
+        resourceType: 'platform',
+        resourceId: body.storeId ?? 'all',
+        details: {
+          dryRun: r.dryRun,
+          totals: r.totals,
+          resumed: !!body.cursor,
+          done: r.nextCursor === null,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: r });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+const saleJournalBackfillBody = z
+  .object({
+    /** DEFAULT TRUE: nothing is posted unless the caller says `dryRun: false`. */
+    dryRun: z.boolean().default(true),
+    cursor: z.string().max(2048).optional(),
+    budget: z.number().int().min(1).max(SALE_BACKFILL_MAX_BUDGET).optional(),
+    storeId: z.string().uuid().optional(),
+  })
+  .strict();
+
+// POST /admin/accounting/sale-journal-backfill: post the missing GL sale entry for PAID orders that never got one (COD "Mark paid" lost its
+// order/created event on a Worker). Journal only: never re-sends order/created (no email/push). Idempotent, dry-run by default, resumable.
+router.post(
+  '/accounting/sale-journal-backfill',
+  ...superAdmin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = parseInput(saleJournalBackfillBody, req.body);
+      const r = await runSaleJournalBackfill(body);
+      await auditLog({
+        action: 'accounting.sale_journal_backfill',
         userId: req.user!.userId,
         resourceType: 'platform',
         resourceId: body.storeId ?? 'all',

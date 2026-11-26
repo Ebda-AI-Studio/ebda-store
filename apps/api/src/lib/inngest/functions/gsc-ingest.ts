@@ -25,6 +25,7 @@
  *
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
+import { readStorePlan } from '../../store-plan';
 import type { JobDef } from '../../jobs/types';
 import { allStoresDirectory, runInStoreCtx, withStoreDb } from '../../jobs/store-db';
 import logger from '../../logger';
@@ -184,7 +185,21 @@ const gscIngestCronFn = inngest.createFunction(
       ).then(list => list.map(s => ({ id: s.id })))
     );
 
-    const batches = chunk(stores, BULK_AI_BATCH_SIZE);
+    // Stores to visit: entitlement read in one batched prefetch per run (selection only). The per-store gate below stays a
+    // LIVE read, so a downgrade mid-run is still honoured before any paid action (entitlements are NEVER-stale).
+    const enabledIds = new Set(
+      await step.run('select-enabled-stores', () =>
+        featureService.selectEnabled(
+          stores.map(s => s.id),
+          'answer_engine_insights'
+        )
+      )
+    );
+
+    const batches = chunk(
+      stores.filter(s => enabledIds.has(s.id)),
+      BULK_AI_BATCH_SIZE
+    );
 
     let ingested = 0;
     let skipped = 0;
@@ -247,9 +262,7 @@ export const gscIngestOnDemand: JobDef = inngest.createFunction(
     // this on-demand twin must apply the same exclusion (mirrors
     // `stock-reorder-scan.ts` / `answer-engine-citation-scan.ts`'s on-demand
     // plan gate).
-    const store = await withStoreDb(storeId, db =>
-      db.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-    );
+    const store = await withStoreDb(storeId, db => readStorePlan(db as never, storeId));
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },

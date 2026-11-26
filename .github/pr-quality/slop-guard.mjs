@@ -10,6 +10,12 @@
 //     then enforced against DIR's baseline, not the PR's copy: the PR baseline may not contain an id DIR's lacks, no violation outside DIR's
 //     baseline is allowed, and none of the PR's eslint-suppressions.json may total more per rule than DIR's. DIR's .pr-quality.json also wins.
 //     A DIR with no baseline yet (the adoption PR) falls back to the plain check.
+//   --merge-base-root DIR  (CI; built by merge-base-tree.sh) a data tree of the ratchet files as of merge-base(base, PR head) plus `.mb-touched`, the
+//     files the PR changed since then. Rule for EVERY ratchet entry (slop id, eslint suppression entry, capability baseline id): the allowed value is the
+//     base TIP's. The ONE exception: an entry the PR leaves unchanged (same key, its source file NOT in `.mb-touched`) may keep its merge-base value, so
+//     a main that shrank after the PR branched does not fail it. Anything the PR touches is judged against the tip, so an OLD merge-base cannot
+//     resurrect an exemption on code the PR edits. merge-base-tree.sh refuses (no `.mb-touched` written => plain tip comparison) when the merge-base is
+//     more than 200 commits or 7 days behind the tip (MB_MAX_COMMITS / MB_MAX_DAYS).
 // Config (.pr-quality.json): { "roots": ["apps","packages"], "locales": ["apps/web/messages"], "baseline": ".pr-quality-baseline.json",
 //   "skip": ["generated"], "frameworkExports": ["extra names"], "ruleExemptions": [{ "rule": "unused-export", "path": "<foundation.lock.json dir>",
 //   "reason": "...", "requires": "<foundation.lock.json parity test>" }] }.  Ruling SLOP-VENDORED-1: the ONLY exemption that exists. It waives the
@@ -19,7 +25,7 @@
 //   duplicate-helper has its own narrow escape (Ruling SLOP-TWIN-1): `// pq-allow(duplicate-helper): twin of <path>` above BOTH copies, each pointing at the
 //   other; honoured only while the twin file exists, has the same function with an identical body, and points back.
 import { readFileSync, readdirSync, lstatSync, existsSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, resolve, sep, isAbsolute, posix } from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
@@ -106,7 +112,7 @@ function functions(text) {
   return allFunctions(text).filter((f) => f.len >= 160 && f.nlines >= 5 && !FRAMEWORK.has(f.name));
 }
 
-export function scan({ root, config = {} }) {
+export function scan({ root, config = {}, baseRoot = null }) {
   const roots = config.roots ?? ['apps', 'packages', 'src'];
   const fw = new Set([...FRAMEWORK, ...(config.frameworkExports ?? [])]);
   const viol = new Map(); // id -> description
@@ -154,7 +160,7 @@ export function scan({ root, config = {} }) {
     }
   }
 
-  const waived = vendoredExemption(root, config);
+  const waived = vendoredExemption(root, config, baseRoot);
   if (waived.dir) {
     for (const id of [...viol.keys()]) if (id.startsWith('unused-export|') && id.split('|')[1].startsWith(`${waived.dir}/`)) viol.delete(id);
   } else if ((config.ruleExemptions ?? []).length) {
@@ -173,6 +179,29 @@ export function scan({ root, config = {} }) {
   return viol;
 }
 
+/** the merge-base reference tree, or null when it is absent (no `.mb-touched` = disabled = tip comparison) */
+export function mergeBaseRef(dir) {
+  if (!dir || !existsSync(join(dir, '.mb-touched'))) return null;
+  const list = (f) => (existsSync(join(dir, f)) ? new Set(readFileSync(join(dir, f), 'utf8').split('\n').filter(Boolean)) : new Set());
+  // `.mb-paths` = every path in the merge-base tree; a missing list means no id can name a real file (fail closed: tip comparison)
+  return { dir, touched: list('.mb-touched'), paths: list('.mb-paths') };
+}
+/** the source file an id names (`rule|path|...`) ONLY when that path is a real file in the merge-base tree; otherwise null = no merge-base allowance
+ *  (route ids like `/dashboard`, dotted names like `analytics.dashboard` and ids with no path are judged against the base tip alone) */
+export const sourceOfId = (id, mb) => { const p = id.split('|')[1]; return p && mb.paths.has(p) ? p : null; };
+
+/** per ENTRY (`suppressions-file`, source key, rule) counts over every eslint-suppressions.json under root */
+export function eslintEntries(root, roots = ['apps', 'packages']) {
+  const rootFile = join(root, 'eslint-suppressions.json');
+  const names = [...(existsSync(rootFile) && lstatSync(rootFile).isFile() ? ['eslint-suppressions.json'] : []), ...walk(root, roots).filter((f) => f.endsWith('/eslint-suppressions.json'))];
+  const entries = new Map();
+  for (const f of names) {
+    const data = readJsonRegular(join(root, f));
+    for (const [src, rules] of Object.entries(data)) for (const [rule, v] of Object.entries(rules)) entries.set(JSON.stringify([f, src, rule]), { f, src, rule, n: v?.count ?? 0 });
+  }
+  return { entries, files: names.length };
+}
+
 /** sum of counts per `suppressions-file|rule` over every eslint-suppressions.json under root (a moved file keeps its total) */
 export function eslintTotals(root, roots = ['apps', 'packages']) {
   const rootFile = join(root, 'eslint-suppressions.json');
@@ -185,12 +214,27 @@ export function eslintTotals(root, roots = ['apps', 'packages']) {
   return { totals, files: names.length };
 }
 
-/** `file|rule` keys whose total grew over the base's. A base with no suppression files at all is the adoption PR: nothing to compare. */
-export function eslintGrowth(root, baseRoot, roots) {
-  const base = eslintTotals(baseRoot, roots);
+/** entries whose count exceeds the allowed one: the base TIP's, or (untouched source file, merge-base reference `mb`) the larger of tip and merge-base.
+ *  A base with no suppression files at all is the adoption PR: nothing to compare. Per ENTRY, never a per-file total: entries cannot be traded. */
+export function eslintGrowth(root, baseRoot, roots, mb = null) {
+  const base = eslintEntries(baseRoot, roots);
   if (base.files === 0) return [];
-  const cur = eslintTotals(root, roots);
-  return [...cur.totals].filter(([k, n]) => n > (base.totals.get(k) ?? 0)).map(([k, n]) => `${k} ${base.totals.get(k) ?? 0} -> ${n}`);
+  const cur = eslintEntries(root, roots);
+  const ref = mb ? eslintEntries(mb.dir, roots) : null;
+  const out = [];
+  for (const [k, e] of cur.entries) {
+    const tip = base.entries.get(k)?.n ?? 0;
+    let allowed = tip;
+    if (ref && ref.files > 0) {
+      const dir = e.f.includes('/') ? e.f.slice(0, e.f.lastIndexOf('/')) : '.';
+      const paths = [e.src, dir === '.' ? e.src : `${dir}/${e.src}`];
+      const real = paths.some((x) => mb.paths.has(x)); // the source must be a real file at the merge-base
+      const touched = paths.some((x) => mb.touched.has(x));
+      if (real && !touched) allowed = Math.max(tip, ref.entries.get(k)?.n ?? 0);
+    }
+    if (e.n > allowed) out.push(`${e.f}|${e.src}|${e.rule} ${tip} -> ${e.n}`);
+  }
+  return out;
 }
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
@@ -210,11 +254,32 @@ function* filesUnder(root, dir) {
  * Valid only when: exactly one entry { rule: 'unused-export', path === foundation.lock.json "dir", reason, requires === the lock's parity test and it
  * exists }, AND every file the lock names under `dir` has the locked sha256, AND no file under `dir` is outside the lock.
  */
-export function vendoredExemption(root, config = {}) {
+/** A lock-supplied relative path is data from the PR: reject absolute, backslash, empty and any `..` segment before it touches the file system. */
+function safeRel(rel) {
+  if (typeof rel !== 'string' || rel === '' || isAbsolute(rel) || rel.includes('\\') || rel.includes('\0')) return false;
+  const n = posix.normalize(rel);
+  return !(n === '..' || n.startsWith('../') || n.split('/').includes('..')) && !isAbsolute(n);
+}
+const inside = (parent, child) => child === parent || child.startsWith(parent.endsWith(sep) ? parent : parent + sep);
+
+/**
+ * `baseRoot` (CI and the pre-push hook pass --base-root): the exemption is only trusted while the PR's foundation.lock.json is BYTE-IDENTICAL to the base
+ * branch's. The lock is data the PR controls; read from the PR root alone, a PR could edit the lock and the vendored files together and waive its own
+ * code. A real foundation bump therefore does not get the waiver on its own PR (its new vendored exports must be justified inline or land after the lock
+ * is on the base), which is the conservative side. No base lock = nothing to trust = no exemption.
+ */
+export function vendoredExemption(root, config = {}, baseRoot = null) {
   const entries = config.ruleExemptions ?? [];
   if (entries.length === 0) return { dir: null, why: 'none configured' };
   const lockPath = join(root, 'foundation.lock.json');
   if (!existsSync(lockPath)) return { dir: null, why: 'no foundation.lock.json' };
+  if (baseRoot) {
+    const baseLock = join(baseRoot, 'foundation.lock.json');
+    if (!existsSync(baseLock)) return { dir: null, why: 'the base branch has no foundation.lock.json to trust' };
+    if (!readFileSync(baseLock).equals(readFileSync(lockPath))) {
+      return { dir: null, why: "foundation.lock.json differs from the base branch's (the lock is PR-controlled; a bump gets no waiver on its own PR)" };
+    }
+  }
   let lock;
   try { lock = readJsonRegular(lockPath); } catch (e) { return { dir: null, why: String(e.message) }; }
   if (entries.length !== 1) return { dir: null, why: 'exactly one exemption is allowed' };
@@ -222,7 +287,18 @@ export function vendoredExemption(root, config = {}) {
   if (x.rule !== 'unused-export') return { dir: null, why: `rule ${x.rule}: only unused-export may be exempted` };
   if (typeof x.reason !== 'string' || x.reason.trim().length < 10) return { dir: null, why: 'a real reason is required' };
   if (x.path !== lock.dir) return { dir: null, why: `path ${x.path} is not exactly the vendored folder ${lock.dir}` };
+  // path safety: dir, parity and every entry stay inside the checkout (and entries under dir stay inside dir) before anything is stat'ed or read
+  const rootAbs = resolve(root);
+  if (!safeRel(lock.dir) || !inside(rootAbs, resolve(rootAbs, lock.dir))) return { dir: null, why: 'foundation.lock.json "dir" is not a safe path inside the repo' };
+  const dirAbs = resolve(rootAbs, lock.dir);
+  if (!safeRel(lock.parity) || !inside(rootAbs, resolve(rootAbs, lock.parity))) return { dir: null, why: 'foundation.lock.json "parity" is not a safe path inside the repo' };
   if (x.requires !== lock.parity || !existsSync(join(root, x.requires))) return { dir: null, why: 'the parity test is missing' };
+  for (const rel of Object.keys(lock.files ?? {})) {
+    if (!safeRel(rel)) return { dir: null, why: `foundation.lock.json entry ${JSON.stringify(rel)} is not a safe relative path` };
+    const abs = resolve(rootAbs, rel);
+    if (!inside(rootAbs, abs)) return { dir: null, why: `foundation.lock.json entry ${rel} escapes the repo` };
+    if (rel.startsWith(`${lock.dir}/`) && !inside(dirAbs, abs)) return { dir: null, why: `foundation.lock.json entry ${rel} escapes ${lock.dir}` };
+  }
   for (const [rel, want] of Object.entries(lock.files ?? {})) {
     if (!rel.startsWith(`${lock.dir}/`) && rel !== lock.parity) continue;
     const p = join(root, rel);
@@ -249,11 +325,11 @@ function main() {
   const cfgPath = arg('--config', join(root, '.pr-quality.json'));
   const config = (baseRoot && readCfg(baseRoot)) || (existsSync(cfgPath) ? readJsonRegular(cfgPath) : {});
   const basePath = arg('--baseline', join(root, config.baseline ?? '.pr-quality-baseline.json'));
-  const current = scan({ root, config });
+  const current = scan({ root, config, baseRoot });
   if (a.includes('--list')) { for (const d of current.values()) console.log(d); console.log(`${current.size} violation(s)`); return; }
   // SLOP-VENDORED-1: ids the active exemption waives are ignored on BOTH sides (an old baseline entry for a waived vendored export is
   // neither "fixed but still listed" nor needed), so the exemption never forces every later PR to rewrite the baseline.
-  const waivedDir = vendoredExemption(root, config).dir;
+  const waivedDir = vendoredExemption(root, config, baseRoot).dir;
   const waivedId = (id) => !!waivedDir && id.startsWith('unused-export|') && id.split('|')[1].startsWith(`${waivedDir}/`);
   const rawBaseline = existsSync(basePath) ? readJsonRegular(basePath).ids ?? [] : null;
   const baseline = rawBaseline === null ? null : rawBaseline.filter((id) => !waivedId(id));
@@ -269,13 +345,19 @@ function main() {
   for (const id of added) { console.error(`slop-guard: NEW ${current.get(id)}`); bad++; }
   for (const id of stale) { console.error(`slop-guard: FIXED but still in the baseline: ${id}  (run: node ${relative(root, process.argv[1])} --update)`); bad++; }
   if (baseRoot) {
-    const bp = join(baseRoot, config.baseline ?? '.pr-quality-baseline.json');
+    const bpRel = config.baseline ?? '.pr-quality-baseline.json';
+    const bp = join(baseRoot, bpRel);
+    const mb = mergeBaseRef(arg('--merge-base-root', null));
+    const mbp = mb && join(mb.dir, bpRel);
+    const MB = new Set(mbp && existsSync(mbp) ? (readJsonRegular(mbp).ids ?? []).filter((id) => !waivedId(id)) : []);
+    // an id absent from the TIP is allowed only when the PR left it unchanged since the merge-base (in it, source file untouched)
+    const unchanged = (id) => { const src = mb && sourceOfId(id, mb); return MB.has(id) && !!src && !mb.touched.has(src); };
     if (existsSync(bp)) {
       const B = new Set((readJsonRegular(bp).ids ?? []).filter((id) => !waivedId(id)));
-      for (const id of baseline ?? []) if (!B.has(id)) { console.error(`slop-guard: the PR baseline holds an id the base branch's does not (it can only shrink): ${id}`); bad++; }
-      for (const id of current.keys()) if (!B.has(id)) { console.error(`slop-guard: NEW vs the base branch's baseline: ${current.get(id)}`); bad++; }
+      for (const id of baseline ?? []) if (!B.has(id) && !unchanged(id)) { console.error(`slop-guard: the PR baseline holds an id the base branch's does not (it can only shrink): ${id}`); bad++; }
+      for (const id of current.keys()) if (!B.has(id) && !unchanged(id)) { console.error(`slop-guard: NEW vs the base branch's baseline: ${current.get(id)}`); bad++; }
     }
-    for (const g of eslintGrowth(root, baseRoot, config.roots)) { console.error(`slop-guard: eslint suppressions grew vs the base branch (they can only shrink): ${g}`); bad++; }
+    for (const g of eslintGrowth(root, baseRoot, config.roots, mb)) { console.error(`slop-guard: eslint suppressions grew vs the base branch (they can only shrink): ${g}`); bad++; }
   }
   if (bad) {
     if (added.length) console.error('Fix the new violation, or justify it inline with  pq-allow(<rule>): <reason>');

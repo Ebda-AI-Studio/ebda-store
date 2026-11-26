@@ -22,7 +22,7 @@
   },
   "helpArticle": "product-tags-faqs-and-variants",
   "questions": {
-    "ar": ["اضيف اسئلة شائعة لمنتج"],
+    "ar": ["اضيف اسئلة شائعة لمنتج", "ازاي اكتب اسئلة شائعة للمنتج بالذكاء؟", "فين اسئلة المنتج؟"],
     "en": ["Add FAQs to a product"]
   },
   "steps": ["Product edit > FAQs; AI drafts."],

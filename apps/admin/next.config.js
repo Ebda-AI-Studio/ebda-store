@@ -121,6 +121,10 @@ const nextConfig = {
     return [
       // QA-TRUST-1: /legal /privacy /terms and /llms.txt are real URLs (one 308 hop to ebda.app)
       ...trustRedirects(),
+      // `/admin` is a guessed alias (the admin app IS the root, and has no locale path prefix):
+      // send it, and its /ar and /en spellings, to the dashboard instead of a 404.
+      { source: '/admin', destination: '/', permanent: false },
+      { source: '/:locale(ar|en)/admin', destination: '/', permanent: false },
       {
         source: '/stores/:id/layout',
         destination: '/stores/:id/builder',
@@ -136,6 +140,8 @@ const nextConfig = {
         destination: '/stores/:id/builder',
         permanent: true,
       },
+      // STORE-QA-30: "فريق العمل" lives at /staff; /team is the obvious link guess.
+      { source: '/stores/:id/team', destination: '/stores/:id/staff', permanent: true },
       // The legacy in-Store WhatsApp bridge pages were deleted (Ruling WA-LEGACY-1);
       // old bookmarks land on Settings. `/integrations/*` only ever held that bridge page.
       ...[

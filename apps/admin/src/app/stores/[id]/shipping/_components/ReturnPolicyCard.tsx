@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPut } from '../../../../../lib/api';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Return-policy control.
@@ -106,7 +107,7 @@ export const ReturnPolicyCard = forwardRef<ReturnPolicyHandle, Props>(function R
   if (loading) return null;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="rounded-md border border-border bg-card p-4">
       <h3
         data-setting-id="shipping.return-policy"
         className="text-sm font-semibold text-foreground"
@@ -117,7 +118,7 @@ export const ReturnPolicyCard = forwardRef<ReturnPolicyHandle, Props>(function R
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="return-window-days" className="block text-xs font-medium text-foreground">
+          <label htmlFor="return-window-days" className="block text-sm font-medium text-foreground">
             {t('windowLabel')}
           </label>
           <input
@@ -127,14 +128,14 @@ export const ReturnPolicyCard = forwardRef<ReturnPolicyHandle, Props>(function R
             value={days}
             onChange={e => setDays(e.target.value)}
             placeholder={t('notDeclared')}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className={`${FIELD_CLASSES} mt-1`}
           />
         </div>
 
         <div>
           <label
             htmlFor="return-fees-paid-by"
-            className="block text-xs font-medium text-foreground"
+            className="block text-sm font-medium text-foreground"
           >
             {t('feesLabel')}
           </label>
@@ -143,7 +144,7 @@ export const ReturnPolicyCard = forwardRef<ReturnPolicyHandle, Props>(function R
             value={feesPaidBy}
             onChange={e => setFeesPaidBy(e.target.value)}
             disabled={days.trim() === ''}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+            className={`${FIELD_CLASSES} mt-1`}
           >
             <option value="customer">{t('feesCustomer')}</option>
             <option value="merchant">{t('feesMerchant')}</option>

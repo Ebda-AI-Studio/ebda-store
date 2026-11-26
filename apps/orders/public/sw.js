@@ -21,6 +21,9 @@
 const CACHE = 'force-orders-v5';
 const APP_SHELL = ['/orders', '/manifest.webmanifest'];
 
+// Registered synchronously on first evaluation (browsers drop/warn on listeners added later). No page messages us.
+self.addEventListener('message', () => {});
+
 self.addEventListener('install', event => {
   event.waitUntil(
     caches

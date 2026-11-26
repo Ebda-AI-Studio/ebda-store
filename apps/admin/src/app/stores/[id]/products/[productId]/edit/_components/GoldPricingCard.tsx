@@ -30,6 +30,7 @@ import { apiGet, apiPut } from '../../../../../../../lib/api';
 import { formatPrice } from '../../../../../../../lib/format';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 export interface GoldProductFields {
   id: string;
   pricingMode?: 'fixed' | 'gold_rate' | null;
@@ -196,7 +197,7 @@ export function GoldPricingCard({
   };
 
   return (
-    <div className="rounded-xl border bg-card p-6 shadow-sm" data-setting-id="gold.productPricing">
+    <div className="rounded-md border bg-card p-6 shadow-sm" data-setting-id="gold.productPricing">
       <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{t('body')}</p>
 
@@ -224,7 +225,7 @@ export function GoldPricingCard({
               <select
                 value={karat}
                 onChange={e => setKarat(Number(e.target.value) as GoldKarat)}
-                className="mt-1 block min-h-11 w-full rounded-md border bg-background px-3"
+                className={`${FIELD_CLASSES} mt-1 block`}
               >
                 {GOLD_KARATS.map(k => (
                   <option key={k} value={k}>
@@ -240,7 +241,7 @@ export function GoldPricingCard({
                 inputMode="decimal"
                 value={grams}
                 onChange={e => setGrams(e.target.value)}
-                className="mt-1 block min-h-11 w-full rounded-md border bg-background px-3"
+                className={`${FIELD_CLASSES} mt-1 block`}
               />
               <span className="mt-1 block text-xs text-muted-foreground">{t('gramsHint')}</span>
             </label>
@@ -249,7 +250,7 @@ export function GoldPricingCard({
               <select
                 value={makingType}
                 onChange={e => setMakingType(e.target.value as MakingChargeType)}
-                className="mt-1 block min-h-11 w-full rounded-md border bg-background px-3"
+                className={`${FIELD_CLASSES} mt-1 block`}
               >
                 <option value="per_gram">{t('perGram')}</option>
                 <option value="fixed">{t('fixed')}</option>
@@ -262,7 +263,7 @@ export function GoldPricingCard({
                 inputMode="decimal"
                 value={making}
                 onChange={e => setMaking(e.target.value)}
-                className="mt-1 block min-h-11 w-full rounded-md border bg-background px-3"
+                className={`${FIELD_CLASSES} mt-1 block`}
               />
             </label>
             <label className="block text-sm">
@@ -272,7 +273,7 @@ export function GoldPricingCard({
                 inputMode="decimal"
                 value={margin}
                 onChange={e => setMargin(e.target.value)}
-                className="mt-1 block min-h-11 w-full rounded-md border bg-background px-3"
+                className={`${FIELD_CLASSES} mt-1 block`}
               />
               <span className="mt-1 block text-xs text-muted-foreground">{t('marginHint')}</span>
             </label>
@@ -283,7 +284,7 @@ export function GoldPricingCard({
                 readOnly
                 value={minorToDecimalString(product.price)}
                 dir="ltr"
-                className="mt-1 block min-h-11 w-full rounded-md border bg-muted px-3"
+                className={`${FIELD_CLASSES} mt-1 block`}
               />
               <span className="mt-1 block text-xs text-muted-foreground">{t('priceHint')}</span>
             </label>
@@ -307,7 +308,7 @@ export function GoldPricingCard({
                       placeholder={t('inherit')}
                       value={vGrams[v.id] ?? ''}
                       onChange={e => setVGrams(m => ({ ...m, [v.id]: e.target.value }))}
-                      className="min-h-11 w-32 rounded-md border bg-background px-3"
+                      className={`${FIELD_CLASSES} w-32`}
                     />
                   </li>
                 ))}

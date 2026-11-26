@@ -51,10 +51,8 @@ vi.mock('@api/services/newsletter-broadcast.service', () => ({
   newsletterAudienceSize: m.nl.audience,
   broadcastNewsletter: m.nl.broadcast,
 }));
-vi.mock('@api/services/onesignal.service', () => ({
-  OneSignalNotConfiguredError: class extends Error {},
-  OneSignalRequestError: class extends Error {},
-  OneSignalService: {
+vi.mock('@api/services/push.service', () => ({
+  pushService: {
     isConfigured: m.push.configured,
     broadcastToStore: m.push.broadcast,
     listRecentBroadcasts: vi.fn(),
@@ -549,14 +547,14 @@ describe('review fix: campaign schedule and push audience', () => {
       previewOf(T('campaign_send_draft'), { campaignId: 'c1', scheduledAt: soon(40) })
     ).rejects.toThrow(/30 days/);
   });
-  it('the push card says the audience size is unknown to Ebda Store', async () => {
+  it('the push card names the audience as the shoppers who allowed notifications on this store', async () => {
     const d = await previewOf(T('push_broadcast'), {
       titleEn: 'T',
       titleAr: 'ع',
       bodyEn: 'B',
       bodyAr: 'ن',
     });
-    expect(String(d.rows[0]!.after)).toContain('audience size unknown to Ebda Store');
+    expect(String(d.rows[0]!.after)).toContain('allowed notifications on this store');
   });
 });
 

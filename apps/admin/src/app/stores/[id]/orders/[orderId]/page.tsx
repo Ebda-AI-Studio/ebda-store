@@ -78,6 +78,21 @@ export default function OrderDetailPage() {
     fetchOrder();
   }, [fetchOrder]);
 
+  // Re-read the order without the full-page loading state. A status write has server-side effects the
+  // client cannot guess (cash on delivery becomes paid on delivery, stock, refund fields), so every
+  // status write re-syncs the whole order instead of patching `status` locally.
+  const refreshOrder = useCallback(async () => {
+    if (!storeId || !orderId) return;
+    try {
+      const { data } = await apiGet<{ order: OrderDetail }>(
+        `/api/v1/stores/${storeId}/orders/${orderId}`
+      );
+      if (data?.order) setOrder(data.order);
+    } catch {
+      /* keep the optimistic row; the merchant can reload */
+    }
+  }, [storeId, orderId]);
+
   // Choosing "Refunded" only RECORDS a refund: no money moves (that is
   // "Refund via provider"). Confirm first, the same as the order list (#762) —
   // the footer offers it as the primary action on a paid, cancelled order.
@@ -110,6 +125,7 @@ export default function OrderDetailPage() {
         toastError(t('errors.statusUpdateFailed'), apiError.message ?? '');
       } else {
         setOrder(o => (o ? { ...o, status: newStatus } : o));
+        await refreshOrder();
         // QA-D6: name the new status (same toast the orders list shows) so the change is unmistakable.
         toastSuccess(
           tList('toast.statusUpdatedTitle'),
@@ -231,13 +247,13 @@ export default function OrderDetailPage() {
         </div>
 
         {isLoading && (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
             {t('loading')}
           </div>
         )}
 
         {error && !isLoading && (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center">
             <p className="text-sm text-destructive-ink">{error}</p>
             <Button
               type="button"
@@ -261,11 +277,7 @@ export default function OrderDetailPage() {
                   // pattern the returns/shipments/notifications surfaces
                   // use) rather than inventing a new chip style —
                   // every-data-needs-a-UI surface for Order.source.
-                  <OrderStatusBadge
-                    status="agent"
-                    label={t('agent')}
-                    colorMap={{ agent: { className: 'bg-violet-50 text-violet-700' } }}
-                  />
+                  <OrderStatusBadge status="agent" label={t('agent')} family="orderSource" />
                 )}
               </div>
               <span className="text-xs text-muted-foreground">

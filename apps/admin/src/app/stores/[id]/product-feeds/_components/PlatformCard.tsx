@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 import { feedUrl, type FeedLang, type PlatformKey } from './types';
 
 const LANGS: FeedLang[] = ['ar', 'en'];
@@ -26,7 +27,7 @@ export function PlatformCard({ platform, origin }: { platform: PlatformKey; orig
 
   return (
     <section
-      className="bg-card rounded-xl border border-border p-5 flex flex-col gap-4"
+      className="bg-card rounded-lg border border-border p-5 flex flex-col gap-4"
       aria-labelledby={`feed-${platform}`}
     >
       <header>
@@ -45,7 +46,7 @@ export function PlatformCard({ platform, origin }: { platform: PlatformKey; orig
             <div key={lang}>
               <label
                 htmlFor={`feed-${platform}-${lang}`}
-                className="block text-xs font-medium text-muted-foreground mb-1"
+                className="block text-sm font-medium text-muted-foreground mb-1"
               >
                 {t(`language.${lang}`)}
               </label>
@@ -56,7 +57,7 @@ export function PlatformCard({ platform, origin }: { platform: PlatformKey; orig
                   dir="ltr"
                   value={url}
                   onFocus={e => e.currentTarget.select()}
-                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-xs font-mono text-foreground"
+                  className={`${FIELD_CLASSES} min-w-0 flex-1 font-mono`}
                 />
                 <Button type="button" variant="outline" size="sm" onClick={() => copy(url)}>
                   {t('copy')}

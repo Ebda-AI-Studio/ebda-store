@@ -8,6 +8,7 @@ import { apiGet, apiPost } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AccountNode {
@@ -181,7 +182,7 @@ export default function AccountsPage() {
   if (error && !tree) {
     return (
       <AdminLayout title={t('title')}>
-        <div className="p-6 text-red-600 text-sm">{error}</div>
+        <div className="p-6 text-destructive-ink text-sm">{error}</div>
       </AdminLayout>
     );
   }
@@ -209,14 +210,14 @@ export default function AccountsPage() {
           )}
         </div>
 
-        {seedMsg && <p className="text-sm text-emerald-600">{seedMsg}</p>}
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {seedMsg && <p className="text-sm text-success-ink">{seedMsg}</p>}
+        {error && <p className="text-destructive-ink text-sm">{error}</p>}
 
         {/* Create custom account form */}
         {showCreate && parentOptions.length > 0 && (
           <form
             onSubmit={handleCreate}
-            className="space-y-3 rounded-xl border border-border bg-muted/20 p-4"
+            className="space-y-3 rounded-md border border-border bg-muted/20 p-4"
           >
             <h2 className="text-base font-semibold">{t('createTitle')}</h2>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -226,7 +227,7 @@ export default function AccountsPage() {
                   required
                   value={form.parentId}
                   onChange={e => setForm(f => ({ ...f, parentId: e.target.value }))}
-                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                  className={FIELD_CLASSES}
                 >
                   <option value="">{t('selectParent')}</option>
                   {parentOptions.map(p => (
@@ -244,7 +245,7 @@ export default function AccountsPage() {
                   onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
                   placeholder="5210"
                   pattern="\d{4,6}"
-                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 font-mono text-sm"
+                  className={`${FIELD_CLASSES} font-mono`}
                 />
               </label>
               <label className="space-y-1 text-sm">
@@ -253,7 +254,7 @@ export default function AccountsPage() {
                   required
                   value={form.nameEn}
                   onChange={e => setForm(f => ({ ...f, nameEn: e.target.value }))}
-                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                  className={FIELD_CLASSES}
                 />
               </label>
               <label className="space-y-1 text-sm">
@@ -262,11 +263,11 @@ export default function AccountsPage() {
                   value={form.nameAr}
                   onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))}
                   dir="rtl"
-                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                  className={FIELD_CLASSES}
                 />
               </label>
             </div>
-            {createErr && <p className="text-red-600 text-sm">{createErr}</p>}
+            {createErr && <p className="text-destructive-ink text-sm">{createErr}</p>}
             <div className="flex items-center gap-2">
               <Button type="submit" disabled={creating} variant="default">
                 {creating ? t('creating') : t('createSubmit')}

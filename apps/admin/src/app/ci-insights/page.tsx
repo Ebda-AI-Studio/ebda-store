@@ -104,7 +104,7 @@ function Inner() {
       ) : (
         <ul className="space-y-3">
           {rows.map(r => (
-            <li key={r.id} className="rounded-xl border bg-card p-4">
+            <li key={r.id} className="rounded-md border bg-card p-4">
               <p className="text-sm text-foreground">{locale === 'ar' ? r.findingAr : r.finding}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {t('evidence', {
@@ -132,7 +132,7 @@ function Inner() {
         </ul>
       )}
 
-      <section aria-labelledby="ci-gates" className="rounded-xl border bg-card p-4">
+      <section aria-labelledby="ci-gates" className="rounded-md border bg-card p-4">
         <h2 id="ci-gates" className="text-base font-semibold text-foreground">
           {t('gates.title')}
         </h2>

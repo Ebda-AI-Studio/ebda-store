@@ -1,0 +1,35 @@
+---
+title: 'Webhooks: send store events to your own system'
+description: Get a signed message on your own server when an order or product changes, test it, rotate the secret and resend failed deliveries.
+section: Settings
+order: 33
+appPath: /stores
+keywords: webhook endpoint events erp integration order created paid refunded product stock secret signature test resend deliveries
+capabilities:
+  - integrations.webhooks@1
+---
+
+A webhook sends a signed message to your own server every time something changes in your store, for example to feed an ERP or accounting tool.
+
+## Set it up
+
+1. Open **Settings**, then **For developers**, then **Webhooks**.
+2. Press **Add endpoint**. Enter a public HTTPS address, an optional note, and tick the events you want: order placed, paid, shipped or delivered or cancelled, refunded, product added, changed or deleted, or stock is low.
+3. Press **Save**. Copy the signing secret now. It is shown only once.
+4. Press **Send test event** to check your server answers.
+
+Customer name, email and phone are left out unless you turn on that option for the endpoint.
+
+## Afterwards
+
+- **Delivery log** lists recent sends with the result. **Resend** repeats one.
+- **New secret** replaces the secret and the old one stops at once. Update your server first.
+- **Turn off** or **Delete** stops the events.
+
+## Good to know
+
+- Webhooks are on the Growth and Business plans, and only the store owner can use them.
+- Up to 10 endpoints per store. Local and private addresses are refused.
+- If your server is down, each event is tried up to 6 times over about a day.
+- After 10 failed events in a row the endpoint turns itself off.
+- The log keeps the last 50 sends per endpoint, for 30 days.

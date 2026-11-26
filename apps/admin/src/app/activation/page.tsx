@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { apiGet } from '../../lib/api';
@@ -113,11 +114,11 @@ function Inner() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      <section aria-labelledby="act-funnel" className="rounded-xl border bg-card p-4">
+      <section aria-labelledby="act-funnel" className="rounded-md border bg-card p-4">
         <h2 id="act-funnel" className="text-base font-semibold text-foreground">
           {t('funnel.title')}
         </h2>
-        <p className="mt-1 text-xs text-muted-foreground">{t('funnel.body')}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t('funnel.body')}</p>
         <div className="mt-3 flex flex-wrap items-end gap-3 text-sm">
           <label className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">{t('funnel.from')}</span>
@@ -126,7 +127,7 @@ function Inner() {
               value={from}
               max={to}
               onChange={e => setFrom(e.target.value)}
-              className="rounded-md border border-border bg-background px-2 py-1"
+              className={FIELD_CLASSES}
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -136,13 +137,13 @@ function Inner() {
               value={to}
               min={from}
               onChange={e => setTo(e.target.value)}
-              className="rounded-md border border-border bg-background px-2 py-1"
+              className={FIELD_CLASSES}
             />
           </label>
         </div>
         {funnel && (
           <>
-            <p className="mt-3 text-xs text-muted-foreground">
+            <p className="mt-3 text-sm text-muted-foreground">
               {t('funnel.stores', { n: funnel.stores })}
               {funnel.truncated ? ` ${t('funnel.truncated')}` : ''}
             </p>
@@ -182,7 +183,7 @@ function Inner() {
         )}
       </section>
 
-      <section aria-labelledby="act-stores" className="rounded-xl border bg-card p-4">
+      <section aria-labelledby="act-stores" className="rounded-md border bg-card p-4">
         <h2 id="act-stores" className="text-base font-semibold text-foreground">
           {t('stores.title')}
         </h2>

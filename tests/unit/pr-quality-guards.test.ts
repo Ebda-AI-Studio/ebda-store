@@ -3,7 +3,15 @@
 // @ts-nocheck
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  existsSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -13,6 +21,7 @@ import {
   enforceFrom,
 } from '../../.github/pr-quality/pr-body-check.mjs';
 import { scan, compare, eslintGrowth } from '../../.github/pr-quality/slop-guard.mjs';
+import { growth } from '../../.github/pr-quality/capability-ratchet.mjs';
 
 const GOOD =
   '## Verified\nnpm test green, 14 new tests\n\n## Not verified\nThe live deploy\n\n## Cost-if-wrong\nA red check until the secret exists\n';
@@ -189,6 +198,194 @@ describe('base-branch enforcement', () => {
     spawnSync('node', [cli, '--root', pr, '--update']);
     expect(guard(pr, b.root).status).toBe(0);
   });
+  // Per-entry rule: the allowed value is the base TIP's; an entry the PR leaves unchanged since the merge-base (same key, its source file NOT in
+  // `.mb-touched`) may keep its merge-base value. Anything the PR touches is judged against the tip.
+  const mbTree = (
+    files: Record<string, string>,
+    touched: string[] = [],
+    extraPaths: string[] = ['apps/a/src/a.ts', 'apps/a/src/b.ts']
+  ) =>
+    repo({
+      ...files,
+      '.mb-touched': touched.join('\n'),
+      '.mb-paths': [...Object.keys(files), ...extraPaths].join('\n'),
+    });
+  const runMb = (pr: string, base: string, mb: string) =>
+    spawnSync('node', [cli, '--root', pr, '--base-root', base, '--merge-base-root', mb], {
+      encoding: 'utf8',
+    });
+  describe('merge-base reference (main shrinks after the PR branched)', () => {
+    // merge-base = 2 baselined ids; main then fixes one (tip = 1 id); the PR branched before
+    const setup = () => {
+      const mb = seed(2);
+      const tipFiles = { ...mb.files };
+      delete tipFiles['apps/a/src/f1.ts'];
+      delete tipFiles['apps/a/src/g1.ts'];
+      const tip = repo(tipFiles);
+      spawnSync('node', [cli, '--root', tip, '--update']);
+      return { mb, tip };
+    };
+    it('main shrinks + the entry is untouched: the tip alone false-fails, the merge-base reference passes', () => {
+      const { mb, tip } = setup();
+      const pr = repo(mb.files);
+      expect(guard(pr, tip).status).toBe(1); // the structural false failure
+      expect(runMb(pr, tip, mbTree(mb.files)).status).toBe(0);
+    });
+    it('the PR touches the file and keeps the stale entry: judged against the tip, fails', () => {
+      const { mb, tip } = setup();
+      const pr = repo(mb.files);
+      const r = runMb(pr, tip, mbTree(mb.files, ['apps/a/src/f1.ts']));
+      expect(r.status).toBe(1);
+      expect(r.stderr).toMatch(/holds an id the base branch's does not/);
+    });
+    it('a PR that ADDS an id still fails', () => {
+      const { mb, tip } = setup();
+      const pr = repo({ ...mb.files, 'apps/a/src/f9.ts': src(9), 'apps/a/src/g9.ts': use(9) });
+      rmSync(join(pr, '.pr-quality-baseline.json'));
+      spawnSync('node', [cli, '--root', pr, '--update', '--init']); // self-consistent, hides the new id
+      expect(runMb(pr, tip, mbTree(mb.files, ['apps/a/src/f9.ts'])).status).toBe(1);
+    });
+    it('a merge-base tree without .mb-touched (cap refused it) is the tip comparison', () => {
+      const { mb, tip } = setup();
+      expect(runMb(repo(mb.files), tip, repo(mb.files)).status).toBe(1);
+    });
+  });
+  describe('eslint suppressions per entry', () => {
+    const sup = (o: Record<string, number>) =>
+      JSON.stringify(
+        Object.fromEntries(Object.entries(o).map(([k, n]) => [k, { 'no-console': { count: n } }]))
+      );
+    const withSup = (files: Record<string, string>, o: Record<string, number>) =>
+      repo({ ...files, 'apps/a/eslint-suppressions.json': sup(o) });
+    it('main shrinks suppressions after branching + untouched source: passes against the merge-base only', () => {
+      const b = seed(1);
+      const mb = withSup(b.files, { 'src/a.ts': 3 });
+      const tip = withSup(b.files, { 'src/a.ts': 1 });
+      const pr = withSup(b.files, { 'src/a.ts': 3 });
+      expect(guard(pr, tip).stderr).toMatch(/eslint suppressions grew/);
+      expect(
+        runMb(pr, tip, mbTree({ 'apps/a/eslint-suppressions.json': sup({ 'src/a.ts': 3 }) })).status
+      ).toBe(0);
+    });
+    it('the PR touches the source file and keeps the stale count: judged against the tip, fails', () => {
+      const b = seed(1);
+      const tip = withSup(b.files, { 'src/a.ts': 1 });
+      const pr = withSup(b.files, { 'src/a.ts': 3 });
+      const mb = mbTree({ 'apps/a/eslint-suppressions.json': sup({ 'src/a.ts': 3 }) }, [
+        'apps/a/src/a.ts',
+      ]);
+      expect(runMb(pr, tip, mb).status).toBe(1);
+    });
+    it('a PR that ADDS suppressions beyond even the merge-base fails', () => {
+      const b = seed(1);
+      const tip = withSup(b.files, { 'src/a.ts': 1 });
+      const mb = mbTree({ 'apps/a/eslint-suppressions.json': sup({ 'src/a.ts': 3 }) });
+      expect(runMb(withSup(b.files, { 'src/a.ts': 4 }), tip, mb).status).toBe(1);
+    });
+    it('trading within one file (same total) fails: the check is per entry', () => {
+      const b = seed(1);
+      const tip = withSup(b.files, { 'src/a.ts': 2, 'src/b.ts': 2 });
+      const pr = withSup(b.files, { 'src/a.ts': 0, 'src/b.ts': 4 }); // total 4 = 4
+      expect(guard(pr, tip).status).toBe(1);
+      const mb = mbTree({
+        'apps/a/eslint-suppressions.json': sup({ 'src/a.ts': 2, 'src/b.ts': 2 }),
+      });
+      expect(runMb(pr, tip, mb).status).toBe(1);
+    });
+  });
+  describe('capability baselines per id', () => {
+    const cap = (ids: string[]) => ({
+      'capabilities/baselines/help.json': JSON.stringify({ ids }),
+    });
+    const real =
+      'model-call-outside-smart-layer|apps/api/src/lib/ai/gemini-keys.ts|provider-sdk-import|e7b5e6352e|0';
+    const fake = [
+      'page-uncovered|/dashboard',
+      'registry|planned.ai-finance',
+      'help-missing|analytics.dashboard',
+      'policy-free-writes|account.login',
+    ];
+    const mb = (ids: string[], touched: string[] = [], paths: string[] = []) => ({
+      dir: repo(cap(ids)),
+      touched: new Set(touched),
+      paths: new Set(paths),
+    });
+    const REAL_PATH = 'apps/api/src/lib/ai/gemini-keys.ts';
+    it('an id naming a real merge-base file may keep its merge-base value while untouched; touching the file or the baseline fails', () => {
+      const tip = repo(cap([]));
+      const pr = repo(cap([real]));
+      expect(growth(tip, pr)).toHaveLength(1); // the tip alone false-fails
+      expect(growth(tip, pr, mb([real], [], [REAL_PATH]))).toEqual([]);
+      expect(growth(tip, pr, mb([real], [REAL_PATH], [REAL_PATH]))).toHaveLength(1);
+      expect(growth(tip, pr, mb([real], [], []))).toHaveLength(1); // the named path is not in the merge-base tree
+      expect(
+        growth(tip, repo(cap([real, 'x|apps/api/new.ts|k|1|0'])), mb([real], [], [REAL_PATH]))
+      ).toHaveLength(1);
+    });
+    it.each(fake)(
+      '%s has no real file: judged against the tip only, even when nothing is touched',
+      id => {
+        const tip = repo(cap([]));
+        expect(growth(tip, repo(cap([id])), mb([id], [], [REAL_PATH]))).toHaveLength(1);
+        expect(growth(repo(cap([id])), repo(cap([id])), mb([id]))).toEqual([]); // in the tip: fine
+      }
+    );
+  });
+  describe('merge-base-tree.sh staleness cap', () => {
+    const script = join(__dirname, '../../.github/pr-quality/merge-base-tree.sh');
+    const git = (cwd: string, ...a: string[]) =>
+      spawnSync('git', ['-C', cwd, '-c', 'user.name=t', '-c', 'user.email=t@t', ...a], {
+        encoding: 'utf8',
+        env: { ...process.env, GIT_DIR: undefined, GIT_WORK_TREE: undefined },
+      });
+    function history(mainCommitsAfterBranch: number) {
+      const d = mkdtempSync(join(tmpdir(), 'mbt-'));
+      git(d, 'init', '-q', '-b', 'main');
+      writeFileSync(join(d, '.pr-quality-baseline.json'), '{"ids":["x|a.ts|1"]}');
+      writeFileSync(join(d, 'a.ts'), '1');
+      git(d, 'add', '.');
+      git(d, 'commit', '-q', '-m', 'c0');
+      git(d, 'branch', 'pr');
+      git(d, 'checkout', '-q', 'pr');
+      writeFileSync(join(d, 'a.ts'), '2');
+      git(d, 'commit', '-q', '-am', 'pr');
+      git(d, 'update-ref', 'refs/pr/head', 'HEAD');
+      git(d, 'checkout', '-q', 'main');
+      for (let i = 0; i < mainCommitsAfterBranch; i++) {
+        writeFileSync(join(d, `m${i}.txt`), String(i));
+        git(d, 'add', '.');
+        git(d, 'commit', '-q', '-m', `m${i}`);
+      }
+      return d;
+    }
+    const build = (d: string, env: Record<string, string> = {}) => {
+      const out = mkdtempSync(join(tmpdir(), 'mbo-'));
+      spawnSync('bash', [script, d, out], { encoding: 'utf8', env: { ...process.env, ...env } });
+      return out;
+    };
+    it('within the cap: writes the merge-base baseline and the PR-touched list', () => {
+      const out = build(history(2));
+      expect(readFileSync(join(out, '.pr-quality-baseline.json'), 'utf8')).toMatch(/x\|a.ts\|1/);
+      expect(readFileSync(join(out, '.mb-touched'), 'utf8').trim()).toBe('a.ts');
+    });
+    it('a leftover OUT tree from an earlier job is wiped, never reused', () => {
+      const d = history(3);
+      const out = mkdtempSync(join(tmpdir(), 'mbo-'));
+      writeFileSync(join(out, '.mb-touched'), 'victim-file.ts\n');
+      writeFileSync(join(out, '.mb-paths'), 'victim-file.ts\n');
+      spawnSync('bash', [script, d, out], {
+        encoding: 'utf8',
+        env: { ...process.env, MB_MAX_COMMITS: '2' }, // capped: nothing is written
+      });
+      expect(existsSync(join(out, '.mb-touched'))).toBe(false);
+      expect(existsSync(join(out, '.mb-paths'))).toBe(false);
+    });
+    it('a merge-base older than the cap writes nothing, so the guards compare against the tip', () => {
+      const out = build(history(3), { MB_MAX_COMMITS: '2' });
+      expect(existsSync(join(out, '.mb-touched'))).toBe(false);
+      expect(existsSync(join(out, '.pr-quality-baseline.json'))).toBe(false);
+    });
+  });
   it('base config wins: a PR cannot narrow roots to skip files', () => {
     const b = seed(1);
     const pr = repo({ ...b.files, '.pr-quality.json': '{"roots":["nowhere"]}' });
@@ -203,7 +400,7 @@ describe('base-branch enforcement', () => {
     ]);
     expect(guard(pr, b.root).status).toBe(1); // base roots scan apps/: the violation still counts and the baseline no longer matches
   });
-  it('eslint suppressions may not grow vs the base; a moved file with the same total is fine', () => {
+  it('eslint suppressions may not grow vs the base; a moved entry is a new entry (per-entry check)', () => {
     const sup = (n: number, file = 'src/a.ts') =>
       JSON.stringify({ [file]: { 'no-console': { count: n } } });
     const base = repo({ 'apps/a/eslint-suppressions.json': sup(3) });
@@ -217,7 +414,7 @@ describe('base-branch enforcement', () => {
       eslintGrowth(repo({ 'apps/a/eslint-suppressions.json': sup(3, 'src/moved.ts') }), base, [
         'apps',
       ])
-    ).toEqual([]);
+    ).toHaveLength(1); // per ENTRY: a moved entry is a new entry
     expect(
       eslintGrowth(repo({ 'apps/b/eslint-suppressions.json': sup(1) }), base, ['apps'])
     ).toHaveLength(1); // a new workspace file cannot launder

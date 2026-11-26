@@ -3,6 +3,7 @@
 import { hasWaMeNumber, normalizeEgyptianMobile } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import type { StoreBranding } from './types';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 interface ContactInfoTabProps {
   branding: StoreBranding;
@@ -24,7 +25,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
   ] as const;
 
   return (
-    <div className="bg-card rounded-xl border p-6 space-y-6">
+    <div className="bg-card rounded-md border p-6 space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">{t('email')}</label>
@@ -33,7 +34,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             value={branding.email || ''}
             onChange={e => onChange({ ...branding, email: e.target.value })}
             placeholder={t('emailPlaceholder')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className={FIELD_CLASSES}
           />
         </div>
         <div>
@@ -45,7 +46,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             placeholder={t('phonePlaceholder')}
             aria-invalid={waInvalid}
             dir="ltr"
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className={FIELD_CLASSES}
           />
           <p
             className={`mt-1 text-xs ${waInvalid ? 'text-destructive-ink' : 'text-muted-foreground'}`}
@@ -56,7 +57,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
         </div>
       </div>
 
-      <fieldset className="space-y-3 rounded-xl border p-4" data-testid="wa-me-toggles">
+      <fieldset className="space-y-3 rounded-md border p-4" data-testid="wa-me-toggles">
         <legend
           data-setting-id="branding.whatsapp-buttons"
           className="px-1 text-sm font-semibold text-foreground"
@@ -92,7 +93,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             value={branding.phone || ''}
             onChange={e => onChange({ ...branding, phone: e.target.value })}
             placeholder={t('phonePlaceholder')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className={FIELD_CLASSES}
           />
         </div>
         <div>
@@ -104,7 +105,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             value={branding.phoneAr || ''}
             onChange={e => onChange({ ...branding, phoneAr: e.target.value })}
             placeholder={t('phoneArPlaceholder')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className={FIELD_CLASSES}
           />
         </div>
       </div>
@@ -117,7 +118,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             onChange={e => onChange({ ...branding, address: e.target.value })}
             rows={3}
             placeholder={t('addressPlaceholder')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+            className={`${TEXTAREA_CLASSES} resize-none`}
           />
         </div>
         <div>
@@ -129,7 +130,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             onChange={e => onChange({ ...branding, addressAr: e.target.value })}
             rows={3}
             placeholder={t('addressArPlaceholder')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+            className={`${TEXTAREA_CLASSES} resize-none`}
           />
         </div>
       </div>
@@ -153,7 +154,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             value={branding.addressUrl || ''}
             onChange={e => onChange({ ...branding, addressUrl: e.target.value })}
             placeholder={t('addressUrlPlaceholder')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className={FIELD_CLASSES}
           />
           <p className="mt-1 text-xs text-muted-foreground">{t('addressUrlHint')}</p>
         </div>
@@ -162,7 +163,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             type="checkbox"
             checked={branding.addressLink !== false}
             onChange={e => onChange({ ...branding, addressLink: e.target.checked })}
-            className="h-4 w-4 rounded border-input text-primary focus:ring-primary/40"
+            className="h-5 w-5 rounded-md border-input text-primary focus:ring-primary/40"
           />
           <span className="text-sm text-foreground">{t('addressClickable')}</span>
         </label>

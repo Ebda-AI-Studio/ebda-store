@@ -169,7 +169,7 @@ describe.skipIf(e.E2E_DB === '1')(
       const j = (await r.json()) as {
         data: {
           stores: Array<{ id: string; _count: { products: number } }>;
-          meta: { total: number };
+          pagination: { total: number };
         };
       };
       for (const s of stores) {
@@ -177,9 +177,9 @@ describe.skipIf(e.E2E_DB === '1')(
         expect(row, `store ${s.slug} listed`).toBeTruthy();
         expect(row!._count.products).toBe(s.productIds.length);
       }
-      expect(j.data.meta.total).toBeGreaterThanOrEqual(stores.length);
+      expect(j.data.pagination.total).toBeGreaterThanOrEqual(stores.length);
       const seen: string[] = [];
-      for (let page = 1; page <= j.data.meta.total; page++) {
+      for (let page = 1; page <= j.data.pagination.total; page++) {
         const p = (await (await get(`/admin/stores?limit=1&page=${page}`, su)).json()) as {
           data: { stores: Array<{ id: string }> };
         };

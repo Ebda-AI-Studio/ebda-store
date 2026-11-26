@@ -32,7 +32,7 @@ export function QrTab({ storeId }: { storeId: string }) {
       ) : (
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_21rem]">
           <div className="space-y-6">
-            <div className="space-y-6 rounded-xl border border-border bg-card p-5 sm:p-6">
+            <div className="space-y-6 rounded-md border border-border bg-card p-5 sm:p-6">
               <TargetPicker
                 storeId={storeId}
                 target={q.target}
@@ -76,7 +76,7 @@ export function QrTab({ storeId }: { storeId: string }) {
           </div>
 
           <aside className="lg:sticky lg:top-4 lg:self-start">
-            <div className="rounded-xl border border-border bg-card p-5">
+            <div className="rounded-md border border-border bg-card p-5">
               <PreviewPanel
                 scene={q.scene}
                 payload={q.payload}

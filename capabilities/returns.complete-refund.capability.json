@@ -18,7 +18,7 @@
   },
   "helpArticle": "returns-and-refunds",
   "questions": {
-    "ar": ["رجّع الفلوس للعميل بعد المرتجع", "رصيد في المحفظة بدل الكاش"],
+    "ar": ["رجّع الفلوس للعميل بعد المرتجع", "رصيد في المحفظة بدل الكاش", "ازاي اكمل المرتجع؟"],
     "en": ["Refund the customer after the return"]
   },
   "steps": ["Returns > Complete (preview shows amount)."],

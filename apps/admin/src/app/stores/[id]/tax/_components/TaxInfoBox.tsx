@@ -18,7 +18,7 @@ export function TaxInfoBox({ taxEnabled, activeRates }: TaxInfoBoxProps) {
   const t = useT('tax.info');
 
   return (
-    <div className="mt-6 bg-info/5 border border-info/30 rounded-xl p-4">
+    <div className="mt-6 bg-info/5 border border-info/30 rounded-md p-4">
       <div className="flex gap-3">
         <svg
           className="w-5 h-5 text-info mt-0.5 shrink-0"

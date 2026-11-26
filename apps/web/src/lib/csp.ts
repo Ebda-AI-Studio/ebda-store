@@ -81,7 +81,13 @@ export function buildStorefrontCsp(nonce: string): string {
     "base-uri 'self'",
     "object-src 'none'",
     "form-action 'self'",
-    nonceScriptSrc(nonce, { hosts: SCRIPT_HOSTS, unsafeEval: STOREFRONT_NEEDS_UNSAFE_EVAL }),
+    nonceScriptSrc(nonce, {
+      hosts: SCRIPT_HOSTS,
+      unsafeEval: STOREFRONT_NEEDS_UNSAFE_EVAL,
+      // QA-109: the PDP 3D viewer's meshopt decoder is WebAssembly. Document-wide, not PDP-only: a client-side
+      // navigation keeps the CSP of the document that first loaded. Never 'unsafe-eval'.
+      wasmUnsafeEval: true,
+    }),
     // Inline event-handler attributes never run (React binds handlers in JS; no vendor snippet writes on* attributes).
     "script-src-attr 'none'",
     // OneSignal v16 page SDK pulls a stylesheet from the bare apex https://onesignal.com/sdks/.

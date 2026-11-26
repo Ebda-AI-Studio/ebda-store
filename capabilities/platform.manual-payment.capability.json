@@ -9,6 +9,8 @@
   "screens": ["/billing-events"],
   "api": [
     "GET /admin/billing/claims",
+    "GET /admin/billing/held-webhooks",
+    "POST /admin/billing/held-webhooks/:id/resolve",
     "POST .../claims/:id/reject",
     "POST /admin/stores/:id/manual-payment",
     "POST /admin/billing/events/:id/refund|manual-refund"
@@ -28,7 +30,7 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": ["حولت وماتفعلتش"],
+    "ar": ["حولت وماتفعلتش", "ازاي اأكد دفع انستاباي للاشتراك؟", "ازاي ارجع فلوس اشتراك؟"],
     "en": ["I paid by InstaPay but nothing activated"]
   },
   "steps": ["Super-admin console only."],

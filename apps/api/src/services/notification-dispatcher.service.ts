@@ -325,6 +325,11 @@ class NotificationDispatcherService {
       logger.debug({ storeId, event }, '[NotificationDispatcher] Push skipped: event_disabled');
     } else if (!this.hasValidCredentials(pushConfig, 'push', storeId)) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] Push skipped: not_configured');
+    } else if (!data.customerId) {
+      // Ruling PUSH-AUDIENCE-1: EVERY shopper-facing push (transactional or promotional) is addressed to ONE customer and
+      // carries their name, order or cart. No customer id = no addressee = no push: it is never a store-wide broadcast
+      // (other shoppers' devices, the orders app). Unknown recipient is not "everyone".
+      logger.debug({ storeId, event }, '[NotificationDispatcher] Push skipped: no_recipient');
     } else if (!(await this.checkRateLimit(storeId, 'push'))) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] Push skipped: rate_limited');
     } else {
@@ -334,10 +339,14 @@ class NotificationDispatcherService {
         const title = pushTemplate.title[locale];
         const body = renderPushBody(pushTemplate.body[locale], data, locale);
 
-        await pushService.sendToStore(storeId, title, body, {
-          event,
-          orderNumber: data.orderNumber,
-        });
+        await pushService.sendToStore(
+          storeId,
+          title,
+          body,
+          { event, orderNumber: data.orderNumber },
+          // only the addressed shopper's own storefront devices (their subscription is their opt-in)
+          { customerId: data.customerId }
+        );
 
         logger.info({ storeId, event }, '[NotificationDispatcher] Push dispatched');
       } catch (err) {

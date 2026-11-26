@@ -5,8 +5,10 @@ import { Toggle } from '../../../../../components/Toggle';
 import { ConnectionStatus } from '../../../../../components/ConnectionStatus';
 import { useT } from '@/i18n/useT';
 import type { ChannelConfig, TestStatus } from './types';
+import { usePushStatus } from './usePushStatus';
 
 interface PushChannelCardProps {
+  storeId: string;
   config: ChannelConfig;
   saving: boolean;
   testing: boolean;
@@ -17,10 +19,11 @@ interface PushChannelCardProps {
 }
 
 /**
- * Web Push (VAPID) configuration card. No per-store credentials — VAPID keys
- * are platform-wide. Shows subscriber count if reported by the API.
+ * Browser push card. No per-store credentials: the platform keys are ours. Says in plain words whether push is
+ * available yet. Shows subscriber count if reported by the API.
  */
 export function PushChannelCard({
+  storeId,
   config,
   saving,
   testing,
@@ -31,12 +34,13 @@ export function PushChannelCard({
 }: PushChannelCardProps) {
   const t = useT('notifications.push');
   const tShared = useT('notifications.shared');
+  const pushStatus = usePushStatus(storeId);
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6">
+    <div className="bg-card rounded-md border border-border p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-info/10 rounded-xl flex items-center justify-center">
+          <div className="w-10 h-10 bg-info/10 rounded-md flex items-center justify-center">
             <svg
               className="w-5 h-5 text-info"
               fill="none"
@@ -65,12 +69,24 @@ export function PushChannelCard({
           <span className="text-sm text-muted-foreground">
             {config.enabled ? tShared('enabled') : tShared('disabled')}
           </span>
-          <Toggle checked={config.enabled} onChange={val => onConfigChange({ enabled: val })} />
+          <Toggle
+            checked={config.enabled}
+            onChange={val => onConfigChange({ enabled: val })}
+            label={t('title')}
+          />
         </div>
       </div>
 
       <div className="mb-4 p-4 bg-muted/50 border border-border rounded-lg">
         <p className="text-sm text-muted-foreground">{t('platformNote')}</p>
+        {pushStatus.available !== null && (
+          <p className="mt-2 text-sm font-medium text-foreground" data-testid="push-availability">
+            {pushStatus.available ? t('statusAvailable') : t('statusUnavailable')}
+          </p>
+        )}
+        {pushStatus.available === false && (
+          <p className="mt-1 text-sm text-muted-foreground">{t('unavailableHint')}</p>
+        )}
       </div>
 
       <div className="flex items-center gap-3">

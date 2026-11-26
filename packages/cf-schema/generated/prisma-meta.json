@@ -19421,6 +19421,13 @@
           "list": false,
           "optional": true
         },
+        "pendingBillingInterval": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "pending_billing_interval",
+          "list": false,
+          "optional": true
+        },
         "billingAnchorDay": {
           "kind": "scalar",
           "type": "Int",

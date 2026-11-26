@@ -10,6 +10,7 @@
   "api": [
     "POST .../push/subscribe",
     "GET/PUT .../notifications/events",
+    "GET /admin/stores/:id/push/status",
     "POST /admin/stores/:id/push/broadcast",
     "GET .../push/broadcasts"
   ],

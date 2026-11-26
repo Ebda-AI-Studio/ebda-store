@@ -18,7 +18,7 @@
   },
   "helpArticle": "store-hero-and-menu",
   "questions": {
-    "ar": ["ازاي اغير القايمة اللي فوق؟", "ضيف رابط في الفوتر"],
+    "ar": ["ازاي اغير القايمة اللي فوق؟", "ضيف رابط في الفوتر", "ازاي اشيل رابط من القايمة؟"],
     "en": ["Edit my menu and footer links"]
   },
   "steps": ["Navigation page: NavMenuEditor + FooterLinksEditor."],

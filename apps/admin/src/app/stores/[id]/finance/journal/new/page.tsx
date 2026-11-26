@@ -11,6 +11,7 @@ import { minorToMajor } from '@/lib/format';
 
 import { roundToMinor } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AccountRow {
@@ -138,7 +139,7 @@ export default function NewJournalEntryPage() {
     return (
       <AdminLayout title={tNew('title')} subtitle={tNew('description')}>
         <div className="max-w-4xl">
-          <div className="rounded-xl border border-warning/30 bg-warning/10 p-6 text-sm text-warning-ink">
+          <div className="rounded-md border border-warning/30 bg-warning/10 p-6 text-sm text-warning-ink">
             <p className="font-semibold mb-1">{tNew('superAdminOnly')}</p>
             <p>{tNew('superAdminNotice')}</p>
           </div>
@@ -157,7 +158,7 @@ export default function NewJournalEntryPage() {
               type="text"
               value={memo}
               onChange={e => setMemo(e.target.value)}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              className={FIELD_CLASSES}
               placeholder={tNew('memoPlaceholder')}
             />
           </label>
@@ -167,7 +168,7 @@ export default function NewJournalEntryPage() {
               type="text"
               value={memoAr}
               onChange={e => setMemoAr(e.target.value)}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              className={FIELD_CLASSES}
               placeholder={tNew('memoArPlaceholder')}
             />
           </label>
@@ -176,7 +177,7 @@ export default function NewJournalEntryPage() {
         {/* Debit/credit line grid — genuine accounting ledger (columns are
             the point); kept as an isolated horizontal-scroll container per
             the B1 mobile-table exception rather than card-stacked. */}
-        <div className="rounded-xl border border-border overflow-x-auto">
+        <div className="rounded-md border border-border overflow-x-auto">
           <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-muted/30">
               <tr>
@@ -202,7 +203,7 @@ export default function NewJournalEntryPage() {
                     <select
                       value={l.accountId}
                       onChange={e => updateLine(i, { accountId: e.target.value })}
-                      className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+                      className={FIELD_CLASSES}
                     >
                       <option value="">— {tNew('selectAccount')} —</option>
                       {accounts.map(a => (
@@ -224,7 +225,7 @@ export default function NewJournalEntryPage() {
                           credit: e.target.value ? '' : l.credit,
                         })
                       }
-                      className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+                      className={`${FIELD_CLASSES} text-end font-mono`}
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -239,7 +240,7 @@ export default function NewJournalEntryPage() {
                           debit: e.target.value ? '' : l.debit,
                         })
                       }
-                      className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+                      className={`${FIELD_CLASSES} text-end font-mono`}
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -247,7 +248,7 @@ export default function NewJournalEntryPage() {
                       type="text"
                       value={l.lineMemo}
                       onChange={e => updateLine(i, { lineMemo: e.target.value })}
-                      className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+                      className={FIELD_CLASSES}
                     />
                   </td>
                   <td className="px-3 py-2 text-center">
@@ -257,7 +258,7 @@ export default function NewJournalEntryPage() {
                       disabled={lines.length <= 2}
                       variant="link"
                       size="sm"
-                      className="text-red-600"
+                      className="text-destructive-ink"
                     >
                       ✕
                     </Button>
@@ -276,9 +277,11 @@ export default function NewJournalEntryPage() {
                 </td>
                 <td className="px-3 py-2" colSpan={2}>
                   {!balanced && totals.debit + totals.credit > 0 && (
-                    <span className="text-red-600 text-xs">{tNew('errors.unbalanced')}</span>
+                    <span className="text-destructive-ink text-xs">
+                      {tNew('errors.unbalanced')}
+                    </span>
                   )}
-                  {balanced && <span className="text-green-700 text-xs">{tNew('balanced')}</span>}
+                  {balanced && <span className="text-success-ink text-xs">{tNew('balanced')}</span>}
                 </td>
               </tr>
             </tfoot>

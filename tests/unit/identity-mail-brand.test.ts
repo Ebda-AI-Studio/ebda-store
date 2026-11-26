@@ -63,4 +63,19 @@ describe('identity-service mail uses the master brand', () => {
     expect(String(h.sent[0].html)).not.toMatch(/Ebda Store/);
     expect(String(h.sent[1].html)).not.toMatch(/ابدأ ستور/);
   });
+
+  it('the "recovery codes changed" notice: master brand, EN and AR, tells the owner what to do', async () => {
+    for (const language of ['en', 'ar'] as const)
+      await sendNoticeMail({
+        to: 'm@example.com',
+        kind: 'recovery_codes_changed',
+        language,
+        firstName: 'M',
+      });
+    expect(h.sent.map(m => m.fromName)).toEqual(['Ebda AI Studio', 'Ebda AI Studio']);
+    expect(String(h.sent[0].html)).toMatch(/recovery codes/i);
+    expect(String(h.sent[0].html)).not.toMatch(/Ebda Store/);
+    expect(String(h.sent[1].html)).toContain('أكواد الاسترجاع');
+    expect(String(h.sent[1].html)).not.toMatch(/ابدأ ستور/);
+  });
 });

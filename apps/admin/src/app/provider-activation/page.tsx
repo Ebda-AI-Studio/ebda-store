@@ -23,6 +23,7 @@ import { apiGet, apiPost } from '../../lib/api';
 import { useT } from '../../i18n/useT';
 import { useLatestRequest } from '../../hooks/useLatestRequest';
 import type { ActivationStatus } from '../../lib/provider-activation';
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 const TABS: ActivationStatus[] = ['requested', 'activated', 'rejected'];
 const STATUS_VARIANT = {
@@ -305,7 +306,7 @@ function ActivationRequestsInner() {
             <span className="mb-1 block font-medium">{t('rejectDialog.noteLabel')}</span>
             <textarea
               aria-label={t('rejectDialog.noteLabel')}
-              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+              className={TEXTAREA_CLASSES}
               rows={3}
               maxLength={1000}
               value={note}

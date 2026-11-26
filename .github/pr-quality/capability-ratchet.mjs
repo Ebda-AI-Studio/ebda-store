@@ -6,7 +6,7 @@
 import { existsSync, lstatSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { readJsonRegular } from './slop-guard.mjs';
+import { readJsonRegular, mergeBaseRef, sourceOfId } from './slop-guard.mjs';
 
 const DIR = 'capabilities/baselines';
 /** The ids of a baseline file; a file that is not `{ "ids": [...] }` is invalid, never "empty". */
@@ -16,7 +16,9 @@ const idsOf = (p) => {
   return j.ids;
 };
 
-export function growth(base, pr) {
+/** `mb` (optional, from mergeBaseRef): an id absent from the base TIP is still allowed when the PR left it unchanged since the merge-base
+ *  (it is in the merge-base file and names a real file of the merge-base tree that is not in `mb.touched`; ids with no real path are judged against the tip). Everything the PR touches is judged against the tip. */
+export function growth(base, pr, mb = null) {
   const out = [];
   const dir = join(pr, DIR);
   if (!existsSync(dir) || lstatSync(dir).isSymbolicLink()) return out;
@@ -25,13 +27,16 @@ export function growth(base, pr) {
   for (const name of readdirSync(dir).filter((n) => n.endsWith('.json')).sort()) {
     const prIds = idsOf(join(dir, name)); // validated even when the base has no such file
     const bp = join(baseDir, name);
+    const mbp = mb && join(mb.dir, DIR, name);
+    const M = new Set(mbp && existsSync(mbp) ? idsOf(mbp) : []);
+    const unchanged = (id) => { const src = mb && sourceOfId(id, mb); return M.has(id) && !!src && !mb.touched.has(src); };
     if (!existsSync(bp)) {
       // the first adoption PR may seed any baseline; after that a new baseline file must start empty (it can only shrink from nothing)
-      if (adopted) for (const id of prIds) out.push(`${name} (new file): ${id}`);
+      if (adopted) for (const id of prIds) if (!unchanged(id)) out.push(`${name} (new file): ${id}`);
       continue;
     }
     const B = new Set(idsOf(bp));
-    for (const id of prIds) if (!B.has(id)) out.push(`${name}: ${id}`);
+    for (const id of prIds) if (!B.has(id) && !unchanged(id)) out.push(`${name}: ${id}`);
   }
   return out;
 }
@@ -44,7 +49,7 @@ function main() {
   if (!base || !pr) { console.error('usage: capability-ratchet.mjs --base <base-checkout> --pr <pr-checkout>'); process.exit(2); }
   let grew;
   try {
-    grew = growth(base, pr);
+    grew = growth(base, pr, mergeBaseRef(arg('--merge-base-root')));
   } catch (e) {
     console.error(`capability-ratchet: ${e.message}`);
     process.exit(1);

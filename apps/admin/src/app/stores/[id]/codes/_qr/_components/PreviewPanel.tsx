@@ -93,7 +93,7 @@ export function PreviewPanel({ scene, payload, check, logo, nameForFile }: Props
   return (
     <div className="space-y-4">
       <h2 className="text-base font-semibold text-foreground">{t('title')}</h2>
-      <div className="flex min-h-[16rem] items-center justify-center rounded-xl border border-border bg-muted/50 p-4">
+      <div className="flex min-h-[16rem] items-center justify-center rounded-md border border-border bg-muted/50 p-4">
         {scene ? (
           <canvas
             ref={ref}

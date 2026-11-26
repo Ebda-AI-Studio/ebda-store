@@ -37,7 +37,7 @@ vi.mock('../../apps/api/src/lib/definer', () => ({
   countAiUsage: (o: { since: Date }) => h.withRlsBypass(o),
 }));
 
-import { assertAiQuota } from '../../apps/api/src/lib/ai-quota';
+import { assertAiQuota, isAiQuotaCapError } from '../../apps/api/src/lib/ai-quota';
 
 describe('assertAiQuota — global caps are cross-tenant (issue 2040, issue 2043)', () => {
   const env = { ...process.env };
@@ -85,5 +85,32 @@ describe('assertAiQuota — global caps are cross-tenant (issue 2040, issue 2043
     });
     expect(h.ambientCount).toHaveBeenCalledTimes(1);
     expect(h.ambientCount.mock.calls[0][0]).toMatchObject({ where: { storeId: 'store-a' } });
+  });
+  // Ported from tests/integration/ai-quota-per-store.test.ts (the Postgres original is deleted).
+  it('an idle store still passes while a heavy store is at its per-store cap (no cross-tenant drain), and the cap error stops the sweep', async () => {
+    process.env.AI_STORE_DAILY_REQUEST_CAP = '3';
+    process.env.AI_DAILY_REQUEST_CAP = '100000';
+    process.env.AI_MONTHLY_REQUEST_CAP = '100000';
+    h.bypassCount.mockResolvedValue(3);
+    h.ambientCount.mockImplementation(async (a: { where: { storeId: string } }) =>
+      a.where.storeId === 'store-a' ? 3 : 0
+    );
+    const err = await assertAiQuota({ storeId: 'store-a' }).catch(e => e);
+    expect(err).toMatchObject({ statusCode: 429, code: 'AI_QUOTA_STORE_DAILY_EXCEEDED' });
+    expect(isAiQuotaCapError(err)).toBe(true);
+    await expect(assertAiQuota({ storeId: 'store-b' })).resolves.toBeUndefined();
+  });
+
+  it('bulk callers stop below the global cap by the interactive reserve while interactive calls still pass', async () => {
+    process.env.AI_STORE_DAILY_REQUEST_CAP = '1000';
+    process.env.AI_DAILY_REQUEST_CAP = '4';
+    process.env.AI_DAILY_INTERACTIVE_RESERVE = '1'; // bulk ceiling = 3
+    process.env.AI_MONTHLY_REQUEST_CAP = '100000';
+    h.bypassCount.mockResolvedValue(3);
+    h.ambientCount.mockResolvedValue(0);
+    await expect(assertAiQuota({ storeId: 'store-b', bulk: true })).rejects.toMatchObject({
+      code: 'AI_QUOTA_DAILY_EXCEEDED',
+    });
+    await expect(assertAiQuota({ storeId: 'store-b' })).resolves.toBeUndefined();
   });
 });

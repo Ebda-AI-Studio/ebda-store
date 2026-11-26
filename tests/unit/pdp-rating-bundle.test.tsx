@@ -198,7 +198,10 @@ describe('PDP markup is unchanged when neither line applies', () => {
       'utf8'
     );
     expect(pdp).toMatch(/<\/h1>\s*\{\/\*[^*]*\*\/\}\s*\{reviewsOn && \(\s*<RatingSummary/);
-    expect(pdp).toMatch(/<BundleSaving productId=\{product\.id\} \/>\s*<B2bPdpPanel/);
+    // The automatic-promotion line (#1053) is a third bare sibling, between the bundle line and the B2B panel.
+    expect(pdp).toMatch(
+      /<BundleSaving productId=\{product\.id\} \/>\s*(?:<AutoPromotionLine productId=\{product\.id\} quantity=\{quantity\} \/>\s*)?<B2bPdpPanel/
+    );
   });
   it('the rating line and the reviews block it links to share ONE condition (reviews switched off = no line, no dead #reviews link)', () => {
     const pdp = readFileSync(

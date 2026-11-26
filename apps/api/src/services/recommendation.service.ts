@@ -7,7 +7,15 @@ import logger from '../lib/logger';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
 import { visibleProductWhere } from '../lib/visible-product';
-import { enrichStockFlags, gateBackorder } from '../lib/effective-inventory';
+import { enrichStockFlags as enrichStockFlagsRaw, gateBackorder } from '../lib/effective-inventory';
+import { CARD_MODEL3D_SELECT, withHas3d } from './product-model.service';
+
+/** Card rows: stock flags + the `has3d` chip flag. */
+const enrichStockFlags = <
+  P extends Parameters<typeof enrichStockFlagsRaw>[0] & { model3d?: unknown },
+>(
+  p: P
+) => enrichStockFlagsRaw(withHas3d(p) as never) as ReturnType<typeof enrichStockFlagsRaw<P>>;
 import { similarProductIds } from '../lib/recommendations/similar-products';
 import { autoRecommendationsEnabled } from '../lib/recommendations/auto-setting';
 
@@ -64,6 +72,8 @@ const productSelect = {
   badgeLabelAr: true,
   // Card fact chips. BOUNDED-stale within the 5-minute recommendation cache.
   facts: true,
+  // Card "3D" chip (id only -> has3d via withHas3d). BOUNDED-stale within the same cache.
+  model3d: CARD_MODEL3D_SELECT,
   // Card "New" badge: every card path reads isProductNew (createdAt inside the
   // window). Without it the badge never rendered on these strips.
   createdAt: true,

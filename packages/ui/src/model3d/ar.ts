@@ -33,3 +33,22 @@ export function sceneViewerIntent(glbUrl: string, title: string, fallbackUrl: st
     `S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end;`
   );
 }
+
+/**
+ * Desktop has no AR: a shopper on a laptop sees a QR instead, so the phone in their pocket opens the
+ * product and the real AR button there. Shown only when AR is on for the product and the model is a
+ * public https file (a blob: admin preview has nothing a phone could open).
+ */
+export function showDesktopQr(opts: {
+  platform: ArPlatform;
+  arEnabled: boolean;
+  src: string;
+  pageUrl: string;
+}): boolean {
+  return (
+    opts.platform === 'none' &&
+    opts.arEnabled &&
+    /^https:\/\//.test(opts.src) &&
+    /^https?:\/\//.test(opts.pageUrl)
+  );
+}

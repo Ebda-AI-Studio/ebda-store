@@ -24,7 +24,7 @@ interface RetryOpts {
 /**
  * Extracts a Prisma/Postgres error code to duck-type against.
  *
- * A raw `$queryRaw`/`$executeRaw` failure (e.g. `reconcileWarehouseStockToAggregate`'s
+ * A raw-SQL failure (e.g. `reconcileWarehouseStockToAggregate`'s
  * `FOR UPDATE` + `INSERT … ON CONFLICT` statements) is wrapped by Prisma as
  * `P2010` ("Raw query failed") with the ACTUAL Postgres error code (e.g.
  * `40P01` deadlock_detected, `40001` serialization_failure) nested at

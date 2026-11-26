@@ -48,6 +48,33 @@ declare module '@ebda-src/repo' {
       }
     ): Promise<{ matches: Array<{ id: string; score: number }> }>;
   }
+  /** STORE-QA-76: `quoteOrderRefund` (packages/repo/src/do/returns.ts) - the admin refund / new-return dialogs' read. */
+  export interface OrderRefundQuote {
+    orderId: string;
+    orderNumber: string;
+    status: string;
+    paymentStatus: string;
+    currency: string;
+    customerId: string | null;
+    total: number;
+    paid: number;
+    refunded: number;
+    refundable: number;
+    paymentProvider: string | null;
+    returnable: { ok: true } | { ok: false; reason: 'NOT_DELIVERED' | 'GUEST_ORDER' };
+    lines: Array<{
+      orderItemId: string;
+      productId: string;
+      name: string;
+      unitPrice: number;
+      quantity: number;
+      remaining: number;
+      trackInventory: boolean;
+      bundleGroupId: string | null;
+    }>;
+    estimate: number | null;
+    coversWholeOrder: boolean;
+  }
   export interface InstapayReceiptRow {
     id: string;
     storeId: string;

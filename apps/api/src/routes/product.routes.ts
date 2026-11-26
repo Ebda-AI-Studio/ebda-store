@@ -301,7 +301,8 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { page, limit, status, category, search, featured, ids, withSalesQuantity } = req.query;
+      const { page, limit, status, category, search, featured, ids, withSalesQuantity, has3d } =
+        req.query;
       const idsParam =
         typeof ids === 'string' && ids.length > 0
           ? ids
@@ -320,6 +321,7 @@ router.get(
         // Tri-state: absent -> undefined, so the default list does not add
         // `WHERE featured = false` and hide featured products.
         featured: parseOptionalBooleanQuery(featured, 'featured'),
+        has3d: parseOptionalBooleanQuery(has3d, 'has3d'),
         ids: idsParam,
         // Inventory page opts in to the per-product sold-units aggregate.
         withSalesQuantity: withSalesQuantity === 'true',

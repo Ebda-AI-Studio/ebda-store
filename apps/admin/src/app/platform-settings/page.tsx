@@ -25,6 +25,7 @@ import { Toggle } from '../../components/Toggle';
 import { apiGet, apiPut } from '../../lib/api';
 import { useT } from '../../i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 function PlatformSettingsInner() {
   const t = useT('platformSettings');
@@ -115,14 +116,19 @@ function PlatformSettingsInner() {
 
   return (
     <div className="p-4 sm:p-6">
-      <section className="max-w-2xl space-y-4 rounded-xl border border-border bg-card p-4">
+      <section className="max-w-2xl space-y-4 rounded-md border border-border bg-card p-4">
         <div>
           <h2 className="text-base font-semibold text-foreground">{t('vat.title')}</h2>
           <p className="text-sm text-muted-foreground">{t('vat.explain')}</p>
         </div>
 
         <div className="flex items-center gap-3">
-          <Toggle checked={enabled} onChange={setEnabled} disabled={saving} />
+          <Toggle
+            checked={enabled}
+            onChange={setEnabled}
+            disabled={saving}
+            label={t('vat.enabled')}
+          />
           <span className="text-sm text-foreground">{t('vat.enabled')}</span>
         </div>
 
@@ -140,7 +146,7 @@ function PlatformSettingsInner() {
             <span className="mb-1 block font-medium text-foreground">{t('vat.mode')}</span>
             <select
               aria-label={t('vat.mode')}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              className={FIELD_CLASSES}
               value={mode}
               onChange={e => setMode(e.target.value as PlatformVatMode)}
             >

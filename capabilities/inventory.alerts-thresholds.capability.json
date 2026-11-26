@@ -22,7 +22,7 @@
   },
   "helpArticle": "stock-alerts-and-reorder-rules",
   "questions": {
-    "ar": ["نبهني لما المنتج يقل", "حد التنبيه"],
+    "ar": ["نبهني لما المنتج يقل", "حد التنبيه", "فين اظبط حد التنبيه للمخزون؟"],
     "en": ["Alert me when stock is low"]
   },
   "steps": ["Set per-product threshold; alerts on dashboard/notifications."],
