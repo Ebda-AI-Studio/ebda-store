@@ -22,6 +22,7 @@ const h = vi.hoisted(() => ({
   storeUpdate: vi.fn(async () => ({})),
   claimUpdateMany: vi.fn(async () => ({ count: 1 })),
   claimFindMany: vi.fn(async () => [{ id: 'claim-1' }]),
+  claimFindFirst: vi.fn(async (): Promise<{ amountMinor: number } | null> => null),
   approve: vi.fn(async () => ['rcpt-1']),
 }));
 vi.mock('../../apps/api/src/lib/repo-factory', async importOriginal => ({
@@ -46,7 +47,11 @@ vi.mock('@ebda/database', async importOriginal => {
   // routed models -> the real routed proxy (D1); the few Postgres models the flow touches -> fakes
   const fake: Record<string, unknown> = {
     store: { findUnique: async () => ({ ownerId: null, billingSuspendedReason: null }) },
-    manualPaymentClaim: { updateMany: h.claimUpdateMany, findMany: h.claimFindMany },
+    manualPaymentClaim: {
+      updateMany: h.claimUpdateMany,
+      findMany: h.claimFindMany,
+      findFirst: h.claimFindFirst,
+    },
   };
   const prisma = new Proxy(real.prisma, {
     get: (t, p) => (typeof p === 'string' && p in fake ? fake[p] : Reflect.get(t, p)),
@@ -134,6 +139,62 @@ beforeEach(() => {
 });
 
 describe('manual payment on D1 fails closed', () => {
+  it('BILLING-AMOUNT-GUARD-1: a typed amount that is not the plan price is refused with the expected amount', async () => {
+    const db = world();
+    await expect(recordManualPayment(input(A, { amountMinor: 4000 }))).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'AMOUNT_MISMATCH',
+      details: { expectedAmountMinor: 5000, amountMinor: 4000 },
+    });
+    expect(db.prepare('SELECT COUNT(*) n FROM billing_events WHERE store_id = ?').get(A)).toEqual({
+      n: 0,
+    });
+    expect(h.storeUpdate).not.toHaveBeenCalled();
+  });
+
+  it('BILLING-AMOUNT-GUARD-1: a claim fixes the expected amount (what the merchant was told), even after the price moved', async () => {
+    const db = world();
+    h.claimFindFirst.mockResolvedValueOnce({ amountMinor: 4321 });
+    await recordManualPayment(input(A, { amountMinor: 4321, claimId: 'claim-1' }));
+    expect(
+      (
+        db.prepare('SELECT amount_minor a FROM billing_events WHERE store_id = ?').get(A) as {
+          a: number;
+        }
+      ).a
+    ).toBe(4321);
+    // and the list price is NOT accepted for that claim
+    h.claimFindFirst.mockResolvedValueOnce({ amountMinor: 4321 });
+    await expect(
+      recordManualPayment(
+        input(A, { amountMinor: 5000, claimId: 'claim-1', reference: 'ref-other-77' })
+      )
+    ).rejects.toMatchObject({ code: 'AMOUNT_MISMATCH', details: { expectedAmountMinor: 4321 } });
+  });
+
+  it('BILLING-AMOUNT-GUARD-1: a replay of an already recorded payment is a duplicate, never a 409, after the price changed', async () => {
+    const db = world();
+    const first = await recordManualPayment(input(A));
+    db.prepare(`UPDATE plans SET price_monthly_minor = 9000 WHERE code = 'growth'`).run();
+    const again = await recordManualPayment(input(A));
+    expect(again).toEqual({ duplicate: true, billingEventId: first.billingEventId });
+  });
+
+  it('BILLING-AMOUNT-GUARD-1: with an explicit reason the different amount is recorded, reason in the ledger row', async () => {
+    const db = world();
+    await recordManualPayment(
+      input(A, { amountMinor: 4000, overrideAmountReason: 'partner discount agreed on WhatsApp' })
+    );
+    const row = db
+      .prepare('SELECT amount_minor a, raw FROM billing_events WHERE store_id = ?')
+      .get(A) as { a: number; raw: string };
+    expect(row.a).toBe(4000);
+    expect(JSON.parse(row.raw)).toMatchObject({
+      expectedAmountMinor: 5000,
+      amountOverrideReason: 'partner discount agreed on WhatsApp',
+    });
+  });
+
   it('a reference store B already holds is refused for store A: 409, and nothing in Postgres moved', async () => {
     const db = world();
     db.prepare(

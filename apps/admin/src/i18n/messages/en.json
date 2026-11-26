@@ -10224,6 +10224,9 @@
       "held": "Held payments"
     },
     "manual": {
+      "amountMismatch": "The amount is not the price of this plan and interval (expected {expected}). Give a reason to record it anyway.",
+      "overrideReason": "Reason for the different amount",
+      "overrideReasonRequired": "Give the reason for the different amount",
       "title": "Record manual payment for {store}",
       "plan": "Plan",
       "interval": "Billing period",

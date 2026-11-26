@@ -455,12 +455,13 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
   }
 
   it('Ebda VAT ON: a recorded InstaPay payment carves the VAT out of the money received; OFF records none', async () => {
-    const pay = (storeId: string, reference: string) =>
+    // the amount received is the plan price for the VAT state: 349,000 with VAT off, 349,000 + 14% exclusive with it on
+    const pay = (storeId: string, reference: string, amountMinor: number) =>
       recordManualPayment({
         storeId,
         planCode: 'growth',
         interval: 'monthly',
-        amountMinor: 397860,
+        amountMinor,
         method: 'instapay',
         reference,
         paidAt: new Date(),
@@ -473,7 +474,7 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
 
     const off = await mkStore('manual-off');
     await owner.systemSetting.deleteMany({ where: { key: 'ebda.vat' } });
-    const r0 = await pay(off.storeId, `IPN-OFF-${run}`);
+    const r0 = await pay(off.storeId, `IPN-OFF-${run}`, 349000);
     expect((await rowOf(r0.billingEventId))?.vatMinor).toBe(0);
 
     await asApp(() =>
@@ -490,12 +491,12 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
     );
     try {
       const on = await mkStore('manual-on');
-      const r1 = await pay(on.storeId, `IPN-ON-${run}`);
+      const r1 = await pay(on.storeId, `IPN-ON-${run}`, 397860);
       const row = await rowOf(r1.billingEventId);
       expect(row?.amountMinor).toBe(397860);
       expect(row?.vatMinor).toBe(48860);
       // Replaying the same reference is idempotent: one row, VAT unchanged.
-      const again = await pay(on.storeId, `IPN-ON-${run}`);
+      const again = await pay(on.storeId, `IPN-ON-${run}`, 397860);
       expect(again).toEqual({ duplicate: true, billingEventId: r1.billingEventId });
     } finally {
       await owner.systemSetting.deleteMany({ where: { key: 'ebda.vat' } });

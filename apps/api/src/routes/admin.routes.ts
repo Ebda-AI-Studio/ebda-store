@@ -799,6 +799,7 @@ router.post(
           periodStart: z.coerce.date().optional().nullable(),
           periodEnd: z.coerce.date().optional().nullable(),
           claimId: z.string().uuid().optional(),
+          overrideAmountReason: z.string().trim().min(3).max(300).optional().nullable(),
           replacesVoidedEventId: z.string().uuid().optional().nullable(),
         })
         .strict()
@@ -826,6 +827,7 @@ router.post(
           periodEnd: (out.periodEnd ?? input.periodEnd)?.toISOString() ?? null,
           periodOverride: !!input.periodStart,
           claimId: input.claimId ?? null,
+          overrideAmountReason: input.overrideAmountReason ?? null,
         },
         ip: req.ip,
         userAgent: req.headers['user-agent'],

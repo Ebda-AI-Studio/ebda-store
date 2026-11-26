@@ -312,6 +312,7 @@ async function downgradeToFree(
       cancelAtPeriodEnd: false,
       trialEndsAt: null,
       pendingPlanCode: null,
+      pendingBillingInterval: null, // a pick for a paid plan dies with the paid plan
       dunningAttempts: 0,
       nextRetryAt: null,
       billingAnchorDay: null,

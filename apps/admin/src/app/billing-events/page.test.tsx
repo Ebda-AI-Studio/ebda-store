@@ -309,6 +309,34 @@ describe('billing ledger: signup-funnel additions', () => {
     );
   });
 
+  it('BILLING-AMOUNT-GUARD-1: an AMOUNT_MISMATCH shows the expected amount and resubmits with the reason', async () => {
+    mockTabs();
+    apiPost
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: 'AMOUNT_MISMATCH',
+          message: 'x',
+          status: 409,
+          details: { expectedAmountMinor: 999000, amountMinor: 1000 },
+        },
+      })
+      .mockResolvedValueOnce({ data: { duplicate: false }, error: null });
+    render(<BillingEventsPage />);
+    openTab('tabs.subscriptions');
+    fireEvent.click((await screen.findAllByRole('button', { name: 'record' }))[0]);
+    fireEvent.change(screen.getByLabelText('reference'), { target: { value: 'IPN-1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }));
+    expect(await screen.findByText(/^amountMismatch/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('overrideReason'), {
+      target: { value: 'partner discount' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }));
+    await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2));
+    expect(apiPost.mock.calls[1][1]).toMatchObject({ overrideAmountReason: 'partner discount' });
+    expect(apiPost.mock.calls[0][1]).not.toHaveProperty('overrideAmountReason');
+  });
+
   it('manual payment: a 409 REFERENCE_USED_ELSEWHERE explains the voided-payment path', async () => {
     mockTabs();
     apiPost.mockResolvedValue({
