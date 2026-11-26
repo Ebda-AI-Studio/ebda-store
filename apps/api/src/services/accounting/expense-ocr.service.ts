@@ -213,8 +213,13 @@ export async function processExpenseReceipt(
 
   // ── 6. Convert amounts to piastres ────────────────────────────────────────────
   const currency = parsed.currency || REGION.currency;
-  const amountFils = toFils(parsed.total ?? parsed.subtotal, currency);
-  const taxFils = toFils(parsed.taxAmount, currency);
+  // ACCT-AUDIT-2: `total` is the GROSS receipt amount (tax included) and createExpense adds `taxAmount` on top of `amount`,
+  // so the amount stored is the NET: total - tax. A receipt with only a subtotal already is net. A tax larger than the
+  // total is a misread, so it is dropped rather than turned into a negative net.
+  const grossFils = parsed.total != null ? toFils(parsed.total, currency) : null;
+  let taxFils = toFils(parsed.taxAmount, currency);
+  if (grossFils != null && taxFils > grossFils) taxFils = 0;
+  const amountFils = grossFils != null ? grossFils - taxFils : toFils(parsed.subtotal, currency);
 
   const nonBaseNote =
     currency !== REGION.currency

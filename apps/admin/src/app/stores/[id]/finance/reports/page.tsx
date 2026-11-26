@@ -82,6 +82,8 @@ interface TaxReportData {
     orderCount: number;
     totalTaxableSales: number;
     totalTaxCollected: number;
+    totalInputTax?: number;
+    netTaxPayable?: number;
     byRate: TaxRateSummary[];
   };
 }
@@ -802,6 +804,23 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
               <p className="text-2xl font-semibold font-mono text-warning-ink">
                 {formatPrice(data.summary.totalTaxCollected)}
               </p>
+            </div>
+          </div>
+
+          {/* Input VAT and the net the return owes (ACCT-AUDIT-10) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-sm text-muted-foreground mb-1">{tt('totalInputTax')}</p>
+              <p className="text-2xl font-semibold font-mono">
+                {formatPrice(data.summary.totalInputTax ?? 0)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-sm text-muted-foreground mb-1">{tt('netTaxPayable')}</p>
+              <p className="text-2xl font-semibold font-mono">
+                {formatPrice(data.summary.netTaxPayable ?? data.summary.totalTaxCollected)}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">{tt('netTaxPayableHint')}</p>
             </div>
           </div>
 

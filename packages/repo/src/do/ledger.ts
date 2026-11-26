@@ -66,7 +66,27 @@ export function systemAccountId(db: SyncSql, storeId: string, code: string): str
   return r.id as string;
 }
 
-/** Idempotent post. Validates DR = CR and at least one line. */
+/**
+ * ACCT-AUDIT-4: the first instant of the OPEN period, or 0 when no month is closed. The merchant closes a month through the
+ * server-owned `settings.accountingLock = { through: 'YYYY-MM-DD', untilMs }` (`untilMs` = the end of that Cairo day, exclusive);
+ * the setting is mirrored into `store_config.settings`. An entry whose posting date is earlier than this is in a closed month.
+ */
+export function periodLockMs(db: SyncSql, storeId: string): number {
+  const row = db.all('SELECT settings FROM store_config WHERE store_id = ?', [storeId])[0];
+  const raw = row?.settings;
+  if (raw === undefined || raw === null) return 0;
+  try {
+    const settings = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const ms = (settings as { accountingLock?: { untilMs?: unknown } }).accountingLock?.untilMs;
+    return typeof ms === 'number' && Number.isFinite(ms) && ms > 0 ? ms : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Idempotent post. Validates DR = CR and at least one line. A manual entry into a closed month is refused (409
+ *  PERIOD_LOCKED); a system entry (a late job, a back-dated document) is posted on the first open instant instead, so the
+ *  closed months never change and the job does not fail. */
 export function postEntry(
   db: SyncSql,
   a: {
@@ -76,6 +96,7 @@ export function postEntry(
     memo?: string;
     memoAr?: string;
     postedAt?: number;
+    postedBy?: string | null;
     lines: JournalLine[];
     now?: number;
   }
@@ -113,6 +134,13 @@ export function postEntry(
     }
     const id = crypto.randomUUID();
     const entryNumber = nextJournalNumber(db, a.storeId, now);
+    let postedAt = a.postedAt ?? now;
+    const open = periodLockMs(db, a.storeId);
+    if (postedAt < open) {
+      if (a.source === 'manual')
+        throw err('PERIOD_LOCKED', 'That month is closed; post the entry in the open period', 409);
+      postedAt = open;
+    }
     db.run(
       `INSERT INTO journal_entries (id, store_id, entry_number, posted_at, source, source_id, memo, memo_ar, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'posted', ?)`,
@@ -120,7 +148,7 @@ export function postEntry(
         id,
         a.storeId,
         entryNumber,
-        a.postedAt ?? now,
+        postedAt,
         a.source,
         a.sourceId ?? null,
         a.memo ?? null,
@@ -151,7 +179,14 @@ export function postEntry(
 /** Mirror an entry (debits become credits) and mark the original `reversed`. Reversing an already reversed entry is a no-op. */
 export function reverseEntry(
   db: SyncSql,
-  a: { storeId: string; entryId: string; reason?: string; now?: number }
+  a: {
+    storeId: string;
+    entryId: string;
+    reason?: string;
+    reasonAr?: string;
+    postedBy?: string | null;
+    now?: number;
+  }
 ): { reversed: boolean; reversalId: string | null } {
   const now = a.now ?? Date.now();
   return db.transactionSync(() => {
@@ -163,8 +198,8 @@ export function reverseEntry(
     if (o.status === 'reversed') return { reversed: false, reversalId: null };
     const id = crypto.randomUUID();
     db.run(
-      `INSERT INTO journal_entries (id, store_id, entry_number, posted_at, source, source_id, memo, memo_ar, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'posted', ?)`,
+      `INSERT INTO journal_entries (id, store_id, entry_number, posted_at, source, source_id, memo, memo_ar, status, posted_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'posted', ?, ?)`,
       [
         id,
         a.storeId,
@@ -173,7 +208,8 @@ export function reverseEntry(
         o.source,
         o.source_id ? `${o.source_id as string}:reversal` : null,
         a.reason ?? `Reversal of ${o.entry_number as string}`,
-        a.reason ?? `إلغاء قيد ${o.entry_number as string}`,
+        a.reasonAr ?? a.reason ?? `إلغاء قيد ${o.entry_number as string}`,
+        a.postedBy ?? null,
         now,
       ]
     );

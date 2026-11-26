@@ -187,3 +187,9 @@ The report sources data from:
 - Left-joined to `customers` for display name
 
 Tax is confirmed to post to account 2100 in `apps/api/src/services/accounting/posting/order-posting.ts` via `postOrderPaymentJournal`. Effective tax rate is **derived** from (tax_collected / taxable_base × 100) rather than stored on the order, because the rate is not persisted on the order record.
+
+## Input VAT and net payable (ACCT-AUDIT-10)
+
+- [ ] Post an expense with 14.00 VAT (chart seeded with **VAT Recoverable 1300**) → the report shows **Input VAT** 14.00 and **Net VAT to pay** = output − input; the XLSX export has both as Summary rows.
+- [ ] A 33.33 sale at 14% (tax 4.67) lands in the **14.00** rate bucket, never a separate 14.01 / 13.99 one.
+- [ ] A basket with a 14% item and an exempt item still shows its blended rate (the order lines carry no per-line rate; see Ruling ACCT-AUDIT-10).

@@ -24,6 +24,12 @@ export const COA_TEMPLATE: CoaTemplateRow[] = [
   { code: '1030', nameEn: 'Bank Main', nameAr: 'بنك رئيسي', type: 'asset' },
   { code: '1100', nameEn: 'Accounts Receivable', nameAr: 'الذمم المدينة', type: 'asset' },
   { code: '1200', nameEn: 'Inventory', nameAr: 'المخزون', type: 'asset' },
+  {
+    code: '1300',
+    nameEn: 'VAT Recoverable (Input)',
+    nameAr: 'ضريبة القيمة المضافة المستردة (مدخلات)',
+    type: 'asset',
+  },
   { code: '2000', nameEn: 'Accounts Payable', nameAr: 'الذمم الدائنة', type: 'liability' },
   { code: '2100', nameEn: 'Tax Payable', nameAr: 'الضريبة المستحقة', type: 'liability' },
   // What the store owes customers as credit (owner decision 2026-10-01, M1-8):

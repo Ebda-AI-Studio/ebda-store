@@ -132,6 +132,9 @@ export async function postStockAdjustmentJournal(args: StockAdjustmentJournalInp
     storeId: args.storeId,
     source: 'stock_adjustment',
     sourceId: adjustment.id,
+    // ACCT-AUDIT-3: keeps the date the adjustment was posted on
+    postedAt:
+      adjustment.postedAt && adjustment.postedAt < new Date() ? adjustment.postedAt : undefined,
     memo: `Stock adjustment — ${adjustment.adjustmentNumber}`,
     memoAr: `تسوية مخزون — ${adjustment.adjustmentNumber}`,
     lines,

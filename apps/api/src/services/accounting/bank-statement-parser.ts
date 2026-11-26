@@ -9,7 +9,9 @@
  *   (a 3rd decimal, if a statement carries one, is truncated — never rounded up)
  *
  * The row_hash (SHA-256 of canonical fields) is the idempotent dedup key.
- * Re-importing the same statement rows is a no-op in the DB.
+ * Re-importing the same statement rows is a no-op in the DB. Two genuinely identical lines in ONE file (same day, amount,
+ * direction, reference and text) are two transactions: the Nth repeat carries its occurrence ordinal in the hash
+ * (ACCT-AUDIT-6), so they stay distinct while a re-upload of the same file still hashes the same.
  */
 
 import { createHash } from 'crypto';
@@ -39,17 +41,38 @@ export interface ParsedRow {
  * Convert a decimal money string to integer piastres.
  * Uses only string manipulation and integer math — NO float arithmetic.
  *
- * Supports: "12.34", "1,234.56", "-0.50", "١٢٣.٤٥" (Arabic-indic)
+ * Supports: "12.34", "1,234.56", "1.234,56", "100,50", "-0.50", "١٢٣.٤٥" (Arabic-indic)
  */
 export function decimalStringToFils(raw: string): number {
   if (!raw || raw.trim() === '') return 0;
 
-  // Normalise Arabic-Indic digits → ASCII
-  const normalised = raw
+  // Normalise Arabic-Indic digits → ASCII, and the Arabic decimal/thousands marks (٫ ٬) to . and ,
+  const digits = raw
     .trim()
     .replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
-    .replace(/,/g, '') // strip thousands separators
+    .replace(/٫/g, '.')
+    .replace(/٬/g, ',')
     .replace(/\s/g, '');
+
+  // ACCT-AUDIT-8: tell the decimal mark from the thousands mark. When both appear the LAST one is the decimal mark
+  // ("1.234,56" and "1,234.56" are the same amount). A lone comma is a decimal mark when it appears once with 1-2 digits
+  // after it ("100,50"); otherwise it groups thousands ("1,234", "1,234,567"). Several dots group thousands ("1.234.567").
+  const lastDot = digits.lastIndexOf('.');
+  const lastComma = digits.lastIndexOf(',');
+  let normalised: string;
+  if (lastDot !== -1 && lastComma !== -1) {
+    normalised =
+      lastComma > lastDot ? digits.replace(/\./g, '').replace(',', '.') : digits.replace(/,/g, '');
+  } else if (lastComma !== -1) {
+    const single = digits.indexOf(',') === lastComma;
+    const after = digits.length - lastComma - 1;
+    normalised =
+      single && after >= 1 && after <= 2 ? digits.replace(',', '.') : digits.replace(/,/g, '');
+  } else if (lastDot !== -1 && digits.indexOf('.') !== lastDot) {
+    normalised = digits.replace(/\./g, '');
+  } else {
+    normalised = digits;
+  }
 
   // Split on decimal point
   const [intPart = '0', fracPart = ''] = normalised.split('.');
@@ -68,13 +91,35 @@ export function decimalStringToFils(raw: string): number {
   return isNegative ? -totalMinor : totalMinor;
 }
 
+/** How many identical lines (same canonical fields) this file already produced; counts this one. */
+function nextOccurrence(
+  seen: Map<string, number>,
+  date: Date,
+  amountFils: number,
+  direction: TransactionDirection,
+  externalRef: string | null,
+  description: string
+): number {
+  const key = [
+    date.toISOString().slice(0, 10),
+    amountFils,
+    direction,
+    externalRef ?? '',
+    description,
+  ].join('|');
+  const n = seen.get(key) ?? 0;
+  seen.set(key, n + 1);
+  return n;
+}
+
 /** Compute the deterministic row hash. */
 function computeRowHash(
   date: Date,
   amountFils: number,
   direction: TransactionDirection,
   externalRef: string | null,
-  description: string
+  description: string,
+  occurrence = 0
 ): string {
   const canonical = [
     date.toISOString().slice(0, 10), // date portion only
@@ -82,6 +127,8 @@ function computeRowHash(
     direction,
     externalRef ?? '',
     description,
+    // the first occurrence keeps the pre-ordinal hash, so lines already imported are still recognised
+    ...(occurrence > 0 ? [`#${occurrence}`] : []),
   ].join('|');
   return createHash('sha256').update(canonical).digest('hex');
 }
@@ -191,7 +238,7 @@ export interface CsvParseResult {
  * Tolerant: skips malformed/empty rows, reports errors without throwing.
  */
 export function parseStatementCsv(buffer: Buffer): CsvParseResult {
-  const text = buffer.toString('utf-8');
+  const text = decodeStatementText(buffer);
   const lines = text
     .split(/\r?\n/)
     .map(l => l.trim())
@@ -204,19 +251,19 @@ export function parseStatementCsv(buffer: Buffer): CsvParseResult {
     return { rows: [], skipped: 0, errors: ['empty file'] };
   }
 
-  // Detect separator (comma vs semicolon vs tab)
-  const header = lines[0];
-  const sep = header.includes(';') ? ';' : header.includes('\t') ? '\t' : ',';
-
-  // Parse header → column index map
-  const cols = splitCsvLine(header, sep).map(h => h.toLowerCase().trim().replace(/^"|"$/g, ''));
-
-  const dateIdx = cols.findIndex(c => DATE_COLS.has(c));
-  const descIdx = cols.findIndex(c => DESC_COLS.has(c));
-  const debitIdx = cols.findIndex(c => DEBIT_COLS.has(c));
-  const creditIdx = cols.findIndex(c => CREDIT_COLS.has(c));
-  const amountIdx = cols.findIndex(c => AMOUNT_COLS.has(c));
-  const refIdx = cols.findIndex(c => REF_COLS.has(c));
+  // ACCT-AUDIT-8: a bank preamble (account holder, period) can sit above the header, so the header is the first of the
+  // top lines that names a date column, a description column and an amount column; none found -> report line 1's gap.
+  let headerAt = -1;
+  let h = analyseHeader(lines[0]);
+  for (let i = 0; i < Math.min(lines.length, HEADER_SCAN_LINES) && headerAt === -1; i++) {
+    const cand = analyseHeader(lines[i]);
+    if (cand.dateIdx !== -1 && cand.descIdx !== -1 && cand.hasAmount) {
+      headerAt = i;
+      h = cand;
+    }
+  }
+  if (headerAt === -1) headerAt = 0;
+  const { sep, dateIdx, descIdx, debitIdx, creditIdx, amountIdx, refIdx } = h;
 
   if (dateIdx === -1) {
     return { rows: [], skipped: 0, errors: ['could not find date column'] };
@@ -224,13 +271,14 @@ export function parseStatementCsv(buffer: Buffer): CsvParseResult {
   if (descIdx === -1) {
     return { rows: [], skipped: 0, errors: ['could not find description column'] };
   }
-  if (debitIdx === -1 && creditIdx === -1 && amountIdx === -1) {
+  if (!h.hasAmount) {
     return { rows: [], skipped: 0, errors: ['could not find amount column'] };
   }
 
   const rows: ParsedRow[] = [];
+  const seen = new Map<string, number>();
 
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = headerAt + 1; i < lines.length; i++) {
     const cells = splitCsvLine(lines[i], sep).map(c => c.trim().replace(/^"|"$/g, ''));
 
     const dateRaw = cells[dateIdx] ?? '';
@@ -288,11 +336,58 @@ export function parseStatementCsv(buffer: Buffer): CsvParseResult {
       direction = piastres < 0 ? 'debit' : 'credit';
     }
 
-    const rowHash = computeRowHash(date, amountFils, direction, externalRef, descRaw);
+    const rowHash = computeRowHash(
+      date,
+      amountFils,
+      direction,
+      externalRef,
+      descRaw,
+      nextOccurrence(seen, date, amountFils, direction, externalRef, descRaw)
+    );
     rows.push({ date, description: descRaw, amountFils, direction, externalRef, rowHash });
   }
 
   return { rows, skipped, errors };
+}
+
+const HEADER_SCAN_LINES = 40;
+
+/** A header cell without quotes, case or the Arabic definite article, so `التاريخ` finds `تاريخ`. */
+function headerKeys(cell: string): string[] {
+  const c = cell.toLowerCase().trim().replace(/^"|"$/g, '').trim();
+  return c.startsWith('ال') ? [c, c.slice(2)] : [c];
+}
+const colIndex = (cols: string[][], set: Set<string>): number =>
+  cols.findIndex(keys => keys.some(k => set.has(k)));
+
+function analyseHeader(line: string) {
+  const sep = line.includes(';') ? ';' : line.includes('\t') ? '\t' : ',';
+  const cols = splitCsvLine(line, sep).map(headerKeys);
+  const debitIdx = colIndex(cols, DEBIT_COLS);
+  const creditIdx = colIndex(cols, CREDIT_COLS);
+  const amountIdx = colIndex(cols, AMOUNT_COLS);
+  return {
+    sep,
+    dateIdx: colIndex(cols, DATE_COLS),
+    descIdx: colIndex(cols, DESC_COLS),
+    debitIdx,
+    creditIdx,
+    amountIdx,
+    refIdx: colIndex(cols, REF_COLS),
+    hasAmount: debitIdx !== -1 || creditIdx !== -1 || amountIdx !== -1,
+  };
+}
+
+/**
+ * Statement bytes -> text. UTF-8 first; a file that is not valid UTF-8 is a windows-1256 export (Egyptian banks), so
+ * decode it as that instead of feeding U+FFFD into descriptions and the row hash.
+ */
+function decodeStatementText(buffer: Buffer): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  } catch {
+    return new TextDecoder('windows-1256').decode(buffer);
+  }
 }
 
 /** Simple CSV line splitter that respects double-quoted fields. */
@@ -341,8 +436,9 @@ export interface OfxParseResult {
 }
 
 export function parseStatementOfx(buffer: Buffer): OfxParseResult {
-  const text = buffer.toString('utf-8');
+  const text = decodeStatementText(buffer);
   const rows: ParsedRow[] = [];
+  const seen = new Map<string, number>();
   const errors: string[] = [];
   let skipped = 0;
 
@@ -392,7 +488,14 @@ export function parseStatementOfx(buffer: Buffer): OfxParseResult {
     const externalRef = fitid || null;
     const description = name || `OFX transaction ${txIdx}`;
 
-    const rowHash = computeRowHash(date, amountFils, direction, externalRef, description);
+    const rowHash = computeRowHash(
+      date,
+      amountFils,
+      direction,
+      externalRef,
+      description,
+      nextOccurrence(seen, date, amountFils, direction, externalRef, description)
+    );
     rows.push({ date, description, amountFils, direction, externalRef, rowHash });
   }
 

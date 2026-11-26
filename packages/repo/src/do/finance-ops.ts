@@ -2,7 +2,7 @@
 // generic `mutate`), and two read-only aggregates the Postgres twin computes with raw SQL (the bank reconciliation ledger side,
 // the stock value of the finance dashboard). Pure synchronous functions over `SyncSql`; every query is scoped by `store_id`.
 import { MoneyError, type SyncSql } from './sync-sql';
-import { nextJournalNumber } from './ledger';
+import { nextJournalNumber, periodLockMs, reverseEntry } from './ledger';
 
 const FX_SCALE = 100_000_000; // journal_lines.fx_rate is numeric(16,8) stored as an integer of 1e-8
 
@@ -94,6 +94,12 @@ export function journalManualOp(
     if (found.some(r => !r.is_active))
       throw new MoneyError('ACCOUNT_INACTIVE', 'A disabled account cannot be posted to', 409);
 
+    if ((postedAt as number) < periodLockMs(db, storeId))
+      throw new MoneyError(
+        'PERIOD_LOCKED',
+        'That month is closed; post the entry in the open period',
+        409
+      );
     const now = Date.now();
     const id = crypto.randomUUID();
     const entryNumber = nextJournalNumber(db, storeId, now);
@@ -211,4 +217,59 @@ export function stockValueOp(
     stockedProducts: Number(r?.stocked ?? 0),
     uncostedProducts: Number(r?.uncosted ?? 0),
   };
+}
+
+/**
+ * Reverse a MANUAL entry (ACCT-AUDIT-9): a mirror entry dated now (so a closed month is never touched), the original marked
+ * `reversed`, the actor stored on the reversal and the reason in its memo. System entries (sales, refunds, expenses ...) are
+ * reversed only by their own flows, which keep the order / document in step, so they are refused here. Once only.
+ */
+export function journalReverseManualOp(
+  db: SyncSql,
+  storeId: string,
+  a: Args
+): { reversalId: string } {
+  const entryId = typeof a.entryId === 'string' && a.entryId ? a.entryId : bad('entryId');
+  const reason = optStr(a.reason, 'reason', 500);
+  if (!reason || reason.trim().length < 3) bad('reason');
+  const actor = optStr(a.actor, 'actor', 128);
+  return db.transactionSync(() => {
+    const o = db.all(
+      'SELECT entry_number, source, status FROM journal_entries WHERE id = ? AND store_id = ?',
+      [entryId, storeId]
+    )[0];
+    if (!o) throw new MoneyError('JOURNAL_NOT_FOUND', `JournalEntry ${entryId} not found`, 404);
+    if (o.source !== 'manual')
+      throw new MoneyError('JOURNAL_NOT_MANUAL', 'Only a manual entry can be reversed here', 409);
+    if (o.status === 'reversed')
+      throw new MoneyError('JOURNAL_ALREADY_REVERSED', 'This entry is already reversed', 409);
+    const num = o.entry_number as string;
+    const r = reverseEntry(db, {
+      storeId,
+      entryId,
+      reason: `Reversal of ${num} - ${reason}`,
+      reasonAr: `إلغاء قيد ${num} - ${reason}`,
+      postedBy: actor,
+    });
+    return { reversalId: r.reversalId as string };
+  });
+}
+
+/**
+ * Input VAT claimed in a period (ACCT-AUDIT-10): the net debit of Input VAT (1300) over the counted entries posted in
+ * `[fromMs, toMs]`. The monthly return is output (Tax Payable, 2100) minus this.
+ */
+export function taxInputTotalOp(db: SyncSql, storeId: string, a: Args): { inputTax: number } {
+  if (typeof a.fromMs !== 'number' || !Number.isFinite(a.fromMs)) bad('fromMs');
+  if (typeof a.toMs !== 'number' || !Number.isFinite(a.toMs)) bad('toMs');
+  const r = db.all(
+    `SELECT COALESCE(SUM(l.debit - l.credit), 0) AS t
+       FROM journal_lines l
+       JOIN journal_entries e ON e.id = l.entry_id
+       JOIN accounts x ON x.id = l.account_id AND x.store_id = e.store_id
+      WHERE e.store_id = ? AND x.code = '1300' AND e.status IN ('posted', 'reversed')
+        AND e.posted_at >= ? AND e.posted_at <= ?`,
+    [storeId, a.fromMs, a.toMs]
+  )[0];
+  return { inputTax: Number(r?.t ?? 0) };
 }

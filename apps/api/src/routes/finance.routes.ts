@@ -9,7 +9,10 @@
  *   GET  /stores/:storeId/finance/accounts          — COA tree (store_admin+)
  *   GET  /stores/:storeId/finance/journal           — paginated entry list (store_admin+)
  *   GET  /stores/:storeId/finance/journal/:entryId  — single entry detail (store_admin+)
- *   POST /stores/:storeId/finance/journal           — manual adjusting entry (super_admin only)
+ *   POST /stores/:storeId/finance/journal           — manual adjusting entry (store_admin+)
+ *   POST /stores/:storeId/finance/payouts           — a gateway payout / COD remittance net of its fee (store_admin+)
+ *   POST /stores/:storeId/finance/journal/:entryId/reverse — reverse a manual entry (store_admin+)
+ *   GET/PUT /stores/:storeId/finance/period-lock    — close / reopen months (store_admin+)
  *   GET  /stores/:storeId/finance/reports/tax-report       — transaction-level tax report (Enterprise)
  *   GET  /stores/:storeId/finance/reports/tax-report.xlsx  — XLSX download (Enterprise)
  */
@@ -41,7 +44,11 @@ import {
   seedCoaForStore,
 } from '../services/accounting/account.service';
 import { idempotencyKeyOf } from '../lib/money-idempotency';
-import { postManualEntry } from '../services/accounting/journal.service';
+import { postManualEntry, reverseManualEntry } from '../services/accounting/journal.service';
+import { postPayout, payoutSchema } from '../services/accounting/payout.service';
+import { StoreService } from '../services/store.service';
+import { adminReadLimiter, auditLog } from '../middleware/security';
+import { getAuthUser } from '../utils/store-helpers';
 import { trialBalance, profitAndLoss, balanceSheet } from '../services/accounting/reports.service';
 import { AnalyticsService, cogsFromPnl, ledgerCostsFields } from '../services/analytics.service';
 import { dashboardStockValues } from '../services/accounting/dashboard-stock';
@@ -273,15 +280,15 @@ const manualEntrySchema = z.object({
 });
 
 /**
- * Manual adjusting entry (super_admin only).
- * Store admins post via service helpers, not raw GL, in v1.
- * Returns 201 on success; the postEntry service validates DR=CR balance.
+ * Manual adjusting entry (store_admin and super_admin, ACCT-AUDIT-9: a merchant must be able to book capital, a loan, an owner
+ * draw or a correction, and to reverse a wrong one).
+ * Returns 201 on success; the postEntry service validates DR=CR balance, the store's own active accounts and the closed months.
  */
 router.post(
   '/:storeId/finance/journal',
   authenticate,
   requireMfaEnrolled,
-  authorize('super_admin'),
+  authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -340,6 +347,183 @@ router.post(
       );
 
       res.status(201).json({ data: entry });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── POST /:storeId/finance/payouts ──────────────────────────────────────────
+
+/** Book a gateway payout or COD remittance: bank (net) + bank fees / cash in transit (gross), one balanced entry. */
+router.post(
+  '/:storeId/finance/payouts',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('accounting.basic'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = payoutSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: parsed.error.flatten(),
+          },
+        });
+        return;
+      }
+      const entry = await runInStoreCtx(req.params.storeId, () =>
+        postPayout(
+          req.params.storeId,
+          parsed.data,
+          req.user?.userId,
+          idempotencyKeyOf(req.header('idempotency-key'))
+        )
+      );
+      res.status(201).json({ data: entry });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── POST /:storeId/finance/journal/:entryId/reverse ─────────────────────────
+
+const reverseSchema = z.object({ reason: z.string().trim().min(3).max(500) });
+
+/** Reverse a manual entry: a mirror entry dated now with the reason and the actor; the original is kept, marked reversed. */
+router.post(
+  '/:storeId/finance/journal/:entryId/reverse',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('accounting.basic'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = reverseSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: parsed.error.flatten(),
+          },
+        });
+        return;
+      }
+      const actor = getAuthUser(req).userId;
+      const entry = await runInStoreCtx(req.params.storeId, () =>
+        reverseManualEntry(req.params.storeId, req.params.entryId, parsed.data.reason, actor)
+      );
+      await auditLog({
+        action: 'finance.journal_reversed',
+        userId: actor,
+        resourceType: 'journal_entry',
+        resourceId: req.params.entryId,
+        storeId: req.params.storeId,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        details: { reason: parsed.data.reason, reversalId: entry.id },
+      });
+      res.status(201).json({ data: entry });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── GET/PUT /:storeId/finance/period-lock ───────────────────────────────────
+
+const periodLockSchema = z.object({
+  through: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable(),
+});
+
+type AccountingLock = { through: string; untilMs: number };
+const readLock = (settings: unknown): AccountingLock | null => {
+  const l = (settings as { accountingLock?: AccountingLock } | null)?.accountingLock;
+  return l && typeof l.through === 'string' && typeof l.untilMs === 'number' ? l : null;
+};
+
+router.get(
+  '/:storeId/finance/period-lock',
+  authenticate,
+  // Before every authorization-performing handler (CodeQL js/missing-rate-limiting reads the order): keyed on req.user.
+  adminReadLimiter,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('accounting.basic'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const store = await StoreService.getById(req.params.storeId);
+      res.json({ data: { through: readLock(store.settings)?.through ?? null } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * Close the books through a Cairo day (inclusive), or reopen with `through: null`. Entries dated in a closed month are
+ * refused (manual) or posted on the first open day (system jobs), so a filed VAT month cannot change silently. The day must be
+ * a real past day: you cannot close today or the future.
+ */
+router.put(
+  '/:storeId/finance/period-lock',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('accounting.basic'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = periodLockSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(422).json({
+          success: false,
+          error: { code: 'validation_failed', message: 'Validation failed.' },
+        });
+        return;
+      }
+      const { storeId } = req.params;
+      const { through } = parsed.data;
+      let lock: AccountingLock | null = null;
+      if (through) {
+        const tz = await storeTimeZone(storeId);
+        const end = zonedDayEnd(through, tz);
+        if (!end || end.getTime() + 1 > Date.now()) {
+          res.status(422).json({
+            success: false,
+            error: {
+              code: 'period_lock_bad_day',
+              message: 'Pick a finished day: today and future days cannot be closed.',
+            },
+          });
+          return;
+        }
+        lock = { through, untilMs: end.getTime() + 1 };
+      }
+      await StoreService.setAccountingLock(storeId, lock);
+      await auditLog({
+        action: 'finance.period_lock',
+        userId: getAuthUser(req).userId,
+        resourceType: 'store',
+        resourceId: storeId,
+        storeId,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        details: { through },
+      });
+      res.json({ data: { through } });
     } catch (err) {
       next(err);
     }
@@ -1038,6 +1222,26 @@ router.get(
           subtotal: fromMinor(report.summary.totalTaxableSales),
           taxRate: '',
           taxCollected: fromMinor(report.summary.totalTaxCollected),
+          total: '',
+        },
+        {
+          rowType: 'Summary',
+          date: '',
+          orderNumber: 'Input VAT claimed on purchases (account 1300)',
+          customer: '',
+          subtotal: '',
+          taxRate: '',
+          taxCollected: fromMinor(report.summary.totalInputTax),
+          total: '',
+        },
+        {
+          rowType: 'Summary',
+          date: '',
+          orderNumber: 'Net VAT payable (output minus input)',
+          customer: '',
+          subtotal: '',
+          taxRate: '',
+          taxCollected: fromMinor(report.summary.netTaxPayable),
           total: '',
         },
         {

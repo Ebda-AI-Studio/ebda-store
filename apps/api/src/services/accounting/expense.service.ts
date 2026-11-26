@@ -11,6 +11,7 @@ import {
 import { createHash } from 'node:crypto';
 import { nextSequence } from '../sequence.service';
 import { storeRepo } from '../../lib/repo-factory';
+import { postExpenseJournal } from './posting/expense-posting';
 import { inngest } from '../../lib/inngest/client';
 import logger from '../../lib/logger';
 import { AppError } from '../../middleware/error-handler';
@@ -433,7 +434,17 @@ async function fireExpensePosted(storeId: string, id: string): Promise<void> {
       data: { storeId, expenseId: id },
     });
   } catch (err) {
+    // ACCT-AUDIT-5: a lost trigger must not leave a posted expense with no journal. Post inline (idempotent per source row);
+    // if that fails too, the nightly period reconciliation re-posts it, and the failure is logged at error level.
     logger.error({ err, expenseId: id, storeId }, 'postExpense: failed to fire inngest event');
+    try {
+      await postExpenseJournal({ storeId, expenseId: id });
+    } catch (postErr) {
+      logger.error(
+        { err: postErr, expenseId: id, storeId },
+        'postExpense: inline journal post failed'
+      );
+    }
   }
 }
 

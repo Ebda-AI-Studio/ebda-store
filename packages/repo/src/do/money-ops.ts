@@ -160,8 +160,19 @@ import {
   affiliatePayoutOp,
   trialBalanceOp,
 } from './job-ops';
-import { journalExpenseOp, journalPoReceiveOp, journalStockAdjustmentOp } from './books-journals';
-import { bankLedgerSideOp, journalManualOp, stockValueOp } from './finance-ops';
+import {
+  journalExpenseOp,
+  journalPoReceiveOp,
+  journalRepostMissingOp,
+  journalStockAdjustmentOp,
+} from './books-journals';
+import {
+  bankLedgerSideOp,
+  journalManualOp,
+  journalReverseManualOp,
+  stockValueOp,
+  taxInputTotalOp,
+} from './finance-ops';
 import { backorderCancelOp } from './backorder-cancel';
 import { MoneyError, type SyncSql } from './sync-sql';
 
@@ -242,7 +253,10 @@ export type MoneyOpName =
   | 'journalExpense'
   | 'journalStockAdjustment'
   | 'journalPoReceive'
+  | 'journalRepostMissing'
   | 'journalManual'
+  | 'journalReverseManual'
+  | 'taxInputTotal'
   | 'backorderCancel'
   | 'bankLedgerSide'
   | 'stockValue'
@@ -387,7 +401,10 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'journalExpense',
   'journalStockAdjustment',
   'journalPoReceive',
+  'journalRepostMissing',
   'journalManual',
+  'journalReverseManual',
+  'taxInputTotal',
   'backorderCancel',
   'bankLedgerSide',
   'stockValue',
@@ -1015,8 +1032,11 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   journalExpense: (db, storeId, a) => journalExpenseOp(db, storeId, a),
   journalStockAdjustment: (db, storeId, a) => journalStockAdjustmentOp(db, storeId, a),
   journalPoReceive: (db, storeId, a) => journalPoReceiveOp(db, storeId, a),
+  journalRepostMissing: (db, storeId, a) => journalRepostMissingOp(db, storeId, a),
   /** Finance admin (Ruling NZ-FEAT-1): see `finance-ops.ts`. */
   journalManual: (db, storeId, a) => journalManualOp(db, storeId, a),
+  journalReverseManual: (db, storeId, a) => journalReverseManualOp(db, storeId, a),
+  taxInputTotal: (db, storeId, a) => taxInputTotalOp(db, storeId, a),
   /** cancelBackorder (Ruling NZ-FEAT-1): claim, deferred-cost flag, stock-debt heal and marker in one section. */
   backorderCancel: (db, storeId, a) => backorderCancelOp(db, storeId, a),
   bankLedgerSide: (db, storeId, a) => bankLedgerSideOp(db, storeId, a),

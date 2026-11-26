@@ -19,11 +19,18 @@ const accountingOn = (db: SyncSql, storeId: string): boolean => {
 
 type Out = { posted: boolean; skipped?: string };
 
+/** ACCT-AUDIT-3: a journal is dated by its document (an expense's own date, an adjustment's / receipt's post date), never
+ *  later than now, so a late-posting job cannot move October's cost into November. Absent date -> now (postEntry's default). */
+const docDate = (v: unknown): number | undefined => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, Date.now()) : undefined;
+};
+
 export function journalExpenseOp(db: SyncSql, storeId: string, a: Record<string, unknown>): Out {
   const id = str(a.expenseId, 'expenseId');
   return db.transactionSync((): Out => {
     const e = db.all(
-      'SELECT id, expense_number, status, total, expense_account_id, paid_from_account_id FROM expenses WHERE id = ? AND store_id = ?',
+      'SELECT id, expense_number, status, total, tax_amount, expense_date, expense_account_id, paid_from_account_id FROM expenses WHERE id = ? AND store_id = ?',
       [id, storeId]
     )[0];
     if (!e) return { posted: false, skipped: 'expense_not_found' };
@@ -32,29 +39,39 @@ export function journalExpenseOp(db: SyncSql, storeId: string, a: Record<string,
     const total = e.total as number;
     if (total === 0) return { posted: false, skipped: 'zero_total' };
     const num = e.expense_number as string;
+    // ACCT-AUDIT-10: the VAT on a purchase is recoverable, so it goes to Input VAT (1300), not into the expense. A chart that
+    // has no 1300 yet (a store not re-seeded) keeps the old gross posting, never a failed job.
+    const tax = Math.min(Math.max(Number(e.tax_amount ?? 0), 0), total);
+    const inputVat =
+      tax > 0
+        ? (db.all("SELECT id FROM accounts WHERE store_id = ? AND code = '1300'", [storeId])[0]
+            ?.id as string | undefined)
+        : undefined;
+    const net = inputVat ? total - tax : total;
+    const line = (
+      accountId: string,
+      debit: number,
+      credit: number,
+      lineMemo: string
+    ): JournalLine => ({
+      accountId,
+      debit,
+      credit,
+      lineMemo,
+      refTable: 'expenses',
+      refId: id,
+    });
     const r = postEntry(db, {
       storeId,
       source: 'expense',
       sourceId: id,
+      postedAt: docDate(e.expense_date),
       memo: `Expense — ${num}`,
       memoAr: `مصروف — ${num}`,
       lines: [
-        {
-          accountId: e.expense_account_id as string,
-          debit: total,
-          credit: 0,
-          lineMemo: `Expense — ${num}`,
-          refTable: 'expenses',
-          refId: id,
-        },
-        {
-          accountId: e.paid_from_account_id as string,
-          debit: 0,
-          credit: total,
-          lineMemo: `Paid — ${num}`,
-          refTable: 'expenses',
-          refId: id,
-        },
+        line(e.expense_account_id as string, net, 0, `Expense — ${num}`),
+        ...(inputVat ? [line(inputVat, tax, 0, `Input VAT — ${num}`)] : []),
+        line(e.paid_from_account_id as string, 0, total, `Paid — ${num}`),
       ],
     });
     return { posted: r.created };
@@ -79,7 +96,7 @@ export function journalStockAdjustmentOp(
   const id = str(a.adjustmentId, 'adjustmentId');
   return db.transactionSync((): Out => {
     const adj = db.all(
-      'SELECT id, adjustment_number, type, status, total_value_impact FROM stock_adjustments WHERE id = ? AND store_id = ?',
+      'SELECT id, adjustment_number, type, status, total_value_impact, posted_at FROM stock_adjustments WHERE id = ? AND store_id = ?',
       [id, storeId]
     )[0];
     if (!adj) return { posted: false, skipped: 'adjustment_not_found' };
@@ -119,6 +136,7 @@ export function journalStockAdjustmentOp(
       storeId,
       source: 'stock_adjustment',
       sourceId: id,
+      postedAt: docDate(adj.posted_at),
       memo: `Stock adjustment — ${num}`,
       memoAr: `تسوية مخزون — ${num}`,
       lines,
@@ -145,7 +163,7 @@ export function journalPoReceiveOp(
   const cleared = Array.isArray(a.clearedBackorders) ? (a.clearedBackorders as Cleared[]) : [];
   return db.transactionSync(() => {
     const po = db.all(
-      'SELECT id, po_number, ap_account_id FROM purchase_orders WHERE id = ? AND store_id = ?',
+      'SELECT id, po_number, ap_account_id, received_at FROM purchase_orders WHERE id = ? AND store_id = ?',
       [poId, storeId]
     )[0];
     if (!po) return { posted: false, skipped: 'po_not_found', entries: 0 };
@@ -172,16 +190,29 @@ export function journalPoReceiveOp(
       refTable: string,
       refId: string
     ): JournalLine => ({ accountId, debit, credit, lineMemo, refTable, refId });
-    if (received > 0) {
+    // ACCT-AUDIT-1: each receive pass posts only the DELTA over what this PO already booked to Inventory (the old single
+    // entry keyed `poId` and the per-pass `poId:recv:<cumulative>` entries are both counted), keyed by the cumulative value so
+    // a replay finds its own entry and a later pass is never dropped.
+    const booked = Number(
+      db.all(
+        `SELECT COALESCE(SUM(l.debit), 0) AS t FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id
+         WHERE e.store_id = ? AND e.source = 'purchase_order' AND e.status = 'posted'
+           AND (e.source_id = ? OR e.source_id LIKE ?) AND l.account_id = ? AND l.ref_table = 'purchase_orders' AND l.ref_id = ?`,
+        [storeId, poId, `${poId}:recv:%`, inventory, poId]
+      )[0].t
+    );
+    const delta = received - booked;
+    if (delta > 0) {
       const r = postEntry(db, {
         storeId,
         source: 'purchase_order',
-        sourceId: poId,
+        sourceId: `${poId}:recv:${received}`,
+        postedAt: docDate(po.received_at),
         memo: `PO receive — ${poNumber}`,
         memoAr: `استلام أمر شراء — ${poNumber}`,
         lines: [
-          jl(inventory, received, 0, `Inventory in (PO ${poNumber})`, 'purchase_orders', poId),
-          jl(ap, 0, received, 'AP — supplier', 'purchase_orders', poId),
+          jl(inventory, delta, 0, `Inventory in (PO ${poNumber})`, 'purchase_orders', poId),
+          jl(ap, 0, delta, 'AP — supplier', 'purchase_orders', poId),
         ],
       });
       if (r.created) entries++;
@@ -225,4 +256,46 @@ export function journalPoReceiveOp(
     }
     return { posted: entries > 0, entries };
   });
+}
+
+/**
+ * ACCT-AUDIT-5: the safety net for a lost posting trigger (a swallowed `inngest.send`, a feature switched off then on). Finds
+ * the POSTED expenses and stock adjustments with no journal entry and every PO that has received lines, and runs the same
+ * idempotent journal ops over them, so a replay (or a second night) posts nothing. `includeExpenses: false` keeps expenses
+ * out for a store whose `accounting.expenses` feature is off. Bounded per run.
+ */
+export function journalRepostMissingOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { expenses: number; stockAdjustments: number; purchaseOrders: number } {
+  const LIMIT = 200;
+  const out = { expenses: 0, stockAdjustments: 0, purchaseOrders: 0 };
+  if (a.includeExpenses !== false) {
+    const rows = db.all(
+      `SELECT x.id FROM expenses x WHERE x.store_id = ? AND x.status = 'posted' AND x.total <> 0
+         AND NOT EXISTS (SELECT 1 FROM journal_entries e WHERE e.store_id = x.store_id AND e.source = 'expense' AND e.source_id = x.id)
+       ORDER BY x.expense_date LIMIT ${LIMIT}`,
+      [storeId]
+    );
+    for (const r of rows)
+      if (journalExpenseOp(db, storeId, { expenseId: r.id }).posted) out.expenses++;
+  }
+  const adj = db.all(
+    `SELECT s.id FROM stock_adjustments s WHERE s.store_id = ? AND s.status = 'posted' AND s.total_value_impact <> 0
+       AND NOT EXISTS (SELECT 1 FROM journal_entries e WHERE e.store_id = s.store_id AND e.source = 'stock_adjustment' AND e.source_id = s.id)
+     LIMIT ${LIMIT}`,
+    [storeId]
+  );
+  for (const r of adj)
+    if (journalStockAdjustmentOp(db, storeId, { adjustmentId: r.id }).posted)
+      out.stockAdjustments++;
+  const pos = db.all(
+    `SELECT p.id FROM purchase_orders p WHERE p.store_id = ?
+       AND EXISTS (SELECT 1 FROM purchase_order_items i WHERE i.po_id = p.id AND i.qty_received > 0) LIMIT ${LIMIT * 5}`,
+    [storeId]
+  );
+  for (const r of pos)
+    if (journalPoReceiveOp(db, storeId, { poId: r.id }).posted) out.purchaseOrders++;
+  return out;
 }

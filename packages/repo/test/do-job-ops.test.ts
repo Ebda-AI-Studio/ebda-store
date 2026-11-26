@@ -324,6 +324,244 @@ describe('expense / stock-adjustment / PO-receive journals (Ruling CF-JOBS-4)', 
     );
     expect(r2.q('SELECT count(*) n FROM journal_entries')[0].n).toBe(0);
   });
+
+  describe('journals are dated by the document, not by the posting job (ACCT-AUDIT-3)', () => {
+    const postedAt = (r: ReturnType<typeof rig>) =>
+      r.q('SELECT posted_at p FROM journal_entries ORDER BY created_at').map(x => Number(x.p));
+    const OCT28 = Date.UTC(2026, 9, 28, 9, 0, 0);
+
+    it('an expense dated 28 Oct that is posted on 3 Nov lands in October', () => {
+      const r = books();
+      r.raw.exec(
+        `INSERT INTO expenses (id, store_id, expense_number, expense_account_id, paid_from_account_id, amount, total, expense_date, status) VALUES ('e1', 's1', 'EXP-1', 'a5200', 'a1000', 500, 500, ${OCT28}, 'posted')`
+      );
+      r.op('journalExpense', { expenseId: 'e1' });
+      expect(postedAt(r)).toEqual([OCT28]);
+    });
+
+    it('a future-dated expense is clamped to now, never posted into the future', () => {
+      const r = books();
+      const future = Date.now() + 40 * 86_400_000;
+      r.raw.exec(
+        `INSERT INTO expenses (id, store_id, expense_number, expense_account_id, paid_from_account_id, amount, total, expense_date, status) VALUES ('e1', 's1', 'EXP-1', 'a5200', 'a1000', 500, 500, ${future}, 'posted')`
+      );
+      r.op('journalExpense', { expenseId: 'e1' });
+      expect(postedAt(r)[0]).toBeLessThanOrEqual(Date.now());
+    });
+
+    it('a stock adjustment keeps the date it was posted on', () => {
+      const r = books();
+      r.raw.exec(
+        `INSERT INTO stock_adjustments (id, store_id, adjustment_number, type, status, total_value_impact, posted_at) VALUES ('s1', 's1', 'ADJ-1', 'damage', 'posted', -300, ${OCT28})`
+      );
+      r.op('journalStockAdjustment', { adjustmentId: 's1' });
+      expect(postedAt(r)).toEqual([OCT28]);
+    });
+
+    it('a PO receipt keeps the date it was received on', () => {
+      const r = books();
+      r.raw.exec(
+        `INSERT INTO suppliers (id, store_id, name) VALUES ('sup', 's1', 'Acme');
+       INSERT INTO purchase_orders (id, store_id, supplier_id, po_number, status, received_at) VALUES ('po1', 's1', 'sup', 'PO-1', 'received', ${OCT28});
+       INSERT INTO purchase_order_items (id, po_id, product_id, qty, qty_received, unit_cost, total) VALUES ('i1', 'po1', 'sku', 1, 1, 100, 100);`
+      );
+      r.op('journalPoReceive', { poId: 'po1' });
+      expect(postedAt(r)).toEqual([OCT28]);
+    });
+  });
+
+  describe('the nightly sweep re-posts journals whose trigger was lost (ACCT-AUDIT-5)', () => {
+    const entries = (r: ReturnType<typeof rig>) =>
+      Number(r.q('SELECT count(*) n FROM journal_entries')[0].n);
+    const seed = (r: ReturnType<typeof rig>) =>
+      r.raw.exec(
+        `INSERT INTO expenses (id, store_id, expense_number, expense_account_id, paid_from_account_id, amount, total, expense_date, status) VALUES ('e1', 's1', 'EXP-1', 'a5200', 'a1000', 500, 500, 1, 'posted'), ('e2', 's1', 'EXP-2', 'a5200', 'a1000', 700, 700, 1, 'draft');
+       INSERT INTO stock_adjustments (id, store_id, adjustment_number, type, status, total_value_impact) VALUES ('s1', 's1', 'ADJ-1', 'damage', 'posted', -300);
+       INSERT INTO suppliers (id, store_id, name) VALUES ('sup', 's1', 'Acme');
+       INSERT INTO purchase_orders (id, store_id, supplier_id, po_number, status) VALUES ('po1', 's1', 'sup', 'PO-1', 'partial');
+       INSERT INTO purchase_order_items (id, po_id, product_id, qty, qty_received, unit_cost, total) VALUES ('i1', 'po1', 'sku', 10, 4, 100, 1000);`
+      );
+
+    it('posts the posted expense, adjustment and PO receipt that have no entry; skips the draft; a second run posts nothing', () => {
+      const r = books();
+      seed(r);
+      expect(r.op('journalRepostMissing', {})).toEqual({
+        expenses: 1,
+        stockAdjustments: 1,
+        purchaseOrders: 1,
+      });
+      expect(entries(r)).toBe(3);
+      expect(r.op('journalRepostMissing', {})).toEqual({
+        expenses: 0,
+        stockAdjustments: 0,
+        purchaseOrders: 0,
+      });
+      expect(entries(r)).toBe(3);
+      expect(tb(r).debit).toBe(tb(r).credit);
+    });
+
+    it('a feature-off store keeps its expenses out of the sweep (includeExpenses false) but still heals the rest', () => {
+      const r = books();
+      seed(r);
+      expect(r.op('journalRepostMissing', { includeExpenses: false })).toEqual({
+        expenses: 0,
+        stockAdjustments: 1,
+        purchaseOrders: 1,
+      });
+      expect(
+        Number(r.q("SELECT count(*) n FROM journal_entries WHERE source = 'expense'")[0].n)
+      ).toBe(0);
+    });
+
+    it('a partially received PO whose second receipt was never journalled is topped up', () => {
+      const r = books();
+      seed(r);
+      r.op('journalPoReceive', { poId: 'po1' });
+      r.raw.exec(`UPDATE purchase_order_items SET qty_received = 10 WHERE id = 'i1'`);
+      expect(r.op('journalRepostMissing', {}).purchaseOrders).toBe(1);
+      expect(
+        Number(
+          r.q(
+            `SELECT COALESCE(SUM(l.debit),0) t FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE a.code = '1200' AND l.ref_table = 'purchase_orders'`
+          )[0].t
+        )
+      ).toBe(1000);
+    });
+  });
+
+  describe('input VAT on expenses (ACCT-AUDIT-10)', () => {
+    const exp = (r: ReturnType<typeof rig>, amount: number, tax: number) =>
+      r.raw.exec(
+        `INSERT INTO expenses (id, store_id, expense_number, expense_account_id, paid_from_account_id, amount, tax_amount, total, expense_date, status) VALUES ('e1', 's1', 'EXP-1', 'a5200', 'a1000', ${amount}, ${tax}, ${amount + tax}, ${Date.now() - 1000}, 'posted')`
+      );
+    const lines = (r: ReturnType<typeof rig>) =>
+      r
+        .q(
+          `SELECT a.code, l.debit, l.credit FROM journal_lines l JOIN accounts a ON a.id = l.account_id ORDER BY a.code`
+        )
+        .map(x => [x.code, Number(x.debit), Number(x.credit)]);
+
+    it('a 114.00 receipt with 14.00 VAT books expense 100.00 + input VAT 14.00 against cash 114.00', () => {
+      const r = books();
+      r.raw.exec(
+        `INSERT INTO accounts (id, store_id, code, name_en, type, is_system) VALUES ('a1300', 's1', '1300', 'VAT Recoverable', 'asset', 1)`
+      );
+      exp(r, 10000, 1400);
+      r.op('journalExpense', { expenseId: 'e1' });
+      expect(lines(r)).toEqual([
+        ['1000', 0, 11400],
+        ['1300', 1400, 0],
+        ['5200', 10000, 0],
+      ]);
+      expect(tb(r).debit).toBe(tb(r).credit);
+    });
+
+    it('a store whose chart has no 1300 yet keeps the old gross posting (never a failed job)', () => {
+      const r = books();
+      exp(r, 10000, 1400);
+      r.op('journalExpense', { expenseId: 'e1' });
+      expect(lines(r)).toEqual([
+        ['1000', 0, 11400],
+        ['5200', 11400, 0],
+      ]);
+    });
+
+    it('an expense with no tax posts two lines as before', () => {
+      const r = books();
+      r.raw.exec(
+        `INSERT INTO accounts (id, store_id, code, name_en, type, is_system) VALUES ('a1300', 's1', '1300', 'VAT Recoverable', 'asset', 1)`
+      );
+      exp(r, 500, 0);
+      r.op('journalExpense', { expenseId: 'e1' });
+      expect(lines(r)).toEqual([
+        ['1000', 0, 500],
+        ['5200', 500, 0],
+      ]);
+    });
+
+    it('taxInputTotal sums the input VAT of the period; a reversal nets it out', () => {
+      const r = books();
+      r.raw.exec(
+        `INSERT INTO accounts (id, store_id, code, name_en, type, is_system) VALUES ('a1300', 's1', '1300', 'VAT Recoverable', 'asset', 1)`
+      );
+      exp(r, 10000, 1400);
+      r.op('journalExpense', { expenseId: 'e1' });
+      expect(r.op('taxInputTotal', { fromMs: 0, toMs: Date.now() + 1000 })).toEqual({
+        inputTax: 1400,
+      });
+      expect(r.op('taxInputTotal', { fromMs: Date.now() + 5000, toMs: Date.now() + 9000 })).toEqual(
+        { inputTax: 0 }
+      );
+    });
+  });
+
+  describe('partial PO receipts (ACCT-AUDIT-1)', () => {
+    const seed = (r: ReturnType<typeof rig>) =>
+      r.raw.exec(
+        `INSERT INTO suppliers (id, store_id, name) VALUES ('sup', 's1', 'Acme');
+       INSERT INTO purchase_orders (id, store_id, supplier_id, po_number, status) VALUES ('po1', 's1', 'sup', 'PO-1', 'partial');
+       INSERT INTO purchase_order_items (id, po_id, product_id, qty, qty_received, unit_cost, total) VALUES ('i1', 'po1', 'sku', 10, 4, 100, 1000);`
+      );
+    const invDebit = (r: ReturnType<typeof rig>) =>
+      Number(
+        r.q(
+          `SELECT COALESCE(SUM(l.debit),0) t FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE a.code = '1200' AND l.ref_table = 'purchase_orders'`
+        )[0].t
+      );
+    const apCredit = (r: ReturnType<typeof rig>) =>
+      Number(
+        r.q(
+          `SELECT COALESCE(SUM(l.credit),0) t FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE a.code = '2000'`
+        )[0].t
+      );
+
+    it('10 units x 100 received 4 then 6 post Inventory 1000 and AP 1000 (the later receipt is not dropped)', () => {
+      const r = books();
+      seed(r);
+      expect(r.op('journalPoReceive', { poId: 'po1' })).toMatchObject({ posted: true, entries: 1 });
+      expect(invDebit(r)).toBe(400);
+      r.raw.exec(`UPDATE purchase_order_items SET qty_received = 10 WHERE id = 'i1'`);
+      expect(r.op('journalPoReceive', { poId: 'po1' })).toMatchObject({ posted: true, entries: 1 });
+      expect(invDebit(r)).toBe(1000);
+      expect(apCredit(r)).toBe(1000);
+      expect(tb(r).debit).toBe(tb(r).credit);
+    });
+
+    it('a replay of each pass posts nothing; three passes net to the received value', () => {
+      const r = books();
+      seed(r);
+      r.op('journalPoReceive', { poId: 'po1' });
+      expect(r.op('journalPoReceive', { poId: 'po1' })).toMatchObject({
+        posted: false,
+        entries: 0,
+      });
+      r.raw.exec(`UPDATE purchase_order_items SET qty_received = 7 WHERE id = 'i1'`);
+      r.op('journalPoReceive', { poId: 'po1' });
+      r.raw.exec(`UPDATE purchase_order_items SET qty_received = 10 WHERE id = 'i1'`);
+      r.op('journalPoReceive', { poId: 'po1' });
+      expect(r.op('journalPoReceive', { poId: 'po1' })).toMatchObject({
+        posted: false,
+        entries: 0,
+      });
+      expect(invDebit(r)).toBe(1000);
+    });
+
+    it('an old single-entry journal (sourceId = poId, cumulative) is counted: only the remainder posts', () => {
+      const r = books();
+      seed(r);
+      r.raw.exec(
+        `INSERT INTO journal_entries (id, store_id, entry_number, posted_at, source, source_id, status, created_at) VALUES ('je0', 's1', 'JE-0', 1, 'purchase_order', 'po1', 'posted', 1);
+       INSERT INTO journal_lines (id, entry_id, account_id, debit, credit, ref_table, ref_id, created_at) VALUES ('l1', 'je0', 'a1200', 400, 0, 'purchase_orders', 'po1', 1), ('l2', 'je0', 'a2000', 0, 400, 'purchase_orders', 'po1', 1);
+       UPDATE purchase_order_items SET qty_received = 10 WHERE id = 'i1';`
+      );
+      expect(r.op('journalPoReceive', { poId: 'po1' })).toMatchObject({ posted: true, entries: 1 });
+      expect(invDebit(r)).toBe(1000);
+      expect(r.op('journalPoReceive', { poId: 'po1' })).toMatchObject({
+        posted: false,
+        entries: 0,
+      });
+    });
+  });
 });
 
 describe('fan-out claims, markers and affiliate writes (Ruling CF-JOBS-4)', () => {

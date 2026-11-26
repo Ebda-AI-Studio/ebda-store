@@ -41,7 +41,7 @@ describe('account.service', () => {
       const first = await prisma.account.count({ where: { storeId: store.id } });
       // 31 since WALLET-GL-1 added 4100 (unused store credit) and 5950 (customer goodwill)
       expect(first).toBe(COA_TEMPLATE.length);
-      expect(first).toBe(31);
+      expect(first).toBe(32); // ACCT-AUDIT-10 added 1300 VAT Recoverable (Input)
 
       // Re-running must not duplicate
       await seedCoaForStore(store.id);
