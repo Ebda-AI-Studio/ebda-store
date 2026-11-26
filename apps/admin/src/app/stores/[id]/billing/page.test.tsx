@@ -7,11 +7,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
-const { apiGet, apiPost, role } = vi.hoisted(() => ({
+const { apiGet, apiPost, role, askConfirm } = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
   role: { current: 'store_admin' },
+  askConfirm: vi.fn(),
 }));
+vi.mock('@/hooks/useConfirm', () => ({ useConfirm: () => askConfirm }));
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'store-1' }) }));
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
@@ -832,5 +834,86 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     );
     expect(await screen.findByText('pay.returnOk')).toBeTruthy();
     expect(await screen.findByText('•••• 4242 visa')).toBeTruthy();
+  });
+});
+
+describe('card plan change (Ruling G35-PRORATE-1)', () => {
+  const plans = [
+    {
+      code: 'basic',
+      nameEn: 'Basic',
+      nameAr: 'بيزيك',
+      priceMonthlyMinor: 149000,
+      priceYearlyMinor: null,
+      limits,
+    },
+    {
+      code: 'growth',
+      nameEn: 'Growth',
+      nameAr: 'النمو',
+      priceMonthlyMinor: 349000,
+      priceYearlyMinor: null,
+      limits,
+    },
+  ];
+  const cardStore = (quote: Record<string, unknown>) => {
+    const summary = billing({
+      plan: { code: 'basic', nameEn: 'Basic', nameAr: 'بيزيك', subscribedPlanCode: 'basic' },
+      subscription: {
+        status: 'active',
+        currentPeriodEnd: '2026-12-01T00:00:00.000Z',
+        trialEndsAt: null,
+        cancelAtPeriodEnd: false,
+      },
+      availablePlans: plans,
+      billing: billingFixture({ hasPaymentMethod: true, billingMethod: 'card', cardBilling: true }),
+    });
+    apiGet.mockImplementation(async (url: string) => {
+      if (url.includes('/change-plan/quote')) return { data: quote, error: null };
+      if (url.endsWith('/invoices')) return { data: { charges: [] }, error: null };
+      if (url.endsWith('/payment-claims')) return { data: { claims: [] }, error: null };
+      return { data: summary, error: null };
+    });
+  };
+
+  it('an upgrade shows the prorated amount before charging and sends the amount it showed', async () => {
+    cardStore({
+      kind: 'upgrade',
+      amountMinor: 100000,
+      remainingDays: 15,
+      effectiveAt: '2026-11-16T00:00:00.000Z',
+    });
+    askConfirm.mockResolvedValue(true);
+    apiPost.mockResolvedValue({ data: { mode: 'upgraded', status: 'succeeded' }, error: null });
+    render(<StoreBillingPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'switchTo' }));
+    await waitFor(() => expect(askConfirm).toHaveBeenCalled());
+    expect(apiGet).toHaveBeenCalledWith(
+      '/api/v1/stores/store-1/billing/change-plan/quote?planCode=growth'
+    );
+    const opts = askConfirm.mock.calls[0][0];
+    expect(opts.consequence).toMatch(/^confirmUpgradeProrated:.*"days":15/);
+    expect(opts.consequence).toContain('1,000');
+    expect(opts.confirmLabel).toBe('confirmUpgradeAction');
+    await waitFor(() =>
+      expect(apiPost).toHaveBeenCalledWith('/api/v1/stores/store-1/billing/change-plan', {
+        planCode: 'growth',
+        expectedAmountMinor: 100000,
+      })
+    );
+  });
+
+  it('declining the confirmation charges nothing', async () => {
+    cardStore({
+      kind: 'upgrade',
+      amountMinor: 100000,
+      remainingDays: 15,
+      effectiveAt: '2026-11-16T00:00:00.000Z',
+    });
+    askConfirm.mockResolvedValue(false);
+    render(<StoreBillingPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'switchTo' }));
+    await waitFor(() => expect(askConfirm).toHaveBeenCalled());
+    expect(apiPost).not.toHaveBeenCalled();
   });
 });
