@@ -215,7 +215,30 @@ describe('finance operations on the DO (Ruling NZ-FEAT-1)', () => {
           ('v2', 'p2', 't', 'b', 100, 2, NULL, 1),
           ('v3', 'p2', 't', 'c', 100, 3, 20, 0);`);
       // p1: 10*40 = 400; p2: 4*50 + 2*30 = 260 (v3 disabled: 3*20 = 60); p3 deleted; p4 other store
-      expect(r.op('stockValue', {})).toEqual({ value: 660, disabledValue: 60 });
+      // stocked: p1 + p2 (p3 deleted, p4 other store); every stocked unit has a cost -> uncosted 0
+      expect(r.op('stockValue', {})).toEqual({
+        value: 660,
+        disabledValue: 60,
+        stockedProducts: 2,
+        uncostedProducts: 0,
+      });
+    });
+
+    it('counts stocked products with no cost instead of letting them value to a silent 0 (QA N2)', () => {
+      const r = rig();
+      r.raw.exec(`
+        INSERT INTO products (id, store_id, name, slug, price, inventory, status, cost_price) VALUES
+          ('p1', 's1', 'NoCost', 'nc', 100, 10, 'active', NULL),
+          ('p2', 's1', 'Costed', 'c', 100, 2, 'active', 40),
+          ('p3', 's1', 'VarNoCost', 'vn', 100, 0, 'active', NULL),
+          ('p5', 's1', 'Empty', 'e', 100, 0, 'active', NULL);
+        INSERT INTO product_variants (id, product_id, title, sku, price, inventory, cost_price, is_active) VALUES
+          ('v1', 'p3', 't', 'a', 100, 3, NULL, 1);`);
+      expect(r.op('stockValue', {})).toMatchObject({
+        value: 80,
+        stockedProducts: 3,
+        uncostedProducts: 2,
+      });
     });
   });
 

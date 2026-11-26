@@ -11,6 +11,7 @@ const m = vi.hoisted(() => ({
   featureEnabled: vi.fn(),
   insertAuditLog: vi.fn(),
   changePlan: vi.fn(),
+  previewChangePlan: vi.fn(),
   cancel: vi.fn(),
   resume: vi.fn(),
   chooseInstapayPlan: vi.fn(),
@@ -78,6 +79,7 @@ vi.mock('@api/services/billing/account.service', () => ({
 }));
 vi.mock('@api/services/billing/subscription-billing.service', () => ({
   changePlan: m.changePlan,
+  previewChangePlan: m.previewChangePlan,
   cancelSubscription: m.cancel,
   resumeSubscription: m.resume,
   listStoreCharges: m.charges,
@@ -106,6 +108,8 @@ const parse = (n: string, a: unknown) => tool(n).args.parse(a) as never;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // no proration quote by default (the card falls back to the catalogue price); the G35 test below sets one
+  m.previewChangePlan.mockRejectedValue(new Error('no quote'));
   m.featureEnabled.mockResolvedValue(true);
   m.insertAuditLog.mockResolvedValue(undefined);
   m.plans = [
@@ -221,6 +225,30 @@ describe('account + billing tools', () => {
         '3978.6',
       ]);
       expect(d.summary.en).toContain('3978.6');
+    });
+    it('G35-PRORATE-1: the upgrade card charges the prorated difference from the proration seam', async () => {
+      m.previewChangePlan.mockResolvedValue({
+        planCode: 'growth',
+        interval: 'monthly',
+        quote: {
+          kind: 'upgrade',
+          remainingDays: 12,
+          periodDays: 30,
+          charge: { totalMinor: 79600, netMinor: 69825, vatMinor: 9775, vat: null },
+        },
+      });
+      const d = await tool('plan_change').preview!(
+        ctx(),
+        parse('plan_change', { planCode: 'growth' })
+      );
+      const by = (en: string) => d.rows.find(r => r.label.en === en)!.after;
+      expect(by('Total in EGP')).toBe('796');
+      expect(d.summary.en).toContain('796 EGP');
+      expect(d.summary.en).toContain('days left');
+      expect(m.previewChangePlan).toHaveBeenCalledWith({
+        storeId: expect.any(String),
+        planCode: 'growth',
+      });
     });
     it('turning VAT on between the card and the press changes the etag (state fingerprint)', async () => {
       const args = parse('plan_change', { planCode: 'growth' });
