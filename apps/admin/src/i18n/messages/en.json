@@ -7680,7 +7680,7 @@
         "qtyLabel": "Reorder qty",
         "supplierLabel": "Suggested supplier",
         "urgency": "Urgency",
-        "urgencyDays": "{days} days",
+        "urgencyDays": "{days, plural, one {# day} other {# days}}",
         "draftPo": "Draft PO",
         "dismiss": "Dismiss",
         "variantLabel": "Variant"

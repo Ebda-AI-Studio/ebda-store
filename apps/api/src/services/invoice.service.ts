@@ -146,6 +146,14 @@ const INVOICE_LABELS = {
 
 type InvoiceLocale = keyof typeof INVOICE_LABELS;
 
+/** RC1: the variant as the document's language shows it (the Arabic title the order saved, else the canonical one). */
+function variantLabel(
+  item: { variantName?: string | null; variantNameAr?: string | null },
+  ar: boolean
+): string {
+  return (ar && item.variantNameAr) || item.variantName || '';
+}
+
 function isArabic(locale: string): locale is 'ar' {
   return locale === 'ar';
 }
@@ -446,7 +454,7 @@ export class InvoiceService {
                     : '<div class="item-thumb item-thumb-placeholder"></div>'
                 }
                 <div class="item-meta">
-                  <div class="item-name">${escapeHtml(displayName)}${item.variantName ? ` &middot; ${escapeHtml(item.variantName)}` : ''}</div>
+                  <div class="item-name">${escapeHtml(displayName)}${variantLabel(item, ar) ? ` &middot; ${escapeHtml(variantLabel(item, ar))}` : ''}</div>
                   ${item.personalisation ? `<div class="item-note">&#9998; <bdi>${escapeHtml(item.personalisation)}</bdi></div>` : ''}
                   ${(() => {
                     // Gold-rate line: karat, weight and the per-gram rate it was priced at (B5).
@@ -666,6 +674,7 @@ export class InvoiceService {
     /* Order barcode: ink on paper, always LTR, kept together when printing */
     .doc-barcode { margin-top: 28px; text-align: center; color: var(--ink); break-inside: avoid; }
     .doc-barcode svg { width: 100%; max-width: 360px; height: auto; }
+    .doc-barcode-digits { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10px; letter-spacing: 0.12em; color: var(--ink-soft); margin-top: 2px; }
     .doc-barcode-num { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; letter-spacing: 0.2em; color: var(--ink-soft); margin-top: 4px; }
 
     /* Footer */
@@ -1074,7 +1083,7 @@ export function renderInvoiceEmailContent(
               radius: 8,
             })
           : thumbPlaceholder,
-        `${escapeHtml(name)}${item.variantName ? ` &middot; ${escapeHtml(item.variantName)}` : ''}`,
+        `${escapeHtml(name)}${variantLabel(item, ar) ? ` &middot; ${escapeHtml(variantLabel(item, ar))}` : ''}`,
         (item.sku
           ? `<div style="font-size:11px;line-height:16px;color:${c.inkMute};">${escapeHtml(item.sku)}</div>`
           : '') + qtyLine(item.quantity, money(item.price)),

@@ -37,6 +37,8 @@ import { prisma, withStore } from '@ebda/database';
 import { storeDb, storeMoney } from '../../lib/repo-factory';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
+import { EGYPTIAN_ARABIC_REGISTER } from '../../lib/ai/arabic-register';
+import { cleanArabicReasoning } from '../../lib/ai/arabic-sentence-check';
 import { effectiveInventory } from '../../lib/effective-inventory';
 import { withSavepointOn } from '../../lib/savepoint';
 
@@ -211,6 +213,9 @@ function buildGeminiPrompt(candidates: ReorderCandidate[]): string {
   return `You are an inventory ops assistant for an Egypt retailer. For each product below,
 in <=2 sentences each, explain WHY this reorder suggestion makes sense given the velocity
 + on-hand + lead time + open backlog. Output bilingual (English + Arabic).
+Arabic rules: write whole, grammatical sentences; write every unit word in full (never abbreviate or cut a
+word such as "وحدة"); use digits for numbers and make the noun agree with the count (يوم واحد، يومين، 3 أيام،
+14 يوم); never put a lone "بـ"/"لـ" prefix before a number. ${EGYPTIAN_ARABIC_REGISTER}
 Return STRICT JSON:
 { "items": [{ "key": "<the product's key, copied exactly>", "reasoningEn": "...", "reasoningAr": "..." }] }
 
@@ -593,7 +598,8 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
         if (!item?.key) continue;
         reasoningMap.set(item.key, {
           reasoningEn: item.reasoningEn ?? 'AI reasoning unavailable — manual review suggested',
-          reasoningAr: item.reasoningAr ?? null,
+          // RO2: a malformed Arabic sentence is dropped here (the card then shows the English one)
+          reasoningAr: cleanArabicReasoning(item.reasoningAr),
         });
       }
     } catch (err) {
