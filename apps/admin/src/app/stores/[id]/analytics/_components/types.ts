@@ -12,6 +12,11 @@ export interface DashboardStats {
   revenueChange: number;
   ordersChange: number;
   customersChange: number;
+  /** Previous-period totals; 0 means the % change has no baseline (show "New"). */
+  previousRevenue?: number;
+  previousOrders?: number;
+  previousCustomers?: number;
+  previousProfit?: number | null;
   /**
    * Sum of (price - costPrice) * qty over the window's order lines that have a
    * cost. `null` = lines were sold but none has a cost (profit unknown).

@@ -6,9 +6,18 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdtempSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+  mkdtempSync,
+} from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import yaml from 'js-yaml';
 import { cleanGitEnv, initSandboxRepo, sandboxGit, type SandboxGit } from '../helpers/git-env';
 
@@ -115,9 +124,21 @@ describe('scan-clone.sh', () => {
       return process.env.TRUFFLEHOG_BIN;
     const tgz = join(homedir(), '.ebda-ci/tools/trufflehog_3.99.8_darwin_arm64.tar.gz');
     if (!existsSync(tgz) || process.platform !== 'darwin') return undefined;
-    const dir = mkdtempSync(join(tmpdir(), 'th-'));
-    execFileSync('tar', ['-xz', '-C', dir, '-f', tgz, 'trufflehog']);
-    return join(dir, 'trufflehog');
+    // Extract ONCE next to the tarball and reuse it. A fresh mkdtemp per run was never removed and leaked a
+    // 167 MB binary on every pre-push (707 copies, ~118 GB, 2026-11-24). Extract to a temp dir on the same
+    // volume, then rename, so two parallel workers never see a half-written binary.
+    const bin = join(homedir(), '.ebda-ci/tools/trufflehog_3.99.8_darwin_arm64/trufflehog');
+    if (!existsSync(bin)) {
+      const stage = mkdtempSync(join(homedir(), '.ebda-ci/tools/.th-stage-'));
+      try {
+        execFileSync('tar', ['-xz', '-C', stage, '-f', tgz, 'trufflehog']);
+        mkdirSync(dirname(bin), { recursive: true });
+        if (!existsSync(bin)) renameSync(join(stage, 'trufflehog'), bin);
+      } finally {
+        rmSync(stage, { recursive: true, force: true });
+      }
+    }
+    return bin;
   })();
   it.skipIf(!thBin)(
     'trufflehog git scans the scan-clone result end to end (chunks > 0, no error)',

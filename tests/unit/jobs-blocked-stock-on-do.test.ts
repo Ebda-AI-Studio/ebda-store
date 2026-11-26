@@ -74,6 +74,7 @@ vi.mock('@api/lib/repo-factory', () => {
   };
   const repo = { backend: 'do', db, writer, money };
   return {
+    requestPlanMemo: (_id: string, fn: () => Promise<unknown>) => fn(),
     storeRepo: async () => repo,
     storeDb: async () => db,
     storeWriter: async () => writer,

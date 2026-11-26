@@ -6,6 +6,19 @@ import { formatPrice } from '../../lib/format';
 import { useT } from '@/i18n/useT';
 import type { RecentOrder } from './types';
 
+const ORDER_STATUSES = new Set([
+  'pending',
+  'awaiting_payment_confirmation',
+  'confirmed',
+  'processing',
+  'shipped',
+  'delivered',
+  'cancelled',
+  'refunded',
+  'paid',
+  'unpaid',
+]);
+
 interface RecentOrdersProps {
   orders: RecentOrder[];
   isLoading: boolean;
@@ -14,6 +27,7 @@ interface RecentOrdersProps {
 
 export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps) {
   const t = useT('dashboard.super');
+  const tStatus = useT('orders.status');
 
   return (
     // Slimmer rows: half the vertical padding, smaller icon, status as
@@ -80,7 +94,9 @@ export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps
               <div className="flex shrink-0 items-center gap-2">
                 <Badge
                   variant={
-                    order.status === 'paid' || order.status === 'completed'
+                    order.status === 'paid' ||
+                    order.status === 'completed' ||
+                    order.status === 'delivered'
                       ? 'default'
                       : order.status === 'processing'
                         ? 'secondary'
@@ -88,7 +104,7 @@ export function RecentOrders({ orders, isLoading, storeName }: RecentOrdersProps
                   }
                   className="text-xs px-2 py-0.5 capitalize"
                 >
-                  {order.status}
+                  {ORDER_STATUSES.has(order.status) ? tStatus(order.status) : order.status}
                 </Badge>
                 <p className="text-sm font-semibold text-primary">{formatPrice(order.total)}</p>
               </div>

@@ -1484,9 +1484,33 @@ type RequestLike = Pick<Request, 'headers'>;
 interface Scope {
   req: RequestLike;
   repos: Map<string, Promise<StoreRepo>>;
+  /** Per-request memo of the entitlement plan (see `requestPlanMemo`). */
+  plans?: Map<string, Promise<unknown>>;
 }
 const scopes = new AsyncLocalStorage<Scope>();
 const NO_REQUEST: RequestLike = { headers: {} };
+
+/**
+ * Memoise `fn` for the life of ONE request (Ruling BIZ-ALL-5): the entitlement plan is read from D1 at most once per request and
+ * store, however many gates and quota checks ask. Outside a request (job, cron, test) nothing is memoised. A plan write in the same
+ * request drops the entry (`forgetRequestPlan`, called by every entitlement write), so a request never reads its own stale plan.
+ */
+export function requestPlanMemo<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+  const scope = scopes.getStore();
+  if (!scope) return fn();
+  const plans = (scope.plans ??= new Map());
+  let hit = plans.get(storeId) as Promise<T> | undefined;
+  if (!hit) {
+    hit = fn();
+    plans.set(storeId, hit);
+    hit.catch(() => plans.delete(storeId));
+  }
+  return hit;
+}
+
+function forgetRequestPlan(storeId: string): void {
+  scopes.getStore()?.plans?.delete(storeId);
+}
 
 /** The StoreDO stub's read entry point (lib/store-backend.ts types the rest of the stub). */
 interface QueryStub {
@@ -2243,6 +2267,7 @@ export async function storeUpdateOnDo(
         `Store.${k}: update operators and relation writes are not served by the DO`
       );
   }
+  if (touchesEntitlement(data)) forgetRequestPlan(storeId);
   await mirrorEntitlementToPg(storeId, data); // NZ-D21: Postgres sources the entitlement copy-back
   // the ONE D1 Store writer (NZ-D20); no row matched = unknown store: fail closed, never a blind DO write
   if ((await d1StoreWrite({ id: storeId }, d1StorePatch(data))) === 0)
@@ -2369,6 +2394,7 @@ async function applyPostCommit(storeId: string, patch: Record<string, unknown>):
     Object.entries(patch).filter(([k]) => !(ENTITLEMENT_FIELDS as readonly string[]).includes(k))
   );
   if (touchesEntitlement(patch)) {
+    forgetRequestPlan(storeId);
     try {
       await syncStoreEntitlement(storeId);
     } catch (err) {
