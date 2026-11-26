@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { applyD1Migrations } from 'cloudflare:test';
 import { DEFAULT_PLAN_SEEDS } from '@ebda/shared';
-import { accessToken, authState } from './helpers';
+import { accessToken, authState, identityAccessToken } from './helpers';
 
 type DoAnswer = { ok: true; json: string } | { ok: false; code: string; message?: string };
 
@@ -184,11 +184,10 @@ describe.skipIf(e.E2E_DB === '1')(
         .run();
       for (const u of [owner, customerId])
         await authState(`user:tv:${u}`, [['set', `user:tv:${u}`, '0', {}]]);
-      const sa = await accessToken({
-        userId: owner,
-        jti: 'j-mcp-do-owner',
-        role: 'store_admin',
-        storeId,
+      // an identity-service token with a fresh sign-in: the key and write-switch routes are credential-class (TEN-4)
+      const sa = await identityAccessToken({
+        sub: owner,
+        stores: [{ id: storeId, role: 'owner' }],
       });
       merchant = { authorization: `Bearer ${sa}`, 'x-store-id': storeId };
 

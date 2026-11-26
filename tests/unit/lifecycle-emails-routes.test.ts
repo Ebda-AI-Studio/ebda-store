@@ -17,10 +17,14 @@ vi.mock('@api/config', () => ({
 }));
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {
-    req.user = { userId: 'u1', role: 'store_admin' };
+    req.user = { userId: 'u1', role: req.headers['x-role'] ?? 'store_admin' };
     next();
   },
-  authorize: () => (_req: any, _res: any, next: any) => next(),
+  // Same contract as the real one: a role outside the list is a 403.
+  authorize:
+    (...roles: string[]) =>
+    (req: any, res: any, next: any) =>
+      roles.includes(req.user.role) ? next() : res.status(403).json({ success: false }),
 }));
 vi.mock('@api/middleware/store-access', () => ({
   requireStoreAccess: (_req: any, _res: any, next: any) => next(),
@@ -59,6 +63,21 @@ describe('GET /stores/:storeId/lifecycle-emails', () => {
     expect(res.body).toEqual({ success: true, data: { optedOut: false, entries: [] } });
     expect(m.list).toHaveBeenCalledWith(STORE);
     expect(res.headers['cache-control']).toBe('no-store');
+  });
+
+  // The setup emails page is the owner's (and platform support's): staff cannot read it by URL either.
+  it('is 403 for staff and never reads the log', async () => {
+    const res = await request(app).get(`/stores/${STORE}/lifecycle-emails`).set('x-role', 'staff');
+    expect(res.status).toBe(403);
+    expect(m.list).not.toHaveBeenCalled();
+  });
+
+  it('is 200 for the store owner (store_admin) and for super_admin', async () => {
+    m.list.mockResolvedValue({ optedOut: false, entries: [] });
+    for (const role of ['store_admin', 'super_admin']) {
+      const res = await request(app).get(`/stores/${STORE}/lifecycle-emails`).set('x-role', role);
+      expect(res.status, role).toBe(200);
+    }
   });
 });
 
