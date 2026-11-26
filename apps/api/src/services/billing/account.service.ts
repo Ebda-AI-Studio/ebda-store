@@ -63,6 +63,7 @@ import {
   type LedgerVat,
 } from './charge-amount';
 import { storeUpdate, storeUpdateMany } from '../../lib/repo-factory';
+import { notifyStandingChanged } from '../../lib/wa/standing-state';
 import { releaseInstapayReference, withClaimReleases } from '../../lib/instapay-ref-claim';
 
 type Tx = Prisma.TransactionClient;
@@ -153,6 +154,8 @@ async function afterStatusChange(storeId: string): Promise<void> {
   // Account status is NEVER-stale: every public resolve/slug/id cache goes.
   await bustStoreCaches(store.id, store.slug, store.domain);
   await featureService.invalidateCache(storeId).catch(() => undefined);
+  // ...and Ebda Chat's spend gate (STORE-STANDING-1, #839). The write observer sends it too; same job, it re-reads the standing.
+  await notifyStandingChanged(storeId);
 }
 
 // ─────────────────────────── store allowance ──────────────────────────────
