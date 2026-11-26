@@ -2,12 +2,13 @@
   "id": "billing.change-plan",
   "status": "live",
   "area": "billing",
-  "version": 1,
-  "versionDate": "2026-11-14",
+  "version": 2,
+  "versionDate": "2026-11-17",
   "titleAr": "غير الباقة / الغي الاشتراك",
   "titleEn": "Upgrade, downgrade, cancel or resume subscription",
   "screens": ["/stores/[id]/billing"],
   "api": [
+    "GET /stores/:storeId/billing/change-plan/quote",
     "POST /stores/:storeId/billing/change-plan",
     "POST /stores/:storeId/billing/cancel",
     "POST /stores/:storeId/billing/resume",
@@ -19,7 +20,7 @@
   "policy": "confirm",
   "undo": {
     "class": "irreversible",
-    "note": "An upgrade charges the card at once and a downgrade starts at period end; both are confirmed on a card. Cancelling can be resumed with subscription_resume before the period ends."
+    "note": "An upgrade starts at once and charges the card the prorated difference for the days left in the paid period (Ruling G35-PRORATE-1); a downgrade starts at period end with nothing charged; both are confirmed first. Cancelling can be resumed with subscription_resume before the period ends."
   },
   "helpArticle": "plans-and-billing",
   "questions": {
@@ -33,7 +34,8 @@
   },
   "steps": [
     "Billing > Change plan / Cancel.",
-    "Assistant: a downgrade is a confirm card; an upgrade shows the exact amounts (before VAT, VAT, total) and opens the payment screen where you confirm the charge. The assistant never charges the saved card itself."
+    "Billing > Switch to: the confirm dialog shows what the change costs now (an upgrade = the price difference for the days left, VAT included; a downgrade = nothing now, starts at the period end). The charge sent is the amount shown; if it changed, nothing is charged and the screen asks again (409 QUOTE_CHANGED).",
+    "Assistant: a downgrade is a confirm card; an upgrade shows the exact amounts (before VAT, VAT, total) of the prorated difference for the days left in the paid period (Ruling G35-PRORATE-1) and opens the payment screen where you confirm the charge. The assistant never charges the saved card itself."
   ],
   "edgeCases": [
     "Plan downgrade mid-task: features gated on next call, staff over maxStaff, orders over monthly cap (Basic 300/mo)",
