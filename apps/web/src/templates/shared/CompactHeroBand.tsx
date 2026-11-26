@@ -30,8 +30,9 @@ export function CompactHeroBand({
   bg?: string;
   /**
    * UI audit 2026-11-11 (P2 #6): the title IS the store name the header already shows. Repeating it as
-   * 30 px display type pushed the first photo to y 450 on a phone. The h1 stays (SEO, screen readers)
-   * but is visually hidden, and the band shrinks to the call to action.
+   * 30 px display type pushed the first photo to y 450 on a phone, so the band is compact: the name as a
+   * single 20-24 px display line with the call to action beside it (one row). It is never hidden: hiding
+   * it left a bare strip with one lone button (live QA 2026-11-17, ameliaaurum.com/ar).
    */
   echoesBrand?: boolean;
 }) {
@@ -43,11 +44,17 @@ export function CompactHeroBand({
     <section
       data-hero="compact"
       data-hero-quiet={quiet ? '' : undefined}
-      className={`border-b border-primary/50 px-4 sm:px-6 lg:px-8 ${quiet ? 'py-4 sm:py-6' : 'py-8 sm:py-10'}`}
+      className={`border-b border-primary/50 px-4 sm:px-6 lg:px-8 ${quiet ? 'py-5 sm:py-6' : 'py-8 sm:py-10'}`}
     >
-      <div className="mx-auto flex max-w-7xl flex-col items-start gap-3">
+      <div
+        className={
+          quiet
+            ? 'mx-auto flex max-w-7xl flex-row flex-wrap items-center justify-between gap-x-6 gap-y-3'
+            : 'mx-auto flex max-w-7xl flex-col items-start gap-3'
+        }
+      >
         <h1
-          className={`font-display text-3xl leading-tight text-foreground sm:text-4xl rtl:leading-[1.45]${quiet ? ' sr-only' : ''}`}
+          className={`font-display leading-tight text-foreground rtl:leading-[1.45] ${quiet ? 'text-xl sm:text-2xl' : 'text-3xl sm:text-4xl'}`}
           style={onBg}
         >
           {title}

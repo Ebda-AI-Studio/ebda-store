@@ -81,3 +81,38 @@ export async function storeStockValueFils(
   `;
   return Number(rows[0]?.total ?? 0);
 }
+
+/**
+ * Cost coverage of the on-hand stock figure, for a product row aliased `p`: `stocked` counts the products that hold
+ * on-hand units, `uncosted` the stocked products with at least one unit that has NO cost (variant cost, else the
+ * parent's). A stock VALUE built on such a unit skips it, so it is partial (or unknown when every stocked product is
+ * uncosted) — never a true 0. Twin of `STOCK_COST_COVERAGE_SQLITE` (packages/repo/src/do/finance-ops.ts).
+ */
+export const STOCK_COST_COVERAGE_SQL = Prisma.sql`
+  COALESCE(SUM(CASE
+    WHEN EXISTS (SELECT 1 FROM public.product_variants pv WHERE pv.product_id = p.id)
+    THEN (EXISTS (SELECT 1 FROM public.product_variants pv
+                   WHERE pv.product_id = p.id AND pv.is_active AND pv.inventory > 0))::int
+    ELSE (p.inventory > 0)::int END), 0) AS stocked,
+  COALESCE(SUM(CASE
+    WHEN EXISTS (SELECT 1 FROM public.product_variants pv WHERE pv.product_id = p.id)
+    THEN (EXISTS (SELECT 1 FROM public.product_variants pv
+                   WHERE pv.product_id = p.id AND pv.is_active AND pv.inventory > 0
+                     AND COALESCE(pv.cost_price, p.cost_price) IS NULL))::int
+    ELSE (p.inventory > 0 AND p.cost_price IS NULL)::int END), 0) AS uncosted`;
+
+/** Products with stock on hand, and how many of them have no cost (see `STOCK_COST_COVERAGE_SQL`). */
+export async function storeStockCostCoverage(
+  storeId: string,
+  client: DbClient = prisma
+): Promise<{ stockedProducts: number; uncostedProducts: number }> {
+  const rows = await client.$queryRaw<{ stocked: bigint; uncosted: bigint }[]>`
+    SELECT ${STOCK_COST_COVERAGE_SQL}
+    FROM public.products p
+    WHERE p.store_id = ${storeId} AND p.deleted_at IS NULL
+  `;
+  return {
+    stockedProducts: Number(rows[0]?.stocked ?? 0),
+    uncostedProducts: Number(rows[0]?.uncosted ?? 0),
+  };
+}

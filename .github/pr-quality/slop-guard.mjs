@@ -25,7 +25,7 @@
 //   duplicate-helper has its own narrow escape (Ruling SLOP-TWIN-1): `// pq-allow(duplicate-helper): twin of <path>` above BOTH copies, each pointing at the
 //   other; honoured only while the twin file exists, has the same function with an identical body, and points back.
 import { readFileSync, readdirSync, lstatSync, existsSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, resolve, sep, isAbsolute, posix } from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
@@ -112,7 +112,7 @@ function functions(text) {
   return allFunctions(text).filter((f) => f.len >= 160 && f.nlines >= 5 && !FRAMEWORK.has(f.name));
 }
 
-export function scan({ root, config = {} }) {
+export function scan({ root, config = {}, baseRoot = null }) {
   const roots = config.roots ?? ['apps', 'packages', 'src'];
   const fw = new Set([...FRAMEWORK, ...(config.frameworkExports ?? [])]);
   const viol = new Map(); // id -> description
@@ -160,7 +160,7 @@ export function scan({ root, config = {} }) {
     }
   }
 
-  const waived = vendoredExemption(root, config);
+  const waived = vendoredExemption(root, config, baseRoot);
   if (waived.dir) {
     for (const id of [...viol.keys()]) if (id.startsWith('unused-export|') && id.split('|')[1].startsWith(`${waived.dir}/`)) viol.delete(id);
   } else if ((config.ruleExemptions ?? []).length) {
@@ -254,11 +254,32 @@ function* filesUnder(root, dir) {
  * Valid only when: exactly one entry { rule: 'unused-export', path === foundation.lock.json "dir", reason, requires === the lock's parity test and it
  * exists }, AND every file the lock names under `dir` has the locked sha256, AND no file under `dir` is outside the lock.
  */
-export function vendoredExemption(root, config = {}) {
+/** A lock-supplied relative path is data from the PR: reject absolute, backslash, empty and any `..` segment before it touches the file system. */
+function safeRel(rel) {
+  if (typeof rel !== 'string' || rel === '' || isAbsolute(rel) || rel.includes('\\') || rel.includes('\0')) return false;
+  const n = posix.normalize(rel);
+  return !(n === '..' || n.startsWith('../') || n.split('/').includes('..')) && !isAbsolute(n);
+}
+const inside = (parent, child) => child === parent || child.startsWith(parent.endsWith(sep) ? parent : parent + sep);
+
+/**
+ * `baseRoot` (CI and the pre-push hook pass --base-root): the exemption is only trusted while the PR's foundation.lock.json is BYTE-IDENTICAL to the base
+ * branch's. The lock is data the PR controls; read from the PR root alone, a PR could edit the lock and the vendored files together and waive its own
+ * code. A real foundation bump therefore does not get the waiver on its own PR (its new vendored exports must be justified inline or land after the lock
+ * is on the base), which is the conservative side. No base lock = nothing to trust = no exemption.
+ */
+export function vendoredExemption(root, config = {}, baseRoot = null) {
   const entries = config.ruleExemptions ?? [];
   if (entries.length === 0) return { dir: null, why: 'none configured' };
   const lockPath = join(root, 'foundation.lock.json');
   if (!existsSync(lockPath)) return { dir: null, why: 'no foundation.lock.json' };
+  if (baseRoot) {
+    const baseLock = join(baseRoot, 'foundation.lock.json');
+    if (!existsSync(baseLock)) return { dir: null, why: 'the base branch has no foundation.lock.json to trust' };
+    if (!readFileSync(baseLock).equals(readFileSync(lockPath))) {
+      return { dir: null, why: "foundation.lock.json differs from the base branch's (the lock is PR-controlled; a bump gets no waiver on its own PR)" };
+    }
+  }
   let lock;
   try { lock = readJsonRegular(lockPath); } catch (e) { return { dir: null, why: String(e.message) }; }
   if (entries.length !== 1) return { dir: null, why: 'exactly one exemption is allowed' };
@@ -266,7 +287,18 @@ export function vendoredExemption(root, config = {}) {
   if (x.rule !== 'unused-export') return { dir: null, why: `rule ${x.rule}: only unused-export may be exempted` };
   if (typeof x.reason !== 'string' || x.reason.trim().length < 10) return { dir: null, why: 'a real reason is required' };
   if (x.path !== lock.dir) return { dir: null, why: `path ${x.path} is not exactly the vendored folder ${lock.dir}` };
+  // path safety: dir, parity and every entry stay inside the checkout (and entries under dir stay inside dir) before anything is stat'ed or read
+  const rootAbs = resolve(root);
+  if (!safeRel(lock.dir) || !inside(rootAbs, resolve(rootAbs, lock.dir))) return { dir: null, why: 'foundation.lock.json "dir" is not a safe path inside the repo' };
+  const dirAbs = resolve(rootAbs, lock.dir);
+  if (!safeRel(lock.parity) || !inside(rootAbs, resolve(rootAbs, lock.parity))) return { dir: null, why: 'foundation.lock.json "parity" is not a safe path inside the repo' };
   if (x.requires !== lock.parity || !existsSync(join(root, x.requires))) return { dir: null, why: 'the parity test is missing' };
+  for (const rel of Object.keys(lock.files ?? {})) {
+    if (!safeRel(rel)) return { dir: null, why: `foundation.lock.json entry ${JSON.stringify(rel)} is not a safe relative path` };
+    const abs = resolve(rootAbs, rel);
+    if (!inside(rootAbs, abs)) return { dir: null, why: `foundation.lock.json entry ${rel} escapes the repo` };
+    if (rel.startsWith(`${lock.dir}/`) && !inside(dirAbs, abs)) return { dir: null, why: `foundation.lock.json entry ${rel} escapes ${lock.dir}` };
+  }
   for (const [rel, want] of Object.entries(lock.files ?? {})) {
     if (!rel.startsWith(`${lock.dir}/`) && rel !== lock.parity) continue;
     const p = join(root, rel);
@@ -293,11 +325,11 @@ function main() {
   const cfgPath = arg('--config', join(root, '.pr-quality.json'));
   const config = (baseRoot && readCfg(baseRoot)) || (existsSync(cfgPath) ? readJsonRegular(cfgPath) : {});
   const basePath = arg('--baseline', join(root, config.baseline ?? '.pr-quality-baseline.json'));
-  const current = scan({ root, config });
+  const current = scan({ root, config, baseRoot });
   if (a.includes('--list')) { for (const d of current.values()) console.log(d); console.log(`${current.size} violation(s)`); return; }
   // SLOP-VENDORED-1: ids the active exemption waives are ignored on BOTH sides (an old baseline entry for a waived vendored export is
   // neither "fixed but still listed" nor needed), so the exemption never forces every later PR to rewrite the baseline.
-  const waivedDir = vendoredExemption(root, config).dir;
+  const waivedDir = vendoredExemption(root, config, baseRoot).dir;
   const waivedId = (id) => !!waivedDir && id.startsWith('unused-export|') && id.split('|')[1].startsWith(`${waivedDir}/`);
   const rawBaseline = existsSync(basePath) ? readJsonRegular(basePath).ids ?? [] : null;
   const baseline = rawBaseline === null ? null : rawBaseline.filter((id) => !waivedId(id));

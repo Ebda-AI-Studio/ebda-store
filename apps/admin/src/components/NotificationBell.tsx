@@ -3,7 +3,10 @@
 import { Button } from '@/components/ui/Button';
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useRouter } from 'next/navigation';
+import { useParams, usePathname, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useLocale } from 'next-intl';
+import { useAttention } from '../hooks/useAttention';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
 import { useT } from '@/i18n/useT';
@@ -23,6 +26,15 @@ export function NotificationBell() {
   const router = useRouter();
   const { notifications, unreadCount, isConnected, markAsRead, markAllAsRead, clearNotifications } =
     useNotifications();
+  const params = useParams();
+  const lang: 'ar' | 'en' = useLocale() === 'ar' ? 'ar' : 'en';
+  const pathname = usePathname() ?? '';
+  const storeParam =
+    typeof params?.id === 'string' && pathname.startsWith('/stores/') ? params.id : null;
+  // Money/setup blockers come from the ONE attention feed (same source as the Settings badges and dashboard tiles).
+  const attention = useAttention(storeParam);
+  const actionItems = attention.items.filter(i => i.severity === 'action');
+  const badgeCount = unreadCount + attention.actionCount;
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -129,9 +141,9 @@ export function NotificationBell() {
         </svg>
 
         {/* Unread Badge */}
-        {unreadCount > 0 && (
+        {badgeCount > 0 && (
           <span className="absolute -top-1 -end-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-destructive rounded-full">
-            {unreadCount > 9 ? '9+' : unreadCount}
+            {badgeCount > 9 ? '9+' : badgeCount}
           </span>
         )}
 
@@ -176,6 +188,32 @@ export function NotificationBell() {
                 )}
               </div>
             </div>
+
+            {/* Money + setup blockers (one source: the attention feed) */}
+            {storeParam && actionItems.length > 0 && (
+              <ul
+                aria-label={t('needsAttention')}
+                className="border-b border-border bg-warning/10"
+                data-testid="bell-attention"
+              >
+                {actionItems.map(i => (
+                  <li key={i.id}>
+                    <Link
+                      href={`/stores/${storeParam}/${i.section === 'settings' ? 'settings' : i.section}`}
+                      onClick={() => setIsOpen(false)}
+                      className="block px-4 py-3 text-sm hover:bg-warning/20"
+                    >
+                      <span className="font-medium text-foreground">{i.title[lang]}</span>
+                      {typeof i.count === 'number' && (
+                        <span className="ms-2 text-xs font-semibold text-warning-ink">
+                          {i.count}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
 
             {/* Notification List */}
             <div className="max-h-[400px] overflow-y-auto">

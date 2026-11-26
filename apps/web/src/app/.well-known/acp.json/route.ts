@@ -5,7 +5,7 @@ import {
   storefrontBaseUrl,
 } from '../../../lib/agent-store-resolver';
 
-import { REGION } from '@ebda/shared';
+import { REGION, STORE_MCP_READ_TOOL_NAMES, STORE_MCP_WRITE_TOOL_NAMES } from '@ebda/shared';
 /**
  * `/.well-known/acp.json` — Agentic Commerce Protocol discovery.
  *
@@ -90,6 +90,8 @@ export async function GET() {
       mcp_transport: 'streamable-http',
       product_feed: `${base}/feeds/products.json`,
       llms_txt: `${base}/llms.txt`,
+      mcp_server_card: `${base}/.well-known/mcp/server-card.json`,
+      agent_skills: `${base}/.well-known/agent-skills/index.json`,
     },
     authentication: {
       // Reads are anonymous by design — that is the whole strategic surface.
@@ -110,8 +112,8 @@ export async function GET() {
         'Ask the merchant (see merchant.contact) to issue an agent key. Without it the read tools still work and the write tools return an error explaining this.',
     },
     tools: {
-      read: ['search_products', 'get_product', 'get_store_info', 'view_cart', 'get_order_status'],
-      write: ['add_to_cart', 'place_order'],
+      read: STORE_MCP_READ_TOOL_NAMES,
+      write: STORE_MCP_WRITE_TOOL_NAMES,
     },
   };
 

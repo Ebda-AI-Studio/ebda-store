@@ -34,7 +34,7 @@ import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { readInStoreContext, runInStoreTenantContext } from '../lib/store-scoped-read';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
-import { requireMfaEnrolled } from '../middleware/require-mfa';
+import { requireMfaEnrolled, requireRecentLogin } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { auditLog } from '../middleware/security';
@@ -181,6 +181,7 @@ router.post(
   ...chain,
   // BE:S-2 (Ruling FP-3): an impersonated session must not mint a durable key that outlives it.
   rejectImpersonated,
+  requireRecentLogin, // TEN-4: credential-class change needs a recent sign-in
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;
@@ -280,6 +281,8 @@ router.get(
 router.put(
   '/:id/integrations/merchant-mcp/write-switch',
   ...chain,
+  rejectImpersonated, // TEN-3 sweep
+  requireRecentLogin, // TEN-4: credential-class change needs a recent sign-in
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;
@@ -307,6 +310,8 @@ router.put(
 router.delete(
   '/:id/integrations/merchant-keys/:keyId',
   ...chain,
+  rejectImpersonated, // TEN-3 sweep
+  requireRecentLogin, // TEN-4: credential-class change needs a recent sign-in
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId, keyId } = req.params;

@@ -15,6 +15,33 @@ export const PULSE_PERIODS = [
 ] as const satisfies readonly Period[];
 export type PulsePeriod = (typeof PULSE_PERIODS)[number];
 
+const PERIOD_KEY = 'ebda.dashboard.pulsePeriod';
+
+function readStoredPeriod(): PulsePeriod {
+  try {
+    const v = window.sessionStorage.getItem(PERIOD_KEY);
+    return (PULSE_PERIODS as readonly string[]).includes(v ?? '') ? (v as PulsePeriod) : 'last_7';
+  } catch {
+    return 'last_7';
+  }
+}
+
+/** The selected period survives a language switch (a reload) for the tab's session; defaults to 7 days. */
+export function usePulsePeriod(): [PulsePeriod, (p: PulsePeriod) => void] {
+  const [period, setPeriodState] = useState<PulsePeriod>(() =>
+    typeof window === 'undefined' ? 'last_7' : readStoredPeriod()
+  );
+  const setPeriod = useCallback((p: PulsePeriod) => {
+    setPeriodState(p);
+    try {
+      window.sessionStorage.setItem(PERIOD_KEY, p);
+    } catch {
+      /* storage unavailable: the choice just lasts until reload */
+    }
+  }, []);
+  return [period, setPeriod];
+}
+
 export interface PulseStats {
   totalRevenue: number;
   totalOrders: number;
@@ -25,6 +52,9 @@ export interface PulseStats {
   revenueChange: number;
   ordersChange: number;
   customersChange: number;
+  /** Absent on an older cached API response; 0 means the change is not a percentage. */
+  previousRevenue?: number;
+  previousOrders?: number;
 }
 
 export interface PulseSalesPoint {

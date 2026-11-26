@@ -8,7 +8,34 @@ import {
   withMoneyTx,
   SlugEntityType,
   withStore,
+  ambientScope,
 } from '@ebda/database';
+
+/**
+ * INV-AUDIT-3: a Postgres-store stock write records its movement row, the same row the StoreDO op writes (type, reason, actor =
+ * the request's user). A change that changes nothing writes nothing.
+ */
+async function recordPgStockMovements(
+  storeId: string,
+  moves: Array<{ productId: string; previous: number; next: number }>,
+  opts: { type?: 'initial' | 'adjustment'; reason?: string } = {}
+): Promise<void> {
+  const rows = moves.filter(m => m.previous !== m.next);
+  if (rows.length === 0) return;
+  await prisma.inventoryHistory.createMany({
+    data: rows.map(m => ({
+      productId: m.productId,
+      storeId,
+      type: opts.type ?? 'adjustment',
+      quantity: m.next - m.previous,
+      previousStock: m.previous,
+      newStock: m.next,
+      reason: opts.reason ?? 'Bulk inventory update',
+      reference: null,
+      createdBy: ambientScope().userId ?? null,
+    })),
+  });
+}
 import { assertBarcodeAvailable, ensureBarcode, parseBarcodeOrThrow } from './barcode.service';
 import { AppError } from '../middleware/error-handler';
 import { effectiveInventory, enrichStockFlags } from '../lib/effective-inventory';
@@ -30,7 +57,12 @@ import { readInStoreContext } from '../lib/store-scoped-read';
 import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
 import { cleanupRemovedImages } from './r2-cleanup.service';
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
-import { PUBLIC_MODEL3D_SELECT, toPublicModel3d } from './product-model.service';
+import {
+  CARD_MODEL3D_SELECT,
+  PUBLIC_MODEL3D_SELECT,
+  toPublicModel3d,
+  withHas3d,
+} from './product-model.service';
 import { publicGoldFields } from './gold-rate/public';
 import {
   assertSizeChartInStore,
@@ -227,6 +259,8 @@ interface ListProductsOptions {
   tag?: string;
   search?: string;
   featured?: boolean;
+  /** Admin list tri-state: true = only products WITH a 3D model, false = only without; absent = all. */
+  has3d?: boolean;
   /** Inclusive lower bound on `Product.price` (in piastres). */
   minPrice?: number;
   /** Inclusive upper bound on `Product.price` (in piastres). */
@@ -490,6 +524,8 @@ const PUBLIC_LISTING_SELECT = {
   ...STOREFRONT_PRODUCT_SELECT,
   lowStockThreshold: true,
   trackInventory: true,
+  // Card "3D" chip: id only, mapped to `has3d` by withHas3d (never ships the relation).
+  model3d: CARD_MODEL3D_SELECT,
   images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
   categories: { include: { category: true } },
   options: LISTING_SWATCH_OPTIONS_SELECT,
@@ -610,7 +646,7 @@ async function onSaleIdsFromDo(
 
 export class ProductService {
   static async list(storeId: string, options: ListProductsOptions = {}) {
-    const { status, category, search, featured, ids, withSalesQuantity } = options;
+    const { status, category, search, featured, ids, withSalesQuantity, has3d } = options;
     const page = Math.max(1, options.page || 1);
     // Cap matches the admin per-page selector's max option (500). 100 was
     // too low — merchants hitting 200/500 in the UI got silently
@@ -626,6 +662,12 @@ export class ProductService {
 
     if (featured !== undefined) {
       where.featured = featured;
+    }
+
+    // Admin "has 3D model" filter: ProductModel is 1:1 on productId (unique), so the relation
+    // filter is an indexed anti/semi-join, no scan of model rows.
+    if (has3d !== undefined) {
+      where.model3d = has3d ? { isNot: null } : { is: null };
     }
 
     if (ids && ids.length > 0) {
@@ -997,6 +1039,8 @@ export class ProductService {
           productIds: [product.id],
           mode: 'set',
           value: data.inventory,
+          type: 'initial',
+          reason: 'Opening stock',
         });
         (product as { inventory?: number }).inventory = data.inventory;
       } catch (err) {
@@ -1005,6 +1049,13 @@ export class ProductService {
         throw err;
       }
     }
+
+    if (data.inventory && !openingStockOnDo)
+      await recordPgStockMovements(
+        storeId,
+        [{ productId: product.id, previous: 0, next: data.inventory }],
+        { type: 'initial', reason: 'Opening stock' }
+      );
 
     // BARCODE-1: no barcode typed -> the store's next in-store EAN-13 (when inventory.barcode is on).
     // A product that later gets variants carries its codes on the variants.
@@ -1449,7 +1500,7 @@ export class ProductService {
   }
 
   static async updateInventory(storeId: string, productId: string, quantity: number) {
-    await this.getById(storeId, productId);
+    const before = await this.getById(storeId, productId);
 
     const doStock = await storeStock(storeId);
     if (doStock) {
@@ -1461,6 +1512,9 @@ export class ProductService {
       where: { id: productId, storeId },
       data: { inventory: quantity },
     });
+    await recordPgStockMovements(storeId, [
+      { productId, previous: (before as { inventory: number }).inventory, next: quantity },
+    ]);
 
     await this.invalidateStoreProductCache(storeId);
 
@@ -1681,15 +1735,25 @@ export class ProductService {
           where: { storeId, id: { in: simpleIds }, deletedAt: null },
           data: { inventory: qty },
         });
+        await recordPgStockMovements(
+          storeId,
+          simpleProducts.map(p => ({ productId: p.id, previous: p.inventory, next: qty }))
+        );
       } else {
         // adjust: add delta, floor at 0.
         // Run in chunks of 20 to avoid pool exhaustion.
         await runChunked(simpleProducts, 20, p => {
           const newQty = Math.max(0, p.inventory + Math.round(value));
-          return prisma.product.update({
-            where: { id: p.id, storeId },
-            data: { inventory: newQty },
-          });
+          return prisma.product
+            .update({
+              where: { id: p.id, storeId },
+              data: { inventory: newQty },
+            })
+            .then(() =>
+              recordPgStockMovements(storeId, [
+                { productId: p.id, previous: p.inventory, next: newQty },
+              ])
+            );
         });
       }
     }
@@ -1940,7 +2004,7 @@ export class ProductService {
         return row ? [row] : [];
       });
       return {
-        products: pageRows.map(p => enrichStockFlags(p)),
+        products: pageRows.map(p => enrichStockFlags(withHas3d(p))),
         facets,
         meta: {
           page: cursor ? undefined : page,
@@ -2138,7 +2202,7 @@ export class ProductService {
         // No type-erasing cast here: keeping the precise Prisma payload type
         // means `listPublic`'s return carries id/name/slug/images/categories
         // etc. for consumers like the AI product feed to typecheck against.
-        products: page_products.map(p => enrichStockFlags(p)),
+        products: page_products.map(p => enrichStockFlags(withHas3d(p))),
         facets,
         meta: {
           page: cursor ? undefined : page,
@@ -2220,7 +2284,7 @@ export class ProductService {
 
     const result = {
       // No type-erasing cast (see the position-ordered path above).
-      products: products.map(p => enrichStockFlags(p)),
+      products: products.map(p => enrichStockFlags(withHas3d(p))),
       facets,
       meta: {
         page: cursor ? undefined : page,

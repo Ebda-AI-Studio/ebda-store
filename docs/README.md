@@ -17,6 +17,8 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [CHANGELOG-2026-11-04-admin-fix-pass-t4.md](CHANGELOG-2026-11-04-admin-fix-pass-t4.md) - Admin fix pass, T4 store setup pages (2026-11-04)
 - [CHANGELOG-2026-11-04-admin-fix-pass-t6.md](CHANGELOG-2026-11-04-admin-fix-pass-t6.md) - Admin fix pass, T6 stock / finance / insights / platform / onboarding (2026-11-04)
 - [CHANGELOG-2026-11-09-admin-audit-closure-ux.md](CHANGELOG-2026-11-09-admin-audit-closure-ux.md) - Admin audit closure, UX rows (2026-11-09)
+- [CHANGELOG-2026-11-16-studio-social-links.md](CHANGELOG-2026-11-16-studio-social-links.md) - Ebda AI Studio social links on the marketing site (2026-11-16)
+- [CHANGELOG-2026-11-12-session-role-lifecycle.md](CHANGELOG-2026-11-12-session-role-lifecycle.md) - Session and role lifecycle fixes (ID-02/05/06/07/08, TEN-2/3/4)
 - [admin-routes-triage-2026-11-11.md](admin-routes-triage-2026-11-11.md) - Triage of the 89 routes with no admin caller (F-9-prune)
 - [CHANGELOG-2026-11-09-admin-audit-closure-p2-api-web.md](CHANGELOG-2026-11-09-admin-audit-closure-p2-api-web.md) - Admin audit closure, API and storefront rows (2026-11-09)
 - [CHANGELOG-2026-11-09-admin-audit-closure-p2-store-do.md](CHANGELOG-2026-11-09-admin-audit-closure-p2-store-do.md) - Atomic StoreDO settings patch (2026-11-09)
@@ -325,6 +327,10 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/done/2026-10-26-search-as-you-type.md](plans/done/2026-10-26-search-as-you-type.md) - Search as you type, everywhere (2026-10-26)
 - [plans/2026-11-14-catalogue-feeds.md](plans/2026-11-14-catalogue-feeds.md) - Product catalogue feeds: Google, Meta, TikTok (2026-11-14)
 - [plans/2026-11-12-arabic-stemming.md](plans/2026-11-12-arabic-stemming.md) - Arabic light stemming for storefront search (2026-11-12)
+- [plans/2026-11-14-gateway-payout-postings.md](plans/2026-11-14-gateway-payout-postings.md) - Gateway payout, fee and COD remittance postings (clearing 1000/1010/1020 to bank 1030; prerequisite of the AI finance plans)
+- [plans/2026-11-14-ai-transaction-categorising.md](plans/2026-11-14-ai-transaction-categorising.md) - AI categorising of bank transactions: rules, memory, dictionary, then Gemini; merchant confirms every posting
+- [plans/2026-11-14-ai-bank-reconciliation.md](plans/2026-11-14-ai-bank-reconciliation.md) - AI bank reconciliation: ranked candidates, N:1 payout and COD batches, LLM tie-break, review queue
+- [plans/2026-11-14-sales-forecasting.md](plans/2026-11-14-sales-forecasting.md) - Sales forecasting: per-SKU seasonal-naive / SES / Croston with backtests, Egyptian calendar, stock-out dates, revenue forecast card
 - [plans/2026-10-26-storefront-locale-paths.md](plans/2026-10-26-storefront-locale-paths.md) - Storefront English at its own URL (audit M-168, SEO-9)
 - [plans/done/2026-10-28-customer-intelligence.md](plans/done/2026-10-28-customer-intelligence.md) - Customer Intelligence (CI): capture, internal learning, merchant features
 - [plans/done/2026-10-28-store-on-cloudflare.md](plans/done/2026-10-28-store-on-cloudflare.md) - Ebda Store on Cloudflare only: detailed executable plan

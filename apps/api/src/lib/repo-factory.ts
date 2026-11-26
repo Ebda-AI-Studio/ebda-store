@@ -39,6 +39,7 @@ import type { NextFunction, Request, Response } from 'express';
 import {
   afterTenantTxCommit,
   afterTxCommit,
+  ambientScope,
   currentStoreId,
   prisma,
   withStore,
@@ -243,7 +244,14 @@ export interface StockClient {
     key?: string
   ): Promise<{ successful: number; failed: number; errors: string[]; applied: StockLevel[] }>;
   setVariantInventory(
-    a: { productId: string; updates: Array<{ variantId: string; inventory: number }> },
+    a: {
+      productId: string;
+      updates: Array<{ variantId: string; inventory: number }>;
+      /** movement row (INV-AUDIT-3): who and why; opening stock passes type 'initial' */
+      userId?: string;
+      reason?: string;
+      type?: HistoryType;
+    },
     key?: string
   ): Promise<{
     updated: number;
@@ -256,7 +264,14 @@ export interface StockClient {
     key?: string
   ): Promise<{ changed: boolean; historyId: string | null }>;
   setWarehouseStock(
-    a: { warehouseId: string; productId: string; variantId?: string | null; quantity: number },
+    a: {
+      warehouseId: string;
+      productId: string;
+      variantId?: string | null;
+      quantity: number;
+      userId?: string;
+      reason?: string;
+    },
     key?: string
   ): Promise<{ quantity: number }>;
   adjustWarehouseStock(
@@ -266,6 +281,7 @@ export interface StockClient {
       variantId?: string | null;
       delta: number;
       reason?: string;
+      userId?: string;
     },
     key?: string
   ): Promise<{ newQuantity: number }>;
@@ -401,6 +417,10 @@ export interface StockClient {
     productIds: string[];
     mode: 'set' | 'adjust';
     value: number;
+    /** movement row (INV-AUDIT-3) */
+    userId?: string;
+    reason?: string;
+    type?: 'initial';
   }): Promise<{ updated: number }>;
   reconcileWarehouseAll(a: { limit?: number; afterKey?: string | null }): Promise<{
     skusReconciled: number;
@@ -641,6 +661,7 @@ export interface MoneyClient {
   importVariants(a: {
     productId: string;
     variants: unknown[];
+    userId?: string | null;
   }): Promise<{ variantsCreated: number }>;
   /** In-store barcodes (Ruling BARCODE-DO-1). */
   barcodeFill(a: {
@@ -984,6 +1005,8 @@ export interface MoneyClient {
   >;
   analyticsStock(a: Record<string, never>): Promise<{
     stockValue: number;
+    stockedProducts: number;
+    uncostedProducts: number;
     backorderCount: number;
     backorderValue: number;
   }>;
@@ -1166,7 +1189,12 @@ export interface MoneyClient {
     asOfMs: number;
     startMs?: number | null;
   }): Promise<{ debit: number; credit: number; unmatchedCount: number; unmatchedNet: number }>;
-  stockValue(): Promise<{ value: number; disabledValue: number }>;
+  stockValue(): Promise<{
+    value: number;
+    disabledValue: number;
+    stockedProducts: number;
+    uncostedProducts: number;
+  }>;
   /** Order fan-out claims, refund notification markers and affiliate commission writes (Ruling CF-JOBS-4). */
   orderNotifyClaim(a: { orderId: string }): Promise<{ claimed: boolean }>;
   statusFanoutClaim(a: { orderId: string; status: string }): Promise<{ claimed: boolean }>;
@@ -1477,9 +1505,33 @@ type RequestLike = Pick<Request, 'headers'>;
 interface Scope {
   req: RequestLike;
   repos: Map<string, Promise<StoreRepo>>;
+  /** Per-request memo of the entitlement plan (see `requestPlanMemo`). */
+  plans?: Map<string, Promise<unknown>>;
 }
 const scopes = new AsyncLocalStorage<Scope>();
 const NO_REQUEST: RequestLike = { headers: {} };
+
+/**
+ * Memoise `fn` for the life of ONE request (Ruling BIZ-ALL-5): the entitlement plan is read from D1 at most once per request and
+ * store, however many gates and quota checks ask. Outside a request (job, cron, test) nothing is memoised. A plan write in the same
+ * request drops the entry (`forgetRequestPlan`, called by every entitlement write), so a request never reads its own stale plan.
+ */
+export function requestPlanMemo<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+  const scope = scopes.getStore();
+  if (!scope) return fn();
+  const plans = (scope.plans ??= new Map());
+  let hit = plans.get(storeId) as Promise<T> | undefined;
+  if (!hit) {
+    hit = fn();
+    plans.set(storeId, hit);
+    hit.catch(() => plans.delete(storeId));
+  }
+  return hit;
+}
+
+function forgetRequestPlan(storeId: string): void {
+  scopes.getStore()?.plans?.delete(storeId);
+}
 
 /** The StoreDO stub's read entry point (lib/store-backend.ts types the rest of the stub). */
 interface QueryStub {
@@ -1532,6 +1584,15 @@ interface QueryStub {
   >;
 }
 
+/**
+ * INV-AUDIT-3: the stock ops that write a movement row take the ACTOR from the request's ambient scope when the caller did not
+ * name one (the scope's `userId` is the signed-in admin; a cron or job has none, so its rows carry no actor).
+ */
+const withActor = <T extends { userId?: string | null }>(a: T): T => {
+  const actor = ambientScope().userId;
+  return a.userId === undefined && actor ? { ...a, userId: actor } : a;
+};
+
 /** The typed stock client over a transport `call(op, args, key)`; shared by the Worker and the contract tests. */
 export function makeStockClient(
   call: (op: string, args: unknown, key?: string) => Promise<any>
@@ -1540,10 +1601,10 @@ export function makeStockClient(
     adjustProduct: (a, key) => call('adjustProduct', a, key),
     setProduct: (a, key) => call('setProduct', a, key),
     bulkAdjustProducts: (a, key) => call('bulkAdjustProducts', a, key),
-    setVariantInventory: (a, key) => call('setVariantInventory', a, key),
+    setVariantInventory: (a, key) => call('setVariantInventory', withActor(a), key),
     setVariantActive: (a, key) => call('setVariantActive', a, key),
-    setWarehouseStock: (a, key) => call('setWarehouseStock', a, key),
-    adjustWarehouseStock: (a, key) => call('adjustWarehouseStock', a, key),
+    setWarehouseStock: (a, key) => call('setWarehouseStock', withActor(a), key),
+    adjustWarehouseStock: (a, key) => call('adjustWarehouseStock', withActor(a), key),
     createStockAdjustment: (a, key) => call('createStockAdjustment', a, key),
     postStockAdjustment: (a, key) => call('postStockAdjustment', a, key),
     createPurchaseOrder: (a, key) => call('createPurchaseOrder', a, key),
@@ -1556,7 +1617,7 @@ export function makeStockClient(
     submitCountLine: a => call('submitCountLine', a),
     closeCountSession: a => call('closeCountSession', a),
     reconcileCountSession: (a, key) => call('reconcileCountSession', a, key),
-    bulkSetInventory: a => call('bulkSetInventory', a),
+    bulkSetInventory: a => call('bulkSetInventory', withActor(a)),
     importCodRemittances: a => call('importCodRemittances', a),
     reconcileWarehouseSku: a => call('reconcileWarehouseSku', a),
     reconcileWarehouseAll: a => call('reconcileWarehouseAll', a),
@@ -1596,7 +1657,7 @@ export function makeMoneyClient(
     receiptImageDeleted: a => call('receiptImageDeleted', a),
     receiptSweep: a => call('receiptSweep', a ?? {}),
     importBatch: a => call('importBatch', a),
-    importVariants: a => call('importVariants', a),
+    importVariants: a => call('importVariants', withActor(a)),
     createOrder: (a, key) => call('createOrder', a, key),
     quoteOrder: a => call('quoteOrder', a),
     confirmPayment: (a, key) => call('confirmPayment', a, key),
@@ -2236,6 +2297,7 @@ export async function storeUpdateOnDo(
         `Store.${k}: update operators and relation writes are not served by the DO`
       );
   }
+  if (touchesEntitlement(data)) forgetRequestPlan(storeId);
   await mirrorEntitlementToPg(storeId, data); // NZ-D21: Postgres sources the entitlement copy-back
   // the ONE D1 Store writer (NZ-D20); no row matched = unknown store: fail closed, never a blind DO write
   if ((await d1StoreWrite({ id: storeId }, d1StorePatch(data))) === 0)
@@ -2362,6 +2424,7 @@ async function applyPostCommit(storeId: string, patch: Record<string, unknown>):
     Object.entries(patch).filter(([k]) => !(ENTITLEMENT_FIELDS as readonly string[]).includes(k))
   );
   if (touchesEntitlement(patch)) {
+    forgetRequestPlan(storeId);
     try {
       await syncStoreEntitlement(storeId);
     } catch (err) {

@@ -59,6 +59,8 @@ export interface TemplateProduct {
   badgeLabelAr?: string | null;
   /** Spec rows; only the `onCard` ones surface as chips (<FactChips>). */
   facts?: ProductFact[];
+  /** Product has a 3D model: the card shows the "3D" chip (<Model3dChip>) that opens the quick view. */
+  has3d?: boolean;
   inStock?: boolean;
   /**
    * Server-computed: inventory <= 0 AND allowBackorder. When true the product

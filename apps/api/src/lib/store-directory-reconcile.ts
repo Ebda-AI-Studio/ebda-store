@@ -22,6 +22,7 @@
  * that cannot be read is alert-only. The report says `postgresSkipped`. Cost if wrong: a Postgres outage silences the Postgres
  * drift repair for that tick (it runs again the next hour).
  */
+import { tombstoneStoreDirectoryRow } from './store-directory-tombstone';
 import { storeDirectory, withStore } from '@ebda/database';
 import { hasStoresOnBackend } from './store-backend';
 import logger from './logger';
@@ -425,7 +426,7 @@ export async function reconcileStoreDirectory(
       });
       continue;
     }
-    await d1.prepare('DELETE FROM "stores" WHERE "id" = ?').bind(id).run();
+    await tombstoneStoreDirectoryRow(d1, id); // never DELETE: Ebda's billing rows cascade from the stores row
     report.corrected.push({ id, why: 'in D1, gone from Postgres' });
   }
 

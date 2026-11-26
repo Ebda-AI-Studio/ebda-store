@@ -50,6 +50,7 @@ import { getDiscountBadgeColor } from './discount-badge';
 import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { Model3dChip } from '../../components/commerce/Model3dChip';
 import { useRenderNow } from '../../contexts/RenderClockContext';
 import { MissingImage } from './MissingImage';
 import { CARD_CAROUSEL_SIZES } from '../../lib/image-sizes';
@@ -787,6 +788,10 @@ function SharedProductCarousel({
                               <FactChips
                                 product={product}
                                 className={styles.productCardBody ? 'mt-1 justify-center' : 'mt-1'}
+                              />
+                              <Model3dChip
+                                product={product}
+                                className={styles.productCardBody ? 'mt-1 mx-auto' : 'mt-1'}
                               />
                             </div>
                           );

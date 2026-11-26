@@ -8,14 +8,26 @@ import { apiGetQuiet } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
 
 import { formatPrice } from '@/lib/format';
+import { ledgerCostsStatus, stockValueState } from '@/lib/money-truth';
 interface FinanceDashboard {
-  thisMonth: { revenue: number; expenses: number; net: number };
+  thisMonth: {
+    revenue: number;
+    expenses: number;
+    net: number;
+    costsStatus?: 'known' | 'partial' | 'unknown';
+    costsMissing?: number;
+    costsTotal?: number;
+  };
   cash: Array<{ id: string; code: string; nameEn: string; balance: number }>;
   stockValue: number;
+  stockedProducts?: number;
+  uncostedProducts?: number;
 }
 
 interface StockSnapshot {
   stockValue: number;
+  stockedProducts?: number;
+  uncostedProducts?: number;
   openBackorderCount: number;
   backorderedDemandValue: number;
   reorderRulesCount: number;
@@ -41,6 +53,7 @@ interface Props {
   storeId: string;
 }
 
+/** One money format (house style, lib/format.ts) — the symbol is part of the value, not a separate unit line. */
 function fmtMoney(minor: number) {
   return formatPrice(minor);
 }
@@ -114,6 +127,23 @@ export function DashboardAccountingSummary({ storeId }: Props) {
   if (!fin && !stock) return null;
 
   const netPositive = (fin?.thisMonth.net ?? 0) >= 0;
+  // Unknown is not zero/revenue (QA 2026-11-17 N1/N2): no booked cost of goods → profit unknown; no cost prices → stock unknown.
+  const costsStatus = fin
+    ? ledgerCostsStatus({
+        revenue: fin.thisMonth.revenue,
+        cogs: 0,
+        costsStatus: fin.thisMonth.costsStatus ?? 'known',
+      })
+    : 'known';
+  const netKnown = costsStatus !== 'unknown';
+  const stockSource = stock ?? fin;
+  const stockState = stockSource
+    ? stockValueState({
+        stockValue: stockSource.stockValue,
+        stockedProducts: stockSource.stockedProducts,
+        uncostedProducts: stockSource.uncostedProducts,
+      })
+    : null;
 
   const tiles = [
     fin && {
@@ -126,14 +156,26 @@ export function DashboardAccountingSummary({ storeId }: Props) {
     fin && {
       href: `/stores/${storeId}/finance/dashboard`,
       label: t('netThisMonth'),
-      value: fmtMoney(fin.thisMonth.net),
+      value: netKnown ? fmtMoney(fin.thisMonth.net) : t('unknown'),
       unit: '',
-      tone: netPositive ? ('success' as const) : ('danger' as const),
+      note:
+        costsStatus === 'partial'
+          ? t('netPartial', {
+              missing: fin.thisMonth.costsMissing ?? 0,
+              total: fin.thisMonth.costsTotal ?? 0,
+            })
+          : undefined,
+      tone: !netKnown
+        ? ('muted' as const)
+        : netPositive
+          ? ('success' as const)
+          : ('danger' as const),
     },
     (fin || stock) && {
       href: `/stores/${storeId}/stock/dashboard`,
       label: t('stockValue'),
-      value: fmtMoney(stock?.stockValue ?? fin?.stockValue ?? 0),
+      value:
+        !stockState || stockState.kind === 'unknown' ? t('unknown') : fmtMoney(stockState.value),
       unit: '',
       tone: 'info' as const,
     },
@@ -156,6 +198,7 @@ export function DashboardAccountingSummary({ storeId }: Props) {
     label: string;
     value: string;
     unit: string;
+    note?: string;
     tone: 'primary' | 'success' | 'danger' | 'info' | 'warning' | 'muted';
   }>;
 
@@ -187,6 +230,7 @@ export function DashboardAccountingSummary({ storeId }: Props) {
                 <span className="ms-1 text-sm font-medium text-muted-foreground">{tile.unit}</span>
               )}
             </p>
+            {tile.note && <p className="mt-1 text-sm text-muted-foreground">{tile.note}</p>}
           </Link>
         ))}
       </div>
