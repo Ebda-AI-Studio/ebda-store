@@ -20,6 +20,7 @@ vi.mock('@ebda/database', async importOriginal => ({
       updateMany: vi.fn(async () => ({ count: 0 })),
       update: vi.fn(async () => ({})),
     },
+    inventoryHistory: { createMany: vi.fn(async () => ({ count: 0 })) }, // INV-AUDIT-3 movement rows
     productVariant: {
       groupBy: vi.fn(async () => [{ productId: 'p1', _sum: { inventory: 5 } }]),
     },
@@ -74,5 +75,10 @@ describe('ProductService.bulkUpdate — a variant product is never written as si
       .mocked(prisma.product.updateMany)
       .mock.calls.map(c => (c[0] as { where: { id: { in: string[] } } }).where.id.in);
     expect(written).toEqual([['p2']]);
+    // Only the simple product's movement is recorded; the skipped variant product writes no history row.
+    const rows = vi.mocked(prisma.inventoryHistory.createMany).mock.calls.at(-1)![0] as {
+      data: Array<{ productId: string }>;
+    };
+    expect(rows.data.map(d => d.productId)).toEqual(['p2']);
   });
 });

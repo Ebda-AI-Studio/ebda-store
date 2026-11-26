@@ -181,7 +181,8 @@ export async function createVariantsForProductTx(
   tx: Prisma.TransactionClient,
   storeId: string,
   productId: string,
-  variants: VariantImportRow[]
+  variants: VariantImportRow[],
+  userId?: string | null
 ): Promise<number> {
   if (variants.length === 0) return 0;
 
@@ -206,10 +207,11 @@ export async function createVariantsForProductTx(
 
   // BARCODE-1: a re-import replaces the variants, so a row with no barcode column must keep the
   // code the variant already had (it may be on a printed label). Matched by sku, else by title.
-  const priorVariants = await tx.productVariant.findMany({
-    where: { productId, barcode: { not: null } },
-    select: { sku: true, title: true, barcode: true },
+  const priorAll = await tx.productVariant.findMany({
+    where: { productId },
+    select: { sku: true, title: true, barcode: true, inventory: true },
   });
+  const priorVariants = priorAll.filter(v => v.barcode !== null);
   const priorBarcodeBySku = new Map(
     priorVariants.filter(v => v.sku).map(v => [v.sku as string, v.barcode as string])
   );
@@ -232,6 +234,21 @@ export async function createVariantsForProductTx(
   // residual race — a bundle created between that read and this write — and
   // turns the global handler's generic "A referenced record does not exist"
   // into something that names the constraint that fired.
+  // INV-AUDIT-3: the replaced variants take their units with them; each is a movement to zero (the DO import writes the same)
+  const replaced = priorAll.filter(v => v.inventory !== 0);
+  if (replaced.length > 0)
+    await tx.inventoryHistory.createMany({
+      data: replaced.map(r => ({
+        productId,
+        storeId,
+        type: 'adjustment' as const,
+        quantity: -r.inventory,
+        previousStock: r.inventory,
+        newStock: 0,
+        reason: 'Variant replaced by bulk import',
+        createdBy: userId ?? null,
+      })),
+    });
   try {
     await tx.productVariant.deleteMany({ where: { productId } });
   } catch (err) {
@@ -340,6 +357,20 @@ export async function createVariantsForProductTx(
       ? await tx.productVariant.createManyAndReturn({ data: variantRows })
       : [];
   const variantIdByPosition = new Map(createdVariants.map(v => [v.position, v.id]));
+  const opening = createdVariants.filter(v => v.inventory !== 0);
+  if (opening.length > 0)
+    await tx.inventoryHistory.createMany({
+      data: opening.map(v => ({
+        productId,
+        storeId,
+        type: 'initial' as const,
+        quantity: v.inventory,
+        previousStock: 0,
+        newStock: v.inventory,
+        reason: 'Initial stock from bulk import',
+        createdBy: userId ?? null,
+      })),
+    });
 
   // 4) Junction rows, batched in a single createMany.
   const junctionRows: Array<{ variantId: string; valueId: string }> = [];
@@ -1428,7 +1459,7 @@ export class BulkService {
                   // Update existing product
                   const current = (await tx.product.findUnique({
                     where: { id: existing.id, storeId },
-                    select: AI_PROVENANCE_SELECT,
+                    select: { ...AI_PROVENANCE_SELECT, inventory: true },
                   })) as Record<string, unknown> | null;
                   await tx.product.update({
                     where: { id: existing.id, storeId },
@@ -1443,6 +1474,21 @@ export class BulkService {
                   });
                   productId = existing.id;
                   result.updated++;
+                  // INV-AUDIT-3: an import UPDATE that changes stock is a movement (the DO import writes the same row)
+                  const prevStock = (current?.inventory as number | undefined) ?? 0;
+                  if (prevStock !== productFields.inventory)
+                    await tx.inventoryHistory.create({
+                      data: {
+                        productId,
+                        storeId,
+                        type: 'adjustment',
+                        quantity: productFields.inventory - prevStock,
+                        previousStock: prevStock,
+                        newStock: productFields.inventory,
+                        reason: 'Stock set by bulk import',
+                        createdBy: userId ?? null,
+                      },
+                    });
 
                   // The incoming row's slug may differ from the product's current
                   // one (e.g. a re-export from a source system with a different
@@ -1560,7 +1606,8 @@ export class BulkService {
                     tx,
                     storeId,
                     productId,
-                    variantsByParent.get(parentKey)!
+                    variantsByParent.get(parentKey)!,
+                    userId
                   );
                   batchVariants += made;
                   variantsByParent.delete(parentKey); // mark consumed
@@ -1678,11 +1725,21 @@ export class BulkService {
       }
       try {
         if (money) {
-          const r = await money.importVariants({ productId: existing.id, variants });
+          const r = await money.importVariants({
+            productId: existing.id,
+            variants,
+            userId: userId ?? null,
+          });
           result.variantsCreated += r.variantsCreated;
         } else
           await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-            const made = await createVariantsForProductTx(tx, storeId, existing.id, variants);
+            const made = await createVariantsForProductTx(
+              tx,
+              storeId,
+              existing.id,
+              variants,
+              userId
+            );
             result.variantsCreated += made;
           });
       } catch (error) {
