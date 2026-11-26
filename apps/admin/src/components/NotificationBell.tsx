@@ -3,10 +3,14 @@
 import { Button } from '@/components/ui/Button';
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useRouter } from 'next/navigation';
+import { useParams, usePathname, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useLocale } from 'next-intl';
+import { useAttention } from '../hooks/useAttention';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
 import { useT } from '@/i18n/useT';
+import { TONE_CLASSES, getStatusEntry } from '@/lib/status-tones';
 
 const iconMap: Record<string, string> = {
   new_order: '🛒',
@@ -17,21 +21,20 @@ const iconMap: Record<string, string> = {
   return_status: '🔄',
 };
 
-const colorMap: Record<string, string> = {
-  new_order: 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success-ink',
-  new_review: 'bg-warning/10 text-warning-ink dark:bg-warning/30 dark:text-warning-ink',
-  new_return: 'bg-primary/10 text-primary-ink dark:bg-primary/30 dark:text-primary-ink',
-  low_stock:
-    'bg-destructive/10 text-destructive-ink dark:bg-destructive/30 dark:text-destructive-ink',
-  order_status: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink',
-  return_status: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink',
-};
-
 export function NotificationBell() {
   const t = useT('components.notificationBell');
   const router = useRouter();
   const { notifications, unreadCount, isConnected, markAsRead, markAllAsRead, clearNotifications } =
     useNotifications();
+  const params = useParams();
+  const lang: 'ar' | 'en' = useLocale() === 'ar' ? 'ar' : 'en';
+  const pathname = usePathname() ?? '';
+  const storeParam =
+    typeof params?.id === 'string' && pathname.startsWith('/stores/') ? params.id : null;
+  // Money/setup blockers come from the ONE attention feed (same source as the Settings badges and dashboard tiles).
+  const attention = useAttention(storeParam);
+  const actionItems = attention.items.filter(i => i.severity === 'action');
+  const badgeCount = unreadCount + attention.actionCount;
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -138,9 +141,9 @@ export function NotificationBell() {
         </svg>
 
         {/* Unread Badge */}
-        {unreadCount > 0 && (
+        {badgeCount > 0 && (
           <span className="absolute -top-1 -end-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-destructive rounded-full">
-            {unreadCount > 9 ? '9+' : unreadCount}
+            {badgeCount > 9 ? '9+' : badgeCount}
           </span>
         )}
 
@@ -161,7 +164,7 @@ export function NotificationBell() {
           <div
             ref={panelRef}
             style={{ position: 'fixed', top: coords.top, left: coords.left, width: coords.width }}
-            className="bg-card rounded-xl shadow-2xl border border-border z-[100] overflow-hidden"
+            className="bg-card rounded-md shadow-xl border border-border z-[100] overflow-hidden"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 bg-muted border-b border-border">
@@ -185,6 +188,32 @@ export function NotificationBell() {
                 )}
               </div>
             </div>
+
+            {/* Money + setup blockers (one source: the attention feed) */}
+            {storeParam && actionItems.length > 0 && (
+              <ul
+                aria-label={t('needsAttention')}
+                className="border-b border-border bg-warning/10"
+                data-testid="bell-attention"
+              >
+                {actionItems.map(i => (
+                  <li key={i.id}>
+                    <Link
+                      href={`/stores/${storeParam}/${i.section === 'settings' ? 'settings' : i.section}`}
+                      onClick={() => setIsOpen(false)}
+                      className="block px-4 py-3 text-sm hover:bg-warning/20"
+                    >
+                      <span className="font-medium text-foreground">{i.title[lang]}</span>
+                      {typeof i.count === 'number' && (
+                        <span className="ms-2 text-xs font-semibold text-warning-ink">
+                          {i.count}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
 
             {/* Notification List */}
             <div className="max-h-[400px] overflow-y-auto">
@@ -221,7 +250,7 @@ export function NotificationBell() {
                         {/* Icon */}
                         <div
                           className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg ${
-                            colorMap[notification.type] || 'bg-muted text-muted-foreground'
+                            TONE_CLASSES[getStatusEntry('notificationType', notification.type).tone]
                           }`}
                         >
                           {iconMap[notification.type] || '🔔'}

@@ -16,9 +16,13 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": null,
+  "helpArticle": "accept-a-team-invitation",
   "questions": {
-    "ar": ["جالي دعوة انضم لمتجر ازاي اقبلها؟", "لينك الدعوة مش شغال"],
+    "ar": [
+      "جالي دعوة انضم لمتجر ازاي اقبلها؟",
+      "لينك الدعوة مش شغال",
+      "الدعوة وصلتني على الايميل وبعد كده ايه؟"
+    ],
     "en": ["How do I accept a staff invite?"]
   },
   "steps": ["Open the emailed link, set password."],

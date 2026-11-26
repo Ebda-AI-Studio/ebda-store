@@ -12,6 +12,8 @@ import {
   netOrderRevenueMinor,
 } from './revenue-sql';
 
+import { refundedTotal } from '../services/order-refunded-total';
+
 type StoreDbClient = Awaited<ReturnType<typeof storeDb>>;
 
 export async function refundedMinorByOrder(
@@ -39,6 +41,54 @@ export async function refundedMinorByOrder(
     for (const r of retRows) out.set(r.orderId, r._sum?.refundAmount ?? 0);
     for (const p of payRows)
       out.set(p.orderId, Math.max(out.get(p.orderId) ?? 0, p._sum?.refundedAmount ?? 0));
+  }
+  return out;
+}
+
+/**
+ * Refunded piastres per order by the SAME rule as the admin payment card (`refundedTotal`, order.service getById): payment refunds + merchant partial
+ * refunds that are not on a payment row + completed non-gateway, non-exchange returns, each counted once. `refundedMinorByOrder` above takes the larger of
+ * returns and payments per order, which undercounts an order refunded through more than one channel; anything that must agree with the order page
+ * (the assistant's orders summary) uses this. Three batched reads per 500 orders, never one per order. Not capped at the order total: the caller caps.
+ */
+export async function refundedTotalByOrder(
+  db: StoreDbClient,
+  storeId: string,
+  orderIds: string[]
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  for (let i = 0; i < orderIds.length; i += 500) {
+    const ids = orderIds.slice(i, i + 500);
+    const [pays, events, returns] = await Promise.all([
+      db.payment.findMany({
+        where: { orderId: { in: ids } }, // payments carry no store_id: the ids are already this store's orders
+        select: { orderId: true, refundedAmount: true, metadata: true },
+      }),
+      db.orderEvent.findMany({
+        where: {
+          storeId,
+          orderId: { in: ids },
+          toStatus: { in: ['partial_refund_recorded', 'partial_return_restored'] },
+        },
+        select: { orderId: true, metadata: true },
+      }),
+      db.return.findMany({
+        where: { storeId, orderId: { in: ids }, status: 'completed', type: { not: 'exchange' } },
+        select: { orderId: true, refundMethod: true, refundAmount: true, type: true },
+      }),
+    ]);
+    const group = <T extends { orderId: string }>(rows: T[]) => {
+      const m = new Map<string, T[]>();
+      for (const r of rows) m.set(r.orderId, [...(m.get(r.orderId) ?? []), r]);
+      return m;
+    };
+    const p = group(pays);
+    const e = group(events);
+    const r = group(returns);
+    for (const id of ids) {
+      const total = refundedTotal(p.get(id) ?? [], e.get(id) ?? [], r.get(id) ?? []);
+      if (total > 0) out.set(id, total);
+    }
   }
   return out;
 }

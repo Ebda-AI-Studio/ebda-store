@@ -12,11 +12,15 @@ export async function generateMetadata({
 }: {
   params: Promise<{ tenant: string; locale: string }>;
 }): Promise<Metadata> {
-  const { tenant } = await params;
+  const { tenant, locale } = await params;
   const store = await getStoreByTenantParam(tenant);
+  // STORE-QA-42: title follows the locale segment of the URL.
+  const ar = locale === 'ar';
   return {
-    title: 'Categories',
-    description: 'Explore product categories and find exactly what you are looking for.',
+    title: ar ? 'الفئات' : 'Categories',
+    description: ar
+      ? 'تصفح فئات المنتجات وهات اللي بتدوّر عليه.'
+      : 'Explore product categories and find exactly what you are looking for.',
     ...(isResolvedStore(store)
       ? { alternates: await storefrontAlternates(store, '/categories', true) }
       : {}),

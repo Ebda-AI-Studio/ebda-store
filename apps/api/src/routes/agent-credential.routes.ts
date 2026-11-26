@@ -27,7 +27,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@ebda/database';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
-import { requireMfaEnrolled } from '../middleware/require-mfa';
+import { requireMfaEnrolled, requireRecentLogin } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { encryption } from '../services/encryption.service';
@@ -155,6 +155,7 @@ router.post(
   '/:id/integrations/agent-key',
   ...chain,
   rejectImpersonated, // BE:S-2 (Ruling FP-3)
+  requireRecentLogin, // TEN-4: credential-class change needs a recent sign-in
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;
@@ -204,6 +205,7 @@ router.delete(
   '/:id/integrations/agent-key',
   ...chain,
   rejectImpersonated, // BE:S-2 (Ruling FP-3)
+  requireRecentLogin, // TEN-4: credential-class change needs a recent sign-in
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;

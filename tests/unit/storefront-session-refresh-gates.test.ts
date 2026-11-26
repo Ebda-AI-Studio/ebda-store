@@ -247,7 +247,7 @@ describe('#2164 / #2157 — one evidence-free session probe per tab', () => {
     expect(sessionProbeSpent()).toBe(false);
     const result = await api.getProfile();
     expect(result.success).toBe(false);
-    expect(urls(fetchMock).filter(u => u.endsWith('/auth/me'))).toHaveLength(1);
+    expect(urls(fetchMock).filter(u => u.split('?')[0].endsWith('/auth/me'))).toHaveLength(1);
     expect(refreshes(fetchMock)).toHaveLength(1);
     expect(sessionProbeSpent()).toBe(true);
     expect(hasSessionHint()).toBe(false); // spent probe + no hint = a guest

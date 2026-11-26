@@ -22,7 +22,9 @@ import { apiGet, apiPost } from '../../lib/api';
 import { openProtectedDocument } from '../../lib/open-document';
 import { useT } from '../../i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
+import { ChangeRequestsPanel } from './_components/ChangeRequestsPanel';
 import { withNumerals } from '@ebda/shared';
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 type Tab = 'pending' | 'verified' | 'rejected' | 'revoked' | 'all';
 const TABS: Tab[] = ['pending', 'verified', 'rejected', 'revoked', 'all'];
@@ -221,6 +223,7 @@ function TaxVerificationInner() {
 
   return (
     <div className="p-4 sm:p-6">
+      <ChangeRequestsPanel />
       <div role="tablist" className="mb-4 flex flex-wrap gap-2">
         {TABS.map(k => (
           <button
@@ -283,13 +286,13 @@ function TaxVerificationInner() {
             <div className="space-y-4 text-sm">
               <dl className="grid gap-2 sm:grid-cols-2">
                 <div>
-                  <dt className="text-xs text-muted-foreground">{t('columns.trn')}</dt>
+                  <dt className="text-sm text-muted-foreground">{t('columns.trn')}</dt>
                   <dd dir="ltr" className="font-mono text-start">
                     {detail.taxRegistrationNumber ?? '—'}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-muted-foreground">{t('columns.legalName')}</dt>
+                  <dt className="text-sm text-muted-foreground">{t('columns.legalName')}</dt>
                   <dd>{detail.legalName ?? '—'}</dd>
                 </div>
               </dl>
@@ -327,7 +330,7 @@ function TaxVerificationInner() {
                     <span className="mb-1 block font-medium">{t('detail.reasonLabel')}</span>
                     <textarea
                       aria-label={t('detail.reasonLabel')}
-                      className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+                      className={TEXTAREA_CLASSES}
                       rows={3}
                       maxLength={1000}
                       value={reason}
