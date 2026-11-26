@@ -4,22 +4,9 @@
 > (the code that actually gates features at runtime). If this table and the code disagree, the code
 > wins — regenerate this doc.**
 >
-> **Last synced: 2026-09-07.** 🤖 marks an AI capability — all AI is available on every paid plan (AI-first policy).
->
-> **Prior sync 2026-07-21.** Added `bundles` (fixed-kit product bundles) — in no plan baseline,
-> same "sold as an add-on, enable per store via `StoreFeature`" shape as `agent_feed` and
-> `agent_checkout` WERE originally; both of those have since moved into every paid plan baseline
-> (AI-first policy, 2026-07-21 — see `plan-baselines.ts`), so only `bundles` stays add-on; see the "Not plan-gated" section below.
->
-> **Prior sync 2026-07-02.** Multi-currency, bank reconciliation, barcode scanning, and
-> multi-warehouse are shipped Enterprise features (not roadmap). Tax reports (XLSX export),
-> profit anomaly watch, loyalty redemption, low-stock alerts, backorders, and server-side CAPI
-> pixels are also real and confirmed against code. The 2026-06 shipping/orders/payment-lifecycle
-> work (delivery-area rates + bulk import/export, Orders-PWA CRUD, payment-received
-> alerts, auto-cancel-unpaid, variant stock totals, Stock → Scan) is **not** a new plan tier — see
-> the "Not plan-gated" section below for where each piece sits. The barcode **Scan** UI is gated by
-> the existing `inventory.barcode` Enterprise key (row already in the matrix); everything else is
-> core/platform and ungated.
+> **Last synced: 2026-11-15** (Ruling `BIZ-ALL-1`, Ahmad 2026-11-15: **the Business plan has every feature; nothing is sold
+> separately any more**). 🤖 marks an AI capability: all AI is on every paid plan (AI-first policy), covered by the plan's AI quota.
+> Older syncs (2026-09-07, 07-21, 07-02) are in git history.
 
 Plans are **layered (strict superset)**: Professional includes everything in Starter, Enterprise
 includes everything in Professional. `free` is a stripped grace/demo state, **not a sold tier**
@@ -29,47 +16,64 @@ self-serve signup and no free trial). Super-admin can override any feature per s
 
 ## Matrix
 
-| Feature (key)                                                | Free | Starter | Professional | Enterprise |
-| ------------------------------------------------------------ | :--: | :-----: | :----------: | :--------: |
-| Coupons (`coupons`)                                          |  ✅  |   ✅    |      ✅      |     ✅     |
-| Reviews (`reviews`)                                          |  ✅  |   ✅    |      ✅      |     ✅     |
-| Inventory — basic (`inventory.basic`)                        |  ✅  |   ✅    |      ✅      |     ✅     |
-| Returns (`returns`)                                          |  —   |   ✅    |      ✅      |     ✅     |
-| Tax (`tax`)                                                  |  —   |   ✅    |      ✅      |     ✅     |
-| PWA (`pwa`)                                                  |  —   |   ✅    |      ✅      |     ✅     |
-| SEO (`seo`)                                                  |  —   |   ✅    |      ✅      |     ✅     |
-| Search autocomplete (`search_autocomplete`)                  |  —   |   ✅    |      ✅      |     ✅     |
-| Marketing pixels (`marketing_pixels`)                        |  —   |   ✅    |      ✅      |     ✅     |
-| Shipping carriers (`shipping_carriers`)                      |  —   |   ✅    |      ✅      |     ✅     |
-| Bulk operations (`bulk_operations`)                          |  —   |   ✅    |      ✅      |     ✅     |
-| Abandoned cart (`abandoned_cart`)                            |  —   |   ✅    |      ✅      |     ✅     |
-| Staff accounts (`staff_accounts`)                            |  —   |   ✅    |      ✅      |     ✅     |
-| AI Product Feed (`agent_feed`) 🤖                            |  —   |   ✅    |      ✅      |     ✅     |
-| Product feeds: Google / Meta / TikTok (`product_feeds`)      |  —   |   ✅    |      ✅      |     ✅     |
-| Agentic checkout / MCP (`agent_checkout`) 🤖                 |  —   |   ✅    |      ✅      |     ✅     |
-| Upsell / cross-sell (`upsell_crosssell`) 🤖                  |  —   |   ✅    |      ✅      |     ✅     |
-| Accounting — profit anomaly (`accounting.profit_anomaly`) 🤖 |  —   |   ✅    |      ✅      |     ✅     |
-| Answer-Engine Insights (`answer_engine_insights`) 🤖         |  —   |   ✅    |      ✅      |     ✅     |
-| Inventory — stock alerts (`inventory.stock_alerts`)          |  —   |    —    |      ✅      |     ✅     |
-| Inventory — backorder (`inventory.backorder`)                |  —   |    —    |      ✅      |     ✅     |
-| Accounting — basic / CoA + journals (`accounting.basic`)     |  —   |    —    |      ✅      |     ✅     |
-| Accounting — expenses (`accounting.expenses`)                |  —   |    —    |      ✅      |     ✅     |
-| Accounting — invoicing (`accounting.invoicing`)              |  —   |    —    |      ✅      |     ✅     |
-| Loyalty (`loyalty`)                                          |  —   |    —    |      ✅      |     ✅     |
-| Push notifications (`push_notifications`)                    |  —   |    —    |      ✅      |     ✅     |
-| Inventory — multi-warehouse (`inventory.multi_warehouse`)    |  —   |    —    |      —       |     ✅     |
-| Inventory — barcode (`inventory.barcode`)                    |  —   |    —    |      —       |     ✅     |
-| Inventory — purchase orders (`inventory.purchase_orders`)    |  —   |    —    |      —       |     ✅     |
-| Inventory — bulk adjustments (`inventory.bulk_adjustments`)  |  —   |    —    |      —       |     ✅     |
-| Accounting — tax reports (`accounting.tax_reports`)          |  —   |    —    |      —       |     ✅     |
-| Accounting — multi-currency (`accounting.multi_currency`)    |  —   |    —    |      —       |     ✅     |
-| Accounting — bank reconcile (`accounting.bank_reconcile`)    |  —   |    —    |      —       |     ✅     |
-| Affiliate program (`affiliate`)                              |  —   |    —    |      —       |     ✅     |
-| SMS (`sms`)                                                  |  —   |    —    |      —       |     ✅     |
-| Floating widget (`floating_widget`)                          |  —   |    —    |      —       |     ✅     |
-| Payment-gateway abandonment capture (`payment_abandonment`)  |  —   |    —    |      —       |     ✅     |
+Generated from `PLAN_BASELINE` (`packages/shared/src/plan-baselines.ts`) over every key of `FEATURE_REGISTRY`: all 51 keys, sorted by the first plan that has them.
+`remove_branding`, `b2b.wholesale`, `merchant_mcp` and `merchant_mcp_write` are ALSO decided by the plan limits (`FeatureService.rowsToMap`: the flag wins both ways), so Growth gets branding removal and the merchant MCP through its limits even though the baseline column shows Business. The two keys marked "by design" are the only ones in no baseline (`BUSINESS_BASELINE_EXCLUSIONS`).
 
-## Not plan-gated by baseline (add-on or always-on)
+| Feature (key)                                                                  | Free | Basic (`starter`) | Growth (`professional`) | Business (`enterprise`)  |
+| ------------------------------------------------------------------------------ | :--: | :---------------: | :---------------------: | :----------------------: |
+| 3D product models + AR (`product_3d`)                                          |  ✅  |        ✅         |           ✅            |            ✅            |
+| Coupons (`coupons`)                                                            |  ✅  |        ✅         |           ✅            |            ✅            |
+| Inventory — Stock Tracking (`inventory.basic`)                                 |  ✅  |        ✅         |           ✅            |            ✅            |
+| Product Reviews (`reviews`)                                                    |  ✅  |        ✅         |           ✅            |            ✅            |
+| Abandoned Cart Recovery (`abandoned_cart`)                                     |  —   |        ✅         |           ✅            |            ✅            |
+| Accounting — Profit Anomaly Watch (`accounting.profit_anomaly`) 🤖             |  —   |        ✅         |           ✅            |            ✅            |
+| AI Agent Checkout (MCP) (`agent_checkout`) 🤖                                  |  —   |        ✅         |           ✅            |            ✅            |
+| AI Product Feed (`agent_feed`) 🤖                                              |  —   |        ✅         |           ✅            |            ✅            |
+| Answer-Engine Insights (`answer_engine_insights`) 🤖                           |  —   |        ✅         |           ✅            |            ✅            |
+| Bulk Operations (`bulk_operations`)                                            |  —   |        ✅         |           ✅            |            ✅            |
+| Marketing Pixels (`marketing_pixels`)                                          |  —   |        ✅         |           ✅            |            ✅            |
+| Product feeds: Google / Meta / TikTok (`product_feeds`)                        |  —   |        ✅         |           ✅            |            ✅            |
+| Progressive Web App (`pwa`)                                                    |  —   |        ✅         |           ✅            |            ✅            |
+| Returns & Refunds (`returns`)                                                  |  —   |        ✅         |           ✅            |            ✅            |
+| Search Autocomplete (`search_autocomplete`) (hidden)                           |  —   |        ✅         |           ✅            |            ✅            |
+| SEO Tools (`seo`) (hidden)                                                     |  —   |        ✅         |           ✅            |            ✅            |
+| Shipping Carriers (`shipping_carriers`)                                        |  —   |        ✅         |           ✅            |            ✅            |
+| Staff Accounts (`staff_accounts`)                                              |  —   |        ✅         |           ✅            |            ✅            |
+| Tax Management (`tax`)                                                         |  —   |        ✅         |           ✅            |            ✅            |
+| Upsell & Cross-sell (`upsell_crosssell`) 🤖                                    |  —   |        ✅         |           ✅            |            ✅            |
+| Accounting — Expense Tracking (`accounting.expenses`)                          |  —   |         —         |           ✅            |            ✅            |
+| Accounting — Invoicing (`accounting.invoicing`)                                |  —   |         —         |           ✅            |            ✅            |
+| Accounting — Journal + P&L (`accounting.basic`)                                |  —   |         —         |           ✅            |            ✅            |
+| Customer Wallet (`customer_wallet`)                                            |  —   |         —         |           ✅            |            ✅            |
+| Email Campaigns (`email_campaigns`)                                            |  —   |         —         |           ✅            |            ✅            |
+| Inventory — Backorder (`inventory.backorder`)                                  |  —   |         —         |           ✅            |            ✅            |
+| Inventory — Low-Stock Alerts (`inventory.stock_alerts`)                        |  —   |         —         |           ✅            |            ✅            |
+| Loyalty Program (`loyalty`)                                                    |  —   |         —         |           ✅            |            ✅            |
+| Pay with Wallet at Checkout (`customer_wallet_checkout`)                       |  —   |         —         |           ✅            |            ✅            |
+| Push Notifications (`push_notifications`)                                      |  —   |         —         |           ✅            |            ✅            |
+| Accounting — Bank Reconciliation (`accounting.bank_reconcile`)                 |  —   |         —         |            —            |            ✅            |
+| Accounting — Multi-Currency (`accounting.multi_currency`)                      |  —   |         —         |            —            |            ✅            |
+| Accounting — Tax Reports (`accounting.tax_reports`)                            |  —   |         —         |            —            |            ✅            |
+| Affiliate Program (`affiliate`)                                                |  —   |         —         |            —            |            ✅            |
+| ETA e-receipts (Egypt) (`eta_ereceipt`) (hidden)                               |  —   |         —         |            —            |            ✅            |
+| Floating Widget (`floating_widget`)                                            |  —   |         —         |            —            |            ✅            |
+| Inventory — Barcode Scanning (`inventory.barcode`)                             |  —   |         —         |            —            |            ✅            |
+| Inventory — Bulk Adjustments (`inventory.bulk_adjustments`)                    |  —   |         —         |            —            |            ✅            |
+| Inventory — Multi-Warehouse (`inventory.multi_warehouse`)                      |  —   |         —         |            —            |            ✅            |
+| Inventory — Purchase Orders (`inventory.purchase_orders`)                      |  —   |         —         |            —            |            ✅            |
+| Inventory Management (`inventory`)                                             |  —   |         —         |            —            |            ✅            |
+| Merchant MCP — write tools (`merchant_mcp_write`)                              |  —   |         —         |            —            |            ✅            |
+| Merchant MCP (store control for agents) (`merchant_mcp`)                       |  —   |         —         |            —            |            ✅            |
+| Payment-Gateway Abandonment Capture (`payment_abandonment`)                    |  —   |         —         |            —            |            ✅            |
+| Product Bundles (`bundles`)                                                    |  —   |         —         |            —            |            ✅            |
+| Remove "Powered by Ebda Store" (`remove_branding`)                             |  —   |         —         |            —            |            ✅            |
+| Smart hints (Customer Intelligence) (`customer_intelligence`)                  |  —   |         —         |            —            |            ✅            |
+| SMS Notifications (`sms`)                                                      |  —   |         —         |            —            |            ✅            |
+| Wholesale pricing (`b2b.wholesale`) (hidden)                                   |  —   |         —         |            —            |            ✅            |
+| AI Agent Checkout — open writes (no credential) (`agent_checkout_open_writes`) |  —   |         —         |            —            | — (by design, see below) |
+| WhatsApp Notifications (`whatsapp`) (hidden)                                   |  —   |         —         |            —            | — (by design, see below) |
+
+## Not plan-gated by baseline (always-on, or off by design)
 
 - **Product discount engine** (per-product percentage/fixed discount with live preview) — part of the core product editor; available from Starter up.
 - **WhatsApp** (`whatsapp`) — **OFF for every store, in NO plan baseline, `hidden: true` in the registry (Ruling `WHATSAPP-OFF-1`).** The legacy in-Store WhatsApp API bridge (admin `/whatsapp` page, WBS connection, templates, bot config, order-update sends, payment-link send, bot analytics, the `/wa-bridge/*` endpoints) was DELETED (Ruling `WA-LEGACY-1`, 2026-10-25); the separate Ebda Chat product (wa.ebda.app) replaces it through the Store contract and keeps using this key and the plan limit `whatsappAutomation`. Only a super-admin `StoreFeature` `whatsapp` override (`enabled=true`) turns it on, per store. Plain `wa.me` buttons (contact, floating widget, product share, COD confirm, "message customer", setup-guide share) never depend on it. This retires the 2026-06-09 (#94) "universal by default (managed-agency)" model.
@@ -88,10 +92,8 @@ self-serve signup and no free trial). Super-admin can override any feature per s
     PRESENTED: a lookup failure of ours (p0), a merchant integration sending a stale key from a stable
     source (p1, 3 per 16 min), a credential sweep from many sources (p1 at 10, escalating to a single
     platform p0 when 3+ stores are hit at once), and credential-less volume (info, 50).
-  - **Escape hatch:** `agent_checkout_open_writes` — in NO plan baseline, so enforcement is ON everywhere by default. A super-admin `StoreFeature` override turns it on for ONE store to drop the credential requirement there (takes effect in ≤300s, no deploy). It is the rollback lever, never the enable switch.
-- **Product Bundles** (`bundles`) — added 2026-09-06, **in no plan baseline** (Starter, Professional,
-  and Enterprise all default to disabled) — sold as an individually-priced add-on and enabled per
-  store via a `StoreFeature` override, same shape as `agent_feed`/`agent_checkout`. A fixed kit of
+  - **Escape hatch:** `agent_checkout_open_writes` — in NO plan baseline, on purpose even on Business (ON = the credential requirement is dropped, so a baseline entry would reopen the hole; Ruling `BIZ-ALL-1`), so enforcement is ON everywhere by default. A super-admin `StoreFeature` override turns it on for ONE store to drop the credential requirement there (takes effect in ≤300s, no deploy). It is the rollback lever, never the enable switch.
+- **Product Bundles** (`bundles`) — added 2026-09-06; **in the Business baseline since 2026-11-15 (Ruling `BIZ-ALL-1`; before that it was enabled per store by a `StoreFeature` override). Basic and Growth stay off.** A fixed kit of
   specific products at specific quantities, sold as one line at one price (fixed price / % off the
   component sum / fixed amount off). Availability is derived from component stock
   (`min(floor(componentStock / quantity))`) — no separate bundle stock row, so nothing is
@@ -105,8 +107,7 @@ self-serve signup and no free trial). Super-admin can override any feature per s
   sitemap fan-out and JSON-LD. (The WhatsApp DM-ordering path that used to resolve bundles was
   deleted with the legacy bridge, Ruling `WA-LEGACY-1`.) Coupons and cart promotions
   are excluded from bundle lines by design, and the storefront quotes a coupon against the loose
-  items only so the quote matches the charge. Rollout is a supervised pilot: one merchant, one real
-  order, one real return, then offer to others. Flipping the flag does not bust the 600s AI-feed
+  items only so the quote matches the charge. Flipping the flag does not bust the 600s AI-feed
   cache.
 - **Answer-Engine Insights** (`answer_engine_insights`) — added to `STARTER_CORE` on 2026-07-22 (Plan 8A, same AI-first policy as `agent_feed`), so it's on every paid plan and off on `free`. Merchant surface: `/stores/:id/answer-engine` (Marketing hub) shows per-engine (Gemini/Perplexity/OpenAI) cited counts, a week-over-week trend, and the latest per-prompt win/lose list with a "run AI citation fix" deep-link to the `bulk-ai-citation-copy` GEO sweep for every prompt the store lost. Read API (`GET /stores/:id/answer-engine/summary`) fails closed like every other feature-gated route in this codebase — `403 FEATURE_DISABLED`, not a 404. Underlying `AnswerEngineCheck` rows come from a weekly citation-scan cron (Gemini always runs on the platform key; Perplexity/OpenAI are opt-in, platform-wide-toggled, DB-config-keyed add-on engines — see `docs/ENVIRONMENT.md`). **Google Search Console ingestion (Plan 8B, added 2026-07-23) is part of this SAME feature — no separate feature key.** The same page's GSC section (`GET /stores/:id/answer-engine/gsc`, same `403 FEATURE_DISABLED` gate) surfaces a daily impressions/clicks/CTR/position trend and top queries from `GscDailyMetric` rows written by a force-managed daily ingestion cron. Dormant (zero rows, UI shows "Google Search Console not connected") until `GSC_SERVICE_ACCOUNT_JSON` is provisioned — see `docs/ENVIRONMENT.md` and `docs/runbooks/google-search-console-indexing.md`.
 
@@ -118,7 +119,7 @@ Rationale: Ebda Store is an AI-first product and AI is its only uncontested diff
 
 `accounting.profit_anomaly` moves independently of `accounting.basic`: `profit-anomaly.service.ts` reads only coupon, inventory-history, payment and store data — never journal entries — so it functions on Starter without the accounting suite.
 
-- The legacy parent `inventory` flag is **intentionally not in any baseline** — code reads the granular `inventory.*` sub-keys.
+- The legacy parent `inventory` flag is in the Business baseline only (Ruling `BIZ-ALL-1`) — code reads the granular `inventory.*` sub-keys, so it changes nothing at runtime.
 - **Delivery areas & fees** (governorate → area cascade, per-area fee, bulk xlsx/csv import + xlsx export, hide-unpriced) — **core shipping, ungated.** Part of the checkout + Settings → Shipping for every plan; not a `FeatureKey`. The legacy `ShippingZone` API stays as a fallback when a store has no area rates.
 - **Orders + Orders PWA CRUD** (status, mark-paid, payment link, refund, refresh payment/refund, bulk mark-paid, activity timeline, staff order permissions) — **core, ungated.** There is no `orders` feature key; order management is universal. Staff visibility is governed by the staff/role system, not a plan baseline. Exception: the **invoice viewer** (`/orders/:orderId/invoice`) admin page gates on **`accounting.invoicing`** (Professional+, same row already in the matrix) via `FeatureUpgradeGate` — the underlying API route itself has no plan check yet.
 - **Order payment-lifecycle alerts** ("Payment received", auto-cancel-unpaid via `AUTO_CANCEL_UNPAID_DAYS`, no-false-refund-on-unpaid-cancel) — **platform-level, ungated.** Background Inngest jobs that run for every store; tuned by env, not by plan. Note: the unpaid-online-order "Checkout abandoned" merchant push is NOT ungated — it belongs to the Enterprise `payment_abandonment` feature (`PAYMENT_ABANDON_MINUTES`), the sole such alert since the always-on "Payment pending — follow up" nudge was removed 2026-07-18.
@@ -129,8 +130,8 @@ Rationale: Ebda Store is an AI-first product and AI is its only uncontested diff
 ## Upgrade UX
 
 When a store-admin opens a feature their plan doesn't include, they see an on-brand
-**"Available on the &lt;Plan&gt; plan"** upsell page (the `FeatureUpgradeGate` component) with the
-feature's value proposition + a contact CTA — not a silent redirect. The "lowest plan that
+**"Available on the &lt;Plan&gt; plan"** page (the `FeatureUpgradeGate` component) with the
+feature's value proposition, an upgrade button and "add just this feature" (`lib/feature-add-link.ts`; the single-feature purchase flow lives in the self-service add-ons stack) — not a silent redirect. A Business store never sees a lock: if one still lands there, the feature was switched off for that store and the page offers support only. The "lowest plan that
 unlocks feature X" shown there is computed by `lowestPlanForFeature()` in `plan-baselines.ts`.
 
 ## How to regenerate

@@ -31,6 +31,7 @@ import {
   type ParsedReturn,
   type RefundRequest,
   type RefundResult,
+  type GatewayReversals,
 } from './types';
 import { hmacSha256Hex, safeEqual } from './signature';
 
@@ -147,6 +148,9 @@ export class StubBillingProvider implements BillingProvider {
         chargeId,
         ...(this.timeoutCharged ? {} : { failureReason: 'stub: declined (answer lost)' }),
         raw: { stub: true, state: 'answer_lost' },
+        // the later status lookup states what was charged, like a gateway's transaction details
+        amountMinor: req.amountMinor,
+        currency: req.currency,
       });
       throw new BillingProviderError('stub: timeout', false);
     }
@@ -162,7 +166,13 @@ export class StubBillingProvider implements BillingProvider {
         raw: { stub: true, state: 'declined' },
       };
     } else {
-      result = { status: 'succeeded', chargeId, raw: { stub: true, state: 'paid' } };
+      result = {
+        status: 'succeeded',
+        chargeId,
+        raw: { stub: true, state: 'paid' },
+        amountMinor: req.amountMinor,
+        currency: req.currency,
+      };
     }
     this.charges.set(req.idempotencyKey, result);
     return result;
@@ -174,6 +184,13 @@ export class StubBillingProvider implements BillingProvider {
     chargeId: string | null;
   }): Promise<ChargeResult | null> {
     return this.charges.get(req.idempotencyKey) ?? null;
+  }
+
+  /** Reversals the gateway "made outside Ebda", by charge id (tests set it; the reversal reconcile reads it, #837). */
+  outOfBandReversals = new Map<string, GatewayReversals>();
+
+  async listReversals(req: { chargeId: string }): Promise<GatewayReversals> {
+    return this.outOfBandReversals.get(req.chargeId) ?? { reversals: [], unknownOperations: [] };
   }
 
   async refund(req: RefundRequest): Promise<RefundResult> {

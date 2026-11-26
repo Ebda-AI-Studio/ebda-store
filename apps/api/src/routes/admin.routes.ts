@@ -32,11 +32,13 @@ import { listGrants } from '../services/billing/grants.service';
 import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
 import { searchProductIds } from '../services/product-search.service';
-import { auditLog } from '../middleware/security';
+import { auditLog, auditLogStrict } from '../middleware/security';
 import {
+  listHeldBillingWebhooks,
   listLedger,
   listSubscriptionsForAdmin,
   refundCharge,
+  resolveHeldBillingWebhook,
 } from '../services/billing/subscription-billing.service';
 import {
   listClaimsForAdmin,
@@ -633,6 +635,64 @@ router.get(
         })
         .parse(req.query);
       res.json({ success: true, data: { subscriptions: await listSubscriptionsForAdmin(q) } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * #627: subscription payments a provider reported as SUCCESSFUL that we could not match (unknown order, a different
+ * amount or currency, no amount). The merchant may have paid without being upgraded: listed here until a person resolves.
+ */
+router.get(
+  '/billing/held-webhooks',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const q = z
+        .object({
+          status: z.enum(['open', 'resolved']).default('open'),
+          limit: z.coerce.number().int().min(1).max(200).optional(),
+        })
+        .parse(req.query);
+      res.json({ success: true, data: { held: await listHeldBillingWebhooks(q) } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/billing/held-webhooks/:id/resolve',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = z.string().uuid().parse(req.params.id);
+      const { action, note } = z
+        .object({
+          action: z.enum(['credited', 'refunded', 'not_ours']),
+          note: z.string().trim().min(3).max(500),
+        })
+        .parse(req.body);
+      // the audit row is written BEFORE the resolve changes anything (strict: a failed audit refuses the resolve)
+      await resolveHeldBillingWebhook({
+        id,
+        actorId: req.user!.userId,
+        action,
+        note,
+        audit: () =>
+          auditLogStrict({
+            action: 'billing.held_webhook_resolved',
+            userId: req.user!.userId,
+            resourceType: 'billing_webhook_event',
+            resourceId: id,
+            details: { action, note },
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+          }),
+      });
+      res.json({ success: true });
     } catch (error) {
       next(error);
     }
@@ -3190,6 +3250,8 @@ router.post(
           tv: target.tokenVersion,
           // Non-standard claim — allows future guards to detect impersonation
           impersonatedBy: req.user!.userId,
+          // TEN-2: ties the token to the admin's identity session; revoking that session (or demoting the admin) kills it.
+          impSid: (req as Request & { accountsSid?: string }).accountsSid,
         },
         config.jwtSecret,
         {

@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // the customer's profile.
     try {
       const result = onMount ? await getProfileWithMountRetries() : await api.getProfile();
-      if (result.success && result.data && result.data.user.role === 'customer') {
+      if (result.success && result.data?.user && result.data.user.role === 'customer') {
         setUser(result.data.user);
       } else if (isTransientSessionAnswer(result)) {
         // A throttle, a timeout or a 5xx is not a sign-out (#1789, #2098):

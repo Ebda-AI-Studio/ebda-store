@@ -187,7 +187,8 @@ describe.skipIf(e.E2E_DB === '1')('API-HANG-1: concurrent public reads never han
       results.filter(r => r.timeouts > 0 && r.ms > budgetFor(r.timeouts)),
       summary
     ).toEqual([]);
-    void summary;
+    // eslint-disable-next-line no-console -- CI shows the measured p50/p95/max on success (Ahmad/coordinator 2026-11-16)
+    console.info(`API-HANG-1 cold reads: ${summary}`);
   }, 120_000);
   it('p95Budget: a slow runner passes a healthy batch, a serialised batch fails (arithmetic of Ruling HANG-BUDGET-RELATIVE-1)', () => {
     // #1036/45147191074: p95 3031 ms on a loaded runner; healthy batch ~ 85 x baseline, serial 200 reads ~ 190 x baseline

@@ -24,7 +24,7 @@ Use **Bulk import** to upload a CSV or XLSX file.
 
 1. Download the CSV template from the import page.
 2. Fill it in, one product per row. Variants are linked to their parent product by `parentSku`.
-3. Upload the file and click **Preview Import**. Check the table, then confirm. Nothing is saved until you confirm.
+3. Upload the file and click **Preview Import**. Check the table, then confirm. Nothing is saved until you confirm. The preview runs the same checks as the real import (missing names, a barcode that already belongs to another product, variant rows without a parent), so a row shown as ready will import. Exporting your products and importing the same file again changes nothing.
 
 Prices (`price`, `compareAtPrice`, `costPrice`) are in **Egyptian pounds, written as you would type them**: `250`, `250.5`, `250.50` or `1,250.50` (a price typed with Arabic-Indic digits is read correctly too). Use **two decimals at most**. A price with three decimals, such as `12.500`, is rejected as ambiguous because it could mean 12.5 or 12,500. Negative or non-numeric prices are rejected too, and a product row with no price is an error.
 

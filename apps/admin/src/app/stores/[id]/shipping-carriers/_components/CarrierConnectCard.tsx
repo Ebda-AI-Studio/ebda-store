@@ -11,6 +11,7 @@ import {
   type CredentialMode,
   type ProviderCatalogEntry,
 } from '@ebda/shared';
+import { ProviderLogo } from '@/components/ProviderLogo';
 import { useT } from '@/i18n/useT';
 import { Alert } from '../../../../../components/Alert';
 import { apiPost, apiPut } from '../../../../../lib/api';
@@ -256,13 +257,7 @@ export function CarrierConnectCard({ entry, config, storeId, onChanged }: Props)
     >
       {/* header */}
       <div className="flex flex-wrap items-center gap-3 p-4">
-        <div
-          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-sm font-bold text-white"
-          style={{ backgroundColor: entry.logo.color }}
-          aria-hidden="true"
-        >
-          {entry.logo.monogram}
-        </div>
+        <ProviderLogo code={entry.code} name={entry.name[locale]} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-semibold text-foreground">{entry.name[locale]}</h3>

@@ -13,6 +13,8 @@ type AssistantMode = (typeof ASSISTANT_MODES)[number];
 
 interface ModeState {
   mode: AssistantMode;
+  /** What the merchant actually gets (QA-112): the same server decision as the merchant's /assistant/status. */
+  effective?: { mode: AssistantMode; reason: string | null };
   lastChange: { by: string | null; at: string } | null;
 }
 
@@ -104,6 +106,20 @@ export function AssistantModeCard({ storeId }: { storeId: string }) {
                   })
                 : t('neverChanged')}
             </p>
+            {state.effective && state.effective.mode !== state.mode && (
+              <p
+                className="rounded-md bg-warning/10 p-2 text-sm text-warning-ink"
+                data-testid="assistant-mode-effective"
+              >
+                {state.effective.mode === 'off'
+                  ? t('effectiveOff', {
+                      reason: state.effective.reason
+                        ? t(`reasons.${state.effective.reason}`)
+                        : t('reasons.unreadable'),
+                    })
+                  : t('effectiveCapped', { mode: t(`modes.${state.effective.mode}.label`) })}
+              </p>
+            )}
             {saveError && (
               <p role="alert" className="text-sm text-destructive-ink">
                 {saveError}

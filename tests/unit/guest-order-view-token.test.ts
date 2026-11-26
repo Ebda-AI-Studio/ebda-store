@@ -187,7 +187,13 @@ describe('SEC-15 follow-ups', () => {
       'utf8'
     );
     expect(pay).toContain('maskReceiptPayerPii(receipt)');
-    expect(pay).toMatch(/requestHoldsOrderViewToken\(req, orderId\)\s*\?\s*receipt/);
+    // ONLY the view token unmasks the receipt payer; the signed status link (a forwarded bearer URL) never does (G54 review)
+    expect(pay).toMatch(
+      /requestHoldsOrderViewToken\(req, orderId\)\s*\?\s*receipt\s*:\s*maskReceiptPayerPii\(receipt\)/
+    );
+    expect(pay).toMatch(
+      /requestHoldsOrderViewToken\(req, orderId\) \|\|\s*\(await requestHoldsOrderStatusLink\(req, orderId, getOrderStoreId\)\)/
+    );
     expect(pay).toContain('receiptId: null');
     const pub = fs.readFileSync(
       path.resolve(__dirname, '../../apps/api/src/routes/public.routes.ts'),
@@ -311,6 +317,85 @@ describe('TEN-5: InstaPay receipt upload + submit need the order view token', ()
       });
       expect(r.nexted).toBe(true);
       expect(looked).toBe(false);
+    });
+  });
+
+  describe('G54 / INSTAPAY-UPLOAD-1 part b: the signed order-status link opens this order only', () => {
+    const STORE = '44444444-4444-4444-8444-444444444444';
+    const OTHER_STORE = '55555555-5555-4555-8555-555555555555';
+    const call = async (orderId: string, link: string | undefined, orderStore: string | null) => {
+      const { requireOrderAccess } = await import('@api/lib/order-view-token');
+      let status = 0;
+      let nexted = false;
+      await requireOrderAccess(
+        async () => false,
+        async () => orderStore
+      )(
+        {
+          get: (n: string) => (n.toLowerCase() === 'x-order-status-link' ? link : undefined),
+          params: { orderId },
+        },
+        {
+          status(c: number) {
+            status = c;
+            return { json: () => undefined };
+          },
+        },
+        () => {
+          nexted = true;
+        }
+      );
+      return { status, nexted };
+    };
+    const withSecret = async <T>(fn: () => Promise<T>) => {
+      const prev = process.env.ORDER_STATUS_LINK_SECRET;
+      process.env.ORDER_STATUS_LINK_SECRET = 's'.repeat(40);
+      try {
+        return await fn();
+      } finally {
+        if (prev === undefined) delete process.env.ORDER_STATUS_LINK_SECRET;
+        else process.env.ORDER_STATUS_LINK_SECRET = prev;
+      }
+    };
+
+    it("passes with this order's link on the order's own store", () =>
+      withSecret(async () => {
+        const { signOrderStatusLinkToken } = await import('@api/lib/order-status-link-token');
+        expect((await call(A, signOrderStatusLinkToken(STORE, A), STORE)).nexted).toBe(true);
+      }));
+    it("refuses another order's link, a link naming another store, a tampered link and no link", () =>
+      withSecret(async () => {
+        const { signOrderStatusLinkToken } = await import('@api/lib/order-status-link-token');
+        expect((await call(A, signOrderStatusLinkToken(STORE, B), STORE)).status).toBe(403);
+        expect((await call(A, signOrderStatusLinkToken(OTHER_STORE, A), STORE)).status).toBe(403);
+        const t = signOrderStatusLinkToken(STORE, A);
+        expect((await call(A, t.slice(0, -2) + 'xx', STORE)).status).toBe(403);
+        expect((await call(A, undefined, STORE)).status).toBe(403);
+      }));
+    it('a route that does not opt in ignores the link (the plain guard is unchanged)', () =>
+      withSecret(async () => {
+        const { requireOrderAccess } = await import('@api/lib/order-view-token');
+        const { signOrderStatusLinkToken } = await import('@api/lib/order-status-link-token');
+        let status = 0;
+        await requireOrderAccess(async () => false)(
+          {
+            get: (n: string) =>
+              n.toLowerCase() === 'x-order-status-link'
+                ? signOrderStatusLinkToken(STORE, A)
+                : undefined,
+            params: { orderId: A },
+          },
+          { status: (c: number) => ((status = c), { json: () => undefined }) },
+          () => undefined
+        );
+        expect(status).toBe(403);
+      }));
+    it('the InstaPay guard opts in with the order store lookup', () => {
+      const pay = fs.readFileSync(
+        path.resolve(__dirname, '../../apps/api/src/routes/payment.routes.ts'),
+        'utf8'
+      );
+      expect(pay).toMatch(/requireOrderAccess\(customerOwnsOrder, getOrderStoreId\)/);
     });
   });
 

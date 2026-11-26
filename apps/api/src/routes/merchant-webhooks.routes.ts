@@ -147,6 +147,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
 router.post(
   '/',
+  rejectImpersonated, // TEN-3 sweep: a webhook endpoint is an exfiltration channel
   writeLimiter,
   requireWebhooksPlan,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -215,6 +216,7 @@ router.post(
 
 router.patch(
   '/:id',
+  rejectImpersonated, // TEN-3 sweep
   writeLimiter,
   planGateUnlessDisable,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -248,18 +250,23 @@ router.patch(
   }
 );
 
-router.delete('/:id', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
-    const { id } = idParam.parse(req.params);
-    await endpointOr404(storeId, id);
-    await (await wdb(storeId)).webhookEndpoint.deleteMany({ where: { id, storeId } });
-    await audit(req, 'webhook_endpoint.deleted', id);
-    res.json({ success: true, data: { deleted: true } });
-  } catch (error) {
-    next(error);
+router.delete(
+  '/:id',
+  rejectImpersonated,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { id } = idParam.parse(req.params);
+      await endpointOr404(storeId, id);
+      await (await wdb(storeId)).webhookEndpoint.deleteMany({ where: { id, storeId } });
+      await audit(req, 'webhook_endpoint.deleted', id);
+      res.json({ success: true, data: { deleted: true } });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 router.post(
   '/:id/rotate-secret',

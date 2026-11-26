@@ -193,7 +193,11 @@ curl -sI -H 'Origin: https://ebda.app' https://media.ebda.app/platform/instapay-
 
 The CSP `connect-src` of web and admin also gains `https://media.ebda.app` (this PR).
 
-## Phase 2 (not in this PR)
+## Phase 2 status (feat/3d-viewer-phase-2, LAUNCH-SCOPE-ALL-1)
+
+Built: item 2 (`<Model3dChip>` on the 6 card render paths + the 3 adapters + listing/recommendation/wishlist payloads as `has3d`, CACHE CLASS BOUNDED-stale riding `invalidateStoreProductCaches`; the chip is a non-interactive `<span>` inside the card link whose tap opens the lazy quick view, keyboard users follow the link to the PDP), item 3 (`<Model3dQuickView>`, a Sheet over the PDP payload so `product_3d` is applied server-side), item 4 JSON-LD (`subjectOf` 3DModel GLB + optional USDZ), item 6 admin filter (`GET /products?has3d=true|false`, admin list "3D model" select). Android AR = Scene Viewer (ARCore) and iOS = Quick Look already ship in the viewer (Phase 1), hidden where unsupported; Ruling 3D-P2-AR-1: no in-page WebXR session now. Cost if wrong: Android devices without Scene Viewer lose the AR button's destination (it falls back to the product URL). NOT built: AI feed field, hotspots, Insights 3D engagement, server-side optimise job.
+
+## Phase 2 remainder (original list)
 
 1. Server-side optimisation job (see above) + self-hosted Draco/KTX2 decoders, then accept those files.
 2. "3D" chip on product cards — all 8 card render paths in one change (CLAUDE.md platform rule).

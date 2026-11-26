@@ -48,12 +48,14 @@ export default function LoginPage() {
 
   // A revoked session sends people here with ?ended=1 (and the flag): say why, calmly, once.
   const [sessionEnded, setSessionEnded] = useState(false);
+  const [stepUp, setStepUp] = useState(false);
   useEffect(() => {
     const flagged = consumeSessionEnded();
     const queried =
       typeof window !== 'undefined' &&
       new URLSearchParams(window.location.search).get('ended') === '1';
     if (flagged || queried) setSessionEnded(true);
+    if (new URLSearchParams(window.location.search).get('stepup') === '1') setStepUp(true);
   }, []);
 
   // On mount: prefill email + check box if a remembered email exists.
@@ -302,6 +304,14 @@ export default function LoginPage() {
                 className="rounded-lg border border-border bg-muted p-4 text-sm text-foreground"
               >
                 {t('sessionEnded')}
+              </div>
+            )}
+            {stepUp && !sessionEnded && !error && (
+              <div
+                role="status"
+                className="rounded-lg border border-border bg-muted p-4 text-sm text-foreground"
+              >
+                {t('stepUpRequired')}
               </div>
             )}
             {error && (

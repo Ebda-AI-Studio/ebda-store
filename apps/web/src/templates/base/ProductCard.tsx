@@ -55,6 +55,7 @@ import {
 import { cn } from '@ebda/ui';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { FactChips } from '../../components/commerce/FactChips';
+import { Model3dChip } from '../../components/commerce/Model3dChip';
 import { useRenderNow } from '../../contexts/RenderClockContext';
 import { MissingImage } from '../shared/MissingImage';
 import { CARD_GRID_SIZES } from '../../lib/image-sizes';
@@ -478,6 +479,7 @@ function MinimalProductCard({
             )}
             <SwatchDots product={product} max={5} />
             <FactChips product={product} className="mt-1" />
+            <Model3dChip product={product} className="mt-1" />
           </div>
         )}
       </Link>

@@ -5,7 +5,7 @@ import { AppError } from './error-handler';
 import { redis } from '../services/redis.service';
 import { getUserState } from '../lib/definer';
 import { getAccountState } from '../lib/identity-client';
-import { withIdentityTimeout } from '../lib/identity-timeout';
+import { withIdentityTimeout, identityFailureFields } from '../lib/identity-timeout';
 import { accountStateCached } from '../lib/identity-live-cache';
 import { needsLiveIdentity } from '../lib/auth-sensitivity';
 import logger from '../lib/logger';
@@ -47,6 +47,8 @@ export interface AuthPayload {
    * person being impersonated.
    */
   impersonatedBy?: string;
+  /** Identity-service session id of the impersonating super_admin at mint time (TEN-2): the token dies with that session. */
+  impSid?: string;
 }
 
 declare module 'express-serve-static-core' {
@@ -222,7 +224,10 @@ export async function authenticateAccounts(
       );
     }
   }
-  if (opts.live === false) return { user: accountsUser(claims), claims };
+  // ID-02: platform power is NEVER trusted from the claim alone. A `pa` token is always checked LIVE, and against the
+  // account's CURRENT role, so a demoted super admin loses it on the next request rather than when the token expires.
+  const platformAdmin = claims.pa === 'super_admin';
+  if (opts.live === false && !platformAdmin) return { user: accountsUser(claims), claims };
 
   // LIVE: ONE source for revocation + existence + status (the identity service). Postgres is not consulted.
   let revoked: boolean;
@@ -239,11 +244,14 @@ export async function authenticateAccounts(
       // when positive (lib/identity-live-cache.ts documents the NEVER-stale class and the cross-isolate residual).
       const [r, a] = await Promise.all([
         withIdentityTimeout(sessionRevoked(claims.sid), 'isRevoked'),
-        accountStateCached(
-          claims.sub,
-          () => withIdentityTimeout(getAccountState(claims.sub), 'getAccountState'),
-          v => v?.status === 'active'
-        ),
+        // A platform admin skips the shared 30 s account-state cache: a demotion made on another isolate must not be hidden by it.
+        platformAdmin
+          ? withIdentityTimeout(getAccountState(claims.sub), 'getAccountState')
+          : accountStateCached(
+              claims.sub,
+              () => withIdentityTimeout(getAccountState(claims.sub), 'getAccountState'),
+              v => v?.status === 'active'
+            ),
       ]);
       revoked = r;
       account = a;
@@ -255,7 +263,18 @@ export async function authenticateAccounts(
     if (opts.timing) opts.timing.identityMs = performance.now() - identityStart;
   } catch (err) {
     // Cannot confirm the session is alive: refuse, but as an outage (503), not as a bad credential (401 would log users out).
-    logger.error({ err: (err as Error).message }, '[auth] identity live check failed');
+    const f = identityFailureFields(err);
+    logger.error(
+      {
+        err: (err as Error).message,
+        errName: f.errName,
+        call: f.call,
+        elapsedMs: f.elapsedMs,
+        budgetMs: f.budgetMs,
+        timedOut: f.timedOut,
+      },
+      '[auth] identity live check failed'
+    );
     throw new AppError(503, 'IDENTITY_UNAVAILABLE', 'Sign-in service unavailable, try again');
   }
   if (revoked) throw new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked');
@@ -263,7 +282,35 @@ export async function authenticateAccounts(
   if (!account) throw new AppError(401, 'TOKEN_REVOKED', 'Account not found');
   if (account.status !== 'active')
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account is not active');
+  if (platformAdmin && account.role !== 'super_admin')
+    throw new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked');
   return { user: accountsUser(claims, account.role), claims };
+}
+
+/**
+ * TEN-2: an impersonation token (1 h, HS256) is only as alive as the platform admin who minted it. Asked LIVE and uncached on
+ * every request that carries one: the impersonator's identity session must not be revoked, and the account must still be an
+ * active `super_admin`. Throws AppError (401 revoked/demoted, 503 when the identity service cannot answer: fail closed).
+ */
+// pq-allow(unused-export): test seam, imported by tests/unit/session-role-lifecycle.test.ts
+export async function assertImpersonatorLive(p: {
+  impersonatedBy?: string;
+  impSid?: string;
+}): Promise<void> {
+  if (!p.impersonatedBy) return;
+  let revoked = false;
+  let account: Awaited<ReturnType<typeof getAccountState>>;
+  try {
+    [revoked, account] = await Promise.all([
+      p.impSid ? withIdentityTimeout(sessionRevoked(p.impSid), 'isRevoked') : false,
+      withIdentityTimeout(getAccountState(p.impersonatedBy), 'getAccountState'),
+    ]);
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, '[auth] impersonator live check failed');
+    throw new AppError(503, 'IDENTITY_UNAVAILABLE', 'Sign-in service unavailable, try again');
+  }
+  if (revoked || !account || account.status !== 'active' || account.role !== 'super_admin')
+    throw new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked');
 }
 
 export async function authenticate(
@@ -296,6 +343,7 @@ export async function authenticate(
       req.user = user;
       (req as any).tokenJti = claims.jti;
       (req as any).accountsSid = claims.sid;
+      (req as Request & { accountsAuthTime?: number }).accountsAuthTime = claims.authTime;
       (req as any).accountsStores = claims.stores;
       return next();
     } catch (err) {
@@ -371,6 +419,9 @@ export async function authenticate(
     if (payload.role !== 'customer' && !nonCustomerTokenAllowedForRequest(req)) {
       return next(new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token'));
     }
+
+    // TEN-2: the impersonation outlives neither the impersonator's session nor their super_admin role.
+    await assertImpersonatorLive(payload);
 
     req.user = payload;
     // Expose the jti on the request so downstream middleware (e.g. logout)
@@ -493,6 +544,9 @@ export async function optionalAuthenticate(
     // #622 / Ruling CORS-TB-1: same rule as `authenticate` — a guest, not an error.
     if (payload.role !== 'customer' && !nonCustomerTokenAllowedForRequest(req)) return next();
 
+    // TEN-2: a dead impersonator makes the token no identity at all (guest), like a revoked one.
+    await assertImpersonatorLive(payload);
+
     req.user = payload;
   } catch (err) {
     // A validly-signed token whose REVOCATION status we could not confirm
@@ -609,6 +663,24 @@ export function rejectAdminOnMerchantOrigin(req: Request, res: Response, next: N
       message: 'This endpoint is not available from this origin',
     },
   });
+}
+
+/**
+ * ID-05: `/auth/logout` is CSRF-exempt (it must work for a session that lost its token) and the session cookie is
+ * `SameSite=None`, so a page on ANY origin could force-end an identity session suite-wide. For an identity-service (admin
+ * namespace) session the request must come from a platform origin; a request with no Origin is refused only when the browser
+ * says it is cross-site (`Sec-Fetch-Site`), so server-to-server callers and old browsers keep working.
+ */
+export function isCrossSiteAdminRequest(req: Request): boolean {
+  const origin = req.headers.origin;
+  if (typeof origin === 'string' && origin !== '') {
+    return !isPlatformOrigin(origin, {
+      webUrl: config.webUrl,
+      adminUrl: config.adminUrl,
+      nodeEnv: config.nodeEnv,
+    });
+  }
+  return req.headers['sec-fetch-site'] === 'cross-site';
 }
 
 /**

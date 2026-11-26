@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { derivedSecret } from './derived-secret';
+import { verifyOrderStatusLinkToken } from './order-status-link-token';
 
 /**
  * Signed, expiring "view" token for ONE guest order (SEC-15 / M-137).
@@ -68,6 +69,30 @@ export function requestHoldsOrderViewToken(
 }
 
 /**
+ * Ruling INSTAPAY-UPLOAD-1 part b (register G54): the signed order-status link (`X-Order-Status-Link`, the token behind
+ * the COD/WhatsApp "order details" button, `order-status-link-token.ts`) also opens THIS order's InstaPay payment flow,
+ * so a guest who reopens the order from WhatsApp on another device can pay. It must name exactly this order AND the
+ * store the order belongs to (`orderStoreId`, the route's own lookup). Never throws: a missing secret, a malformed or
+ * expired token, another order or another store is simply "no". It opens instructions, upload and submit only: the receipt
+ * payer's PII stays masked for a link holder (a forwarded URL is not the shopper), only the view token unmasks it.
+ */
+export async function requestHoldsOrderStatusLink(
+  req: { get(name: string): string | undefined },
+  orderId: string,
+  orderStoreId: (orderId: string) => Promise<string | null>
+): Promise<boolean> {
+  try {
+    const raw = req.get('x-order-status-link');
+    if (!raw) return false;
+    const claim = verifyOrderStatusLinkToken(raw);
+    if (!claim || claim.orderId.toLowerCase() !== orderId.toLowerCase()) return false;
+    return (await orderStoreId(orderId)) === claim.storeId;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * TEN-5 (2026-11-12 audit) + Ruling INSTAPAY-UPLOAD-1: route guard for the guest InstaPay WRITES (`receipt` upload,
  * `submit`). The order UUID alone is not a credential (it leaks through history, screenshots, shared links). They accept the order's view token OR the SIGNED-IN customer who owns the order, so a shopper
  * who returns on another tab or device (no sessionStorage token) can still pay. `ownsOrder` is the route's own
@@ -75,7 +100,9 @@ export function requestHoldsOrderViewToken(
  * answer as no credential. The token path stays first and needs no lookup. Mount BEFORE multer.
  */
 export function requireOrderAccess(
-  ownsOrder: (customerId: string, orderId: string) => Promise<boolean>
+  ownsOrder: (customerId: string, orderId: string) => Promise<boolean>,
+  /** Set = the signed order-status link is accepted too (INSTAPAY-UPLOAD-1 part b), checked against this lookup. */
+  orderStoreId?: (orderId: string) => Promise<string | null>
 ) {
   return async (
     req: {
@@ -88,6 +115,8 @@ export function requireOrderAccess(
   ): Promise<void> => {
     const orderId = req.params.orderId ?? '';
     if (!UUID_RE.test(orderId) || requestHoldsOrderViewToken(req, orderId)) return next();
+    if (orderStoreId && (await requestHoldsOrderStatusLink(req, orderId, orderStoreId)))
+      return next();
     const customerId = req.user?.role === 'customer' ? req.user.userId : undefined;
     let owns = false;
     if (customerId) {

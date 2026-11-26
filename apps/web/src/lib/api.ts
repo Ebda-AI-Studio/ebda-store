@@ -22,7 +22,11 @@
  * authenticates via 'accessToken' with session/store headers, while the
  * admin app uses a simpler 'authToken' approach.
  */
-import { rememberOrderViewToken, readOrderViewToken } from './order-view-token';
+import {
+  rememberOrderViewToken,
+  readOrderViewToken,
+  readOrderStatusLink,
+} from './order-view-token';
 import {
   isIosWebkit,
   moveSearchToHeader,
@@ -157,6 +161,8 @@ interface Product {
   badgeLabelAr?: string | null;
   /** Merchant spec rows (fabric, karat...): PDP table, card chips, compare rows. */
   facts?: ProductFact[];
+  /** Listing/card payloads: true when the product has a 3D model (card "3D" chip). */
+  has3d?: boolean;
   /** Made-to-order business days; null/absent = ready to ship. Feeds the PDP delivers-by chip. */
   leadTimeDays?: number | null;
   /** PDP personalisation field (PersonalisationConfig); null/absent = no field. */
@@ -620,7 +626,8 @@ const SESSION_PROBE_KEY = 'authProbe';
 
 function claimSessionProbe(endpoint: string, options: RequestInit): boolean {
   if (typeof window === 'undefined') return false;
-  if (endpoint !== '/auth/me' || (options.method || 'GET').toUpperCase() !== 'GET') return false;
+  if (endpoint.split('?')[0] !== '/auth/me' || (options.method || 'GET').toUpperCase() !== 'GET')
+    return false;
   try {
     const ss = window.sessionStorage;
     if (!ss || ss.getItem(SESSION_PROBE_KEY) !== null) return false;
@@ -910,6 +917,11 @@ class ApiClient {
     )?.[1];
     const viewToken = orderId ? readOrderViewToken(orderId) : null;
     if (viewToken) headers['X-Order-View-Token'] = viewToken;
+    // G54: opened from the signed order-status link (WhatsApp button) with no view token: the link opens this order's
+    // InstaPay flow only (the API checks order + store).
+    const statusLink = orderId && !viewToken ? readOrderStatusLink(orderId) : null;
+    if (statusLink && /\/payments\/instapay\//.test(endpoint))
+      headers['X-Order-Status-Link'] = statusLink;
 
     // 45s request timeout — long enough for cold-start + complex order
     // creation, short enough to surface a real error before the user
@@ -1177,11 +1189,14 @@ class ApiClient {
   }
 
   async getProfile() {
-    const result = await this.request<{ user: User }>('/auth/me');
+    // `?probe=guest`: a request carrying NO auth cookie and no bearer is answered 200 `{ user: null }` instead of a
+    // 401 that the browser logs as a red console error on every guest visit. Any request that carries a cookie
+    // takes the normal path (401 -> refresh -> retry), so the Safari-ITP heal (#2164) is unchanged.
+    const result = await this.request<{ user: User | null }>('/auth/me?probe=guest');
     // A 200 here is the other proof a session lives in this browser — it covers
     // sessions established before the marker existed, and it re-arms one whose
-    // localStorage was cleared while the cookies survived.
-    if (result.success && result.data) {
+    // localStorage was cleared while the cookies survived. `user: null` is the guest answer, not a session.
+    if (result.success && result.data?.user) {
       markSessionEstablished();
     }
     return result;

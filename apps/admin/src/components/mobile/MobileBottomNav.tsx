@@ -6,12 +6,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { bottomNavClasses } from '../ui/tokens';
 import { useT } from '@/i18n/useT';
+import { AttentionBadge } from '../attention/AttentionBadge';
 
 interface MobileBottomNavProps {
   storeId: string;
   /** When true, the "More" tab opens the existing hamburger drawer
    *  instead of routing — caller passes its own open handler. */
   onOpenMore: () => void;
+  /** "Needs attention" counts from the shared feed: Orders tab and the More tab (settings issues). */
+  badges?: { orders?: number; more?: number };
 }
 
 interface Tab {
@@ -34,9 +37,10 @@ interface Tab {
  * The "More" tab routes back to the existing drawer rather than
  * re-implementing every page link — keeps the IA in one place.
  */
-export function MobileBottomNav({ storeId, onOpenMore }: MobileBottomNavProps) {
+export function MobileBottomNav({ storeId, onOpenMore, badges }: MobileBottomNavProps) {
   const pathname = usePathname();
   const t = useT('nav');
+  const tAttention = useT('attention');
 
   // Portal target — resolved after first client paint so SSR is safe.
   // Rendering via createPortal(…, document.body) detaches the nav from
@@ -94,15 +98,20 @@ export function MobileBottomNav({ storeId, onOpenMore }: MobileBottomNavProps) {
         const active = isActive(tab.href);
         return (
           <Link key={tab.key} href={tab.href} className={bottomNavClasses(active)}>
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
-            </svg>
+            <span className="relative">
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
+              </svg>
+              {tab.key === 'orders' && badges?.orders ? (
+                <AttentionBadge count={badges.orders} className="absolute -top-2 start-3" />
+              ) : null}
+            </span>
             <span>{t(tab.key as 'dashboard' | 'orders' | 'products')}</span>
           </Link>
         );
@@ -111,17 +120,30 @@ export function MobileBottomNav({ storeId, onOpenMore }: MobileBottomNavProps) {
         data-ui="nav"
         type="button"
         onClick={onOpenMore}
-        aria-label={t('more')}
+        aria-label={
+          badges?.more ? `${t('more')}, ${tAttention('badge', { count: badges.more })}` : t('more')
+        }
         className={bottomNavClasses(false)}
       >
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 6h16M4 12h16M4 18h16"
-          />
-        </svg>
+        <span className="relative">
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 6h16M4 12h16M4 18h16"
+            />
+          </svg>
+          {badges?.more ? (
+            <AttentionBadge count={badges.more} className="absolute -top-2 start-3" />
+          ) : null}
+        </span>
         <span>{t('more')}</span>
       </button>
     </nav>

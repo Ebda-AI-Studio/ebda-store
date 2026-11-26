@@ -1,5 +1,6 @@
 'use client';
 
+import { ProviderLogo } from '@/components/ProviderLogo';
 import { useT } from '@/i18n/useT';
 import { minorToMajor } from '@/lib/format';
 import { formatFils, type Affiliate } from './types';
@@ -90,6 +91,11 @@ export function PayoutsHistory({
             <label className="block text-sm font-medium text-muted-foreground mb-2">
               {t('fields.method')}
             </label>
+            {method === 'instapay' && (
+              <div className="mb-2">
+                <ProviderLogo code="instapay" name={t('methods.instapay')} size="sm" />
+              </div>
+            )}
             <select
               value={method}
               onChange={e => onMethodChange(e.target.value)}

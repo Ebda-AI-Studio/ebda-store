@@ -9,6 +9,22 @@
  * elsewhere; `tests/unit/no-force-branding.test.ts` guards against inherited third-party brand strings.
  */
 
+/**
+ * The studio's public profiles (Instagram, Facebook, TikTok, LinkedIn, YouTube). This file is a raw-TS entry with no imports
+ * (shared-raw-ts-entries-self-contained; the Workers test runtime and wrangler alias `@ebda/shared` as a FILE, so a subpath
+ * import cannot resolve there), so the list is mirrored from the foundation's `EBDA.social`, and
+ * tests/unit/social-from-foundation.test.tsx fails on any drift from the vendored data. WhatsApp is a contact line, not a profile.
+ */
+const SOCIAL_PROFILES: readonly { id: string; label: string; url: string }[] = [
+  { id: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/ebdaai.studio/' },
+  { id: 'facebook', label: 'Facebook', url: 'https://www.facebook.com/ebdaaistudio' },
+  { id: 'tiktok', label: 'TikTok', url: 'https://www.tiktok.com/@ebdaaistudio' },
+  { id: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/company/ebda-ai-studio/' },
+  { id: 'youtube', label: 'YouTube', url: 'https://www.youtube.com/@EbdaAIStudio' },
+];
+/** Organization JSON-LD `sameAs`: the same list, as URLs. */
+export const SOCIAL_SAME_AS: string[] = SOCIAL_PROFILES.map(a => a.url);
+
 export const BRAND = {
   name: 'Ebda AI Studio',
   nameAr: 'ابدأ ستوديو للذكاء الاصطناعي',
@@ -858,6 +874,8 @@ export function siteFooter(lang: NavLang): {
     name: string;
     mission: string;
     contacts: { id: string; label: string; value: string; href: string }[];
+    /** Official profiles, from the foundation's `EBDA.social` (never retyped here). */
+    social: { id: string; label: string; href: string; ariaLabel: string }[];
   };
   columns: SiteFooterColumn[];
   copyright: (year: number) => string;
@@ -892,6 +910,16 @@ export function siteFooter(lang: NavLang): {
           href: whatsappUrl(),
         },
       ],
+      social: SOCIAL_PROFILES.map(a => ({
+        id: a.id,
+        label: a.label,
+        href: a.url,
+        ariaLabel: L(
+          lang,
+          `ابدأ ستوديو للذكاء الاصطناعي على ${a.label}`,
+          `Ebda AI Studio on ${a.label}`
+        ),
+      })),
     },
     columns: [
       {
@@ -1054,6 +1082,14 @@ export function siteNavHtml(
   );
 }
 
+const socialHtml = (f: ReturnType<typeof siteFooter>) =>
+  `<ul class="sf-social">${f.brand.social
+    .map(
+      a =>
+        `<li><a href="${esc(a.href)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(a.ariaLabel)}">${esc(a.label)}</a></li>`
+    )
+    .join('')}</ul>`;
+
 const colHtml = (c: SiteFooterColumn) =>
   `<nav class="sf-col" aria-labelledby="sf-${c.id}"><h2 id="sf-${c.id}">${esc(c.title)}</h2><ul>${c.links
     .map(l => `<li><a href="${esc(l.href)}">${esc(l.label)}</a></li>`)
@@ -1070,7 +1106,7 @@ export function siteFooterHtml(lang: NavLang, markHtml: string, year: number): s
     .join('');
   return (
     `<footer class="site-footer band-dark sf"><div class="wrap">` +
-    `<div class="sf-grid"><div class="sf-brand"><p class="sf-name">${markHtml}<span>${esc(f.brand.name)}</span></p><p class="sf-mission">${esc(f.brand.mission)}</p><dl class="sf-contact">${contacts}</dl></div>` +
+    `<div class="sf-grid"><div class="sf-brand"><p class="sf-name">${markHtml}<span>${esc(f.brand.name)}</span></p><p class="sf-mission">${esc(f.brand.mission)}</p><dl class="sf-contact">${contacts}</dl>${socialHtml(f)}</div>` +
     f.columns.map(colHtml).join('') +
     `</div><div class="sf-bottom"><p class="muted small">${esc(f.copyright(year))}</p></div></div></footer>`
   );
@@ -1349,6 +1385,9 @@ export const SITE_FOOTER_CSS = `
 .sf-contact{margin:0;display:grid;gap:10px}
 .sf-contact dt{color:#a9b1af;font-size:.8125rem}
 .sf-contact dd{margin:0}
+.sf-social{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:4px 16px}
+.sf-social a{display:inline-block;padding:10px 0;min-height:44px;color:#f3f5f4}
+.sf-social a:hover{color:${BRAND.colors.lift}}
 .sf-col h2{font-size:.8125rem;font-weight:600;letter-spacing:.04em;color:${BRAND.colors.lift};margin:0 0 10px}
 html[lang=ar] .sf-col h2{letter-spacing:0}
 .sf-col ul{list-style:none;margin:0;padding:0;display:grid}

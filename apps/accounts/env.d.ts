@@ -29,6 +29,11 @@ export interface MailerRpc {
     } & (
       | { kind: 'factor_added'; factor: 'totp' | 'passkey' }
       | { kind: 'chat_member_added'; workspaceName: string }
+      /** ID-06: a recovery-relevant credential changed and the other sessions were signed out. */
+      | {
+          kind: 'credential_changed';
+          change: 'mfa_disabled' | 'passkey_removed' | 'phone_changed';
+        }
       | { kind: 'recovery_codes_changed' }
     )
   ): Promise<void>;

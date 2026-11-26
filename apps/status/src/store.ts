@@ -85,7 +85,7 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
       const prev = this.sql
         .exec<StateRow>(`SELECT * FROM component_state WHERE id = ?`, r.id)
         .one();
-      // Slow (8 s < t <= 15 s) is degraded, not down; only a streak of slow probes counts as a failure.
+      // Slow (8 s < t <= 15 s) is degraded, not down, and counts against the daily uptime (STATUS-PROBE-1); only a streak of slow probes opens an incident.
       const slowStreak = r.ok && r.slow ? prev.consec_slow + 1 : 0;
       if (r.ok && slowStreak >= SLOW_STREAK_FAILS) {
         r = { ...r, ok: false, error: `slow ${slowStreak} probes in a row (${r.latencyMs}ms)` };
@@ -95,7 +95,8 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
          ON CONFLICT(day, component) DO UPDATE SET checks = checks + 1, ok = ok + excluded.ok`,
         day,
         r.id,
-        r.ok ? 1 : 0
+        // STATUS-PROBE-1: an answer slower than the slow line is not an available check (a shopper feels it as down).
+        r.ok && !r.slow ? 1 : 0
       );
       const s = prev;
 

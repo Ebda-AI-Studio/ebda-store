@@ -118,7 +118,8 @@ beforeEach(() => {
   user('staff-1', 'staff');
   user('other-owner', 'store_admin');
   user('admin-who-is-staff', 'store_admin');
-  user('root-1', 'store_admin'); // profile row; the platform role comes from the token's pa claim
+  // the platform role comes from the token's pa claim, but ID-02 re-checks it LIVE against the account's current role
+  user('root-1', 'super_admin');
 });
 
 const get = async (t: string, store = STORE) =>

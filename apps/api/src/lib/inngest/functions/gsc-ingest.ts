@@ -25,6 +25,7 @@
  *
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
+import { readStorePlan } from '../../store-plan';
 import type { JobDef } from '../../jobs/types';
 import { allStoresDirectory, runInStoreCtx, withStoreDb } from '../../jobs/store-db';
 import logger from '../../logger';
@@ -261,9 +262,7 @@ export const gscIngestOnDemand: JobDef = inngest.createFunction(
     // this on-demand twin must apply the same exclusion (mirrors
     // `stock-reorder-scan.ts` / `answer-engine-citation-scan.ts`'s on-demand
     // plan gate).
-    const store = await withStoreDb(storeId, db =>
-      db.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-    );
+    const store = await withStoreDb(storeId, db => readStorePlan(db as never, storeId));
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },

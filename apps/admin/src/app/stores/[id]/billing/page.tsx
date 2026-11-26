@@ -33,6 +33,7 @@ import { useAuth } from '../../../../lib/auth';
 import { useT } from '../../../../i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
 import { DataTable } from '@/components/mobile/DataTable';
+import { ProviderLogo } from '@/components/ProviderLogo';
 import { InstapayPanel } from '../../../../components/billing/InstapayPanel';
 import { SupportLink } from '../../../../components/billing/SupportLink';
 import { InstapayReceiptForm } from '../../../../components/instapay/InstapayReceiptForm';
@@ -327,10 +328,45 @@ export default function StoreBillingPage() {
   async function switchPlan(planCode: string) {
     setBusy(planCode);
     try {
+      // Ruling G35-PRORATE-1: show what the change costs (the prorated difference) before anything is charged.
+      const { data: q, error: qe } = await apiGet<{
+        kind: 'upgrade' | 'downgrade' | 'same';
+        basis?: 'prorated' | 'full';
+        amountMinor: number;
+        remainingDays: number;
+        effectiveAt: string;
+      }>(
+        `/api/v1/stores/${storeId}/billing/change-plan/quote?planCode=${encodeURIComponent(planCode)}`
+      );
+      if (qe || !q) {
+        toastError(t('changeError'), qe?.message);
+        return;
+      }
+      const target = data?.availablePlans.find(p => p.code === planCode);
+      const chargesNow = q.kind === 'upgrade' && q.amountMinor > 0;
+      const ok = await askConfirm({
+        object: t('changePlanObject', { plan: target ? planName(target) : planCode }),
+        consequence: chargesNow
+          ? q.basis === 'full'
+            ? t('confirmUpgradeFull', {
+                amount: formatMoney(q.amountMinor, locale, { fixedDecimals: true }),
+              })
+            : t('confirmUpgradeProrated', {
+                amount: formatMoney(q.amountMinor, locale, { fixedDecimals: true }),
+                days: q.remainingDays,
+              })
+          : t('confirmChangeAtPeriodEnd', { date: fmtDate(q.effectiveAt) ?? '' }),
+        confirmLabel: chargesNow ? t('confirmUpgradeAction') : t('confirmChangeAction'),
+        tone: 'default',
+      });
+      if (!ok) return;
       const { data: d, error: e } = await apiPost<{
         mode: 'upgraded' | 'scheduled';
         status?: 'succeeded' | 'failed' | 'pending';
-      }>(`/api/v1/stores/${storeId}/billing/change-plan`, { planCode });
+      }>(`/api/v1/stores/${storeId}/billing/change-plan`, {
+        planCode,
+        expectedAmountMinor: chargesNow ? q.amountMinor : 0,
+      });
       if (e || !d) {
         toastError(t('changeError'), e?.message);
         return;
@@ -944,7 +980,10 @@ export default function StoreBillingPage() {
 
               {(instapay?.available || instapayChosen) && instapay && (
                 <div className="space-y-3 border-t pt-4">
-                  <h3 className="text-sm font-medium">{t('pay.instapay')}</h3>
+                  <h3 className="flex items-center gap-2 text-sm font-medium">
+                    <ProviderLogo code="instapay" name={t('pay.instapay')} size="sm" />
+                    {t('pay.instapay')}
+                  </h3>
                   {!instapayChosen ? (
                     <Button
                       variant="outline"

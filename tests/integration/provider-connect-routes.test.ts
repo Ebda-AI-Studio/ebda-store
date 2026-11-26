@@ -15,9 +15,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'node:crypto';
-import jwt from 'jsonwebtoken';
 import { createPrismaClient, Prisma, runWithRequestDb, type AppPrismaClient } from '@ebda/database';
-import { config } from '@api/config';
 import { inngest } from '@api/lib/inngest/client';
 import paymentSettingsRoutes from '@api/routes/payment-settings.routes';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
@@ -26,6 +24,8 @@ import { planService } from '@api/services/plan.service';
 import { redis } from '@api/services/redis.service';
 import { PaymentService } from '@api/services/payment-providers/payment.factory';
 import { getProviderEntry } from '@ebda/shared';
+import { installTestIdentity } from '@api/lib/test-identity';
+import { mintIdentityToken } from '../helpers/identity-session';
 import { KashierStub, KASHIER_STUB } from '../stubs/kashier-stub';
 import { serveStub, type ServedStub } from '../stubs/serve';
 
@@ -58,12 +58,14 @@ const asApp = <T>(fn: () => Promise<T>) =>
     beforeDisconnect: () => awaitDeferredWork(5000),
   });
 
-const token = (userId: string) =>
-  jwt.sign(
-    { userId, email: `${userId}@example.test`, role: 'store_admin', tv: 0 },
-    config.jwtSecret,
-    { expiresIn: '30m', issuer: 'ebda-api', audience: 'ebda-app' }
-  );
+// The credential routes sit behind requireRecentLogin (TEN-4): the merchant needs an identity-service token with a fresh sign-in
+// (a legacy token has no auth_time and is refused there on purpose). One identity token per store owner, minted without a DB read.
+const token = (userId: string, storeId: string) =>
+  mintIdentityToken({
+    userId,
+    email: `${userId}@example.test`,
+    stores: [{ id: storeId, role: 'owner' }],
+  });
 
 /** Long enough that the hint shows its last 4; distinctive so a leak is greppable. */
 const SECRET_KEY = `${KASHIER_STUB.secretKey}`;
@@ -93,7 +95,7 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
       data: { name: `pcr-${t}`, slug: `pcr-${t}`, ownerId: user.id, status: 'active' },
     });
     await planService.assignPlan(store.id, { planCode: 'comped' });
-    const s = { id: store.id, userId: user.id, jwt: token(user.id) };
+    const s = { id: store.id, userId: user.id, jwt: await token(user.id, store.id) };
     stores.push(s);
     return s;
   }
@@ -125,6 +127,7 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
     owner.paymentConfig.findFirstOrThrow({ where: { storeId: s.id, provider: 'kashier' } });
 
   beforeAll(async () => {
+    expect(installTestIdentity(), 'EBDA_TEST_IDENTITY_JWK + NODE_ENV=test').toBe(true);
     vi.spyOn(inngest, 'send').mockResolvedValue({ ids: [] } as never);
     owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
     stubServer = await serveStub(stub.fetch);
