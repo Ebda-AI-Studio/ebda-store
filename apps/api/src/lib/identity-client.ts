@@ -5,6 +5,7 @@
 import { cfBindings, type AccountBrief, type AccountsRpc, type AccountState } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 import { getUserState } from './definer';
+import logger from './logger';
 import { invalidateAccountState, resetLiveIdentityCache } from './identity-live-cache';
 
 let override: AccountsRpc | undefined;
@@ -30,6 +31,11 @@ async function call<T>(
     return await p;
   } catch (e) {
     if (e instanceof AppError) throw e;
+    // QA-105 diagnostics: the original error is replaced below, so record its name and the failing RPC here (no ids, no tokens).
+    logger.warn(
+      { call: String(name), errName: (e as Error)?.name ?? typeof e, err: (e as Error)?.message },
+      '[identity] RPC failed'
+    );
     throw new AppError(503, 'IDENTITY_UNAVAILABLE', 'Sign-in service unavailable, try again');
   }
 }
