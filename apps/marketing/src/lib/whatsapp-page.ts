@@ -1,4 +1,9 @@
-import { BRAND, WHATSAPP_YEARLY_MONTHS_PAID, type WhatsAppBasePackageId } from '@ebda/shared/brand';
+import {
+  BRAND,
+  WHATSAPP_YEARLY_MONTHS_PAID,
+  whatsappPackageName,
+  type WhatsAppBasePackageId,
+} from '@ebda/shared/brand';
 import { PLANS } from './plans';
 import type { Locale } from './site';
 
@@ -159,9 +164,21 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
           short: 'مضمّنة',
           tag: `لتجّار ${STORE_AR}`,
         },
-        starter: { name: 'المبتدئة', short: 'المبتدئة', tag: 'لأول فريق' },
-        growth: { name: 'النمو', short: 'النمو', tag: 'حملات وطلبات جوّه الشات' },
-        pro: { name: 'الاحترافية', short: 'الاحترافية', tag: 'ربط برمجي ودعم بالأولوية' },
+        starter: {
+          name: whatsappPackageName('starter', 'ar'),
+          short: whatsappPackageName('starter', 'ar'),
+          tag: 'لأول فريق',
+        },
+        growth: {
+          name: whatsappPackageName('growth', 'ar'),
+          short: whatsappPackageName('growth', 'ar'),
+          tag: 'حملات وطلبات جوّه الشات',
+        },
+        pro: {
+          name: whatsappPackageName('pro', 'ar'),
+          short: whatsappPackageName('pro', 'ar'),
+          tag: 'ربط برمجي ودعم بالأولوية',
+        },
       },
       cta: 'ابدأ بباقة {plan}',
       includedLabel: `مضمّنة مع ${STORE_AR} ${BIZ.ar}`,
@@ -300,11 +317,19 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
           short: 'Included',
           tag: `For ${STORE_EN} merchants`,
         },
-        starter: { name: 'Starter', short: 'Starter', tag: 'For a first team' },
-        growth: { name: 'Growth', short: 'Growth', tag: 'Campaigns and ordering in the chat' },
+        starter: {
+          name: whatsappPackageName('starter', 'en'),
+          short: whatsappPackageName('starter', 'en'),
+          tag: 'For a first team',
+        },
+        growth: {
+          name: whatsappPackageName('growth', 'en'),
+          short: whatsappPackageName('growth', 'en'),
+          tag: 'Campaigns and ordering in the chat',
+        },
         pro: {
-          name: 'Professional',
-          short: 'Professional',
+          name: whatsappPackageName('pro', 'en'),
+          short: whatsappPackageName('pro', 'en'),
           tag: 'Integrations and priority support',
         },
       },

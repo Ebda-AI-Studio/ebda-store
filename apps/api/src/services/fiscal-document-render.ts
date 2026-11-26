@@ -1,5 +1,6 @@
 import { intlLocale } from '@ebda/shared';
-import { emailMoney } from './email-templates/_util';
+import { moneyHtml } from './email-templates/_util';
+import { orderBarcodeBlock, ORDER_BARCODE_CSS } from './order-barcode';
 import type { RefundDocumentPayload, SaleDocumentPayload } from './fiscal-document.service';
 
 /**
@@ -92,12 +93,15 @@ function esc(v: unknown): string {
 export function renderFiscalDocumentHtml(
   doc: RenderableDocument,
   locale: 'ar' | 'en',
-  timeZone = 'Africa/Cairo'
+  timeZone = 'Africa/Cairo',
+  /** The store's `settings.receiptBarcodeShape` (unset = plain, `off` = none). */
+  barcodeShape?: unknown
 ): string {
   const ar = locale === 'ar';
   const l = ar ? L.ar : L.en;
-  const money = (n: number) =>
-    `<span dir="ltr">${esc(emailMoney(n, doc.currency || 'EGP', 'en'))}</span>`;
+  // The document's language, not English: Arabic prints «ج.م» (never "EGP") and a sign stays with its number in RTL.
+  const money = (n: number) => moneyHtml(n, doc.currency || 'EGP', locale);
+  const minus = (n: number) => moneyHtml(n, doc.currency || 'EGP', locale, '\u2212');
   const date = (d: Date | string | null | undefined) =>
     d
       ? new Date(d).toLocaleDateString(intlLocale(locale), {
@@ -115,8 +119,12 @@ export function renderFiscalDocumentHtml(
   const seller = p.seller;
   const rate = doc.vatRateBps != null ? ` (${doc.vatRateBps / 100}%)` : '';
 
-  const lines = Array.isArray(p.lines)
-    ? p.lines
+  // Shipping, COD fee and extra charge are totals lines, not purchased items (QA-70): no qty, no unit price.
+  const isCharge = (k: string | undefined) => k === 'shipping' || k === 'cod_fee' || k === 'extra';
+  const allLines = Array.isArray(p.lines) ? p.lines : [];
+  const lines = allLines.some(ln => !isCharge(ln.kind))
+    ? allLines
+        .filter(ln => !isCharge(ln.kind))
         .map(
           ln => `<tr><td>${esc(ar && ln.descriptionAr ? ln.descriptionAr : ln.description)}${
             (ar ? (ln.priceLabelAr ?? ln.priceLabel) : ln.priceLabel)
@@ -129,14 +137,24 @@ export function renderFiscalDocumentHtml(
         )
         .join('')
     : '';
+  const charges = allLines
+    .filter(ln => isCharge(ln.kind))
+    .map(
+      ln =>
+        `<tr><td colspan="3">${esc(ar && ln.descriptionAr ? ln.descriptionAr : ln.description)}</td><td class="n">${money(ln.amount)}</td></tr>`
+    )
+    .join('');
   const discounts = Array.isArray(p.discounts)
     ? p.discounts
         .map(
           d =>
-            `<tr><td colspan="3">${esc(l.discount)}${d.label ? ` (${esc(d.label)})` : ''}</td><td class="n">−${money(d.amount)}</td></tr>`
+            `<tr><td colspan="3">${esc(l.discount)}${d.label ? ` (${esc(d.label)})` : ''}</td><td class="n">${minus(d.amount)}</td></tr>`
         )
         .join('')
     : '';
+
+  // QA-69: the order barcode the store configured in /codes (Code 128 of the order number), as the invoice page prints it.
+  const barcode = p.orderNumber ? orderBarcodeBlock(p.orderNumber, barcodeShape) : '';
 
   return `<!DOCTYPE html>
 <html lang="${locale}" dir="${ar ? 'rtl' : 'ltr'}">
@@ -150,6 +168,7 @@ export function renderFiscalDocumentHtml(
   th,td{padding:8px 6px;border-bottom:1px solid #e2e8f0;text-align:start}
   .n{text-align:end;white-space:nowrap} .tot td{font-weight:700}
   .stamp{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);font-size:72px;font-weight:900;color:#dc2626;opacity:.08}
+  ${ORDER_BARCODE_CSS}
   @media print{body{background:#fff}.page{margin:0;border-radius:0}}
 </style></head>
 <body><div class="page">
@@ -164,11 +183,12 @@ ${p.reason ? `<p class="muted">${esc(l.reason)}: ${esc(p.reason)}</p>` : ''}
 <table>
   ${lines ? `<thead><tr><th>${esc(l.item)}</th><th class="n">${esc(l.qty)}</th><th class="n">${esc(l.unit)}</th><th class="n">${esc(l.amount)}</th></tr></thead>` : ''}
   <tbody>
-    ${lines}${discounts}
+    ${lines}${discounts}${charges}
     <tr><td colspan="3">${esc(l.net)}</td><td class="n">${money(doc.netAmount)}</td></tr>
     <tr><td colspan="3">${esc(l.vat)}${esc(rate)}</td><td class="n">${money(doc.vatAmount)}</td></tr>
-    <tr class="tot"><td colspan="3">${esc(l.total)}</td><td class="n">${doc.docType === 'credit_note' || doc.docType === 'refund_receipt' ? '−' : ''}${money(doc.totalAmount)}</td></tr>
+    <tr class="tot"><td colspan="3">${esc(l.total)}</td><td class="n">${doc.docType === 'credit_note' || doc.docType === 'refund_receipt' ? minus(doc.totalAmount) : money(doc.totalAmount)}</td></tr>
   </tbody>
 </table>
+${barcode}
 </div></body></html>`;
 }

@@ -6,32 +6,8 @@ import type { AbandonedCartConfig } from './types';
 
 import { roundToMinor } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
-interface ToggleProps {
-  checked: boolean;
-  onChange: (val: boolean) => void;
-  disabled?: boolean;
-}
-
-function Toggle({ checked, onChange, disabled }: ToggleProps) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => !disabled && onChange(!checked)}
-      disabled={disabled}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 ${
-        checked ? 'bg-primary' : 'bg-muted'
-      }`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-          checked ? 'translate-x-6 rtl:-translate-x-6' : 'translate-x-1 rtl:-translate-x-1'
-        }`}
-      />
-    </button>
-  );
-}
+import { Toggle } from '@/components/Toggle';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface StepRowProps {
   title: string;
@@ -58,7 +34,7 @@ function StepRow({
     <div className="border border-border rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-medium text-foreground">{title}</h3>
-        <Toggle checked={enabled} onChange={onEnabledChange} />
+        <Toggle checked={enabled} onChange={onEnabledChange} label={title} />
       </div>
       <div className="flex items-center gap-2">
         <label className="text-sm text-muted-foreground">{sendAfterLabel}</label>
@@ -68,7 +44,7 @@ function StepRow({
           value={delay}
           onChange={e => onDelayChange(Number(e.target.value))}
           disabled={!enabled}
-          className="w-20 px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+          className={`${FIELD_CLASSES} w-20`}
         />
         <label className="text-sm text-muted-foreground">{minutesLabel}</label>
       </div>
@@ -98,7 +74,7 @@ export function RecoveryCampaignForm({
   const t = useT('abandonedCarts.campaign');
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6">
+    <div className="bg-card rounded-md border border-border p-6">
       <h2 className="text-lg font-semibold text-foreground mb-5">{t('title')}</h2>
 
       <div className="space-y-6">
@@ -137,13 +113,14 @@ export function RecoveryCampaignForm({
               <Toggle
                 checked={config.autoCouponEnabled}
                 onChange={val => onPatch({ autoCouponEnabled: val })}
+                label={t('autoCoupon.title')}
                 disabled={!config.step3Enabled}
               />
             </div>
             {config.autoCouponEnabled && config.step3Enabled && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1">
+                  <label className="block text-sm text-muted-foreground mb-1">
                     {t('autoCoupon.discount')}
                   </label>
                   <div className="flex items-center gap-1">
@@ -153,13 +130,13 @@ export function RecoveryCampaignForm({
                       max={100}
                       value={config.couponDiscountPercent}
                       onChange={e => onPatch({ couponDiscountPercent: Number(e.target.value) })}
-                      className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                      className={FIELD_CLASSES}
                     />
                     <span className="text-sm text-muted-foreground">%</span>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1">
+                  <label className="block text-sm text-muted-foreground mb-1">
                     {t('autoCoupon.maxDiscount')}
                   </label>
                   <div className="flex items-center gap-1">
@@ -180,13 +157,13 @@ export function RecoveryCampaignForm({
                         })
                       }
                       placeholder={t('autoCoupon.noLimit')}
-                      className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                      className={FIELD_CLASSES}
                     />
                     <span className="text-sm text-muted-foreground">{t('autoCoupon.major')}</span>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1">
+                  <label className="block text-sm text-muted-foreground mb-1">
                     {t('autoCoupon.expiry')}
                   </label>
                   <div className="flex items-center gap-1">
@@ -195,7 +172,7 @@ export function RecoveryCampaignForm({
                       min={1}
                       value={config.couponExpiryHours}
                       onChange={e => onPatch({ couponExpiryHours: Number(e.target.value) })}
-                      className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                      className={FIELD_CLASSES}
                     />
                     <span className="text-sm text-muted-foreground">{t('autoCoupon.hours')}</span>
                   </div>
@@ -211,6 +188,7 @@ export function RecoveryCampaignForm({
             <Toggle
               checked={config.emailEnabled}
               onChange={val => onPatch({ emailEnabled: val })}
+              label={t('email.title')}
             />
           </div>
           <p className="text-sm text-muted-foreground mb-3">{t('email.description')}</p>
@@ -226,7 +204,7 @@ export function RecoveryCampaignForm({
               value={config.emailDelayMinutes}
               onChange={e => onPatch({ emailDelayMinutes: Number(e.target.value) })}
               disabled={!config.emailEnabled}
-              className="w-20 px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+              className={`${FIELD_CLASSES} w-20`}
             />
             <span className="text-sm text-muted-foreground">{t('email.minutes')}</span>
           </div>

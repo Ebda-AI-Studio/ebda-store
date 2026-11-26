@@ -431,7 +431,7 @@ function buildMcpSection(store: PublicStore, base: string): string {
   // surfaces appear and disappear together. If you change the credential line
   // above, change it in apps/web/src/app/.well-known/{acp.json,ucp}/route.ts
   // too — tests/unit/well-known-agent-discovery.test.ts asserts they agree.
-  const discoveryLines = `\n- Discovery (ACP): ${base}/.well-known/acp.json\n- Discovery (UCP): ${base}/.well-known/ucp`;
+  const discoveryLines = `\n- Discovery (ACP): ${base}/.well-known/acp.json\n- Discovery (UCP): ${base}/.well-known/ucp\n- Discovery (MCP server card): ${base}/.well-known/mcp/server-card.json\n- Agent skills (SKILL.md): ${base}/.well-known/agent-skills/index.json`;
   return store.enabledFeatures?.includes('agent_checkout')
     ? `\n\n${MCP_SECTION_HEADING}\n\nThis store accepts orders from AI agents via the Model Context Protocol (MCP):\n\n- MCP endpoint: ${API_URL}/mcp/${store.slug}\n- Transport: Streamable HTTP (stateless, POST only)\n- Read tools (no credential): search_products, get_product, get_store_info, view_cart, get_order_status\n${mcpWriteLine}${discoveryLines}`
     : '';
