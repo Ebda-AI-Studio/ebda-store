@@ -1,6 +1,7 @@
 import { prisma } from '@ebda/database';
 import {
   DISABLED_VARIANT_STOCK_VALUE_SQL,
+  storeStockCostCoverage,
   storeStockValueFils,
 } from '../../lib/effective-inventory-sql';
 import { storeMoney } from '../../lib/repo-factory';
@@ -10,21 +11,35 @@ import { storeMoney } from '../../lib/repo-factory';
  * Object answers from its own `products` / `product_variants` in one statement (Ruling NZ-FEAT-1); a Postgres store runs the
  * variant-aware raw SQL it always did (`storeStockValueFils` + the issue-2146 disabled-variant line).
  */
-export async function dashboardStockValues(
-  storeId: string
-): Promise<{ stockValue: number; disabledVariantStockValue: number }> {
+export async function dashboardStockValues(storeId: string): Promise<{
+  stockValue: number;
+  disabledVariantStockValue: number;
+  /** Products holding on-hand units / how many of those have no cost: the value skips the latter. */
+  stockedProducts: number;
+  uncostedProducts: number;
+}> {
   const money = await storeMoney(storeId);
   if (money) {
     const r = await money.stockValue();
-    return { stockValue: r.value, disabledVariantStockValue: r.disabledValue };
+    return {
+      stockValue: r.value,
+      disabledVariantStockValue: r.disabledValue,
+      stockedProducts: r.stockedProducts,
+      uncostedProducts: r.uncostedProducts,
+    };
   }
-  const [stockValue, disabledValueRows] = await Promise.all([
+  const [stockValue, coverage, disabledValueRows] = await Promise.all([
     storeStockValueFils(storeId),
+    storeStockCostCoverage(storeId),
     prisma.$queryRaw<{ total: bigint }[]>`
       SELECT COALESCE(SUM(${DISABLED_VARIANT_STOCK_VALUE_SQL}), 0) AS total
       FROM public.products p
       WHERE p.store_id = ${storeId} AND p.deleted_at IS NULL
     `,
   ]);
-  return { stockValue, disabledVariantStockValue: Number(disabledValueRows[0]?.total ?? 0) };
+  return {
+    stockValue,
+    disabledVariantStockValue: Number(disabledValueRows[0]?.total ?? 0),
+    ...coverage,
+  };
 }

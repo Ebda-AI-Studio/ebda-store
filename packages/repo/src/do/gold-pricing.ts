@@ -407,6 +407,13 @@ export function createGoldVariant(
           now,
         ]
       );
+      // INV-AUDIT-3: opening stock on a new variant is a movement (the product-keyed row carries the variant's before/after)
+      if ((v.inventory ?? 0) > 0)
+        db.run(
+          `INSERT INTO inventory_history (id, product_id, store_id, type, quantity, previous_stock, new_stock, reason, reference, created_at)
+           VALUES (?, ?, ?, 'initial', ?, 0, ?, 'Opening stock', ?, ?)`,
+          [crypto.randomUUID(), productId, storeId, v.inventory, v.inventory, id, now]
+        );
       for (const valueId of optionValueIds)
         db.run('INSERT INTO product_variant_options (variant_id, value_id) VALUES (?, ?)', [
           id,

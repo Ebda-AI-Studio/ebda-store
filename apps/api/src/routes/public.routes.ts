@@ -2076,6 +2076,8 @@ router.get(
             include: {
               product: {
                 include: {
+                  // Card "3D" chip (id only; wishlistCardProduct maps it to has3d).
+                  model3d: { select: { id: true } },
                   images: {
                     orderBy: { position: 'asc' },
                     take: 1,

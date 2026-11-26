@@ -78,6 +78,10 @@ export interface LowStockProduct {
 }
 
 export interface GlWindow {
+  /** unknown: no cost of goods for the period's revenue; partial: some sold lines have no cost (profit overstated). */
+  costsStatus?: 'known' | 'partial' | 'unknown';
+  costsMissing?: number;
+  costsTotal?: number;
   revenue: number;
   cogs: number;
   grossProfit: number;
@@ -86,6 +90,9 @@ export interface GlWindow {
 
 export interface StockSnapshot {
   stockValue: number;
+  /** Products holding on-hand units, and how many of those have no cost price (the value skips them). */
+  stockedProducts?: number;
+  uncostedProducts?: number;
   openBackorderCount: number;
   backorderedDemandValue: number;
   reorderRulesCount: number;
@@ -181,7 +188,6 @@ export type ChartType = 'revenue' | 'orders';
  * Amounts are stored as piastres (1 EGP = 100 piastres); `formatMoney` scales.
  */
 export function formatCurrency(amount: number): string {
-  // STORE-QA-10: follows the UI language ("4,850.00 ج.م" in ar, "EGP 4,850.00" in en), never a hard-coded 'en'.
   return formatPrice(amount);
 }
 

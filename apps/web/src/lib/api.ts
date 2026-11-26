@@ -161,6 +161,8 @@ interface Product {
   badgeLabelAr?: string | null;
   /** Merchant spec rows (fabric, karat...): PDP table, card chips, compare rows. */
   facts?: ProductFact[];
+  /** Listing/card payloads: true when the product has a 3D model (card "3D" chip). */
+  has3d?: boolean;
   /** Made-to-order business days; null/absent = ready to ship. Feeds the PDP delivers-by chip. */
   leadTimeDays?: number | null;
   /** PDP personalisation field (PersonalisationConfig); null/absent = no field. */

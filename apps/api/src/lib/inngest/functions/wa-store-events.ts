@@ -16,6 +16,7 @@ import { suiteBuyerKeySecret } from '../../wa/config';
 import { buildStoreEvent, sendStoreEvents, type StoreEventInput } from '../../wa/events';
 import { isWhatsAppLinked, hasWhatsAppLinkRow } from '../../wa/link';
 import { PLAN_CHANGED_EVENT, planChangedInput } from '../../wa/plan-state';
+import { STANDING_CHANGED_EVENT, standingInput } from '../../wa/standing-state';
 import { CATALOG_CHANGED_EVENT } from '../../wa/catalog-state';
 import { WhatsAppConsentService } from '../../wa/consent';
 import { CONSENT_CHANGED_EVENT, consentChangedInput } from '../../wa/consent-state';
@@ -493,6 +494,16 @@ export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
     await sendStoreEvents(events);
     return events.length;
   }
+  // Standing (STORE-STANDING-1, #839) goes to Ebda Chat for every store it knows (a link row), linked or not, BEFORE any
+  // active-store filter: a suspension must reach it exactly when the store stops being active. A deleted store has no link row
+  // left (it went with the store), so a deletion is always sent; Ebda Chat acknowledges one for a workspace it never registered.
+  if (event.name === STANDING_CHANGED_EVENT) {
+    const deleted = (event.data as { deleted?: boolean }).deleted === true;
+    const p = await standingInput(storeId, { deleted });
+    if (!p.deleted && !(await hasWhatsAppLinkRow(storeId))) return 0;
+    await sendStoreEvents([await buildStoreEvent(p.input, { seed: p.seed })]);
+    return 1;
+  }
   // Consent state goes to Ebda Chat for every store it knows (a link row), also when unlinked:
   // an opt-out must reach it either way.
   if (event.name === CONSENT_CHANGED_EVENT) {
@@ -538,6 +549,7 @@ export const waStoreEvents: JobDef = inngest.createFunction(
       { event: 'order/status-changed' },
       { event: 'shipment/status-updated' },
       { event: PLAN_CHANGED_EVENT },
+      { event: STANDING_CHANGED_EVENT },
       { event: 'cart/abandoned' },
       { event: 'account/erased' },
       { event: CATALOG_CHANGED_EVENT },
@@ -585,6 +597,8 @@ export const waPlanSync: JobDef = inngest.createFunction(
       let n = 0;
       for (const storeId of linked) {
         n += await emitStoreEventsFor({ name: PLAN_CHANGED_EVENT, data: { storeId } });
+        // Net under the standing observer (STORE-STANDING-1): one envelope per linked store per sweep (stamped with the read time, never deduped).
+        n += await emitStoreEventsFor({ name: STANDING_CHANGED_EVENT, data: { storeId } });
         // Once per (store, origin): the COD v2 template backfill for stores linked before it existed (Ruling WA-COD-V2-2).
         n += await announceLinkOrigin(storeId).catch(err => {
           logger.warn(

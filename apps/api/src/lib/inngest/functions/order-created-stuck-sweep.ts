@@ -4,6 +4,7 @@ import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 import { sweepStoresDb } from '../../jobs/store-db';
 import { stepRunUnlessEmpty } from '../empty-exit';
+import { logSweepRun } from '../sweep-run-log';
 
 /**
  * Stuck order-created sweep — scheduled safety net (hourly, Ruling INNGEST-BUDGET-1).
@@ -177,5 +178,6 @@ export const orderCreatedStuckSweep: JobDef = inngest.createFunction(
     // Revisit at launch, when real orders exist (docs/RULINGS.md, docs/ENVIRONMENT.md).
     triggers: [{ cron: '7 * * * *' }], // hourly, off the :00 pile-up
   },
-  async ({ step, event }) => handleOrderCreatedStuckSweep(step, event)
+  async ({ step, event }) =>
+    logSweepRun('order-created-stuck-sweep', await handleOrderCreatedStuckSweep(step, event))
 );
