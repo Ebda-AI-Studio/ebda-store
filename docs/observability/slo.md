@@ -11,6 +11,8 @@ Telegram** (`apps/api/src/services/alerts.service.ts`). Neon, Railway, Axiom and
 incidents from cold SSR. The 99.9 % storefront target below is NOT met today**; the perf work (edge redirect, render
 cost, caching) is what closes it. Until it is met, every Telegram probe alert is a real miss, not noise.
 
+**Status page reads (Ruling STATUS-SNAPSHOT-1).** The public page and JSON are served from a per-colo snapshot cache, BOUNDED-stale (<= 30 s fresh, <= 10 min while a background refresh runs); the Durable Object is no longer on the visitor's path.
+
 **Status page window (Ruling STATUS-WINDOW-1).** status.ebda.app headlines the LAST 30 DAYS per component and shows the 90-day figure beside it; `/api/status.json` has `uptime30d` next to `uptime` (90 days). The SLO tables below are measured on the 30-day figure.
 
 ## 1. api — `ebda-api` (Worker, D1 + Durable Objects)
