@@ -25,3 +25,21 @@ describe('status storefront probe', () => {
     expect(new RegExp(probe.expectBody!, 'i').test('<main data-zone="hero">')).toBe(true);
   });
 });
+
+/** Custom-domain path (availability goal, 2026-11-17): the demo stores all live on *.ebda.app, so one LIVE merchant domain is probed separately. */
+describe('status custom-domain storefront probe', () => {
+  const probe = COMPONENTS.find(c => c.id === 'storefront-custom-domain')!;
+  it('exists, is a real merchant host (not *.ebda.app) on the canonical /ar URL with the storefront body marker', () => {
+    expect(probe).toBeTruthy();
+    const u = new URL(probe.url);
+    expect(u.hostname.endsWith(BRAND.domains.storeSuffix)).toBe(false);
+    expect(u.pathname).toBe('/ar');
+    expect(probe.expectStatus).toBe(200);
+    expect(probe.expectBody).toBe('data-zone=');
+    expect(probe.product).toBe('store');
+  });
+  it('the demo-store probe above stays on *.ebda.app (a deleted merchant must not paint the demo path down)', () => {
+    const demo = COMPONENTS.find(c => c.id === 'storefront')!;
+    expect(new URL(demo.url).hostname.endsWith(BRAND.domains.storeSuffix)).toBe(true);
+  });
+});

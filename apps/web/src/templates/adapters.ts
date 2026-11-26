@@ -83,6 +83,8 @@ export function toTemplateProduct(p: Product): TemplateProduct {
     options: p.options,
     // Whitelist adapter: without this the card fact chips never render.
     facts: p.facts,
+    // Whitelist adapter: without this the card "3D" chip never renders.
+    has3d: p.has3d === true,
     // Whitelist adapter: without this the "New" badge never rendered on any card.
     createdAt: p.createdAt ?? null,
   };
@@ -112,6 +114,8 @@ export function recommendedToTemplateProduct(p: RecommendedProduct): TemplatePro
     variants: cardVariants(p.variants),
     options: p.options,
     facts: p.facts,
+    // Whitelist adapter: without this the card "3D" chip never renders.
+    has3d: p.has3d === true,
     createdAt: p.createdAt ?? null,
   };
 }
@@ -135,6 +139,7 @@ export interface WishlistCardProduct {
   variants?: Array<{ id: string; price?: number | null; compareAtPrice?: number | null }>;
   options?: TemplateProduct['options'];
   facts?: TemplateProduct['facts'];
+  has3d?: boolean;
   createdAt?: string | null;
 }
 
@@ -159,6 +164,8 @@ export function wishlistToTemplateProduct(itemId: string, p: WishlistCardProduct
     variants: cardVariants(p.variants),
     options: p.options,
     facts: p.facts,
+    // Whitelist adapter: without this the card "3D" chip never renders.
+    has3d: p.has3d === true,
     createdAt: p.createdAt ?? null,
   };
 }

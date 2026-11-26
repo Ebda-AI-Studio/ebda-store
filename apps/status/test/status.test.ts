@@ -30,6 +30,7 @@ const res = (
 
 /** Wipe all rows (Durable Object storage persists across tests in a file). */
 beforeEach(async () => {
+  await caches.default.delete('https://status.ebda.app/__snapshot');
   await runInDurableObject(stub(), (_i, state) => {
     for (const t of ['component_state', 'daily', 'incidents', 'incident_updates']) {
       state.storage.sql.exec(`DELETE FROM ${t}`);

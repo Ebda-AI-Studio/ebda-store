@@ -2,6 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import type { LoyaltySettings } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface PointEarningFormProps {
   settings: LoyaltySettings;
@@ -18,7 +19,7 @@ export function PointEarningForm({ settings, disabled, onChange }: PointEarningF
   const t = useT('loyalty.earning');
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6">
+    <div className="bg-card rounded-md border border-border p-6">
       <h2 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div>
@@ -30,7 +31,7 @@ export function PointEarningForm({ settings, disabled, onChange }: PointEarningF
             min="1"
             value={settings.pointsPerMajorUnit}
             onChange={e => onChange({ pointsPerMajorUnit: parseInt(e.target.value) || 1 })}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
             disabled={disabled}
           />
         </div>
@@ -43,7 +44,7 @@ export function PointEarningForm({ settings, disabled, onChange }: PointEarningF
             min="0"
             value={settings.signupBonus}
             onChange={e => onChange({ signupBonus: parseInt(e.target.value) || 0 })}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
             disabled={disabled}
           />
         </div>
@@ -56,7 +57,7 @@ export function PointEarningForm({ settings, disabled, onChange }: PointEarningF
             min="0"
             value={settings.referralBonus}
             onChange={e => onChange({ referralBonus: parseInt(e.target.value) || 0 })}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
             disabled={disabled}
           />
         </div>
@@ -69,7 +70,7 @@ export function PointEarningForm({ settings, disabled, onChange }: PointEarningF
             min="0"
             value={settings.reviewBonus}
             onChange={e => onChange({ reviewBonus: parseInt(e.target.value) || 0 })}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
             disabled={disabled}
           />
         </div>
@@ -82,7 +83,7 @@ export function PointEarningForm({ settings, disabled, onChange }: PointEarningF
             min="0"
             value={settings.birthdayBonus}
             onChange={e => onChange({ birthdayBonus: parseInt(e.target.value) || 0 })}
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
             disabled={disabled}
           />
         </div>
