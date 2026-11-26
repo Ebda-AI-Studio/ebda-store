@@ -215,11 +215,15 @@ describe('analyticsStock', () => {
     // p1: 3 x 100, p2: 50 x 100, p3: only the ACTIVE variant v1: 2 x 70
     expect(op('analyticsStock', {})).toEqual({
       stockValue: 300 + 5000 + 140,
+      stockedProducts: 3,
+      uncostedProducts: 0,
       backorderCount: 1,
       backorderValue: 400,
     });
     expect(op('analyticsStock', {}, 's2')).toEqual({
       stockValue: 0,
+      stockedProducts: 0,
+      uncostedProducts: 0,
       backorderCount: 0,
       backorderValue: 0,
     });
