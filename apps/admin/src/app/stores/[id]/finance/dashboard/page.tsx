@@ -1,5 +1,6 @@
 'use client';
 
+import { useLocale } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -9,7 +10,8 @@ import { apiGet, apiGetPage } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
-import { reportRangeQueryString, minorToDecimalString, withNumerals } from '@ebda/shared';
+import { reportRangeQueryString, withNumerals } from '@ebda/shared';
+import { formatPrice } from '@/lib/format';
 
 import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -62,9 +64,10 @@ interface SalesStats {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+// STORE-QA-10: the ONE admin money format (grouped, with the currency, per locale), not a bare decimal + a separate currency line.
 function major(piastres: number | null | undefined): string {
-  if (typeof piastres !== 'number' || !Number.isFinite(piastres)) return '0.00';
-  return minorToDecimalString(piastres);
+  if (typeof piastres !== 'number' || !Number.isFinite(piastres)) return formatPrice(0);
+  return formatPrice(piastres);
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -74,6 +77,7 @@ export default function FinanceDashboardPage() {
   const router = useRouter();
   const storeId = params?.id as string;
   const t = useT('finance.dashboard');
+  const adminLocale = useLocale() === 'ar' ? 'ar' : 'en';
   const tc = useT('common');
 
   const [period, setPeriod] = useState<Period>('this_month');
@@ -198,16 +202,8 @@ export default function FinanceDashboardPage() {
     {
       header: '',
       primaryOnMobile: true,
-      cell: row => (
-        <>
-          {row.nameEn}
-          {row.nameAr && (
-            <span className="text-muted-foreground ms-2 text-xs" dir="rtl">
-              — {row.nameAr}
-            </span>
-          )}
-        </>
-      ),
+      // STORE-QA-11: one name in the page language, never "English— Arabic" glued together.
+      cell: row => <>{(adminLocale === 'ar' && row.nameAr) || row.nameEn}</>,
     },
     {
       header: '',
@@ -217,15 +213,15 @@ export default function FinanceDashboardPage() {
         const isNeg = row.balance < 0;
         return (
           <span
-            className={isNeg ? 'font-mono text-red-600' : 'font-mono'}
+            className={isNeg ? 'font-mono text-destructive-ink' : 'font-mono'}
             title={isNeg ? t('negativeBalanceTooltip') : undefined}
           >
             {isNeg && (
-              <span className="inline-flex items-center me-1 px-1 py-0.5 text-xs bg-red-100 text-red-700 rounded">
+              <span className="inline-flex items-center me-1 px-1 py-0.5 text-xs bg-destructive/10 text-destructive-ink rounded-md">
                 !
               </span>
             )}
-            {major(row.balance)} {tc('egp')}
+            {major(row.balance)}
           </span>
         );
       },
@@ -258,13 +254,13 @@ export default function FinanceDashboardPage() {
             <h2 className="text-base font-semibold mb-3">{t('thisMonth')}</h2>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Revenue */}
-              <div className="rounded-xl border border-border p-4 space-y-1">
+              <div className="rounded-md border border-border p-4 space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">
                   {t('revenue')}
                 </p>
                 <p
                   className={`text-2xl font-semibold font-mono ${
-                    dashboardErr ? 'text-muted-foreground' : 'text-green-700'
+                    dashboardErr ? 'text-muted-foreground' : 'text-success-ink'
                   }`}
                   title={dashboardErr ?? undefined}
                 >
@@ -274,19 +270,17 @@ export default function FinanceDashboardPage() {
                   <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                     {t('couldntLoad')}
                   </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
-                )}
+                ) : null}
               </div>
 
               {/* Expenses */}
-              <div className="rounded-xl border border-border p-4 space-y-1">
+              <div className="rounded-md border border-border p-4 space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">
                   {t('expenses')}
                 </p>
                 <p
                   className={`text-2xl font-semibold font-mono ${
-                    dashboardErr ? 'text-muted-foreground' : 'text-red-600'
+                    dashboardErr ? 'text-muted-foreground' : 'text-destructive-ink'
                   }`}
                   title={dashboardErr ?? undefined}
                 >
@@ -296,21 +290,19 @@ export default function FinanceDashboardPage() {
                   <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                     {t('couldntLoad')}
                   </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
-                )}
+                ) : null}
               </div>
 
               {/* Net Income */}
-              <div className="rounded-xl border border-border p-4 space-y-1">
+              <div className="rounded-md border border-border p-4 space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('net')}</p>
                 <p
                   className={`text-2xl font-semibold font-mono ${
                     dashboardErr
                       ? 'text-muted-foreground'
                       : netPositive
-                        ? 'text-green-700'
-                        : 'text-red-600'
+                        ? 'text-success-ink'
+                        : 'text-destructive-ink'
                   }`}
                   title={dashboardErr ?? undefined}
                 >
@@ -327,9 +319,7 @@ export default function FinanceDashboardPage() {
                   <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                     {t('couldntLoad')}
                   </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
-                )}
+                ) : null}
               </div>
             </div>
           </section>
@@ -353,16 +343,15 @@ export default function FinanceDashboardPage() {
                 </span>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="rounded-xl border border-border p-4 space-y-1">
+                <div className="rounded-md border border-border p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
                     {t('salesOrdersRevenue')}
                   </p>
-                  <p className="text-2xl font-semibold font-mono text-green-700">
+                  <p className="text-2xl font-semibold font-mono text-success-ink">
                     {major(salesStats.totalRevenue)}
                   </p>
-                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
                 </div>
-                <div className="rounded-xl border border-border p-4 space-y-1">
+                <div className="rounded-md border border-border p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
                     {t('salesOrdersCount')}
                   </p>
@@ -379,7 +368,7 @@ export default function FinanceDashboardPage() {
             {/* Stock Value */}
             <section>
               <h2 className="text-base font-semibold mb-3">{t('stockValue')}</h2>
-              <div className="rounded-xl border border-border p-6 flex items-center justify-center">
+              <div className="rounded-md border border-border p-6 flex items-center justify-center">
                 <div className="text-center space-y-1">
                   <p
                     className={`text-3xl font-semibold font-mono ${
@@ -393,9 +382,7 @@ export default function FinanceDashboardPage() {
                     <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                       {t('couldntLoad')}
                     </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">{tc('egp')}</p>
-                  )}
+                  ) : null}
                   {!dashboardErr &&
                     disabledVariantStockValue !== null &&
                     disabledVariantStockValue > 0 && (
@@ -414,13 +401,13 @@ export default function FinanceDashboardPage() {
               <h2 className="text-base font-semibold mb-3">{t('cash')}</h2>
               {dashboardErr ? (
                 <div
-                  className="rounded-xl border border-border overflow-hidden p-4 text-sm text-muted-foreground"
+                  className="rounded-md border border-border overflow-hidden p-4 text-sm text-muted-foreground"
                   title={dashboardErr}
                 >
                   — <span className="text-xs text-destructive-ink">{t('couldntLoad')}</span>
                 </div>
               ) : cash.length === 0 ? (
-                <div className="rounded-xl border border-border overflow-hidden p-4 text-sm text-muted-foreground">
+                <div className="rounded-md border border-border overflow-hidden p-4 text-sm text-muted-foreground">
                   —
                 </div>
               ) : (
@@ -444,7 +431,7 @@ export default function FinanceDashboardPage() {
                     { labelKey: 'equity', val: balanceSheet.totalEquity },
                   ] as { labelKey: 'assets' | 'liabilities' | 'equity'; val: number }[]
                 ).map(({ labelKey, val }) => (
-                  <div key={labelKey} className="rounded-xl border border-border p-4 space-y-1">
+                  <div key={labelKey} className="rounded-md border border-border p-4 space-y-1">
                     <p className="text-xs text-muted-foreground uppercase tracking-wide">
                       {t(labelKey)}
                     </p>
@@ -460,9 +447,7 @@ export default function FinanceDashboardPage() {
                       <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                         {t('couldntLoad')}
                       </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">{tc('egp')}</p>
-                    )}
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -484,7 +469,7 @@ export default function FinanceDashboardPage() {
                   {t('viewAll')}
                 </Button>
               </div>
-              <div className="rounded-xl border border-border overflow-hidden">
+              <div className="rounded-md border border-border overflow-hidden">
                 {recentAnomalies.length === 0 ? (
                   <div className="p-4 text-sm text-muted-foreground">—</div>
                 ) : (
@@ -498,9 +483,9 @@ export default function FinanceDashboardPage() {
                         <div key={a.id} className="px-3 py-2 space-y-0.5">
                           <div className="flex items-center gap-2">
                             <span
-                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-medium ${
                                 a.severity === 'p0'
-                                  ? 'bg-red-100 text-red-700'
+                                  ? 'bg-destructive/10 text-destructive-ink'
                                   : 'bg-warning/10 text-warning-ink'
                               }`}
                             >
@@ -511,7 +496,7 @@ export default function FinanceDashboardPage() {
                             </span>
                             <span
                               className={`text-xs font-mono ms-auto ${
-                                a.deltaPercent < 0 ? 'text-red-600' : 'text-green-700'
+                                a.deltaPercent < 0 ? 'text-destructive-ink' : 'text-success-ink'
                               }`}
                             >
                               {sign}
@@ -544,7 +529,7 @@ export default function FinanceDashboardPage() {
                   {t('viewAll')}
                 </Button>
               </div>
-              <div className="rounded-xl border border-border p-6 flex items-center justify-center">
+              <div className="rounded-md border border-border p-6 flex items-center justify-center">
                 <div className="text-center space-y-1">
                   {pendingOcrCount === null ? (
                     <p className="text-sm text-muted-foreground">{tc('loading')}</p>

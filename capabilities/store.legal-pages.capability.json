@@ -22,7 +22,7 @@
   },
   "helpArticle": "store-content-faqs-pages-blog",
   "questions": {
-    "ar": ["ازاي اكتب سياسة الاسترجاع؟", "عدل صفحة الشروط"],
+    "ar": ["ازاي اكتب سياسة الاسترجاع؟", "عدل صفحة الشروط", "ينفع امسح صفحة الخصوصية؟"],
     "en": ["Edit my privacy policy"]
   },
   "steps": ["Pages > edit by slug; legal pages protected from deletion."],

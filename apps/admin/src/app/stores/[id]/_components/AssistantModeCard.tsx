@@ -13,6 +13,8 @@ type AssistantMode = (typeof ASSISTANT_MODES)[number];
 
 interface ModeState {
   mode: AssistantMode;
+  /** What the merchant actually gets (QA-112): the same server decision as the merchant's /assistant/status. */
+  effective?: { mode: AssistantMode; reason: string | null };
   lastChange: { by: string | null; at: string } | null;
 }
 
@@ -69,7 +71,7 @@ export function AssistantModeCard({ storeId }: { storeId: string }) {
   const onSave = () => (choice === 'off' ? void save() : setConfirming(true));
 
   return (
-    <div className="rounded-xl border bg-card shadow-sm" data-testid="assistant-mode-card">
+    <div className="rounded-md border bg-card shadow-sm" data-testid="assistant-mode-card">
       <div className="border-b p-4">
         <h2 className="font-semibold text-foreground">{t('title')}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{t('subtitle')}</p>
@@ -96,7 +98,7 @@ export function AssistantModeCard({ storeId }: { storeId: string }) {
             <p className="text-sm text-muted-foreground" data-testid="assistant-mode-meaning">
               {t(`modes.${choice}.meaning`)}
             </p>
-            <p className="text-xs text-muted-foreground" data-testid="assistant-mode-trail">
+            <p className="text-sm text-muted-foreground" data-testid="assistant-mode-trail">
               {state.lastChange
                 ? t('lastChanged', {
                     by: state.lastChange.by ?? t('unknownActor'),
@@ -104,6 +106,20 @@ export function AssistantModeCard({ storeId }: { storeId: string }) {
                   })
                 : t('neverChanged')}
             </p>
+            {state.effective && state.effective.mode !== state.mode && (
+              <p
+                className="rounded-md bg-warning/10 p-2 text-sm text-warning-ink"
+                data-testid="assistant-mode-effective"
+              >
+                {state.effective.mode === 'off'
+                  ? t('effectiveOff', {
+                      reason: state.effective.reason
+                        ? t(`reasons.${state.effective.reason}`)
+                        : t('reasons.unreadable'),
+                    })
+                  : t('effectiveCapped', { mode: t(`modes.${state.effective.mode}.label`) })}
+              </p>
+            )}
             {saveError && (
               <p role="alert" className="text-sm text-destructive-ink">
                 {saveError}
