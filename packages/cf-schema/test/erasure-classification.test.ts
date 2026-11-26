@@ -14,6 +14,8 @@ type Entry = {
   subjectColumns?: string[];
   actorScrub?: Record<string, string | null>;
   retainedUserIds?: Record<string, string>;
+  pseudonymiseColumns?: string[];
+  scrubOnErasure?: string[];
 };
 const cls = readJson<Record<string, Entry>>('erasure-classification.json');
 const DBS = { 'store-do': openDb('store'), d1: openDb('platform') } as const;
@@ -85,7 +87,7 @@ describe('erasure classification', () => {
     expect(missing).toEqual([]);
   });
 
-  it('every user-id column is accounted for exactly once: actorScrub, subjectColumns or retainedUserIds', () => {
+  it('every user-id column is accounted for exactly once: actorScrub, subjectColumns, pseudonymiseColumns or retainedUserIds', () => {
     const problems: string[] = [];
     for (const [id, e] of Object.entries(cls)) {
       const table = id.split(':')[1];
@@ -98,12 +100,15 @@ describe('erasure classification', () => {
         actorScrub: Object.keys(e.actorScrub ?? {}),
         subjectColumns: e.subjectColumns ?? [],
         retainedUserIds: Object.keys(e.retainedUserIds ?? {}),
+        pseudonymiseColumns: e.pseudonymiseColumns ?? [],
       };
       const all = Object.values(groups).flat();
       if ([...new Set(all)].length !== all.length)
         problems.push(`${id}: a column is in two groups`);
       if (JSON.stringify([...all].sort()) !== JSON.stringify([...(e.userIdColumns ?? [])].sort()))
-        problems.push(`${id}: userIdColumns != actorScrub + subjectColumns + retainedUserIds`);
+        problems.push(
+          `${id}: userIdColumns != actorScrub + subjectColumns + retainedUserIds + pseudonymiseColumns`
+        );
       for (const c of userCols)
         if (!(e.userIdColumns ?? []).includes(c)) problems.push(`${id}.${c}: not in userIdColumns`);
       for (const [c, rep] of Object.entries(e.actorScrub ?? {})) {

@@ -140,6 +140,7 @@ describe('platform D1: user export + erasure covers every personal table', () =>
     const reach = new Set<string>([
       ...Object.keys(plan.subject),
       ...Object.keys(plan.actor),
+      ...Object.keys(plan.pseudonymise),
       INVITE_TABLE,
     ]);
     const unreached = personal.filter(t => !reach.has(t) && !(t in USER_ALLOWLIST));
@@ -183,6 +184,71 @@ describe('platform D1: user export + erasure covers every personal table', () =>
       await erasePlatformSubject(d1, { userId: U, email: null }); // idempotent
     }
   );
+
+  // NZ-N27B: consent evidence outlives the person: the user id becomes a pseudonym and the personal columns NULL, the row stays.
+  const evidenceTables = Object.entries(plan.pseudonymise);
+  it('the plan names both consent-evidence tables (a plan that lost them would pass the loops below)', () => {
+    expect(evidenceTables.map(([t]) => t).sort()).toEqual([
+      'legal_acceptances',
+      'legal_notice_deliveries',
+    ]);
+  });
+  it.each(evidenceTables)(
+    'evidence table %s: exported, user id pseudonymised, personal columns NULL, row + bystander kept',
+    async (table, p) => {
+      const db = openPlatform();
+      const d1 = d1Of(db);
+      const filled = Object.fromEntries(p.scrub.map(c => [c, 'personal-value']));
+      for (const [i, who] of [U, B].entries())
+        insert(db, table, {
+          ...Object.fromEntries(p.userColumns.map(c => [c, who])),
+          doc_key: `d${i}`,
+          version: 'v1',
+          ...filled,
+        });
+      const exp = await exportPlatformSubject(d1, { userId: U, email: null });
+      expect(exp[table]).toHaveLength(1);
+      expect(JSON.stringify(exp[table])).not.toContain(B);
+      await erasePlatformSubject(
+        d1,
+        { userId: U, email: null },
+        Date.now(),
+        platformPlan(),
+        'erased:fixed-test'
+      );
+      expect(count(db, table, `"${p.userColumns[0]}" = ?`, U)).toBe(0);
+      expect(count(db, table, `"${p.userColumns[0]}" = ?`, 'erased:fixed-test')).toBe(1); // the row is KEPT, under the pseudonym
+      expect(count(db, table, `"${p.userColumns[0]}" = ?`, B)).toBe(1);
+      for (const c of p.scrub) {
+        expect(
+          count(db, table, `"${c}" IS NULL AND "${p.userColumns[0]}" = ?`, 'erased:fixed-test')
+        ).toBe(1);
+        expect(count(db, table, `"${c}" = 'personal-value'`)).toBe(1); // only the bystander still holds a value
+      }
+      expect(count(db, table, '1 = 1')).toBe(2);
+      expect(await countPlatformSubject(d1, { userId: U, email: null })).toBe(0);
+      await erasePlatformSubject(d1, { userId: U, email: null }); // idempotent: nothing left to match
+      expect(count(db, table, '1 = 1')).toBe(2);
+    }
+  );
+  it('a random pseudonym is used by default and is per erasure, not the user id', async () => {
+    const db = openPlatform();
+    const d1 = d1Of(db);
+    insert(db, 'legal_acceptances', {
+      user_id: U,
+      doc_key: 'terms',
+      version: 'v1',
+      ip: '1.2.3.4',
+      user_agent: 'UA',
+    });
+    await erasePlatformSubject(d1, { userId: U, email: null });
+    const r = db
+      .prepare('SELECT user_id, ip, user_agent, doc_key, version FROM legal_acceptances')
+      .get() as Record<string, unknown>;
+    expect(String(r.user_id)).toMatch(/^erased:[0-9a-f-]{36}$/);
+    expect(String(r.user_id)).not.toContain(U);
+    expect([r.ip, r.user_agent, r.doc_key, r.version]).toEqual([null, null, 'terms', 'v1']);
+  });
 
   const actorTables = Object.entries(plan.actor);
   it.each(actorTables)(

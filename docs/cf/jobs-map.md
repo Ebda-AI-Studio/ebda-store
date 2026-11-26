@@ -39,6 +39,7 @@ Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of tr
 | `audit-log-archive-weekly`                 | 2-housekeeping  | queue    | cron    | yes         |
 | `bulk-import-orphan-cleanup`               | 2-housekeeping  | queue    | cron    | yes         |
 | `domain-claim-sweep`                       | 2-housekeeping  | queue    | cron    |             |
+| `legal-evidence-retention`                 | 2-housekeeping  | queue    | cron    |             |
 | `instapay-receipt-retention-daily`         | 2-housekeeping  | queue    | cron    |             |
 | `order-anonymize-5y-monthly`               | 2-housekeeping  | queue    | cron    |             |
 | `r2-orphan-sweep`                          | 2-housekeeping  | queue    | cron    |             |

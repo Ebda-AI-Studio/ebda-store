@@ -38,6 +38,8 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   'contact-form-send',
   // custom-domain claims live on the `stores` row and at the domain provider
   'domain-claim-sweep',
+  // consent evidence retention: platform D1 rows only (NULL ip/user-agent after 12 months, delete after 7 years; Ruling NZ-N27B)
+  'legal-evidence-retention',
   // Customer Intelligence daily aggregation: reads the platform's R2 envelopes, writes the platform `CiInsight` (D1) rows, lists stores from the directory; opens no store-do table (Ruling INTEG-1)
   'ci-aggregation-daily',
   // expired uploads in the private bucket only (R2 listing + delete); opens no store table (Ruling INTEG-1)

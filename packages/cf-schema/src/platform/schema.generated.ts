@@ -5,6 +5,7 @@
 import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const aiUsage = sqliteTable('ai_usage', {
   id: text('id')
     .primaryKey()
@@ -24,6 +25,7 @@ export const aiUsage = sqliteTable('ai_usage', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const answerEngineProviderConfigs = sqliteTable('answer_engine_provider_configs', {
   id: text('id')
     .primaryKey()
@@ -37,6 +39,7 @@ export const answerEngineProviderConfigs = sqliteTable('answer_engine_provider_c
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const billingEvents = sqliteTable('billing_events', {
   id: text('id')
     .primaryKey()
@@ -82,6 +85,7 @@ export const billingEvents = sqliteTable('billing_events', {
   etaRejectionReason: text('eta_rejection_reason'),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const billingGrants = sqliteTable('billing_grants', {
   id: text('id')
     .primaryKey()
@@ -107,6 +111,7 @@ export const billingGrants = sqliteTable('billing_grants', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const billingReferrals = sqliteTable('billing_referrals', {
   referredStoreId: text('referred_store_id').primaryKey().notNull(),
   referrerStoreId: text('referrer_store_id').notNull(),
@@ -115,6 +120,7 @@ export const billingReferrals = sqliteTable('billing_referrals', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const billingReminders = sqliteTable('billing_reminders', {
   id: text('id')
     .primaryKey()
@@ -129,6 +135,7 @@ export const billingReminders = sqliteTable('billing_reminders', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const billingWebhookEvents = sqliteTable('billing_webhook_events', {
   id: text('id')
     .primaryKey()
@@ -144,6 +151,7 @@ export const billingWebhookEvents = sqliteTable('billing_webhook_events', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const ciInsights = sqliteTable('ci_insights', {
   id: text('id')
     .primaryKey()
@@ -164,6 +172,7 @@ export const ciInsights = sqliteTable('ci_insights', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const entityIndex = sqliteTable(
   'entity_index',
   {
@@ -189,6 +198,7 @@ export const entityIndex = sqliteTable(
   t => [primaryKey({ columns: [t.kind, t.id] })]
 );
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const instapayReceipts = sqliteTable('instapay_receipts', {
   id: text('id')
     .primaryKey()
@@ -237,6 +247,7 @@ export const instapayReceipts = sqliteTable('instapay_receipts', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const legalAcceptances = sqliteTable('legal_acceptances', {
   id: text('id')
     .primaryKey()
@@ -253,6 +264,7 @@ export const legalAcceptances = sqliteTable('legal_acceptances', {
   source: text('source').notNull(),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const legalNoticeDeliveries = sqliteTable('legal_notice_deliveries', {
   id: text('id')
     .primaryKey()
@@ -271,6 +283,7 @@ export const legalNoticeDeliveries = sqliteTable('legal_notice_deliveries', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const legalNoticeSends = sqliteTable('legal_notice_sends', {
   id: text('id')
     .primaryKey()
@@ -285,6 +298,7 @@ export const legalNoticeSends = sqliteTable('legal_notice_sends', {
   recipientCount: integer('recipient_count'),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const manualPaymentClaims = sqliteTable('manual_payment_claims', {
   id: text('id')
     .primaryKey()
@@ -312,6 +326,7 @@ export const manualPaymentClaims = sqliteTable('manual_payment_claims', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const merchantApiKeys = sqliteTable('merchant_api_keys', {
   id: text('id')
     .primaryKey()
@@ -334,6 +349,7 @@ export const merchantApiKeys = sqliteTable('merchant_api_keys', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const onesignalSubscriptions = sqliteTable('onesignal_subscriptions', {
   id: text('id')
     .primaryKey()
@@ -350,6 +366,7 @@ export const onesignalSubscriptions = sqliteTable('onesignal_subscriptions', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const plans = sqliteTable('plans', {
   id: text('id')
     .primaryKey()
@@ -374,6 +391,7 @@ export const plans = sqliteTable('plans', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const platformAuditLog = sqliteTable('platform_audit_log', {
   id: text('id')
     .primaryKey()
@@ -390,6 +408,7 @@ export const platformAuditLog = sqliteTable('platform_audit_log', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const providerActivationRequests = sqliteTable('provider_activation_requests', {
   id: text('id')
     .primaryKey()
@@ -413,6 +432,7 @@ export const providerActivationRequests = sqliteTable('provider_activation_reque
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const providerVerificationEvents = sqliteTable('provider_verification_events', {
   id: text('id')
     .primaryKey()
@@ -431,6 +451,7 @@ export const providerVerificationEvents = sqliteTable('provider_verification_eve
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const providerVerifications = sqliteTable('provider_verifications', {
   provider: text('provider').primaryKey().notNull(),
   kind: text('kind').notNull(),
@@ -447,6 +468,7 @@ export const providerVerifications = sqliteTable('provider_verifications', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const SlugRedirect = sqliteTable('SlugRedirect', {
   id: text('id')
     .primaryKey()
@@ -464,6 +486,7 @@ export const SlugRedirect = sqliteTable('SlugRedirect', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const staffInvites = sqliteTable('staff_invites', {
   id: text('id')
     .primaryKey()
@@ -482,6 +505,7 @@ export const staffInvites = sqliteTable('staff_invites', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const storeFeatures = sqliteTable('store_features', {
   id: text('id')
     .primaryKey()
@@ -497,6 +521,7 @@ export const storeFeatures = sqliteTable('store_features', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const storeLifecycleEmails = sqliteTable('store_lifecycle_emails', {
   id: text('id')
     .primaryKey()
@@ -511,6 +536,7 @@ export const storeLifecycleEmails = sqliteTable('store_lifecycle_emails', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const storeStaff = sqliteTable('store_staff', {
   id: text('id')
     .primaryKey()
@@ -523,6 +549,7 @@ export const storeStaff = sqliteTable('store_staff', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const storeSubscriptions = sqliteTable('store_subscriptions', {
   id: text('id')
     .primaryKey()
@@ -563,6 +590,7 @@ export const storeSubscriptions = sqliteTable('store_subscriptions', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const storeUsageSnapshots = sqliteTable('store_usage_snapshots', {
   id: text('id')
     .primaryKey()
@@ -592,6 +620,7 @@ export const storeUsageSnapshots = sqliteTable('store_usage_snapshots', {
   aiUnpricedCalls: integer('ai_unpriced_calls').notNull().default(0),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const stores = sqliteTable('stores', {
   id: text('id')
     .primaryKey()
@@ -655,6 +684,7 @@ export const stores = sqliteTable('stores', {
   templateOriginal: text('template_original'),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const systemSettings = sqliteTable('system_settings', {
   id: text('id')
     .primaryKey()
@@ -672,6 +702,7 @@ export const systemSettings = sqliteTable('system_settings', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const trustRequests = sqliteTable('trust_requests', {
   id: text('id')
     .primaryKey()
@@ -698,6 +729,7 @@ export const trustRequests = sqliteTable('trust_requests', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+// pq-allow(unused-export): generated table definition, consumed as schema data
 export const webhookEvents = sqliteTable('webhook_events', {
   id: text('id')
     .primaryKey()
