@@ -21,13 +21,20 @@ await runSearchCheck({
       expect: '/en/whatsapp/templates-and-the-24-hour-window/',
     },
   ],
-  // Header box, no submit: ONE Arabic letter already lists articles (the index is per locale).
+  // Header box, no submit: ONE Arabic letter already lists articles (the index is per locale). A one-letter prefix has no
+  // 'right' article: its first hit is whatever scores best (the Chat wallet guide since the Chat guides were imported);
+  // the targeted query below ('دومين') is what pins custom-domain.
   typeahead: [
-    { page: '/', q: 'د', expect: '/custom-domain/' },
+    { page: '/', q: 'د', expect: '/whatsapp/wallet-top-ups-and-refunds/' },
     { page: '/', q: 'دومين', expect: '/custom-domain/' },
     { page: '/en/', q: 'insta', expect: '/en/instapay/' },
     { page: '/en/', q: 'shopify', expect: '/en/products-and-csv-import/' },
-    { page: '/no-such-page/', q: 'د', expect: '/custom-domain/', status: 404 },
+    {
+      page: '/no-such-page/',
+      q: 'د',
+      expect: '/whatsapp/wallet-top-ups-and-refunds/',
+      status: 404,
+    },
     { page: '/en/no-such-page/', q: 'insta', expect: '/en/instapay/', status: 404 },
   ],
 });
