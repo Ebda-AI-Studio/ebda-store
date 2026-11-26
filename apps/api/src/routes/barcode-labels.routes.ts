@@ -90,6 +90,8 @@ type PickerItem = {
   id: string;
   kind: 'product' | 'variant';
   productId: string;
+  /** Storefront slug: the label QR links to /q/p/<slug>. */
+  productSlug: string;
   name: string;
   nameAr: string | null;
   variantTitle: string | null;
@@ -141,6 +143,7 @@ router.get(
         },
         select: {
           id: true,
+          slug: true,
           name: true,
           nameAr: true,
           price: true,
@@ -162,6 +165,7 @@ router.get(
               id: v.id,
               kind: 'variant',
               productId: p.id,
+              productSlug: p.slug,
               name: p.name,
               nameAr: p.nameAr,
               variantTitle: v.title,
@@ -174,6 +178,7 @@ router.get(
                 id: p.id,
                 kind: 'product',
                 productId: p.id,
+                productSlug: p.slug,
                 name: p.name,
                 nameAr: p.nameAr,
                 variantTitle: null,

@@ -17,7 +17,8 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { USDZExporter } from 'three/examples/jsm/exporters/USDZExporter.js';
 import type { ActiveModel3dLook } from '@ebda/shared';
-import { arPlatform, sceneViewerIntent, type ArPlatform } from './ar';
+import { arPlatform, sceneViewerIntent, showDesktopQr, type ArPlatform } from './ar';
+import { ArDesktopQr, type ArDesktopQrLabels } from './ArDesktopQr';
 
 export type ArSource = 'usdz' | 'generated' | 'scene-viewer';
 
@@ -26,6 +27,8 @@ export interface ProductModelViewerLabels {
   error: string;
   hint: string;
   ar: string;
+  /** Copy for the desktop QR; omit and a desktop shopper sees no AR entry (admin preview). */
+  arDesktop?: ArDesktopQrLabels;
 }
 
 export interface ProductModelViewerProps {
@@ -431,6 +434,16 @@ export const ProductModelViewer = forwardRef<ProductModelViewerHandle, ProductMo
       // Scene Viewer fetches the file itself: a blob: preview cannot go there.
       !(platform === 'android' && !/^https:\/\//.test(src));
 
+    const desktopQr =
+      state === 'ready' &&
+      !!labels.arDesktop &&
+      showDesktopQr({
+        platform,
+        arEnabled: !!ar?.enabled,
+        src,
+        pageUrl: ar?.fallbackUrl ?? '',
+      });
+
     return (
       <div className={`relative h-full w-full ${className}`}>
         <div ref={hostRef} className="absolute inset-0" />
@@ -487,6 +500,9 @@ export const ProductModelViewer = forwardRef<ProductModelViewerHandle, ProductMo
             </svg>
             {labels.ar}
           </button>
+        )}
+        {desktopQr && labels.arDesktop && ar && (
+          <ArDesktopQr url={ar.fallbackUrl} labels={labels.arDesktop} />
         )}
       </div>
     );

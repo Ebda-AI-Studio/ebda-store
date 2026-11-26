@@ -168,6 +168,63 @@ describe('returnCreate', () => {
   });
 });
 
+describe('returnCreate: a GUEST return (Ruling GUEST-RET-1 / GUEST-RETURN-MARKER-1)', () => {
+  it('creates the return for a guest order (`guest:<orderId>` marker), only for a guest order, and money does not move', () => {
+    const f = fixture();
+    f.x(`UPDATE orders SET customer_id = NULL`);
+    const guest = (customerId?: string) =>
+      f.op('returnCreate', {
+        orderId: 'o1',
+        ...(customerId ? { customerId } : { guest: true }),
+        type: 'return',
+        reason: 'changed my mind',
+        items: [{ orderItemId: 'i1', productId: 'p1', productName: 'Tee', quantity: 1 }],
+      }).returnId as string;
+    const id = guest();
+    expect(f.ret(id)).toMatchObject({
+      status: 'pending',
+      refund_amount: 10000,
+      customer_id: 'guest:o1',
+    });
+    // a request is no refund: no ledger line, no wallet row, no claim
+    expect(f.ret(id).refunded_at).toBeNull();
+    expect(f.one('SELECT count(*) n FROM wallet_transactions').n).toBe(0);
+    // a named customer does not match a guest order
+    expect(refusal(() => guest('cust')).code).toBe('INVALID_ORDER');
+  });
+  it('a customer order is not reachable as a guest order', () => {
+    const f = fixture(); // o1 belongs to 'cust'
+    expect(
+      refusal(() =>
+        f.op('returnCreate', {
+          orderId: 'o1',
+          guest: true,
+          type: 'return',
+          reason: 'x',
+          items: [{ orderItemId: 'i1', productId: 'p1', productName: 'Tee', quantity: 1 }],
+        })
+      ).code
+    ).toBe('INVALID_ORDER');
+  });
+  it('a guest return cannot be completed to store credit (no wallet to credit)', () => {
+    const f = fixture();
+    f.x(`UPDATE orders SET customer_id = NULL`);
+    const id = f.op('returnCreate', {
+      orderId: 'o1',
+      guest: true,
+      type: 'return',
+      reason: 'x',
+      items: [{ orderItemId: 'i1', productId: 'p1', productName: 'Tee', quantity: 1 }],
+    }).returnId as string;
+    f.toReceived(id);
+    expect(
+      refusal(() =>
+        f.op('returnClaim', { returnId: id, refundMethod: 'store_credit', walletFeature: true })
+      ).code
+    ).toBe('GUEST_STORE_CREDIT');
+  });
+});
+
 describe('complete: claim, finish, release', () => {
   it('a double claim is RETURN_ALREADY_COMPLETING, a sibling is RETURN_ORDER_BUSY, release re-opens it', () => {
     const f = fixture();
