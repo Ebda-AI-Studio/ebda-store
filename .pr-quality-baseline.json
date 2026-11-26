@@ -1474,7 +1474,6 @@
     "unused-export|apps/api/src/services/cart-email-optin.service.ts|RestoreResult",
     "unused-export|apps/api/src/services/cart-recovery-email.service.ts|CART_RECOVERY_EMAIL_EVENT",
     "unused-export|apps/api/src/services/cart-recovery-email.service.ts|DeliverOutcome",
-    "unused-export|apps/api/src/services/cart-recovery-email.service.ts|cartEmailDailyCap",
     "unused-export|apps/api/src/services/cart-recovery-email.service.ts|cartEmailDueAt",
     "unused-export|apps/api/src/services/cart-recovery-email.service.ts|renderCartRecoveryEmail",
     "unused-export|apps/api/src/services/cart.service.ts|resolveLineNote",
