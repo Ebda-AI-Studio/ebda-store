@@ -121,6 +121,8 @@ const SKIP = [
 const ALLOW: Record<string, string> = {
   'apps/web/src/templates/shared/icons.tsx':
     "Instagram's official logo gradient (#FB8A2E stop): a third-party brand mark, not Ebda chrome",
+  'apps/admin/public/provider-logos/geidea.svg':
+    "Geidea's official logo (#FF4D00): a third-party brand mark shown unaltered, not Ebda chrome",
   'apps/admin/src/app/stores/[id]/branding/_components/types.ts':
     "COLOR_PRESETS: the merchant's own swatch choices (an orange option a merchant may pick), not a default",
   'apps/api/src/lib/ai/eval/fixtures/golden/store-content.ts':

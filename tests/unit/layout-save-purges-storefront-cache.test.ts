@@ -44,7 +44,7 @@ vi.mock('@api/services/r2-cleanup.service', () => ({
 vi.mock('@api/services/redis.service', () => ({ redis: { set: vi.fn(), get: vi.fn() } }));
 vi.mock('@api/services/store.service', () => ({ bustStoreCaches: m.bustStoreCaches }));
 // The legacy PUT also records a published builder revision (visual builder
-// Phase 1); that path has its own integration test (tests/integration/page-builder.test.ts).
+// Phase 1); that path has its own integration test (apps/api/workers-test/page-builder.test.ts).
 vi.mock('@api/services/page-builder.service', () => ({
   publishLegacyLayout: vi.fn().mockResolvedValue('ok'),
 }));

@@ -67,7 +67,8 @@ export function refundableBalance(
   const manualReturn = n(
     db.all(
       `SELECT COALESCE(SUM(refund_amount), 0) AS s FROM returns
-        WHERE store_id = ?1 AND order_id = ?2 AND status = 'completed' AND refund_method IN (?3, ?4, ?5)`,
+        WHERE store_id = ?1 AND order_id = ?2 AND status = 'completed' AND type <> 'exchange'
+          AND refund_method IN (?3, ?4, ?5)`,
       [storeId, orderId, ...MANUAL_RETURN_METHODS]
     )[0]?.s
   );

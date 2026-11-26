@@ -22,9 +22,11 @@ import logger from '../lib/logger';
 import { sendAlert } from '../services/alerts.service';
 import { cfBindings } from './bindings';
 import { doStoreIdList } from '../lib/store-backend';
+import { withSweepScope } from '../lib/sweep-scope';
 import { runBackupSweep, type SweepEnv } from './ops/backup-sweep';
 import { allJobCronStrings, runScheduledJobs } from '../lib/jobs/schedule';
 import { syncStoreSchedules } from '../lib/jobs/store-schedule';
+import { runRequestBudgetAlert } from '../lib/request-budget-alert';
 import { runEntityIndexHealthCron } from '../lib/entity-index-health';
 import { reconcileStoreDirectory } from '../lib/store-directory-reconcile';
 import { checkSuperAdminInvariant } from '../lib/super-admin-invariant';
@@ -48,6 +50,8 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
     { name: 'store-directory-reconcile', run: () => reconcileStoreDirectory() },
     // Issue 458: StoreDO entity-index dead-letter rows -> one P1 per row per day (the DO cannot call sendAlert).
     { name: 'entity-index-health', run: () => runEntityIndexHealthCron() },
+    // FOLD-COUNTERS: p95 / 5xx over budget per route from the ebda_request_budget dataset (needs CF_ANALYTICS_* secrets, else skipped).
+    { name: 'request-budget-alert', run: () => runRequestBudgetAlert() },
     // The assistant's help index: re-embed the bundled help corpus when its hash changed (a KV read when nothing changed; never throws into the cron).
     {
       name: 'assistant-help-index',
@@ -64,7 +68,7 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
     { name: 'billing-deferred-webhooks', run: () => processDeferredBillingWebhooks() },
     // InstaPay receipts / manual-payment claims left half-done by a dead Worker (N-10d): complete or roll back, P1 if undecidable.
     { name: 'payments-reconcile', run: () => reconcilePayments() },
-    // NZ-PG-9: all markers set + no Hyperdrive + STORE_CREATE_ON_DO unset = every store creation fails: P1.
+    // NZ-PG-9: all markers set + no Postgres binding + STORE_CREATE_ON_DO unset = every store creation fails: P1.
     {
       name: 'store-create-config',
       run: async () => void (await alertIfStoreCreateMisconfigured()),
@@ -127,7 +131,8 @@ export async function runScheduled(
     jobs.map(async job => {
       if (frozen) return deferLegacyJob(cron, job.name, scheduledTime);
       try {
-        await withReachLabel(job.name, () => job.run());
+        // One sweep scope per job run (lib/sweep-scope.ts): store backends read once, repeated reads memoised.
+        await withSweepScope(() => withReachLabel(job.name, () => job.run()));
         logger.info({ cron, job: job.name }, '[cron] job done');
         return { name: job.name, ok: true };
       } catch (err) {

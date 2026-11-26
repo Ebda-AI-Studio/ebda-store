@@ -27,7 +27,7 @@ export function DangerZone({
   return (
     <div className="mt-8">
       <h2 className="mb-4 font-semibold text-destructive-ink">{t('title')}</h2>
-      <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-6 shadow-sm">
+      <div className="rounded-md border-2 border-destructive/40 bg-destructive/5 p-6 shadow-sm">
         {/* Suspend / Activate: super_admin only. PATCH /stores/:id/status also enforces authorize('super_admin')
             server-side, so hiding it here is defence in depth, not the only gate. */}
         <div className="mb-6 flex flex-col gap-3 border-b border-destructive/20 pb-6 sm:flex-row sm:items-center sm:justify-between">

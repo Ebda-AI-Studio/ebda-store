@@ -10,7 +10,7 @@ updated: 2026-05-24
 **Pre-conditions:**
 
 - `GOOGLE_GENERATIVE_AI_KEY` set in staging API env (Gemini Flash Lite)
-- AI quota counters reset (or quota is not exhausted): `AI_DAILY_REQUEST_CAP` default 450
+- AI quota counters reset (or quota is not exhausted): `AI_DAILY_REQUEST_CAP` default 1800
 - Test store has ≥10 products; ≥3 with missing Arabic names (for translate sweep)
 - Preview/staging env only
 
