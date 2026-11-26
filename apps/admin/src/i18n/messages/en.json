@@ -3226,7 +3226,11 @@
           "label": "Ship orders with this carrier",
           "saveFirst": "Save the credentials first.",
           "testFirst": "Run Test connection successfully on the saved credentials first.",
-          "notActivated": "Request activation first. You can enable it once we activate it."
+          "testsItself": "Turning it on tests your saved keys first.",
+          "confirmLabel": "Test and turn on",
+          "confirmConsequence": "Ebda Store tests your {mode} keys now. If the test passes, customers can pay or ship with this provider at checkout straight away.",
+          "activated": "Turned on. Customers can use it at checkout now.",
+          "activatedUnverified": "Turned on. This provider has no safe test call, so watch your first real order."
         },
         "capabilities": {
           "cod": "Cash on delivery",
@@ -5422,7 +5426,11 @@
         "label": "Accept payments with this provider",
         "saveFirst": "Save the credentials first.",
         "testFirst": "Run Test connection successfully on the saved credentials first.",
-        "notActivated": "Request activation first. You can enable it once we activate it."
+        "testsItself": "Turning it on tests your saved keys first.",
+        "confirmLabel": "Test and turn on",
+        "confirmConsequence": "Ebda Store tests your {mode} keys now. If the test passes, customers can pay or ship with this provider at checkout straight away.",
+        "activated": "Turned on. Customers can use it at checkout now.",
+        "activatedUnverified": "Turned on. This provider has no safe test call, so watch your first real order."
       },
       "webhook": {
         "label": "Webhook URL",
@@ -11330,8 +11338,8 @@
     "request": "Request activation",
     "requestAgain": "Request again",
     "requesting": "Sending…",
-    "hint": "Save your credentials first. We activate within about {hours} hours.",
-    "requestedLine": "We'll activate it within about {hours} hours",
+    "hint": "Save your credentials first, then turn the provider on yourself: Ebda Store tests your keys for you.",
+    "requestedLine": "Your request is with the Ebda Store team. You can also turn it on yourself once your test passes.",
     "requestedAt": "Requested: {time}",
     "rejectedTitle": "Activation was declined. Note from the team:",
     "credentialsRequired": "Save your credentials first",
@@ -11372,6 +11380,8 @@
       "runTest": "Run test",
       "activate": "Activate for this store",
       "reject": "Reject with note",
+      "deactivate": "Deactivate for this store",
+      "deactivated": "Turned off for this store. The merchant was emailed.",
       "activated": "Activated. The merchant can enable it now.",
       "rejected": "Rejected. The merchant was emailed.",
       "notTested": "Run a passing test on the current credentials first.",

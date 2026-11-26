@@ -15,6 +15,8 @@ import { ProviderLogo } from '@/components/ProviderLogo';
 import { useT } from '@/i18n/useT';
 import { Alert } from '../../../../../components/Alert';
 import { apiPost, apiPut } from '../../../../../lib/api';
+import { selfActivateProvider } from '../../../../../lib/provider-self-activation';
+import { useConfirm } from '@/hooks/useConfirm';
 import { UnverifiedProviderNotice } from '../../../../../components/UnverifiedProviderNotice';
 import { PickupAddressForm, type PickupAddress } from './PickupAddressForm';
 import {
@@ -70,6 +72,7 @@ export function CarrierConnectCard({ entry, config, storeId, onChanged }: Props)
   const t = useT('shipping.carriers.connect');
   const locale: 'ar' | 'en' = useLocale() === 'ar' ? 'ar' : 'en';
   const base = `/api/v1/stores/${storeId}/shipping-carriers`;
+  const askConfirm = useConfirm();
   const configUrl = `${base}/configs/${entry.code}`;
 
   const activeMode: CredentialMode =
@@ -108,12 +111,9 @@ export function CarrierConnectCard({ entry, config, storeId, onChanged }: Props)
   // (and Test connection) is the gate, and the first real order confirms it.
   const unverified = !entry.manual && !entry.verified;
   const connected = Boolean(config?.connectionTestCurrent && config?.connectionTest?.ok);
-  const canEnable = connected;
-  const enableBlockedReason = !config
-    ? t('enable.saveFirst')
-    : !connected
-      ? t('enable.testFirst')
-      : null;
+  // The switch tests the saved credentials itself (server-side), so only "nothing saved yet" blocks it.
+  const enableBlockedReason =
+    !config || !activeReady ? t('enable.saveFirst') : t('enable.testsItself');
 
   const statusKey = config?.enabled ? 'enabled' : connected ? 'connected' : 'notConnected';
   const statusTone =
@@ -202,7 +202,41 @@ export function CarrierConnectCard({ entry, config, storeId, onChanged }: Props)
     await onChanged();
   }
 
+  /** Turning ON = "Test and turn on" (gap A7): the server runs the check, the merchant confirms, no super admin. */
+  async function activate() {
+    setBusy('toggle');
+    setNotice(null);
+    const r = await selfActivateProvider(storeId, entry.code, async ({ mode: m }) =>
+      askConfirm({
+        object: entry.name[locale === 'ar' ? 'ar' : 'en'],
+        consequence: t('enable.confirmConsequence', { mode: t(`modes.${m}`) }),
+        confirmLabel: t('enable.confirmLabel'),
+        tone: 'default',
+      })
+    );
+    setBusy(null);
+    if (r.status === 'cancelled') return;
+    if (r.status === 'failed') {
+      setNotice({ type: 'error', text: locale === 'ar' ? r.triage.ar : r.triage.en });
+      await onChanged();
+      return;
+    }
+    if (r.status === 'error') {
+      setNotice({ type: 'error', text: r.message || t('messages.failed') });
+      return;
+    }
+    setNotice({
+      type: 'success',
+      text: r.unverifiedConnection ? t('enable.activatedUnverified') : t('enable.activated'),
+    });
+    await onChanged();
+  }
+
   async function toggle(enabled: boolean) {
+    if (enabled) {
+      await activate();
+      return;
+    }
     setBusy('toggle');
     setNotice(null);
     const { error: apiErr } = await apiPut(configUrl, { enabled });
@@ -524,7 +558,7 @@ export function CarrierConnectCard({ entry, config, storeId, onChanged }: Props)
                   role="switch"
                   aria-label={t('enable.label')}
                   checked={Boolean(config?.enabled)}
-                  disabled={busy !== null || (!config?.enabled && !canEnable)}
+                  disabled={busy !== null || (!config?.enabled && !activeReady)}
                   onChange={e => toggle(e.target.checked)}
                   className="peer sr-only"
                 />

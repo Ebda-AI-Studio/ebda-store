@@ -63,6 +63,7 @@ import { shipmentCreate } from './shipment-create';
 import { storeUsageSnapshot } from './store-usage-snapshot';
 import { billingRenewalDaily } from './billing-renewal';
 import { domainClaimSweep } from './domain-claim-sweep';
+import { providerActivationLedgerReconcile } from './provider-activation-ledger-reconcile';
 import { r2OrphanSweep } from './r2-orphan-sweep';
 import { paymentAbandonmentSweep } from './payment-abandonment-sweep';
 import { paymentWebhookProcess } from './payment-webhook-process';
@@ -187,6 +188,7 @@ const allInngestFunctions: JobDef[] = [
   storeUsageSnapshot,
   billingRenewalDaily,
   domainClaimSweep,
+  providerActivationLedgerReconcile,
   // Weekly R2 orphan sweep: lists bucket vs DB references and reports
   // orphans via logger + Telegram. Deletion gated on R2_ORPHAN_SWEEP_APPLY=true.
   r2OrphanSweep,

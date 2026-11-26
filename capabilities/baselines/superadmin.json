@@ -27,7 +27,6 @@
     "superadmin-route-unreasoned|POST /admin/legal-policies/:docKey/:version/resume",
     "superadmin-route-unreasoned|POST /admin/legal-policies/:docKey/:version/retry-failed",
     "superadmin-route-unreasoned|POST /admin/legal-policies/:docKey/:version/send-notice",
-    "superadmin-route-unreasoned|POST /admin/provider-activation/:storeId/:provider/activate",
     "superadmin-route-unreasoned|POST /admin/provider-activation/:storeId/:provider/reject",
     "superadmin-route-unreasoned|POST /admin/provider-activation/:storeId/:provider/test",
     "superadmin-route-unreasoned|POST /admin/provider-verification/:provider/confirm",

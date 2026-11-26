@@ -1,3 +1,5 @@
+import { recordAdminEnable } from '../services/provider-activation.service';
+import { adminEnableNeedsLedger, refuseUnconfirmedEnable } from '../lib/provider-confirm-gate';
 import { Router, Request, Response, NextFunction } from 'express';
 import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
 import { z } from 'zod/v3';
@@ -225,6 +227,8 @@ router.put(
       if ((body.credentials || body.activate) && !body.mode) {
         throw new AppError(422, 'MODE_REQUIRED', 'Say which mode (sandbox or live) these are for');
       }
+      // Checkout-visible: a merchant turns a carrier ON through /provider-activation/.../activate (confirm step).
+      if (body.enabled === true) refuseUnconfirmedEnable(req.user?.role, carrier);
       const result = await shippingCarrierService.upsertCarrierConfig(storeId, carrier, {
         credentials: body.credentials
           ? { mode: body.mode!, fields: body.credentials }
@@ -236,6 +240,22 @@ router.put(
         isDefault: body.isDefault,
         settings: body.settings,
       });
+
+      // The super-admin override leaves the same append-only ledger row as a self-activation (reverted if it cannot be written).
+      if (
+        body.enabled === true &&
+        result.config.enabled &&
+        adminEnableNeedsLedger(req.user?.role, carrier)
+      ) {
+        await recordAdminEnable({
+          storeId,
+          provider: carrier,
+          mode: result.config.testMode === false ? 'live' : 'sandbox',
+          revert: async () => {
+            await shippingCarrierService.upsertCarrierConfig(storeId, carrier, { enabled: false });
+          },
+        });
+      }
 
       // Names of the fields that changed, never their values.
       await auditLog({

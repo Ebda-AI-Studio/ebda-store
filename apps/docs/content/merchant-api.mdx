@@ -34,6 +34,10 @@ Completing enrolment returns one-time backup codes. They are shown once.
 
 `POST /api/v1/mcp/admin/:storeSlug` speaks the Model Context Protocol so that scripts and AI assistants can read and operate one store. It requires an `x-merchant-key` and the scopes your key was minted with. See [Authentication](/authentication/#merchant-api-keys) for minting and revoking keys.
 
+## Turning a payment or shipping provider on
+
+A payment gateway or shipping carrier is turned on in two calls, never by a plain switch: `POST /api/v1/provider-activation/store/:storeId/:provider/activate/preview` runs Test connection on the server and, if it passes, returns a single-use `confirmToken` (valid for 2 minutes); `POST .../activate/confirm` with that token and an `Idempotency-Key` header turns the provider on. The old `toggle` and carrier `PUT` routes answer `409 CONFIRMATION_REQUIRED` when asked to turn a provider on. **API keys cannot turn providers on yet** (a versioned token path for keys is planned); connecting, testing and turning providers off still work.
+
 <Callout type="soon" title="Not yet documented here">
   Store, product, order and inventory management routes exist (the dashboard uses them) but are not
   annotated for OpenAPI yet, so they are not in the [generated reference](/api-reference/). Until

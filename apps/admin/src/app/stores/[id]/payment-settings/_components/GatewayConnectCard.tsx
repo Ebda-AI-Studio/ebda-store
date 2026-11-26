@@ -15,6 +15,8 @@ import { ProviderLogo } from '@/components/ProviderLogo';
 import { useT } from '@/i18n/useT';
 import { Alert } from '../../../../../components/Alert';
 import { apiPost, apiPut } from '../../../../../lib/api';
+import { selfActivateProvider } from '../../../../../lib/provider-self-activation';
+import { useConfirm } from '@/hooks/useConfirm';
 import { UnverifiedProviderNotice } from '../../../../../components/UnverifiedProviderNotice';
 import { FIELD_CLASSES } from '@/components/ui/tokens';
 
@@ -81,6 +83,7 @@ export function GatewayConnectCard({ entry, config, storeId, onChanged }: Props)
   const t = useT('paymentSettings.connect');
   const locale: 'ar' | 'en' = useLocale() === 'ar' ? 'ar' : 'en';
   const base = `/api/v1/payment-settings/store/${storeId}/${entry.code}`;
+  const askConfirm = useConfirm();
 
   const activeMode: CredentialMode = config?.testMode === false ? 'live' : 'sandbox';
   const [mode, setMode] = useState<CredentialMode>(activeMode);
@@ -118,12 +121,9 @@ export function GatewayConnectCard({ entry, config, storeId, onChanged }: Props)
   // (and Test connection) is the gate, and the first real order confirms it.
   const unverified = !entry.manual && !entry.verified;
   const connected = Boolean(config?.connectionTestCurrent && config?.connectionTest?.ok);
-  const canEnable = connected;
-  const enableBlockedReason = !config
-    ? t('enable.saveFirst')
-    : !config.connectionTestCurrent || !config.connectionTest?.ok
-      ? t('enable.testFirst')
-      : null;
+  // The switch tests the saved credentials itself (server-side), so only "nothing saved yet" blocks it.
+  const enableBlockedReason =
+    !config || !activeReady ? t('enable.saveFirst') : t('enable.testsItself');
 
   const statusKey = config?.isEnabled ? 'enabled' : connected ? 'connected' : 'notConnected';
   const statusTone =
@@ -206,7 +206,41 @@ export function GatewayConnectCard({ entry, config, storeId, onChanged }: Props)
     await onChanged();
   }
 
+  /** Turning ON = "Test and turn on" (gap A7): the server runs the check, the merchant confirms, no super admin. */
+  async function activate() {
+    setBusy('toggle');
+    setNotice(null);
+    const r = await selfActivateProvider(storeId, entry.code, async ({ mode }) =>
+      askConfirm({
+        object: entry.name[locale === 'ar' ? 'ar' : 'en'],
+        consequence: t('enable.confirmConsequence', { mode: t(`modes.${mode}`) }),
+        confirmLabel: t('enable.confirmLabel'),
+        tone: 'default',
+      })
+    );
+    setBusy(null);
+    if (r.status === 'cancelled') return;
+    if (r.status === 'failed') {
+      setNotice({ type: 'error', text: locale === 'ar' ? r.triage.ar : r.triage.en });
+      await onChanged();
+      return;
+    }
+    if (r.status === 'error') {
+      setNotice({ type: 'error', text: r.message || t('messages.failed') });
+      return;
+    }
+    setNotice({
+      type: 'success',
+      text: r.unverifiedConnection ? t('enable.activatedUnverified') : t('enable.activated'),
+    });
+    await onChanged();
+  }
+
   async function toggle(enabled: boolean) {
+    if (enabled) {
+      await activate();
+      return;
+    }
     setBusy('toggle');
     setNotice(null);
     const { error: apiErr } = await apiPost(`${base}/toggle`, { enabled });
@@ -525,7 +559,7 @@ export function GatewayConnectCard({ entry, config, storeId, onChanged }: Props)
                 role="switch"
                 aria-label={t('enable.label')}
                 checked={Boolean(config?.isEnabled)}
-                disabled={busy !== null || (!config?.isEnabled && !canEnable)}
+                disabled={busy !== null || (!config?.isEnabled && !activeReady)}
                 onChange={e => toggle(e.target.checked)}
                 className="peer sr-only"
               />

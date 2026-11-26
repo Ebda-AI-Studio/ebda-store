@@ -1808,7 +1808,6 @@
     "unused-export|apps/api/src/services/provider-verification.service.ts|ProviderOperation",
     "unused-export|apps/api/src/services/provider-verification.service.ts|ProviderVerificationRow",
     "unused-export|apps/api/src/services/provider-verification.service.ts|autoVerifyAfter",
-    "unused-export|apps/api/src/services/provider-verification.service.ts|isProviderVerified",
     "unused-export|apps/api/src/services/provider-verification.service.ts|resetProviderVerificationCache",
     "unused-export|apps/api/src/services/provisioning.service.ts|ProvisionStoreInput",
     "unused-export|apps/api/src/services/provisioning.service.ts|ProvisioningResult",
