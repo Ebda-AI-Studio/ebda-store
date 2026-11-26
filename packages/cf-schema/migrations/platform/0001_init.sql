@@ -284,8 +284,8 @@ CREATE TABLE IF NOT EXISTS "manual_payment_claims" (
   CONSTRAINT "manual_payment_claims_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "manual_payment_claims_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "manual_payment_claims_amount_check" CHECK ("amount_minor" > 0),
-  CONSTRAINT "manual_payment_claims_status_check" CHECK ("status" IN ('pending', 'confirmed', 'rejected')),
-  CONSTRAINT "manual_payment_claims_method_check" CHECK ("method" IN ('instapay', 'bank', 'cash'))
+  CONSTRAINT "manual_payment_claims_method_check" CHECK ("method" IN ('instapay', 'bank', 'cash')),
+  CONSTRAINT "manual_payment_claims_status_check" CHECK ("status" IN ('pending', 'confirmed', 'rejected', 'reserved'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "manual_payment_claims_method_payer_reference_key" ON "manual_payment_claims" ("method", "payer_reference");
 CREATE INDEX IF NOT EXISTS "manual_payment_claims_store_id_created_at_idx" ON "manual_payment_claims" ("store_id", "created_at" DESC);
