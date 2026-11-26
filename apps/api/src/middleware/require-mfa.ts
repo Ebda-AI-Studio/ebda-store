@@ -55,3 +55,32 @@ export async function requireMfaEnrolled(
     next(err);
   }
 }
+
+/** How recent the interactive login behind a session must be for a credential-class change (TEN-4). */
+// pq-allow(unused-export): test seam, imported by tests/unit/session-role-lifecycle.test.ts
+export const STEP_UP_MAX_AGE_SECONDS = 30 * 60;
+
+/**
+ * TEN-4: a real step-up for credential-class changes (minting keys, staff and provider credentials).
+ *
+ * `requireMfaEnrolled` only ever bites a super_admin, so a stolen merchant session (cookie, XSS, an unattended laptop) could
+ * mint a durable key or add staff with nothing more than the 30-day session. This gate asks for the one thing the identity
+ * service already stamps on every token: `auth_time`, the instant of the interactive login (password + the second factor when
+ * the account has one) behind the session. Older than {@link STEP_UP_MAX_AGE_SECONDS}, or absent, = 403 STEP_UP_REQUIRED, and
+ * the client sends the user through the identity service's sign-in again, which mints a fresh session. 403 and not 401 on
+ * purpose: a 401 would make clients try a refresh, which keeps the SAME auth_time and would loop.
+ * Not a TOTP prompt per action (that needs an accounts-side endpoint and a UI): a fresh login already includes the factor.
+ * Mount AFTER `authenticate`. Tokens that are not identity-service tokens carry no auth_time and are refused (fail closed).
+ */
+export function requireRecentLogin(req: Request, _res: Response, next: NextFunction): void {
+  const authTime = (req as Request & { accountsAuthTime?: number }).accountsAuthTime;
+  const age = authTime ? Date.now() / 1000 - authTime : Infinity;
+  if (age > STEP_UP_MAX_AGE_SECONDS) {
+    return next(
+      new AppError(403, 'STEP_UP_REQUIRED', 'Sign in again to confirm this change', {
+        stepUp: true,
+      })
+    );
+  }
+  next();
+}

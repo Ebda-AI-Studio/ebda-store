@@ -5,12 +5,18 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Modal, useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
-import { WEBHOOK_EVENT_TYPES, withNumerals, type WebhookEventType } from '@ebda/shared';
+import {
+  WEBHOOK_EVENT_TYPES,
+  webhookUrlShapeError,
+  withNumerals,
+  type WebhookEventType,
+} from '@ebda/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiDelete, apiGet, apiPatch, apiPost, type ApiError } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 import { planNamesJoined } from '@/lib/plan-labels';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Merchant outgoing webhooks: endpoints, the once-only signing secret, the delivery log with
@@ -78,6 +84,13 @@ export default function WebhooksPage() {
   const [logFor, setLogFor] = useState<Endpoint | null>(null);
   const [log, setLog] = useState<Delivery[] | null>(null);
 
+  // Event types carry dots ('webhook.test'); next-intl reads a dot as nesting, so the keys use underscores (QA-83).
+  // An event type this build has no copy for shows as its raw type, never as a raw i18n key.
+  const eventLabel = (ev: string) => {
+    const key = `events.${ev.replace(/\./g, '_')}`;
+    return t.has(key) ? t(key) : ev;
+  };
+
   const errText = useCallback(
     (e: ApiError) =>
       e.status === 402
@@ -134,6 +147,12 @@ export default function WebhooksPage() {
   };
 
   const save = async () => {
+    // QA-84: say WHY the address is refused (Ebda host, http, IP...) instead of the API's generic validation text.
+    const shapeError = webhookUrlShapeError(form.url.trim());
+    if (shapeError) {
+      setFormError(t(`urlError.${shapeError}`));
+      return;
+    }
     setBusy('save');
     setFormError(null);
     const body = {
@@ -238,7 +257,7 @@ export default function WebhooksPage() {
 
   const fmt = (v: string | null) =>
     v ? new Date(v).toLocaleString(undefined, withNumerals()) : t('table.never');
-  const badge = 'rounded px-1.5 py-0.5 text-xs font-medium';
+  const badge = 'rounded-md px-1.5 py-0.5 text-xs font-medium';
 
   return (
     <AdminLayout
@@ -298,7 +317,7 @@ export default function WebhooksPage() {
                   <span
                     className={`${badge} ${
                       ep.active
-                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                        ? 'bg-success/10 text-success-ink'
                         : 'bg-muted text-muted-foreground'
                     }`}
                     dir="auto"
@@ -322,7 +341,7 @@ export default function WebhooksPage() {
                 <div className="flex flex-wrap gap-1">
                   {ep.events.map(ev => (
                     <span key={ev} className={`${badge} bg-muted text-foreground`} dir="auto">
-                      {t(`events.${ev.replace('.', '_')}`)}
+                      {eventLabel(ev)}
                     </span>
                   ))}
                 </div>
@@ -408,10 +427,10 @@ export default function WebhooksPage() {
         title={editing ? t('form.editTitle') : t('form.addTitle')}
       >
         <div className="space-y-3">
-          <label className="block text-xs font-medium text-foreground" dir="auto">
+          <label className="block text-sm font-medium text-foreground" dir="auto">
             {t('form.urlLabel')}
             <input
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className={`${FIELD_CLASSES} mt-1`}
               value={form.url}
               onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
               placeholder={t('form.urlPlaceholder')}
@@ -423,10 +442,10 @@ export default function WebhooksPage() {
               {t('form.urlHelp')}
             </span>
           </label>
-          <label className="block text-xs font-medium text-foreground" dir="auto">
+          <label className="block text-sm font-medium text-foreground" dir="auto">
             {t('form.descriptionLabel')}
             <input
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className={`${FIELD_CLASSES} mt-1`}
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               maxLength={120}
@@ -434,13 +453,13 @@ export default function WebhooksPage() {
             />
           </label>
           <fieldset className="space-y-1">
-            <legend className="text-xs font-medium text-foreground" dir="auto">
+            <legend className="text-sm font-medium text-foreground" dir="auto">
               {t('form.eventsLabel')}
             </legend>
             {WEBHOOK_EVENT_TYPES.map(ev => (
               <label
                 key={ev}
-                className="flex items-center gap-2 text-xs max-md:min-h-11"
+                className="flex items-center gap-2 text-sm max-md:min-h-11"
                 dir="auto"
               >
                 <input
@@ -448,11 +467,11 @@ export default function WebhooksPage() {
                   checked={form.events.includes(ev)}
                   onChange={() => toggleEvent(ev)}
                 />
-                <span>{t(`events.${ev.replace('.', '_')}`)}</span>
+                <span>{eventLabel(ev)}</span>
               </label>
             ))}
           </fieldset>
-          <label className="flex items-start gap-2 text-xs" dir="auto">
+          <label className="flex items-start gap-2 text-sm" dir="auto">
             <input
               type="checkbox"
               className="mt-0.5"
@@ -611,16 +630,16 @@ export default function WebhooksPage() {
           ) : null}
           <ul className="space-y-2">
             {log?.map(d => (
-              <li key={d.id} className="rounded-lg border p-2 text-xs">
+              <li key={d.id} className="rounded-lg border p-2 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-foreground" dir="auto">
-                    {t(`events.${d.eventType}`)}
+                    {eventLabel(d.eventType)}
                     {d.isTest ? ` · ${t('log.test')}` : ''}
                   </span>
                   <span
                     className={`${badge} ${
                       d.status === 'success'
-                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                        ? 'bg-success/10 text-success-ink'
                         : d.status === 'failed'
                           ? 'border border-destructive/40 bg-destructive/5 text-foreground'
                           : 'bg-muted text-muted-foreground'

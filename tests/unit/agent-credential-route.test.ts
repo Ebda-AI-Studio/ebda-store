@@ -58,6 +58,7 @@ vi.mock('@api/middleware/auth', () => ({
 
 vi.mock('@api/middleware/require-mfa', () => ({
   requireMfaEnrolled: (_req: any, _res: any, next: any) => next(),
+  requireRecentLogin: (_req: any, _res: any, next: any) => next(),
 }));
 
 vi.mock('@api/middleware/store-access', () => ({

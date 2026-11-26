@@ -416,6 +416,36 @@ describe('Kashier getChargeStatus (M-023 stuck-charge lookup)', () => {
     });
   });
 
+  it('review of #687: the gateway amount is read as DECIMAL EGP and returned as integer PIASTRES (the ledger unit), with its currency', async () => {
+    // 199.99 EGP = 19999 piastres, the same unit the ledger and the webhook compare in: no false amount_mismatch hold
+    expect(
+      await ask(mkGet(200, details({ amount: '199.99', currency: 'EGP' })).p, 'TX-1')
+    ).toMatchObject({
+      status: 'succeeded',
+      amountMinor: 19999,
+      currency: 'EGP',
+    });
+    expect(
+      await ask(mkGet(200, details({ amount: 1000, currency: 'EGP' })).p, 'TX-1')
+    ).toMatchObject({
+      amountMinor: 100000,
+    });
+    // an amount on the matching transaction entry wins over the body's, and a body with none states none (the sweep then HOLDS it)
+    const entry = mkGet(
+      200,
+      details({
+        amount: '5.00',
+        transactions: [{ transactionId: 'TX-1', amount: '12.50', currency: 'EGP' }],
+      })
+    );
+    expect(await ask(entry.p, 'TX-1')).toMatchObject({ amountMinor: 1250 });
+    expect(await ask(mkGet(200, details()).p, 'TX-1')).toMatchObject({
+      status: 'succeeded',
+      amountMinor: null,
+      currency: null,
+    });
+  });
+
   it('with NO transaction id it throws (cannot tell) and never claims "not found"; so does anything unclear', async () => {
     const f = mkGet(200, details());
     await expect(ask(f.p, null)).rejects.toThrow(/without a transaction id/);
@@ -477,5 +507,63 @@ describe('period helpers', () => {
     expect(renewalKey('s1', end, 0)).toBe('sub:s1:2026-11-03T04:00:00.000Z');
     expect(renewalKey('s1', end, 1)).toBe('sub:s1:2026-11-03T04:00:00.000Z:retry1');
     expect(DUNNING_RETRY_DAYS).toEqual([3, 7]);
+  });
+});
+
+describe('Kashier listReversals (#837 daily refund/chargeback reconcile)', () => {
+  const mk = (status: number, json: unknown) =>
+    new KashierBillingProvider({
+      baseUrl: 'https://kashier.test/',
+      merchantId: 'MID-1',
+      secretKey: 'sk',
+      apiKey: API_KEY,
+      fetchImpl: (async () =>
+        new Response(JSON.stringify(json), { status })) as unknown as typeof fetch,
+    });
+  const body = (transactions: unknown[], over: Record<string, unknown> = {}) => ({
+    body: { transactionId: 'TX-1', merchantOrderId: ORDER, transactions, ...over },
+  });
+
+  it('lists successful refund-family and chargeback operations; skips the payment and failed ones', async () => {
+    const r = await mk(
+      200,
+      body([
+        { transactionId: 'TX-1', operation: 'pay', status: 'SUCCESS', amount: 100 },
+        { transactionId: 'RF-1', operation: 'refund', status: 'SUCCESS', amount: 40 },
+        { transactionId: 'RF-2', operation: 'partial_refund', status: 'FAILURE', amount: 10 },
+        { transactionId: 'CB-1', operation: 'chargeback', status: 'SUCCESS' },
+      ])
+    ).listReversals({ chargeId: 'TX-1', merchantOrderId: ORDER });
+    expect(r.reversals).toEqual([
+      { ref: 'RF-1', operation: 'refund', amountMinor: 4000 },
+      { ref: 'CB-1', operation: 'chargeback', amountMinor: null },
+    ]);
+    expect(r.unknownOperations).toEqual([]);
+  });
+
+  it('an operation it does not know is reported, never dropped', async () => {
+    const r = await mk(
+      200,
+      body([{ transactionId: 'X-1', operation: 'retrieval_request', status: 'SUCCESS' }])
+    ).listReversals({ chargeId: 'TX-1', merchantOrderId: ORDER });
+    expect(r.unknownOperations).toEqual(['retrieval_request']);
+  });
+
+  it('throws (never "no reversals") on an error, another transaction or another order', async () => {
+    await expect(
+      mk(500, {}).listReversals({ chargeId: 'TX-1', merchantOrderId: ORDER })
+    ).rejects.toThrow();
+    await expect(
+      mk(200, body([], { transactionId: 'TX-2' })).listReversals({
+        chargeId: 'TX-1',
+        merchantOrderId: ORDER,
+      })
+    ).rejects.toThrow();
+    await expect(
+      mk(200, body([], { merchantOrderId: 'other' })).listReversals({
+        chargeId: 'TX-1',
+        merchantOrderId: ORDER,
+      })
+    ).rejects.toThrow();
   });
 });

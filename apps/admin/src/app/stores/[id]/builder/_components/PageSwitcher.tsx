@@ -8,6 +8,7 @@
 import { PAGE_KINDS, PAGE_KIND_LABELS, type PageKind } from '@ebda/shared';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 export interface PreviewProduct {
   slug: string;
@@ -36,7 +37,7 @@ export function PageSwitcher({
         aria-label={t('label')}
         value={pageKey}
         onChange={e => onChange(e.target.value as PageKind)}
-        className="rounded-lg border border-border bg-background px-2 py-1 text-xs font-semibold max-lg:min-h-11"
+        className={FIELD_CLASSES}
         data-testid="page-switcher"
         data-setting-id="builder.page-switcher"
       >
@@ -52,7 +53,7 @@ export function PageSwitcher({
             aria-label={t('previewProduct')}
             value={previewSlug ?? ''}
             onChange={e => onPreviewSlug(e.target.value)}
-            className="max-w-40 truncate rounded-lg border border-border bg-background px-2 py-1 text-xs"
+            className={`${FIELD_CLASSES} max-w-40 truncate`}
             data-testid="preview-product"
           >
             {products.map(p => (

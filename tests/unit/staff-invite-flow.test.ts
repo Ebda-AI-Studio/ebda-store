@@ -100,6 +100,7 @@ vi.mock('@ebda/database', () => {
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _r: any, n: any) => {
     req.user = h.actor;
+    req.accountsAuthTime = Math.floor(Date.now() / 1000); // TEN-4: a fresh sign-in
     n();
   },
   authorize: () => (_q: any, _r: any, n: any) => n(),
@@ -231,14 +232,17 @@ describe('POST /stores/:id/staff: an invite never binds to an existing identity'
 
   it('defence in depth: an identity that claims created but answers with a different id is refused', async () => {
     h.invite.mockResolvedValue({ id: 'someone-elses-id', created: true });
-    expect((await add()).status).toBe(409);
+    expect((await add()).status).toBe(202); // ID-07: same answer as a real invitation
     expect(h.userCreates).toEqual([]);
     expect(h.staffCreates).toEqual([]);
   });
 
   it.each(['customer', 'super_admin'])('refuses when the identity REAL role is %s', async role => {
     h.invite.mockResolvedValue({ id: 'x', created: false, emailVerified: true, role });
-    expect((await add()).status).toBe(409);
+    // ID-07: the SAME 202 as a real invitation (no ROLE_CONFLICT oracle for platform admins), but nothing is sent or stored
+    const res = await add();
+    expect(res.status).toBe(202);
+    expect(res.body).toEqual({ success: true, data: { status: 'invitation_sent' } });
     expect(h.mails).toEqual([]);
     expect(h.invites).toEqual([]);
   });
@@ -246,7 +250,10 @@ describe('POST /stores/:id/staff: an invite never binds to an existing identity'
   it('refuses a platform admin that already has a Store profile (real role from the identity, not a literal)', async () => {
     h.existingId = 'admin-1';
     h.account.mockResolvedValue({ role: 'super_admin', emailVerified: true });
-    expect((await add()).status).toBe(409);
+    const res = await add();
+    expect(res.status).toBe(202);
+    expect(res.body.data.status).toBe('invitation_sent');
+    expect(h.mails).toEqual([]);
     expect(h.staffCreates).toEqual([]);
   });
 

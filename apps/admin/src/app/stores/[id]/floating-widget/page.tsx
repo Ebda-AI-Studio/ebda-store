@@ -9,6 +9,7 @@ import { StickySaveBar } from '../../../../components/StickySaveBar';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { ColorField } from '../../../../components/ColorField';
 import { useFeatures } from '../../../../hooks/useFeatures';
+import { FeatureUpgradeGate } from '../../../../components/FeatureUpgradeGate';
 import { useT } from '@/i18n/useT';
 import type {
   FloatingButton,
@@ -19,6 +20,7 @@ import type {
   StoreTheme,
 } from '@ebda/shared';
 import { DEFAULT_FLOATING_WIDGET_CONFIG } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface StoreSocialLinks {
   instagram?: string;
@@ -167,31 +169,22 @@ export default function FloatingWidgetPage() {
     return (
       <AdminLayout title={t('pageTitle')}>
         <div className="animate-pulse space-y-4">
-          <div className="h-24 rounded-2xl bg-muted" />
-          <div className="h-48 rounded-2xl bg-muted" />
+          <div className="h-24 rounded-lg bg-muted" />
+          <div className="h-48 rounded-lg bg-muted" />
         </div>
       </AdminLayout>
     );
   }
 
   if (!featureEnabled) {
-    return (
-      <AdminLayout title={t('pageTitle')} subtitle={t('premiumSubtitle')}>
-        <div className="max-w-xl rounded-2xl border border-border bg-card p-8 text-center">
-          <h2 className="mb-2 text-lg font-semibold text-foreground">
-            {t('featureNotEnabledTitle')}
-          </h2>
-          <p className="text-sm text-muted-foreground">{t('featureNotEnabledBody')}</p>
-        </div>
-      </AdminLayout>
-    );
+    return <FeatureUpgradeGate featureKey="floating_widget" storeId={storeId} />;
   }
 
   return (
     <AdminLayout title={t('pageTitle')} subtitle={t('mainSubtitle')}>
       <div className="space-y-6 pb-32">
         {/* Master enable */}
-        <section className="rounded-2xl border border-border bg-card p-6">
+        <section className="rounded-lg border border-border bg-card p-6">
           <label className="flex items-center justify-between gap-4 cursor-pointer">
             <span className="flex-1 min-w-0">
               <span
@@ -214,7 +207,7 @@ export default function FloatingWidgetPage() {
         </section>
 
         {/* Position + expand direction */}
-        <section className="grid gap-4 rounded-2xl border border-border bg-card p-6 md:grid-cols-2">
+        <section className="grid gap-4 rounded-lg border border-border bg-card p-6 md:grid-cols-2">
           <label className="flex flex-col gap-1">
             <span
               data-setting-id="floating-widget.position"
@@ -225,7 +218,7 @@ export default function FloatingWidgetPage() {
             <select
               value={config.position ?? 'br'}
               onChange={e => patch({ position: e.target.value as FloatingPosition })}
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              className={FIELD_CLASSES}
             >
               {ALL_POSITIONS.map(k => (
                 <option key={k} value={k}>
@@ -244,7 +237,7 @@ export default function FloatingWidgetPage() {
             <select
               value={config.expandDirection ?? 'up'}
               onChange={e => patch({ expandDirection: e.target.value as FloatingExpandDirection })}
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              className={FIELD_CLASSES}
             >
               {ALL_EXPAND_DIRECTIONS.map(k => (
                 <option key={k} value={k}>
@@ -258,7 +251,7 @@ export default function FloatingWidgetPage() {
               type="checkbox"
               checked={config.startExpanded === true}
               onChange={e => patch({ startExpanded: e.target.checked })}
-              className="h-4 w-4 cursor-pointer accent-primary"
+              className="h-5 w-5 cursor-pointer accent-primary"
             />
             <span className="text-sm text-foreground">{t('startExpandedLabel')}</span>
           </label>
@@ -268,7 +261,7 @@ export default function FloatingWidgetPage() {
                 type="checkbox"
                 checked={config.hideOnMobile === true}
                 onChange={e => patch({ hideOnMobile: e.target.checked })}
-                className="h-4 w-4 cursor-pointer accent-primary"
+                className="h-5 w-5 cursor-pointer accent-primary"
               />
               {t('hideOnMobile')}
             </label>
@@ -277,7 +270,7 @@ export default function FloatingWidgetPage() {
                 type="checkbox"
                 checked={config.hideOnDesktop === true}
                 onChange={e => patch({ hideOnDesktop: e.target.checked })}
-                className="h-4 w-4 cursor-pointer accent-primary"
+                className="h-5 w-5 cursor-pointer accent-primary"
               />
               {t('hideOnDesktop')}
             </label>
@@ -285,7 +278,7 @@ export default function FloatingWidgetPage() {
         </section>
 
         {/* Toggle button styling */}
-        <section className="space-y-4 rounded-2xl border border-border bg-card p-6">
+        <section className="space-y-4 rounded-lg border border-border bg-card p-6">
           <header>
             <h2 className="text-base font-semibold text-foreground">{t('toggleButtonTitle')}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">{t('toggleButtonHint')}</p>
@@ -306,7 +299,7 @@ export default function FloatingWidgetPage() {
                 value={config.toggleLabel ?? ''}
                 onChange={e => patch({ toggleLabel: e.target.value })}
                 placeholder={t('menuLabelEnSample')}
-                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                className={FIELD_CLASSES}
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -319,7 +312,7 @@ export default function FloatingWidgetPage() {
                 onChange={e => patch({ toggleLabelAr: e.target.value })}
                 placeholder={t('menuLabelArSample')}
                 dir="rtl"
-                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                className={FIELD_CLASSES}
               />
             </label>
           </div>
@@ -332,13 +325,13 @@ export default function FloatingWidgetPage() {
               value={config.toggleIconUrl ?? ''}
               onChange={e => patch({ toggleIconUrl: e.target.value })}
               placeholder="https://…/icon.png"
-              className="h-5 w-9 cursor-pointer accent-primary"
+              className={`${FIELD_CLASSES} w-9 cursor-pointer`}
             />
           </label>
         </section>
 
         {/* Buttons list */}
-        <section className="space-y-4 rounded-2xl border border-border bg-card p-6">
+        <section className="space-y-4 rounded-lg border border-border bg-card p-6">
           <header className="flex items-center justify-between gap-2">
             <div>
               <h2 className="text-base font-semibold text-foreground">{t('buttonsTitle')}</h2>
@@ -353,7 +346,7 @@ export default function FloatingWidgetPage() {
           ) : (
             <ul className="space-y-3">
               {(config.buttons ?? []).map((b, i, arr) => (
-                <li key={b.id} className="rounded-xl border border-border bg-background p-4">
+                <li key={b.id} className="rounded-md border border-border bg-background p-4">
                   <div className="flex items-start gap-3">
                     <div className="flex flex-col gap-1 pt-1">
                       <Button
@@ -390,7 +383,7 @@ export default function FloatingWidgetPage() {
                             onChange={e =>
                               updateButton(b.id, { kind: e.target.value as FloatingButtonKind })
                             }
-                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                            className={FIELD_CLASSES}
                           >
                             {ALL_BUTTON_KINDS.map(k => (
                               <option key={k} value={k}>
@@ -405,7 +398,7 @@ export default function FloatingWidgetPage() {
                             value={b.label ?? ''}
                             onChange={e => updateButton(b.id, { label: e.target.value })}
                             placeholder={t('tooltipEnPlaceholder')}
-                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                            className={FIELD_CLASSES}
                           />
                           <input
                             type="text"
@@ -413,7 +406,7 @@ export default function FloatingWidgetPage() {
                             onChange={e => updateButton(b.id, { labelAr: e.target.value })}
                             placeholder={t('tooltipArPlaceholder')}
                             dir="rtl"
-                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                            className={FIELD_CLASSES}
                           />
                         </div>
                       </div>
@@ -434,7 +427,7 @@ export default function FloatingWidgetPage() {
                                   ? t('usingStoreWhatsapp', { value: store.whatsapp })
                                   : '201001234567'
                               }
-                              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                              className={FIELD_CLASSES}
                             />
                           </label>
                           <label className="flex flex-col gap-1">
@@ -448,7 +441,7 @@ export default function FloatingWidgetPage() {
                                 updateButton(b.id, { whatsappMessage: e.target.value })
                               }
                               placeholder={t('prefillExample')}
-                              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                              className={FIELD_CLASSES}
                             />
                           </label>
                         </div>
@@ -467,7 +460,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStoreInstagram', { value: store.socialLinks.instagram })
                                 : t('handleSampleDemoShop')
                             }
-                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                            className={FIELD_CLASSES}
                           />
                         </label>
                       )}
@@ -485,7 +478,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStorePhone', { value: store.phone })
                                 : '+201001234567'
                             }
-                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                            className={FIELD_CLASSES}
                           />
                         </label>
                       )}
@@ -503,7 +496,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStoreTiktok', { value: store.socialLinks.tiktok })
                                 : t('handleSample')
                             }
-                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                            className={FIELD_CLASSES}
                           />
                         </label>
                       )}
@@ -521,7 +514,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStoreSnapchat', { value: store.socialLinks.snapchat })
                                 : t('handleSample')
                             }
-                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                            className={FIELD_CLASSES}
                           />
                         </label>
                       )}
@@ -539,7 +532,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStoreYoutube', { value: store.socialLinks.youtube })
                                 : 'https://youtube.com/@mystore'
                             }
-                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                            className={FIELD_CLASSES}
                           />
                         </label>
                       )}
@@ -557,7 +550,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStoreFacebook', { value: store.socialLinks.facebook })
                                 : 'https://facebook.com/mystore'
                             }
-                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                            className={FIELD_CLASSES}
                           />
                         </label>
                       )}
@@ -575,7 +568,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStoreX', { value: store.socialLinks.twitter })
                                 : t('handleSample')
                             }
-                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                            className={FIELD_CLASSES}
                           />
                         </label>
                       )}
@@ -593,7 +586,7 @@ export default function FloatingWidgetPage() {
                                 ? t('usingStoreTelegram', { value: store.socialLinks.telegram })
                                 : t('handleSample')
                             }
-                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                            className={FIELD_CLASSES}
                           />
                         </label>
                       )}
@@ -608,7 +601,7 @@ export default function FloatingWidgetPage() {
                               value={b.emailAddress ?? ''}
                               onChange={e => updateButton(b.id, { emailAddress: e.target.value })}
                               placeholder="info@store.com"
-                              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                              className={FIELD_CLASSES}
                             />
                           </label>
                           <label className="flex flex-col gap-1">
@@ -620,7 +613,7 @@ export default function FloatingWidgetPage() {
                               value={b.emailSubject ?? ''}
                               onChange={e => updateButton(b.id, { emailSubject: e.target.value })}
                               placeholder={t('emailSubjectExample')}
-                              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                              className={FIELD_CLASSES}
                             />
                           </label>
                         </div>
@@ -636,7 +629,7 @@ export default function FloatingWidgetPage() {
                               value={b.musicUrl ?? ''}
                               onChange={e => updateButton(b.id, { musicUrl: e.target.value })}
                               placeholder="https://r2.dev/.../track.mp3"
-                              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                              className={FIELD_CLASSES}
                             />
                           </label>
                           <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -644,7 +637,7 @@ export default function FloatingWidgetPage() {
                               type="checkbox"
                               checked={b.musicLoop !== false}
                               onChange={e => updateButton(b.id, { musicLoop: e.target.checked })}
-                              className="h-4 w-4 cursor-pointer accent-primary"
+                              className="h-5 w-5 cursor-pointer accent-primary"
                             />
                             {t('loopAudioLabel')}
                           </label>
@@ -661,7 +654,7 @@ export default function FloatingWidgetPage() {
                               value={b.customHref ?? ''}
                               onChange={e => updateButton(b.id, { customHref: e.target.value })}
                               placeholder="https://…"
-                              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                              className={FIELD_CLASSES}
                             />
                           </label>
                           <label className="flex flex-col gap-1">
@@ -673,7 +666,7 @@ export default function FloatingWidgetPage() {
                               value={b.iconUrl ?? ''}
                               onChange={e => updateButton(b.id, { iconUrl: e.target.value })}
                               placeholder="https://…/icon.svg"
-                              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                              className={FIELD_CLASSES}
                             />
                           </label>
                         </div>

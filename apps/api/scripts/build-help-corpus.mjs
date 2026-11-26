@@ -3,7 +3,9 @@
 //   apps/api/src/smart-layer/registry.generated.json     the capability registry as the engine's RegistryCap list (the engine's own `toRegistryView`)
 //   apps/api/src/cf/modules/help-corpus.mjs             apps/help/content/{ar,en}/**/*.mdx as heading-aware chunks + a content hash (skip-if-unchanged index);
 //                                                       an ES module the Worker uploads separately (wrangler `rules`), NOT part of worker.js (Ruling BUNDLE-BUDGET-12)
-// `node apps/api/scripts/build-help-corpus.mjs` writes them (run it after changing `capabilities/` or `apps/help/content`; `tests/unit/assistant-adapter.test.ts` fails when they are stale); `--check` exits 1 when they are stale.
+// BUILD-TIME ASSETS (docs/plans/2026-11-24-help-corpus-build-time.md): both files are git-ignored outputs, never committed. They are generated before every use:
+// wrangler `build.command` (deploy, dry-run, dev), the npm-ci composite action (CI jobs), vitest globalSetup (unit + workers pools), and the pre-scripts of
+// apps/api (dev/build/lint) and the root `typecheck`. `node apps/api/scripts/build-help-corpus.mjs` writes them; `--check` exits 1 when they are stale.
 import { build } from 'esbuild';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
@@ -81,13 +83,17 @@ export async function buildAssets() {
   };
 }
 
+/** Where each generated file goes (both are git-ignored build outputs: docs/plans/2026-11-24-help-corpus-build-time.md). */
+export const targets = ({ registry, corpus }) => [
+  ['registry.generated.json', registry],
+  [join('..', 'cf', 'modules', 'help-corpus.mjs'), corpus],
+];
+
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const { registry, corpus } = await buildAssets();
-  const files = [
-    ['registry.generated.json', registry],
-    [join('..', 'cf', 'modules', 'help-corpus.mjs'), corpus],
-  ];
+  const assets = await buildAssets();
+  const files = targets(assets);
   if (process.argv.includes('--check')) {
+    // CI sanity: the files on disk are exactly what the sources produce (a missing file counts as stale).
     const stale = files
       .filter(([n, c]) => !existsSync(join(OUT, n)) || readFileSync(join(OUT, n), 'utf8') !== c)
       .map(([n]) => n);
@@ -95,5 +101,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       console.error(`stale: ${stale.join(', ')} (run node apps/api/scripts/build-help-corpus.mjs)`);
       process.exit(1);
     }
-  } else for (const [n, c] of files) writeFileSync(join(OUT, n), c);
+  } else {
+    // Write only what changed: a watcher (tsx watch, vitest watch) must not see a rewrite on every start.
+    for (const [n, c] of files) {
+      const f = join(OUT, n);
+      if (!existsSync(f) || readFileSync(f, 'utf8') !== c) writeFileSync(f, c);
+    }
+  }
 }
