@@ -81,14 +81,20 @@ export function buildAdminCsp({
     "base-uri 'self'",
     "object-src 'none'",
     "form-action 'self'",
-    nonceScriptSrc(nonce, { hosts: SCRIPT_HOSTS, unsafeEval: ADMIN_NEEDS_UNSAFE_EVAL }),
+    nonceScriptSrc(nonce, {
+      hosts: SCRIPT_HOSTS,
+      unsafeEval: ADMIN_NEEDS_UNSAFE_EVAL,
+      // QA-109: the product editor's 3D preview decodes meshopt (WebAssembly). Document-wide, not editor-only: the
+      // admin is an SPA and keeps the first document's CSP. Never 'unsafe-eval'.
+      wasmUnsafeEval: true,
+    }),
     // Inline event-handler attributes never run (React binds handlers in JS).
     "script-src-attr 'none'",
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com ${PUSH_STYLE_HOSTS}`,
     "font-src 'self' data: https://fonts.gstatic.com",
     "img-src 'self' data: https: blob:",
     "media-src 'self' https://*.r2.dev https://media.ebda.app blob:",
-    `connect-src 'self' ${api} ${accounts} https://media.ebda.app ${PUSH_CONNECT_HOSTS} https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com`,
+    `connect-src 'self' ${api} ${accounts} blob: https://media.ebda.app ${PUSH_CONNECT_HOSTS} https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com`,
     `frame-src ${PUSH_HTTP_HOSTS} ${framesForRoute}`,
     "worker-src 'self' blob:",
     "manifest-src 'self'",

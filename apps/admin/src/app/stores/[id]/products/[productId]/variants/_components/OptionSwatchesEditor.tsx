@@ -88,7 +88,7 @@ export function OptionSwatchesEditor({ storeId, productId, options, onSaved }: P
   }
 
   return (
-    <div className="mt-4 rounded-xl border bg-card p-5 shadow-sm">
+    <div className="mt-4 rounded-md border bg-card p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">{t('swatchesTitle')}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{t('swatchesHint')}</p>
       <div className="mt-3 space-y-4">

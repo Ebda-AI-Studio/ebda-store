@@ -32,7 +32,7 @@ import {
 import { registerPlanGate } from './plan-gate-registry';
 import { AccountsError, accountsLogout, accountsToken, establishApiSession } from './accounts';
 import { armProactiveRefresh, disarmProactiveRefresh, grantExpiryMs } from './proactive-refresh';
-import { handleSessionEnded } from './session-ended';
+import { handleSessionEnded, handleStepUpRequired } from './session-ended';
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -601,7 +601,27 @@ export async function checkSessionWithMountRetries(
  * Authentication is handled automatically via the HTTP-only cookie sent
  * by the browser when `credentials: 'include'` is set.
  */
+/** Fired after a successful write to a store resource: "needs attention" refetches so a fixed issue clears its badge at once. */
+export const ATTENTION_REFRESH_EVENT = 'ebda:attention-refresh';
+
 export async function apiRequest<T = unknown>(
+  endpoint: string,
+  options: RequestInit & { quietUpsell?: boolean } = {}
+): Promise<{ data: T | null; error: ApiError | null }> {
+  const result = await apiRequestInner<T>(endpoint, options);
+  const method = (options.method || 'GET').toUpperCase();
+  if (
+    method !== 'GET' &&
+    !result.error &&
+    typeof window !== 'undefined' &&
+    /\/stores\/|\/payment-settings\/|\/billing/.test(endpoint)
+  ) {
+    window.dispatchEvent(new Event(ATTENTION_REFRESH_EVENT));
+  }
+  return result;
+}
+
+async function apiRequestInner<T = unknown>(
   endpoint: string,
   options: RequestInit & {
     /** An optional widget call: a plan 402/403 must not open the upgrade dialog (the widget just hides). */
@@ -721,6 +741,9 @@ export async function apiRequest<T = unknown>(
       // only calls non-gated routes (/auth/me, /auth/mfa/*) so this can't loop.
       // The session was revoked server-side (password change, signed out elsewhere): end it visibly, once.
       if (typeof window !== 'undefined' && errCode === 'TOKEN_REVOKED') handleSessionEnded();
+      // TEN-4: the change needs a recent sign-in: one visible re-login, then back to this page.
+      if (typeof window !== 'undefined' && errCode === 'STEP_UP_REQUIRED')
+        void handleStepUpRequired(() => accountsLogout());
       if (
         typeof window !== 'undefined' &&
         errCode === 'MFA_SETUP_REQUIRED' &&
@@ -838,7 +861,19 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
       if (accessToken) authHeaders.Authorization = `Bearer ${accessToken}`;
     }
 
+    // STORE-QA-56: a multipart body is not `application/json`, so the API's
+    // CSRF gate (apps/api/src/middleware/security.ts, "custom request header"
+    // branch) only lets a cookie-only session through when this header is set.
+    // The admin never sends X-Session-ID, so without it every FormData write
+    // (InstaPay receipt, imports, uploads) 403s CSRF_MISSING_SESSION whenever
+    // there is no Bearer token in localStorage.
+    const writeHeaders: Record<string, string> = {};
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      writeHeaders['X-Requested-With'] = 'XMLHttpRequest';
+    }
+
     return {
+      ...writeHeaders,
       ...authHeaders,
       ...csrfHeaders,
       ...(options.headers as Record<string, string>),

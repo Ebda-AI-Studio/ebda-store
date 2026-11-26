@@ -13,6 +13,7 @@ import { buildStorefrontCsp } from './src/lib/csp';
 // global alias would be ambiguous across apps/{web,admin,api,orders}).
 // Zero behavior change — Next.js resolves both forms identically.
 import { devSuffixesAllowed } from './src/lib/platform-host';
+import { loginAliasRedirect } from './src/lib/login-alias';
 import { studioHostResponse } from './studio-host';
 import { DEMO_LOOK_HEADER, parseDemoLook } from './src/lib/demo-look-param';
 import {
@@ -25,6 +26,7 @@ import {
   localePathsOn,
   type PathLocale,
 } from './src/lib/locale-paths';
+import { applyOrderLinkHeaders } from './src/lib/order-link-headers';
 
 /**
  * HOST ROUTING (program plan §1, design cloudflare-backend §4).
@@ -393,6 +395,28 @@ function handleStoreHost(
     return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   }
 
+  // `/login`, `/account/login`, `/ar/login`, `/ar/account/login` are guessed URLs: the real sign-in is `/auth/login`.
+  // A permanent redirect, `returnTo` kept; a language prefix on the guess becomes the language cookie (as QA-C6).
+  if (request.method === 'GET' || request.method === 'HEAD') {
+    const alias = loginAliasRedirect(request.nextUrl.pathname, request.nextUrl.search);
+    if (alias) {
+      const target = request.nextUrl.clone();
+      target.pathname = '/auth/login';
+      target.search = request.nextUrl.search;
+      const redirectResponse = NextResponse.redirect(target, 308);
+      if (alias.locale) {
+        redirectResponse.cookies.set('force-language', alias.locale, {
+          path: '/',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 365,
+          secure: request.nextUrl.protocol === 'https:',
+        });
+        redirectResponse.headers.set('Cache-Control', 'private, no-store');
+      }
+      return redirectResponse;
+    }
+  }
+
   // Language in the URL (Ruling LOCALE-PATHS-1): only for a store that opted in, never inside the admin preview
   // iframe. A demo-look preview (`?look=`) DOES take the prefix rules (skipping them left `/ar?look=x` unrewritten = 404),
   // but never the shared tenant-tree and always `private, no-store`. See `src/lib/locale-paths.ts` for the rules.
@@ -578,6 +602,7 @@ export function middleware(request: NextRequest) {
   headers.set('x-nonce', nonce);
   headers.set('Content-Security-Policy', csp);
   const response = routeStorefront(new NextRequest(request, { headers }));
+  applyOrderLinkHeaders(request.nextUrl.pathname, response.headers);
   // The studio pages (ebda.app help/status hosts) already carry their own, stricter CSP: keep it.
   if (!response.headers.has('Content-Security-Policy')) {
     response.headers.set('Content-Security-Policy', csp);

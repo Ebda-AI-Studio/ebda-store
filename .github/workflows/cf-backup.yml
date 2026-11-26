@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   backup:
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: 45
     environment: production
     env:
@@ -36,14 +36,14 @@ jobs:
         with:
           node-version: '24'
           # remote Actions cache on hosted runners only (a self-hosted runner already has ~/.npm; the remote cache pulled GBs there)
-          cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}
       - uses: ./.github/actions/npm-ci
       - name: Require the inputs
+        timeout-minutes: 5
         run: |
           for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID EBDA_BACKUP_AGE_PUBLIC_KEY BACKUP_EXPORT_SECRET; do
             test -n "${!v}" || { echo "::error::$v is not set in the production environment"; exit 1; }
           done
-          command -v age >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq age >/dev/null; }
+          command -v age >/dev/null || { sudo apt-get -o DPkg::Lock::Timeout=120 -o Acquire::Retries=3 update -qq && sudo apt-get -o DPkg::Lock::Timeout=120 -o Acquire::Retries=3 install -y -qq age >/dev/null; }
       - name: Warn when the failure alert cannot fire
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -60,7 +60,7 @@ jobs:
     name: Notify on backup failure
     needs: [backup]
     if: always() && needs.backup.result == 'failure'
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: 2
     # Environment secrets are only visible to a job that names the environment: without this line the alert saw no
     # TELEGRAM_* values even when they were set in `production` (first real run: "no telegram secrets - skip").

@@ -7,24 +7,23 @@ import { toCsv } from '@/lib/csv';
 import { useT } from '@/i18n/useT';
 import { DataTable } from '@/components/mobile/DataTable';
 import { apiGet, apiFetch } from '@/lib/api';
-import { minorToMajor } from '@/lib/format';
+import { minorToMajor, formatPrice } from '@/lib/format';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
 import { resolveStoreTimeZone, zonedIsoDay, zonedMonthStartDay } from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type TabKey = 'trialBalance' | 'pnl' | 'balanceSheet' | 'taxReport';
+import {
+  toTrialBalanceRows,
+  sumTrialBalance,
+  type ApiTrialBalanceRow,
+  type TrialBalanceRow,
+} from './trial-balance';
 
-interface TrialBalanceRow {
-  code: string;
-  nameEn: string;
-  nameAr: string | null;
-  debit: number;
-  credit: number;
-  balance: number;
-}
+type TabKey = 'trialBalance' | 'pnl' | 'balanceSheet' | 'taxReport';
 
 interface PnlSection {
   accounts: { code: string; nameEn: string; balance: number }[];
@@ -148,7 +147,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
     const isLatest = beginRequest();
     setLoading(true);
     setError(null);
-    apiGet<TrialBalanceRow[]>(
+    apiGet<ApiTrialBalanceRow[]>(
       `/api/v1/stores/${storeId}/finance/reports/trial-balance?asOf=${asOf}`
     )
       .then(({ data, error: apiError }) => {
@@ -157,7 +156,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
           // Never leave the previous period's figures on screen under an error.
           setRows(null);
           setError(apiError.message);
-        } else setRows(data ?? []);
+        } else setRows(toTrialBalanceRows(data ?? []));
       })
       .catch(() => {
         if (!isLatest()) return;
@@ -173,10 +172,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
     fetch();
   }, [fetch]);
 
-  const totals = (rows ?? []).reduce(
-    (acc, r) => ({ debit: acc.debit + r.debit, credit: acc.credit + r.credit }),
-    { debit: 0, credit: 0 }
-  );
+  const totals = sumTrialBalance(rows ?? []);
   const balanced = rows && rows.length > 0 && totals.debit === totals.credit;
 
   function exportCsv() {
@@ -213,7 +209,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
             type="date"
             value={asOf}
             onChange={e => setAsOf(e.target.value)}
-            className="block border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={`${FIELD_CLASSES} block`}
           />
         </label>
         <div className="flex gap-2 ms-auto">
@@ -247,7 +243,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive-ink">{error}</p>}
 
       {rows && !loading && (
         <div className="space-y-3">
@@ -293,7 +289,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
             rows={rows}
             rowKey={r => r.code}
           />
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 px-3 py-2 text-sm font-semibold">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm font-semibold">
             <span>{tb('totals')}</span>
             <span className="font-mono">
               {major(totals.debit)} / {major(totals.credit)}
@@ -371,7 +367,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
             type="date"
             value={from}
             onChange={e => setFrom(e.target.value)}
-            className="block border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={`${FIELD_CLASSES} block`}
           />
         </label>
         <label className="space-y-1">
@@ -380,7 +376,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
             type="date"
             value={to}
             onChange={e => setTo(e.target.value)}
-            className="block border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={`${FIELD_CLASSES} block`}
           />
         </label>
         <div className="flex gap-2 ms-auto">
@@ -409,25 +405,23 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive-ink">{error}</p>}
 
       {data && !loading && (
         <div className="space-y-6 max-w-2xl">
           {/* Revenue */}
           <section>
             <h3 className="text-sm font-semibold mb-2">{tp('revenue')}</h3>
-            <div className="rounded-xl border border-border overflow-x-auto">
+            <div className="rounded-md border border-border overflow-x-auto">
               <table className="w-full text-sm">
                 <tbody>
                   {data.revenue.accounts.map((a, i) => (
                     <tr key={i} className="border-b border-border/40 last:border-0">
-                      <td className="px-3 py-2 font-mono text-xs text-muted-foreground w-16">
+                      <td className="px-3 py-2 font-mono text-sm text-muted-foreground w-16">
                         {a.code}
                       </td>
                       <td className="px-3 py-2">{a.nameEn}</td>
-                      <td className="px-3 py-2 text-end font-mono">
-                        {major(a.balance)} {tc('egp')}
-                      </td>
+                      <td className="px-3 py-2 text-end font-mono">{formatPrice(a.balance)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -436,8 +430,8 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                     <td className="px-3 py-2 font-semibold" colSpan={2}>
                       {tp('totalRevenue')}
                     </td>
-                    <td className="px-3 py-2 text-end font-mono font-semibold text-green-700">
-                      {major(data.revenue.total)} {tc('egp')}
+                    <td className="px-3 py-2 text-end font-mono font-semibold text-success-ink">
+                      {formatPrice(data.revenue.total)}
                     </td>
                   </tr>
                 </tfoot>
@@ -448,18 +442,16 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
           {/* Expenses */}
           <section>
             <h3 className="text-sm font-semibold mb-2">{tp('expenses')}</h3>
-            <div className="rounded-xl border border-border overflow-x-auto">
+            <div className="rounded-md border border-border overflow-x-auto">
               <table className="w-full text-sm">
                 <tbody>
                   {data.expenses.accounts.map((a, i) => (
                     <tr key={i} className="border-b border-border/40 last:border-0">
-                      <td className="px-3 py-2 font-mono text-xs text-muted-foreground w-16">
+                      <td className="px-3 py-2 font-mono text-sm text-muted-foreground w-16">
                         {a.code}
                       </td>
                       <td className="px-3 py-2">{a.nameEn}</td>
-                      <td className="px-3 py-2 text-end font-mono">
-                        {major(a.balance)} {tc('egp')}
-                      </td>
+                      <td className="px-3 py-2 text-end font-mono">{formatPrice(a.balance)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -468,8 +460,8 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                     <td className="px-3 py-2 font-semibold" colSpan={2}>
                       {tp('totalExpenses')}
                     </td>
-                    <td className="px-3 py-2 text-end font-mono font-semibold text-red-600">
-                      {major(data.expenses.total)} {tc('egp')}
+                    <td className="px-3 py-2 text-end font-mono font-semibold text-destructive-ink">
+                      {formatPrice(data.expenses.total)}
                     </td>
                   </tr>
                 </tfoot>
@@ -478,15 +470,15 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
           </section>
 
           {/* Net Income */}
-          <div className="rounded-xl border border-border p-4 flex justify-between items-center">
+          <div className="rounded-md border border-border p-4 flex justify-between items-center">
             <span className="font-semibold">{tp('netIncome')}</span>
             <span
               className={`text-xl font-semibold font-mono ${
-                data.netIncome >= 0 ? 'text-green-700' : 'text-red-600'
+                data.netIncome >= 0 ? 'text-success-ink' : 'text-destructive-ink'
               }`}
             >
               {data.netIncome < 0 ? '−' : ''}
-              {major(Math.abs(data.netIncome))} {tc('egp')}
+              {formatPrice(Math.abs(data.netIncome))}
             </span>
           </div>
         </div>
@@ -567,12 +559,12 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
     return (
       <section>
         <h3 className="text-sm font-semibold mb-2">{label}</h3>
-        <div className="rounded-xl border border-border overflow-x-auto">
+        <div className="rounded-md border border-border overflow-x-auto">
           <table className="w-full text-sm">
             <tbody>
               {section.accounts.map((a, i) => (
                 <tr key={i} className="border-b border-border/40 last:border-0">
-                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground w-16">
+                  <td className="px-3 py-2 font-mono text-sm text-muted-foreground w-16">
                     {a.code}
                   </td>
                   <td className="px-3 py-2">
@@ -583,9 +575,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-end font-mono">
-                    {major(a.balance)} {tc('egp')}
-                  </td>
+                  <td className="px-3 py-2 text-end font-mono">{formatPrice(a.balance)}</td>
                 </tr>
               ))}
             </tbody>
@@ -595,7 +585,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
                   {totalLabel}
                 </td>
                 <td className="px-3 py-2 text-end font-mono font-semibold">
-                  {major(section.total)} {tc('egp')}
+                  {formatPrice(section.total)}
                 </td>
               </tr>
             </tfoot>
@@ -614,7 +604,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
             type="date"
             value={asOf}
             onChange={e => setAsOf(e.target.value)}
-            className="block border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={`${FIELD_CLASSES} block`}
           />
         </label>
         <div className="flex gap-2 ms-auto">
@@ -643,7 +633,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive-ink">{error}</p>}
 
       {data && !loading && (
         <div className="space-y-6 max-w-2xl">
@@ -651,9 +641,9 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
           {renderSection(tbs('liabilities'), data.liabilities, tbs('totalLiabilities'))}
           {renderSection(tbs('equity'), data.equity, tbs('totalEquity'))}
           {balanced ? (
-            <p className="text-sm text-green-700">{tbs('balanced')}</p>
+            <p className="text-sm text-success-ink">{tbs('balanced')}</p>
           ) : (
-            <p className="text-sm text-red-600">
+            <p className="text-sm text-destructive-ink">
               {tbs('unbalanced', { amount: major(Math.abs(difference)) })}
             </p>
           )}
@@ -745,7 +735,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
             type="date"
             value={from}
             onChange={e => setFrom(e.target.value)}
-            className="block border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={`${FIELD_CLASSES} block`}
           />
         </label>
         <label className="space-y-1">
@@ -754,7 +744,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
             type="date"
             value={to}
             onChange={e => setTo(e.target.value)}
-            className="block border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={`${FIELD_CLASSES} block`}
           />
         </label>
         <div className="flex gap-2 ms-auto">
@@ -788,29 +778,29 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive-ink">{error}</p>}
 
       {data && !loading && (
         <div className="space-y-6">
           {/* Summary cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="rounded-xl border border-border p-4">
+            <div className="rounded-md border border-border p-4">
               <p className="text-xs text-muted-foreground mb-1">{tt('orderCount')}</p>
               <p className="text-2xl font-semibold font-mono">{data.summary.orderCount}</p>
               <p className="text-xs text-muted-foreground mt-1">
                 {tt('entryCount', { count: data.summary.transactionCount })}
               </p>
             </div>
-            <div className="rounded-xl border border-border p-4">
+            <div className="rounded-md border border-border p-4">
               <p className="text-xs text-muted-foreground mb-1">{tt('totalTaxableSales')}</p>
               <p className="text-2xl font-semibold font-mono">
-                {major(data.summary.totalTaxableSales)} {tc('egp')}
+                {formatPrice(data.summary.totalTaxableSales)}
               </p>
             </div>
-            <div className="rounded-xl border border-border p-4 bg-warning/10 border-warning/30">
+            <div className="rounded-md border border-border p-4 bg-warning/10 border-warning/30">
               <p className="text-xs text-muted-foreground mb-1">{tt('totalTaxCollected')}</p>
               <p className="text-2xl font-semibold font-mono text-warning-ink">
-                {major(data.summary.totalTaxCollected)} {tc('egp')}
+                {formatPrice(data.summary.totalTaxCollected)}
               </p>
             </div>
           </div>
@@ -819,7 +809,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
           {data.summary.byRate.length > 0 && (
             <section>
               <h3 className="text-sm font-semibold mb-2">{tt('byRateBreakdown')}</h3>
-              <div className="rounded-xl border border-border overflow-x-auto">
+              <div className="rounded-md border border-border overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/30">
                     <tr>
@@ -862,7 +852,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                 {tt('noTransactions')}
               </p>
             ) : (
-              <div className="rounded-xl border border-border overflow-hidden">
+              <div className="rounded-md border border-border overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/30">
@@ -901,11 +891,11 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                             row.kind === 'sale' ? '' : ' text-muted-foreground bg-muted/10'
                           }`}
                         >
-                          <td className="px-3 py-2 text-xs">
+                          <td className="px-3 py-2 text-sm">
                             {row.kind === 'sale' ? tt('kindSale') : tt('kindReversal')}
                           </td>
-                          <td className="px-3 py-2 font-mono text-xs">{row.date}</td>
-                          <td className="px-3 py-2 font-mono text-xs">{row.orderNumber}</td>
+                          <td className="px-3 py-2 font-mono text-sm">{row.date}</td>
+                          <td className="px-3 py-2 font-mono text-sm">{row.orderNumber}</td>
                           <td className="px-3 py-2 text-muted-foreground">
                             {row.customerName ?? <span className="italic">{tt('guest')}</span>}
                           </td>

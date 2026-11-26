@@ -7,10 +7,8 @@ import { Button } from '@/components/ui/Button';
 import { useLocale } from 'next-intl';
 import { apiGet, apiPut, apiDelete, apiPatch } from '@/lib/api';
 import {
-  PLAN_LABELS,
-  STORE_PLANS,
-  isInBaseline,
   getSuperAdminFeatures,
+  publicPlanForStorePlan,
   type StorePlan,
   type FeatureKey,
   type FeatureCategory,
@@ -19,6 +17,8 @@ import {
 import { ToggleSwitch } from './_components/ToggleSwitch';
 import { useT } from '@/i18n/useT';
 import { useFeatures } from '@/hooks/useFeatures';
+import { SubscriptionPlanRow, useStorePlan } from '@/components/billing/SubscriptionPlanRow';
+import { featureTriState, type TriState } from '@/lib/feature-state';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -43,27 +43,6 @@ interface StoreInfo {
   status: 'active' | 'suspended' | string;
 }
 
-type TriState = 'baseline_on' | 'override_on' | 'override_off' | 'baseline_off';
-
-function triState(
-  plan: StorePlan,
-  key: FeatureKey,
-  overrideRow: OverrideMetadata | undefined
-): TriState {
-  const inBaseline = isInBaseline(plan, key);
-  if (overrideRow !== undefined) {
-    if (overrideRow.enabled) {
-      // Row exists and is enabled
-      return inBaseline ? 'baseline_on' : 'override_on';
-    } else {
-      // Row exists and is disabled
-      return inBaseline ? 'override_off' : 'baseline_off';
-    }
-  }
-  // No override row
-  return inBaseline ? 'baseline_on' : 'baseline_off';
-}
-
 const CATEGORY_ORDER: FeatureCategory[] = [
   'commerce',
   'marketing',
@@ -76,21 +55,17 @@ import { formatDate } from '@/lib/format';
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 
-function TriStateBadge({ state, plan }: { state: TriState; plan: StorePlan }) {
+function TriStateBadge({ state, planLabel }: { state: TriState; planLabel: string }) {
   const t = useT('features.matrix');
-  const locale = useLocale();
-  const planLabel = locale === 'ar' ? PLAN_LABELS[plan].ar : PLAN_LABELS[plan].en;
   const configs: Record<TriState, { color: string; dot: string; label: string }> = {
     baseline_on: {
-      color:
-        'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
-      dot: 'bg-emerald-500',
+      color: 'bg-success/10 text-success-ink border-success/30',
+      dot: 'bg-success',
       label: t('badges.includedIn', { plan: planLabel }),
     },
     override_on: {
-      color:
-        'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800',
-      dot: 'bg-blue-500',
+      color: 'bg-info/10 text-info-ink border-info/30',
+      dot: 'bg-info',
       label: t('badges.grantedByOverride'),
     },
     override_off: {
@@ -119,33 +94,38 @@ function TriStateBadge({ state, plan }: { state: TriState; plan: StorePlan }) {
 
 interface FeatureRowProps {
   def: FeatureDefinition;
-  plan: StorePlan;
+  tier: StorePlan;
+  planLabel: string;
+  effective: Record<string, boolean>;
   overrideRow: OverrideMetadata | undefined;
   inFlight: boolean;
   onAction: (key: FeatureKey, state: TriState) => void;
 }
 
-function FeatureRowItem({ def, plan, overrideRow, inFlight, onAction }: FeatureRowProps) {
+function FeatureRowItem({
+  def,
+  tier,
+  planLabel,
+  effective,
+  overrideRow,
+  inFlight,
+  onAction,
+}: FeatureRowProps) {
   const tFeatures = useT('features');
-  const state = triState(plan, def.key, overrideRow);
+  const locale = useLocale() === 'ar' ? 'ar' : 'en';
+  const state = featureTriState(tier, def.key, overrideRow, effective);
   const isEffectivelyOn = state === 'baseline_on' || state === 'override_on';
 
   return (
     <div className="flex items-start justify-between px-6 py-4 hover:bg-muted/30 transition-colors">
       <div className="flex-1 min-w-0 me-4">
-        <div className="flex flex-wrap items-center gap-2 mb-0.5">
-          <p className="font-medium text-foreground">{def.name}</p>
-          <span className="text-muted-foreground text-xs">·</span>
-          <p className="text-xs text-muted-foreground" dir="rtl">
-            {def.nameAr}
-          </p>
-        </div>
-        <p className="text-sm text-muted-foreground leading-snug">{def.description}</p>
-        <p className="text-xs text-muted-foreground leading-snug mt-0.5" dir="rtl">
-          {def.descriptionAr}
+        {/* STORE-QA-14: one language per locale. The English + Arabic stack read as a duplicate and leaked internal copy. */}
+        <p className="font-medium text-foreground">{locale === 'ar' ? def.nameAr : def.name}</p>
+        <p className="text-sm text-muted-foreground leading-snug">
+          {locale === 'ar' ? def.descriptionAr : def.description}
         </p>
         <div className="mt-1.5 flex flex-wrap gap-1.5 items-center">
-          <TriStateBadge state={state} plan={plan} />
+          <TriStateBadge state={state} planLabel={planLabel} />
           {def.hidden && (
             <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
               {tFeatures('row.hiddenFromMerchants')}
@@ -165,6 +145,7 @@ function FeatureRowItem({ def, plan, overrideRow, inFlight, onAction }: FeatureR
           enabled={isEffectivelyOn}
           onChange={() => onAction(def.key, state)}
           disabled={inFlight}
+          label={def.nameAr || def.name}
         />
       </div>
     </div>
@@ -176,7 +157,9 @@ function FeatureRowItem({ def, plan, overrideRow, inFlight, onAction }: FeatureR
 interface CategorySectionProps {
   category: FeatureCategory;
   features: FeatureDefinition[];
-  plan: StorePlan;
+  tier: StorePlan;
+  planLabel: string;
+  effective: Record<string, boolean>;
   overrideMap: Map<string, OverrideMetadata>;
   inFlightKeys: Set<string>;
   onAction: (key: FeatureKey, state: TriState) => void;
@@ -185,7 +168,9 @@ interface CategorySectionProps {
 function CategorySection({
   category,
   features,
-  plan,
+  tier,
+  planLabel,
+  effective,
   overrideMap,
   inFlightKeys,
   onAction,
@@ -193,7 +178,7 @@ function CategorySection({
   const t = useT('features.matrix');
   const tFeatures = useT('features');
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden">
+    <div className="bg-card rounded-md border border-border overflow-hidden">
       <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/40">
         <div>
           <h2 className="font-semibold text-foreground">{tFeatures(`categories.${category}`)}</h2>
@@ -210,7 +195,9 @@ function CategorySection({
           <FeatureRowItem
             key={def.key}
             def={def}
-            plan={plan}
+            tier={tier}
+            planLabel={planLabel}
+            effective={effective}
             overrideRow={overrideMap.get(def.key)}
             inFlight={inFlightKeys.has(def.key)}
             onAction={onAction}
@@ -235,10 +222,8 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
   const t = useT('features.matrix');
   const tCommon = useT('common');
   const locale = useLocale();
-  const planLabelFor = useCallback(
-    (p: StorePlan) => (locale === 'ar' ? PLAN_LABELS[p].ar : PLAN_LABELS[p].en),
-    [locale]
-  );
+  // ONE plan source: billing's effective plan (name + feature tier). `stores.plan` is a legacy column and disagreed with it.
+  const planState = useStorePlan(storeId);
 
   // Store info (plan + name)
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
@@ -246,15 +231,11 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
 
   // Feature overrides from API
   const [overrideMap, setOverrideMap] = useState<Map<string, OverrideMetadata>>(new Map());
+  const [effective, setEffective] = useState<Record<string, boolean>>({});
   const [featuresLoading, setFeaturesLoading] = useState(true);
 
   // Per-key in-flight set
   const [inFlightKeys, setInFlightKeys] = useState<Set<string>>(new Set());
-
-  // Plan change modal
-  const [planModalOpen, setPlanModalOpen] = useState(false);
-  const [pendingPlan, setPendingPlan] = useState<StorePlan | null>(null);
-  const [planChanging, setPlanChanging] = useState(false);
 
   // Suspend modal
   const [suspendModalOpen, setSuspendModalOpen] = useState(false);
@@ -282,6 +263,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       toastError(t('toasts.loadFeaturesFailed'), apiErr.message);
     } else if (data) {
       setOverrideMap(new Map(data.metadata.map(m => [m.featureKey, m])));
+      setEffective(data.features ?? {});
     }
     setFeaturesLoading(false);
   }, [storeId, toastError, t]);
@@ -321,39 +303,6 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
     },
     [inFlightKeys, storeId, fetchFeatures, refreshFeatureContext, toastError, t]
   );
-
-  // ── Plan change ────────────────────────────────────────────────────────────
-  const handlePlanChange = useCallback(async () => {
-    if (!pendingPlan) return;
-    setPlanChanging(true);
-    const { error: apiErr } = await apiPut(`/api/v1/admin/stores/${storeId}/plan`, {
-      plan: pendingPlan,
-    });
-    if (apiErr) {
-      toastError(t('toasts.planChangeFailed'), apiErr.message);
-    } else {
-      toastSuccess(
-        t('toasts.planUpdated'),
-        t('toasts.planUpdatedDescription', { plan: planLabelFor(pendingPlan) })
-      );
-      // A plan change moves the feature BASELINE, so the matrix and the
-      // store-wide context both change even with no override touched.
-      await Promise.all([fetchStore(), fetchFeatures(), refreshFeatureContext()]);
-    }
-    setPlanChanging(false);
-    setPlanModalOpen(false);
-    setPendingPlan(null);
-  }, [
-    pendingPlan,
-    storeId,
-    fetchStore,
-    fetchFeatures,
-    refreshFeatureContext,
-    toastSuccess,
-    toastError,
-    t,
-    planLabelFor,
-  ]);
 
   // ── Suspend / reactivate ───────────────────────────────────────────────────
   const handleStatusChange = useCallback(async () => {
@@ -430,43 +379,23 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
     grouped[def.category].push(def);
   }
 
-  const plan = storeInfo.plan as StorePlan;
+  const tier = (planState.plan?.featureTier ?? storeInfo.plan) as StorePlan;
+  const planName = planState.plan
+    ? locale === 'ar'
+      ? planState.plan.nameAr
+      : planState.plan.nameEn
+    : ((l: 'ar' | 'en') => {
+        const sold = publicPlanForStorePlan(storeInfo.plan);
+        return sold ? sold[l] : storeInfo.plan;
+      })(locale === 'ar' ? 'ar' : 'en');
   const isSuspended = storeInfo.status === 'suspended';
 
   return (
     <div className="space-y-8">
-      {/* ── Plan Picker ─────────────────────────────────────────────────────── */}
-      <div className="bg-card rounded-xl border border-border p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h2 className="font-semibold text-foreground">{t('storePlanHeading')}</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">{t('storePlanSubtitle')}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary-ink px-3 py-1 text-sm font-medium">
-              {planLabelFor(plan)}
-            </span>
-            <select
-              className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              value=""
-              onChange={e => {
-                const val = e.target.value as StorePlan;
-                if (val && val !== plan) {
-                  setPendingPlan(val);
-                  setPlanModalOpen(true);
-                }
-              }}
-            >
-              <option value="">{t('changePlanOption')}</option>
-              {STORE_PLANS.filter(p => p !== plan).map(p => (
-                <option key={p} value={p}>
-                  {planLabelFor(p)}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <p className="mt-3 text-xs text-muted-foreground">{t('planChangeNote')}</p>
+      {/* ── Plan: the subscription's priced plan + the one place to assign it (Ruling B1-PLAN-SOT-1) ── */}
+      <div className="space-y-2">
+        <SubscriptionPlanRow storeId={storeId} state={planState} />
+        <p className="text-xs text-muted-foreground">{t('baselineTierNote', { plan: planName })}</p>
       </div>
 
       {/* ── Feature Matrix ───────────────────────────────────────────────────── */}
@@ -479,7 +408,9 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
               key={category}
               category={category}
               features={features}
-              plan={plan}
+              tier={tier}
+              planLabel={planName}
+              effective={effective}
               overrideMap={overrideMap}
               inFlightKeys={inFlightKeys}
               onAction={handleAction}
@@ -491,7 +422,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       {/* ── Danger Zone ──────────────────────────────────────────────────────── */}
       <div className="mt-8">
         <h2 className="mb-4 font-semibold text-destructive-ink">{t('dangerZone.heading')}</h2>
-        <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-6 space-y-4">
+        <div className="rounded-md border-2 border-destructive/40 bg-destructive/5 p-6 space-y-4">
           {/* Suspend / Reactivate */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -547,44 +478,6 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
 
       {/* ── Modals ───────────────────────────────────────────────────────────── */}
 
-      {/* Plan change confirm */}
-      <Modal
-        isOpen={planModalOpen}
-        onClose={() => {
-          setPlanModalOpen(false);
-          setPendingPlan(null);
-        }}
-        title={t('modals.changePlanTitle')}
-        size="sm"
-      >
-        <p className="text-sm text-muted-foreground">
-          {t.rich('modals.changePlanBody', {
-            b: chunks => <strong>{chunks}</strong>,
-            plan: pendingPlan ? planLabelFor(pendingPlan) : '',
-          })}
-        </p>
-        <div className="mt-6 flex justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={() => {
-              setPlanModalOpen(false);
-              setPendingPlan(null);
-            }}
-            disabled={planChanging}
-          >
-            {tCommon('cancel')}
-          </Button>
-          <Button
-            variant="default"
-            onClick={handlePlanChange}
-            disabled={planChanging}
-            isLoading={planChanging}
-          >
-            {tCommon('confirm')}
-          </Button>
-        </div>
-      </Modal>
-
       {/* Suspend / reactivate confirm */}
       <Modal
         isOpen={suspendModalOpen}
@@ -626,7 +519,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
         <p className="text-sm text-muted-foreground">
           {t.rich('modals.resetBody', {
             b: chunks => <strong>{chunks}</strong>,
-            plan: planLabelFor(plan),
+            plan: planName,
           })}
         </p>
         <div className="mt-6 flex justify-end gap-3">

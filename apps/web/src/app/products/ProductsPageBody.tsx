@@ -3,7 +3,7 @@ import { permanentRedirect } from 'next/navigation';
 import type { ResolvedStore } from '../../lib/store-resolver';
 import { API_URL } from '../../lib/api';
 import { publicLayoutUrl } from '../../lib/preview-draft';
-import { fetchSlugRedirect, storeRedirectUrl } from '../../lib/slug-redirect';
+import { fetchSlugRedirect, localizedRedirectUrl } from '../../lib/slug-redirect';
 import {
   resolveLayoutSettings,
   type ProductCardDefaults,
@@ -91,6 +91,8 @@ async function fetchInitialData(
   const productsQuery = new URLSearchParams({
     page: '1',
     limit: '96',
+    // The price filter sizes its slider from `meta.priceMax`, which the API only sends on request.
+    withPriceMax: '1',
   });
   if (filters.category) productsQuery.set('category', filters.category);
   if (filters.tag) productsQuery.set('tag', filters.tag);
@@ -159,7 +161,7 @@ export async function ProductsPageBody({
     const toSlug = await fetchSlugRedirect(store, 'category', category);
     if (toSlug && toSlug !== category) {
       permanentRedirect(
-        storeRedirectUrl(store, `/products?category=${encodeURIComponent(toSlug)}`)
+        await localizedRedirectUrl(store, `/products?category=${encodeURIComponent(toSlug)}`)
       );
     }
   }

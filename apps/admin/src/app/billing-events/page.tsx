@@ -17,6 +17,7 @@
  * Route guard: super_admin only (RequireSuperAdmin + the API's requireRole).
  */
 
+import { formatDate } from '@/lib/format';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge } from '@ebda/ui';
@@ -33,6 +34,7 @@ import { ClaimsPanel } from './_components/ClaimsPanel';
 import { ManualPaymentForm, type ManualPaymentPrefill } from './_components/ManualPaymentForm';
 import { ManualRefundForm, type ManualRefundTarget } from './_components/ManualRefundForm';
 import { GrantsPanel } from './_components/GrantsPanel';
+import { HeldPaymentsPanel } from './_components/HeldPaymentsPanel';
 import { SubscriptionsPanel } from './_components/SubscriptionsPanel';
 
 interface LedgerRow {
@@ -76,7 +78,7 @@ const TYPE_FILTERS = [
   'card_setup',
   'manual_payment',
 ] as const;
-const TABS = ['ledger', 'subscriptions', 'claims', 'grants'] as const;
+const TABS = ['ledger', 'subscriptions', 'claims', 'held', 'grants'] as const;
 
 function statusVariant(s: string): 'success' | 'warning' | 'destructive' | 'default' {
   if (s === 'succeeded') return 'success';
@@ -124,17 +126,20 @@ function LedgerPanel({
     fetchRows();
   }, [fetchRows, refreshKey, refreshSignal]);
 
-  async function refund(row: LedgerRow) {
+  async function refund(row: LedgerRow, keepAccess = false) {
     const amount = formatMoney(row.amountMinor, locale, { fixedDecimals: true });
     const ok = await askConfirm({
       object: t('refundObject', { amount }),
-      consequence: t('confirmRefund', { amount }),
+      consequence: t(keepAccess ? 'confirmRefundKeepAccess' : 'confirmRefund', { amount }),
       confirmLabel: t('refundAction'),
     });
     if (!ok) return;
     setBusy(row.id);
     setMessage(null);
-    const res = await apiPost(`/api/v1/admin/billing/events/${row.id}/refund`, {});
+    const res = await apiPost(
+      `/api/v1/admin/billing/events/${row.id}/refund`,
+      keepAccess ? { keepAccess: true } : {}
+    );
     setBusy(null);
     if (res.error) {
       setMessage(t('refundFailed', { message: res.error.message || 'error' }));
@@ -229,10 +234,7 @@ function LedgerPanel({
             {r.tax.etaSubmittedAt && (
               <span className="block text-muted-foreground">
                 {t('etaSubmittedAt', {
-                  date: new Date(r.tax.etaSubmittedAt).toLocaleDateString(
-                    undefined,
-                    withNumerals()
-                  ),
+                  date: formatDate(r.tax.etaSubmittedAt),
                 })}
               </span>
             )}
@@ -294,15 +296,26 @@ function LedgerPanel({
             {t('recordRefund')}
           </Button>
         ) : r.status === 'succeeded' && r.type !== 'refund' && r.providerRef ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="max-md:min-h-11 max-md:px-4"
-            disabled={busy === r.id}
-            onClick={() => refund(r)}
-          >
-            {t('refund')}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="max-md:min-h-11 max-md:px-4"
+              disabled={busy === r.id}
+              onClick={() => refund(r)}
+            >
+              {t('refund')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="max-md:min-h-11 max-md:px-4"
+              disabled={busy === r.id}
+              onClick={() => refund(r, true)}
+            >
+              {t('refundKeepAccess')}
+            </Button>
+          </div>
         ) : null,
     },
   ];
@@ -416,6 +429,15 @@ function BillingEventsInner() {
           <SubscriptionsPanel refreshKey={refreshKey} onRecordPayment={setForm} />
         )}
         {tab === 'grants' && <GrantsPanel refreshKey={refreshKey} />}
+        {tab === 'held' && (
+          <HeldPaymentsPanel
+            refreshKey={refreshKey}
+            onChanged={m => {
+              setMessage(m);
+              setRefreshKey(k => k + 1);
+            }}
+          />
+        )}
         {tab === 'claims' && (
           <ClaimsPanel
             refreshKey={refreshKey}

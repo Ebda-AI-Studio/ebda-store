@@ -54,20 +54,6 @@ export const DEFAULT_CONFIGS: NotificationConfigs = {
   push_notifications: { enabled: false },
 };
 
-/**
- * Color palette for the notification-log status pill. Handed to the shared
- * OrderStatusBadge via `colorMap`. Distinct from the shipment palette (different
- * vocabulary) and intentionally treats "sent" and "delivered" as equivalent
- * success states.
- */
-export const NOTIFICATION_COLORS = {
-  sent: { className: 'bg-success/10 text-success-ink' },
-  delivered: { className: 'bg-success/10 text-success-ink' },
-  failed: { className: 'bg-destructive/10 text-destructive-ink' },
-  pending: { className: 'bg-muted text-muted-foreground' },
-  queued: { className: 'bg-primary/10 text-primary-ink' },
-} as const;
-
 export const DEFAULT_EVENTS: EventConfig[] = [
   {
     event: 'order_confirmed',
@@ -112,3 +98,24 @@ export const DEFAULT_EVENTS: EventConfig[] = [
     push_notifications: false,
   },
 ];
+
+/**
+ * STORE-QA-62: `GET /notifications/events` answers `{ events: { [event]: { whatsapp, sms, push } } }` (a record), but the page read
+ * it as an array, so a saved toggle never came back after a reload. Fold the stored record (or a legacy array) over the defaults.
+ */
+export function mergeStoredEvents(stored: unknown): EventConfig[] {
+  type Flags = { sms?: boolean; push?: boolean; push_notifications?: boolean };
+  const byEvent = new Map<string, Flags>();
+  if (Array.isArray(stored)) {
+    for (const e of stored as Array<Flags & { event: string }>) byEvent.set(e.event, e);
+  } else if (stored && typeof stored === 'object') {
+    for (const [event, v] of Object.entries(stored as Record<string, object>))
+      byEvent.set(event, v);
+  }
+  return DEFAULT_EVENTS.map(d => {
+    const v = byEvent.get(d.event);
+    return v
+      ? { ...d, sms: v.sms === true, push_notifications: (v.push ?? v.push_notifications) === true }
+      : d;
+  });
+}

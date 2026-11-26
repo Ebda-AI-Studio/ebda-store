@@ -16,6 +16,12 @@ vi.mock('next/link', () => ({
   ),
 }));
 
+const feed = vi.hoisted(() => ({ items: [] as unknown[] }));
+vi.mock('../../../../hooks/useAttention', () => ({
+  useAttention: () => ({ items: feed.items, loaded: true, actionCount: feed.items.length }),
+}));
+vi.mock('next-intl', () => ({ useLocale: () => 'ar' }));
+
 import { NeedsAction } from './NeedsAction';
 
 const ok = (data: unknown) => Promise.resolve({ data, error: null });
@@ -23,6 +29,7 @@ const fail = () =>
   Promise.resolve({ data: null, error: { message: 'x', status: 500, code: 'SERVER_ERROR' } });
 
 beforeEach(() => {
+  feed.items = [];
   apiGet.mockReset();
   cleanup();
 });
@@ -44,6 +51,32 @@ describe('dashboard "needs action" row', () => {
     expect(screen.getByText('orders').closest('a')?.getAttribute('href')).toBe(
       '/stores/s1/orders?status=pending'
     );
+  });
+
+  it('STORE-QA-29: an active store with empty SEO fields gets an SEO tile linking to /seo', async () => {
+    apiGet.mockImplementation((url: string) =>
+      url.endsWith('/seo')
+        ? ok({
+            seo: { metaTitle: '', metaTitleAr: '', metaDescription: '', metaDescriptionAr: '' },
+          })
+        : ok({ meta: { total: 0 }, products: [], stats: { pending: 0 } })
+    );
+    render(<NeedsAction storeId="s1" />);
+    await waitFor(() => expect(screen.getByText('seoMissing')).toBeTruthy());
+    expect(screen.getByText('seoMissing').closest('a')?.getAttribute('href')).toBe(
+      '/stores/s1/seo'
+    );
+  });
+
+  it('no SEO tile once a title exists', async () => {
+    apiGet.mockImplementation((url: string) =>
+      url.endsWith('/seo')
+        ? ok({ seo: { metaTitleAr: 'متجري' } })
+        : ok({ meta: { total: 0 }, products: [], stats: { pending: 0 } })
+    );
+    render(<NeedsAction storeId="s1" />);
+    await waitFor(() => expect(screen.getByText('allClear')).toBeTruthy());
+    expect(screen.queryByText('seoMissing')).toBeNull();
   });
 
   it('says all clear when every count is zero', async () => {
@@ -70,5 +103,34 @@ describe('dashboard "needs action" row', () => {
     await waitFor(() => expect(screen.getByText('orders')).toBeTruthy());
     expect(screen.queryByText('returns')).toBeNull();
     expect(screen.queryByText('loadFailed')).toBeNull();
+  });
+
+  it('money and setup blockers from the attention feed show as tiles, even with nothing else waiting', async () => {
+    apiGet.mockImplementation(() =>
+      ok({ meta: { total: 0 }, products: [], stats: { pending: 0 } })
+    );
+    feed.items = [
+      {
+        id: 'instapay_orders_unconfirmed',
+        severity: 'action',
+        section: 'orders',
+        title: { en: 'InstaPay payments to confirm', ar: 'تحويلات إنستاباي محتاجة تأكيدك' },
+        message: { en: '', ar: '' },
+        count: 2,
+      },
+      {
+        id: 'staff_invites_pending',
+        severity: 'info',
+        section: 'staff',
+        title: { en: 'x', ar: 'دعوات' },
+        message: { en: '', ar: '' },
+      },
+    ];
+    render(<NeedsAction storeId="s1" />);
+    await waitFor(() => expect(screen.getByText('تحويلات إنستاباي محتاجة تأكيدك')).toBeTruthy());
+    expect(
+      screen.getByText('تحويلات إنستاباي محتاجة تأكيدك').closest('a')?.getAttribute('href')
+    ).toBe('/stores/s1/orders');
+    expect(screen.queryByText('دعوات')).toBeNull(); // info items never become tiles
   });
 });

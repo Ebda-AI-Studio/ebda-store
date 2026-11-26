@@ -12,6 +12,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { apiGet, apiPost } from '@/lib/api';
 import { parseStockAdjustCsv, generateStockAdjustCsvTemplate } from '@ebda/shared';
 import type { StockAdjustParseResult, StockAdjustParsedRow } from '@ebda/shared';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,8 +27,16 @@ interface ProductsResponse {
   meta: { total: number };
 }
 
+interface VariantOption {
+  id: string;
+  title: string | null;
+  sku: string | null;
+  inventory: number;
+}
+
 interface ItemDraft {
   productId: string;
+  variantId?: string;
   newQty: string;
 }
 
@@ -73,7 +82,7 @@ const ADJUSTMENT_TYPES = [
   'return_to_supplier',
 ] as const;
 
-const EMPTY_ITEM: ItemDraft = { productId: '', newQty: '' };
+const EMPTY_ITEM: ItemDraft = { productId: '', variantId: '', newQty: '' };
 
 // ─── CSV Upload Component ─────────────────────────────────────────────────────
 
@@ -236,7 +245,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
   return (
     <div className="space-y-5">
       {/* Instructions card */}
-      <div className="rounded-xl border bg-info/5 p-5">
+      <div className="rounded-md border bg-info/5 p-5">
         <h3 className="font-semibold text-info-ink text-sm">{tNew('csvHelpTitle')}</h3>
         <ol className="mt-2 list-decimal list-inside space-y-1 text-sm text-info-ink">
           <li>{tNew('csvHelpStep1')}</li>
@@ -272,7 +281,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
         <select
           value={type}
           onChange={e => setType(e.target.value)}
-          className="w-full max-w-xs border border-border rounded px-3 py-2 text-base sm:text-sm"
+          className={`${FIELD_CLASSES} max-w-xs`}
         >
           {ADJUSTMENT_TYPES.map(at => (
             <option key={at} value={at}>
@@ -292,7 +301,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             value={reason}
             onChange={e => setReason(e.target.value)}
             rows={2}
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+            className={`${TEXTAREA_CLASSES} resize-none`}
             placeholder={t('reasonEnPlaceholder')}
           />
         </label>
@@ -303,7 +312,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             onChange={e => setReasonAr(e.target.value)}
             rows={2}
             dir="rtl"
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+            className={`${TEXTAREA_CLASSES} resize-none`}
             placeholder={t('reasonArPlaceholder')}
           />
         </label>
@@ -311,7 +320,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
 
       {/* File upload */}
       <div
-        className="border-2 border-dashed rounded-xl p-8 text-center hover:border-primary transition cursor-pointer"
+        className="border-2 border-dashed rounded-md p-8 text-center hover:border-primary transition cursor-pointer"
         onClick={() => fileInputRef.current?.click()}
       >
         <input
@@ -374,7 +383,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
           />
           {/* Row-level errors */}
           {errorRowCount > 0 && (
-            <div className="rounded-xl border border-border p-3 bg-destructive/5">
+            <div className="rounded-md border border-border p-3 bg-destructive/5">
               <p className="text-xs font-medium text-destructive-ink mb-1">
                 {tNew('csvRowErrorsLabel')}
               </p>
@@ -393,7 +402,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
 
       {/* Import result */}
       {importResult && (
-        <div className="rounded-xl border border-border p-4 bg-muted/20 space-y-2">
+        <div className="rounded-md border border-border p-4 bg-muted/20 space-y-2">
           <p className="text-sm font-semibold text-foreground">
             {tNew('csvImportComplete', { number: importResult.adjustmentNumber })}
           </p>
@@ -493,6 +502,22 @@ export default function NewStockAdjustmentPage() {
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // STORE-QA-59: a product with variants keeps its stock on the variants, so
+  // each line must name a variant. Rows are loaded when the product is chosen.
+  const [variantsByProduct, setVariantsByProduct] = useState<Record<string, VariantOption[]>>({});
+
+  async function loadVariants(productId: string) {
+    if (!productId || variantsByProduct[productId]) return;
+    const { data } = await apiGet<{ product?: { variants?: VariantOption[] } }>(
+      `/api/v1/stores/${storeId}/products/${productId}`
+    );
+    setVariantsByProduct(cur => ({ ...cur, [productId]: data?.product?.variants ?? [] }));
+  }
+
+  useEffect(() => {
+    if (prefillProductId) void loadVariants(prefillProductId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, prefillProductId]);
 
   useEffect(() => {
     if (!storeId) return;
@@ -518,19 +543,39 @@ export default function NewStockAdjustmentPage() {
       header: tNew('selectProduct'),
       primaryOnMobile: true,
       cell: (item, i) => (
-        <select
-          value={item.productId}
-          onChange={e => updateItem(i, { productId: e.target.value })}
-          className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
-        >
-          <option value="">— {tNew('selectProduct')} —</option>
-          {products.map(p => (
-            <option key={p.id} value={p.id}>
-              {p.sku ? `[${p.sku}] ` : ''}
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-col gap-1">
+          <select
+            value={item.productId}
+            onChange={e => {
+              updateItem(i, { productId: e.target.value, variantId: '' });
+              void loadVariants(e.target.value);
+            }}
+            className={FIELD_CLASSES}
+          >
+            <option value="">— {tNew('selectProduct')} —</option>
+            {products.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.sku ? `[${p.sku}] ` : ''}
+                {p.name}
+              </option>
+            ))}
+          </select>
+          {(variantsByProduct[item.productId]?.length ?? 0) > 0 && (
+            <select
+              value={item.variantId ?? ''}
+              onChange={e => updateItem(i, { variantId: e.target.value })}
+              aria-label={tNew('selectVariant')}
+              className={FIELD_CLASSES}
+            >
+              <option value="">— {tNew('selectVariant')} —</option>
+              {variantsByProduct[item.productId]!.map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.title ?? v.sku ?? v.id.slice(0, 8)} ({v.inventory})
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
       ),
     },
     {
@@ -544,7 +589,7 @@ export default function NewStockAdjustmentPage() {
           step="1"
           value={item.newQty}
           onChange={e => updateItem(i, { newQty: e.target.value })}
-          className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+          className={`${FIELD_CLASSES} text-end font-mono`}
         />
       ),
     },
@@ -560,7 +605,7 @@ export default function NewStockAdjustmentPage() {
           disabled={items.length <= 1}
           variant="link"
           size="sm"
-          className="text-red-600"
+          className="text-destructive-ink"
         >
           ✕
         </Button>
@@ -575,6 +620,12 @@ export default function NewStockAdjustmentPage() {
       setError(tNew('itemsRequired'));
       return;
     }
+    if (
+      validItems.some(it => (variantsByProduct[it.productId]?.length ?? 0) > 0 && !it.variantId)
+    ) {
+      setError(tNew('variantRequired'));
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -584,6 +635,7 @@ export default function NewStockAdjustmentPage() {
         evidenceUrl: evidenceUrl || undefined,
         items: validItems.map(it => ({
           productId: it.productId,
+          ...(it.variantId ? { variantId: it.variantId } : {}),
           newQty: Math.max(0, parseInt(it.newQty) || 0),
         })),
       };
@@ -612,6 +664,12 @@ export default function NewStockAdjustmentPage() {
       setError(tNew('itemsRequired'));
       return;
     }
+    if (
+      validItems.some(it => (variantsByProduct[it.productId]?.length ?? 0) > 0 && !it.variantId)
+    ) {
+      setError(tNew('variantRequired'));
+      return;
+    }
     const ok = await askConfirm({
       object: tNew('postObject', { count: validItems.length }),
       consequence: tNew('postConsequence'),
@@ -628,6 +686,7 @@ export default function NewStockAdjustmentPage() {
         evidenceUrl: evidenceUrl || undefined,
         items: validItems.map(it => ({
           productId: it.productId,
+          ...(it.variantId ? { variantId: it.variantId } : {}),
           newQty: Math.max(0, parseInt(it.newQty) || 0),
         })),
       };
@@ -712,7 +771,7 @@ export default function NewStockAdjustmentPage() {
               <select
                 value={type}
                 onChange={e => setType(e.target.value)}
-                className="w-full max-w-xs border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={`${FIELD_CLASSES} max-w-xs`}
               >
                 {ADJUSTMENT_TYPES.map(at => (
                   <option key={at} value={at}>
@@ -732,7 +791,7 @@ export default function NewStockAdjustmentPage() {
                   value={reason}
                   onChange={e => setReason(e.target.value)}
                   rows={3}
-                  className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+                  className={`${TEXTAREA_CLASSES} resize-none`}
                   placeholder={t('reasonEnPlaceholder')}
                 />
               </label>
@@ -743,7 +802,7 @@ export default function NewStockAdjustmentPage() {
                   onChange={e => setReasonAr(e.target.value)}
                   rows={3}
                   dir="rtl"
-                  className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+                  className={`${TEXTAREA_CLASSES} resize-none`}
                   placeholder={t('reasonArPlaceholder')}
                 />
               </label>
@@ -756,7 +815,7 @@ export default function NewStockAdjustmentPage() {
                 type="url"
                 value={evidenceUrl}
                 onChange={e => setEvidenceUrl(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={FIELD_CLASSES}
                 placeholder={tNew('evidencePlaceholder')}
               />
             </label>

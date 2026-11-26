@@ -12,6 +12,7 @@ import { api, API_URL, type Order } from '../../lib/api';
 import { groupOrderLinesForDisplay } from '@ebda/shared';
 import { returnPolicyCopy, returnPolicyKind } from '../../lib/return-policy-text';
 import { useNumerals } from '../../hooks/useNumerals';
+import GuestReturnForm from './GuestReturnForm';
 
 const RETURN_REASONS = [
   {
@@ -294,6 +295,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
             'عشان تقدّم طلب إرجاع لطلب من طلباتك.'
           )}
         </p>
+        <GuestReturnForm />
       </section>
     );
   }

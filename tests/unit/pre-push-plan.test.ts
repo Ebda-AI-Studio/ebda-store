@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import path, { join } from 'node:path';
 // @ts-expect-error plain .mjs without types
-import { plan } from '../../scripts/ci/pre-push-plan.mjs';
+import { plan, isLightPush, narrowScanners } from '../../scripts/ci/pre-push-plan.mjs';
 // @ts-expect-error plain .mjs without types
 import { loadWorkspaces } from '../../scripts/ci-affected.mjs';
 
@@ -149,6 +149,16 @@ describe('scanner tests are always in the pre-push run (PREPUSH-3)', () => {
     expect(found).toContain('tests/unit/rulings-index.test.ts');
   });
 
+  it('includes the whole-router walkers, which `related` cannot reach from a changed *.routes.ts (PREPUSH-7)', () => {
+    expect(found).toContain('tests/unit/route-table-manifest.test.ts');
+    expect(found).toContain('tests/unit/auth-sensitivity-routes.test.ts');
+    expect(found).toContain('tests/unit/public-mount-admin-route-guard.test.ts');
+    expect(SCANNER_RULE.test("const { default: apiRoutes } = await import('@api/routes');")).toBe(
+      true
+    );
+    expect(SCANNER_RULE.test("import { x } from '@api/routes/order.routes';")).toBe(false);
+  });
+
   it('is by content: the rule matches walkers and greps, not a plain fixture read', () => {
     expect(SCANNER_RULE.test('const files = readdirSync(dir)')).toBe(true);
     expect(SCANNER_RULE.test("execSync('git grep -n foo')")).toBe(true);
@@ -162,12 +172,47 @@ describe('scanner tests are always in the pre-push run (PREPUSH-3)', () => {
   });
 
   it('the gate runs them whatever the diff', () => {
-    const gate = readSrc('scripts/ci/pre-push-gate.sh', 'utf8');
+    // F10: the Store's own steps live in scripts/ci/pre-push-extra.sh, which the vendored gate runs last
+    const gate = readSrc('scripts/ci/pre-push-extra.sh', 'utf8');
     expect(gate).toContain('SCANNERS=$(field scanners)');
     expect(gate).toMatch(/npx vitest run [^\n]*\$SCANNERS/);
     // not nested inside the `affected` branch
     expect(gate.indexOf('SCANNERS=$(field scanners)')).toBeGreaterThan(
       gate.indexOf('if [ "$MODE" = "affected" ]')
     );
+  });
+});
+
+describe('PREPUSH-6 change class', () => {
+  const all = scannerTests();
+
+  it('docs, workflow, i18n and test-only pushes are light; any source, config or script file is not', () => {
+    expect(isLightPush(['.github/workflows/pr-quality.yml', 'tests/unit/x.test.ts'])).toBe(true);
+    expect(isLightPush(['docs/a.md', 'apps/admin/src/locales/en.json'])).toBe(true);
+    expect(isLightPush(['apps/api/src/x.ts'])).toBe(false);
+    expect(isLightPush(['.github/workflows/ci.yml', 'package.json'])).toBe(false);
+    expect(isLightPush(['scripts/ci/pre-push-gate.sh'])).toBe(false);
+    expect(isLightPush([])).toBe(false);
+  });
+
+  it('a light push narrows the scanners; a code push keeps every one', () => {
+    const light = narrowScanners(all, ['.github/workflows/pr-quality.yml']);
+    expect(light.length).toBeGreaterThan(0);
+    expect(light.length).toBeLessThan(all.length);
+    expect(narrowScanners(all, ['apps/api/src/x.ts'])).toEqual(all);
+  });
+
+  it('a narrowed workflow push still runs the scanners that read workflows', () => {
+    const light = narrowScanners(all, ['.github/workflows/pr-quality.yml']);
+    expect(light).toContain('tests/unit/workflow-hosted-runners-only.test.ts');
+  });
+
+  it('PREPUSH-8: EVERY related run uses a prepush slot with 2 workers and never the heavy host lock (CI jobs hold it back to back)', () => {
+    const gate = readSrc('scripts/ci/pre-push-extra.sh', 'utf8');
+    expect(gate).toContain(
+      'prepush-slot.sh npx vitest related --run --passWithNoTests --maxWorkers=2'
+    );
+    expect(gate).not.toMatch(/host-lock\.sh\s+npx vitest/);
+    expect(gate).not.toMatch(/heavy-lock\.sh/);
   });
 });

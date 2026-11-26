@@ -30,7 +30,12 @@ import { readInStoreContext } from '../lib/store-scoped-read';
 import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
 import { cleanupRemovedImages } from './r2-cleanup.service';
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
-import { PUBLIC_MODEL3D_SELECT, toPublicModel3d } from './product-model.service';
+import {
+  CARD_MODEL3D_SELECT,
+  PUBLIC_MODEL3D_SELECT,
+  toPublicModel3d,
+  withHas3d,
+} from './product-model.service';
 import { publicGoldFields } from './gold-rate/public';
 import {
   assertSizeChartInStore,
@@ -227,6 +232,8 @@ interface ListProductsOptions {
   tag?: string;
   search?: string;
   featured?: boolean;
+  /** Admin list tri-state: true = only products WITH a 3D model, false = only without; absent = all. */
+  has3d?: boolean;
   /** Inclusive lower bound on `Product.price` (in piastres). */
   minPrice?: number;
   /** Inclusive upper bound on `Product.price` (in piastres). */
@@ -289,6 +296,55 @@ function buildOptionFilterClause(optionName: string, values: string[]): Prisma.P
  *
  * One query — aggregate via productOption join — no N+1.
  */
+/**
+ * The highest price a shopper can meet in this store's catalogue, in minor units (PL1): the larger of any
+ * public product's price and any variant's own price. The storefront price filter sizes its slider from it,
+ * so a fixed ceiling can no longer hide the dearer products. Variant-aware (a variant overrides the
+ * product's price), store-wide on purpose (not the current filter), and part of the cached list answer,
+ * which every product write already invalidates.
+ */
+/**
+ * The price filter's match rule (PL1): a product is in the range when ANY active variant is (a variant's own
+ * price, else the product price it inherits), or, with no active variants, when the product's own price is.
+ * So a ring at 4,850 whose only variant is 6,000 is out of a "max 5,000" filter and in a 5,500-7,000 one.
+ * Prices are minor units.
+ */
+// pq-allow(unused-export): test seam, imported by tests/unit/catalogue-max-price.test.ts
+export function priceRangeWhere(min?: number, max?: number): Prisma.ProductWhereInput {
+  const range: { gte?: number; lte?: number } = {};
+  if (min !== undefined) range.gte = min;
+  if (max !== undefined) range.lte = max;
+  return {
+    OR: [
+      { variants: { none: { isActive: true } }, price: range },
+      {
+        variants: {
+          some: {
+            isActive: true,
+            OR: [{ price: range }, { price: null, product: { price: range } }],
+          },
+        },
+      },
+    ],
+  };
+}
+
+// pq-allow(unused-export): test seam, imported by tests/unit/catalogue-max-price.test.ts
+export async function catalogueMaxPrice(storeId: string): Promise<number> {
+  const db = await storeDb(storeId);
+  const [p, v] = await Promise.all([
+    db.product.aggregate({
+      where: { storeId, status: 'active', deletedAt: null, audience: 'public' },
+      _max: { price: true },
+    }),
+    db.productVariant.aggregate({
+      where: { product: { storeId, status: 'active', deletedAt: null, audience: 'public' } },
+      _max: { price: true },
+    }),
+  ]);
+  return Math.max(p._max.price ?? 0, v._max.price ?? 0);
+}
+
 async function computeFacets(
   storeId: string,
   baseWhere: Prisma.ProductWhereInput
@@ -441,6 +497,8 @@ const PUBLIC_LISTING_SELECT = {
   ...STOREFRONT_PRODUCT_SELECT,
   lowStockThreshold: true,
   trackInventory: true,
+  // Card "3D" chip: id only, mapped to `has3d` by withHas3d (never ships the relation).
+  model3d: CARD_MODEL3D_SELECT,
   images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
   categories: { include: { category: true } },
   options: LISTING_SWATCH_OPTIONS_SELECT,
@@ -561,7 +619,7 @@ async function onSaleIdsFromDo(
 
 export class ProductService {
   static async list(storeId: string, options: ListProductsOptions = {}) {
-    const { status, category, search, featured, ids, withSalesQuantity } = options;
+    const { status, category, search, featured, ids, withSalesQuantity, has3d } = options;
     const page = Math.max(1, options.page || 1);
     // Cap matches the admin per-page selector's max option (500). 100 was
     // too low — merchants hitting 200/500 in the UI got silently
@@ -577,6 +635,12 @@ export class ProductService {
 
     if (featured !== undefined) {
       where.featured = featured;
+    }
+
+    // Admin "has 3D model" filter: ProductModel is 1:1 on productId (unique), so the relation
+    // filter is an indexed anti/semi-join, no scan of model rows.
+    if (has3d !== undefined) {
+      where.model3d = has3d ? { isNot: null } : { is: null };
     }
 
     if (ids && ids.length > 0) {
@@ -1681,6 +1745,11 @@ export class ProductService {
        * a ranked search never embeds (default deny, Ruling SEARCH-T12-6).
        */
       searcher?: string;
+      /**
+       * Add `meta.priceMax` (the store's highest price, PL1). Opt-in so the default listing payload stays exactly what
+       * it was (Ruling SEARCH-T12-2, pinned by listing-flag-off-golden); only the storefront price filter asks.
+       */
+      withPriceMax?: boolean;
     } = {}
   ) {
     const {
@@ -1815,11 +1884,12 @@ export class ProductService {
       where.tags = { some: { tag: { storeId, name: tag } } };
     }
 
-    if (minPrice !== undefined) {
-      where.price = { ...((where.price as object) || {}), gte: minPrice };
-    }
-    if (maxPrice !== undefined) {
-      where.price = { ...((where.price as object) || {}), lte: maxPrice };
+    // PL1: match on the price a shopper can actually buy at (see priceRangeWhere), not the base price alone.
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        priceRangeWhere(minPrice, maxPrice),
+      ];
     }
 
     // Snapshot the where clause BEFORE option filters for facet computation.
@@ -1885,7 +1955,7 @@ export class ProductService {
         return row ? [row] : [];
       });
       return {
-        products: pageRows.map(p => enrichStockFlags(p)),
+        products: pageRows.map(p => enrichStockFlags(withHas3d(p))),
         facets,
         meta: {
           page: cursor ? undefined : page,
@@ -2042,10 +2112,11 @@ export class ProductService {
       };
       const positionStoreRef = (await listingFor(storeId)).storeRef;
 
-      const [allMatchingFetched, total, facets] = await Promise.all([
+      const [allMatchingFetched, total, facets, priceMax] = await Promise.all([
         (await storeDb(storeId)).product.findMany(positionFindArgs),
         (await storeDb(storeId)).product.count({ where }),
         computeFacets(storeId, whereForFacets),
+        options.withPriceMax ? catalogueMaxPrice(storeId) : Promise.resolve(undefined),
       ]);
 
       const allMatchingRaw = withStoreRef(allMatchingFetched, positionStoreRef);
@@ -2082,7 +2153,7 @@ export class ProductService {
         // No type-erasing cast here: keeping the precise Prisma payload type
         // means `listPublic`'s return carries id/name/slug/images/categories
         // etc. for consumers like the AI product feed to typecheck against.
-        products: page_products.map(p => enrichStockFlags(p)),
+        products: page_products.map(p => enrichStockFlags(withHas3d(p))),
         facets,
         meta: {
           page: cursor ? undefined : page,
@@ -2091,6 +2162,7 @@ export class ProductService {
           totalPages: cursor ? undefined : Math.ceil(total / limit),
           nextCursor,
           skipCapped: skipCapped || undefined,
+          ...(priceMax !== undefined ? { priceMax } : {}),
         },
       };
 
@@ -2135,12 +2207,16 @@ export class ProductService {
       : { ...baseFindManyArgs, skip, take: limit };
 
     // The deals strip has no filter sidebar: skip the facet query on this hot homepage path.
-    const [productsFetched, total, facets] = await Promise.all([
+    const [productsFetched, total, facets, priceMax] = await Promise.all([
       (await storeDb(storeId)).product.findMany(findManyArgs),
       (await storeDb(storeId)).product.count({ where }),
       sort === 'on_sale'
         ? Promise.resolve([] as ProductFacet[])
         : computeFacets(storeId, whereForFacets),
+      // The deals strip has no price filter either; every other list only on request.
+      sort === 'on_sale' || !options.withPriceMax
+        ? Promise.resolve(undefined)
+        : catalogueMaxPrice(storeId),
     ]);
     const productsRaw = withStoreRef(productsFetched, listStoreRef);
 
@@ -2159,7 +2235,7 @@ export class ProductService {
 
     const result = {
       // No type-erasing cast (see the position-ordered path above).
-      products: products.map(p => enrichStockFlags(p)),
+      products: products.map(p => enrichStockFlags(withHas3d(p))),
       facets,
       meta: {
         page: cursor ? undefined : page,
@@ -2168,6 +2244,7 @@ export class ProductService {
         totalPages: cursor ? undefined : Math.ceil(total / limit),
         nextCursor,
         skipCapped: skipCapped || undefined,
+        ...(priceMax !== undefined ? { priceMax } : {}),
       },
     };
 

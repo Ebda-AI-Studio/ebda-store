@@ -196,6 +196,8 @@ export interface CfBindings {
   CI_EVENTS_QUEUE?: QueueProducerLike;
   CI_BUCKET?: R2BucketCasLike;
   CI_OUTCOMES?: AnalyticsEngineLike;
+  /** Per-route request counters, dataset `ebda_request_budget` (lib/request-budget.ts, NEON-ZERO 9.2). */
+  REQUEST_BUDGET?: AnalyticsEngineLike;
   EMAIL_QUEUE?: QueueProducerLike;
   SMS_QUEUE?: QueueProducerLike;
   /** Coarse per-IP flood guard in front of Express (Workers Rate Limiting binding). */
@@ -204,6 +206,10 @@ export interface CfBindings {
   PUBLIC_IP_LIMITER?: RateLimitBindingLike;
   /** Anonymous public READS only: per-tenant, 6000 / 60 s per location. */
   PUBLIC_TENANT_LIMITER?: RateLimitBindingLike;
+  /** `GET /public/store/resolve` only (middleware/store-resolve-native.ts): per shopper IP, 30 / 60 s per location. */
+  STORE_RESOLVE_LIMITER?: RateLimitBindingLike;
+  /** `GET /public/store/resolve` only: unknown-store answers per shopper IP, 20 / 60 s per location, counted on the 404 path. */
+  STORE_MISS_LIMITER?: RateLimitBindingLike;
   CF_VERSION_METADATA?: { id?: string; tag?: string };
   /** Service Binding to the storefront Worker (ebda-web): cache purge without a public host. */
   STOREFRONT?: ServiceBindingLike;

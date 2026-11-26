@@ -13,14 +13,10 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import {
-  OneSignalService,
-  OneSignalNotConfiguredError,
-  OneSignalRequestError,
-} from '../services/onesignal.service';
+import { OneSignalService } from '../services/onesignal.service';
 import { config } from '../config';
 import { auditLog } from '../middleware/security';
-import logger from '../lib/logger';
+import { pushService } from '../services/push.service';
 
 const router = Router();
 
@@ -143,7 +139,7 @@ router.delete(
 //
 // These let a store admin push a one-off notification to every storefront
 // device that consented to push for THIS store. The per-store filter is
-// applied server-side in OneSignalService.broadcastToStore — never trust a
+// applied server-side (pushService.sendToStore) — never trust a
 // `storeId` in the body, always read it from req.params + requireStoreAccess.
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -153,7 +149,7 @@ const adminStoreMiddleware = [
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   // Marketing push broadcast is a Professional-tier feature. Without this gate
-  // the admin blast path (OneSignalService.broadcastToStore) sends real push
+  // the admin blast path (pushService.sendToStore) sends real push
   // to every storefront subscriber on ANY plan — a billing leak. Matches the
   // customer subscribe route's requireFeature('push_notifications').
   // super_admin bypasses inside requireFeature.
@@ -161,9 +157,30 @@ const adminStoreMiddleware = [
 ];
 
 /**
+ * GET /admin/stores/:storeId/push/status
+ * One plain answer for the merchant page: can this store send push right now, and to how many devices.
+ * `available` is false when the platform keys are not installed (our side, never the merchant's).
+ */
+router.get(
+  '/stores/:storeId/push/status',
+  ...adminStoreMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const available = pushService.isConfigured();
+      const subscribers = available ? await pushService.getSubscriberCount(storeId) : 0;
+      res.json({ success: true, data: { available, subscribers } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * POST /admin/stores/:storeId/push/broadcast
- * Send a tenant-scoped push to every storefront subscriber tagged with
- * `storeId = :storeId`.
+ * Native Web Push (VAPID) to every storefront device subscribed for THIS store. The store id comes from the path
+ * (requireStoreAccess), never the body. The ar + en copy rides in `data.i18n`; the storefront worker shows the one that
+ * matches the shopper's browser language.
  */
 router.post(
   '/stores/:storeId/push/broadcast',
@@ -173,14 +190,29 @@ router.post(
       const { storeId } = req.params;
       const parsed = broadcastSchema.parse(req.body);
 
-      const result = await OneSignalService.broadcastToStore({
-        storeId,
-        titleEn: parsed.titleEn,
-        titleAr: parsed.titleAr,
-        bodyEn: parsed.bodyEn,
-        bodyAr: parsed.bodyAr,
-        url: parsed.url,
-      });
+      if (!pushService.isConfigured()) {
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'PUSH_NOT_CONFIGURED',
+            message: 'Push notifications are not available yet.',
+          },
+        });
+        return;
+      }
+
+      const result = await pushService.broadcastToStore(storeId, parsed);
+
+      if (result.skipped === 'channel_disabled') {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'PUSH_CHANNEL_DISABLED',
+            message: 'Turn on push notifications for this store first.',
+          },
+        });
+        return;
+      }
 
       await auditLog({
         action: 'push.broadcast.sent',
@@ -194,34 +226,11 @@ router.post(
         userAgent: req.headers['user-agent'],
       });
 
-      res.json({ success: true, data: result });
+      res.json({
+        success: true,
+        data: { id: `${Date.now()}`, recipients: result.recipients, delivered: result.delivered },
+      });
     } catch (error) {
-      if (error instanceof OneSignalNotConfiguredError) {
-        res.status(503).json({
-          success: false,
-          error: {
-            code: 'PUSH_NOT_CONFIGURED',
-            message:
-              'OneSignal is not configured on the server. Set ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY in the API environment.',
-          },
-        });
-        return;
-      }
-      if (error instanceof OneSignalRequestError) {
-        logger.warn(
-          { status: error.status, body: String(error.body ?? '').slice(0, 500) },
-          '[onesignal] provider request failed'
-        );
-        res.status(502).json({
-          success: false,
-          error: {
-            code: 'PUSH_PROVIDER_ERROR',
-            // BE:S-17: the upstream body is logged, never returned to the merchant.
-            message: 'The push provider could not complete the request. Try again later.',
-          },
-        });
-        return;
-      }
       next(error);
     }
   }
@@ -229,9 +238,7 @@ router.post(
 
 /**
  * GET /admin/stores/:storeId/push/broadcasts
- * Last 10 broadcasts that targeted this store, with delivery + click counts
- * pulled from OneSignal. Used by the admin notifications page to render an
- * audit-style list.
+ * Last 10 broadcasts for this store, from the notification log (delivered / failed per send).
  */
 router.get(
   '/stores/:storeId/push/broadcasts',
@@ -239,35 +246,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const broadcasts = await OneSignalService.listRecentBroadcasts(storeId, 10);
+      const broadcasts = await pushService.listRecentBroadcasts(storeId, 10);
       res.json({ success: true, data: { broadcasts } });
     } catch (error) {
-      if (error instanceof OneSignalNotConfiguredError) {
-        res.status(503).json({
-          success: false,
-          error: {
-            code: 'PUSH_NOT_CONFIGURED',
-            message:
-              'OneSignal is not configured on the server. Set ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY in the API environment.',
-          },
-        });
-        return;
-      }
-      if (error instanceof OneSignalRequestError) {
-        logger.warn(
-          { status: error.status, body: String(error.body ?? '').slice(0, 500) },
-          '[onesignal] provider request failed'
-        );
-        res.status(502).json({
-          success: false,
-          error: {
-            code: 'PUSH_PROVIDER_ERROR',
-            // BE:S-17: the upstream body is logged, never returned to the merchant.
-            message: 'The push provider could not complete the request. Try again later.',
-          },
-        });
-        return;
-      }
       next(error);
     }
   }

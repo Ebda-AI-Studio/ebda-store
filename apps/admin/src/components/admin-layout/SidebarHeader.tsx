@@ -39,7 +39,7 @@ export function SidebarHeader({
         {isStoreAdminWithBranding && storeBranding?.logo ? (
           // Store Branding Logo
           <>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl overflow-hidden bg-muted shadow-lg">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md overflow-hidden bg-muted shadow-md">
               <Image
                 src={storeBranding.logo}
                 alt={storeBranding.name}
@@ -62,7 +62,7 @@ export function SidebarHeader({
         ) : (
           // Ebda Branding (default)
           <>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/90 shadow-lg shadow-primary/25">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gradient-to-br from-primary to-primary/90 shadow-md shadow-sm">
               <Image
                 src="/logo-white.svg"
                 alt={tb('brandAlt')}
@@ -86,7 +86,7 @@ export function SidebarHeader({
       {/* Super Admin Badge */}
       {mode === 'super_admin' && (
         <div className="border-b border-border/50 px-4 py-3">
-          <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-primary/10 to-primary/10 px-3 py-2.5">
+          <div className="flex items-center gap-2.5 rounded-md bg-gradient-to-r from-primary/10 to-primary/10 px-3 py-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/90 text-xs font-bold text-primary-foreground shadow-sm">
               {/* i18n-gate-allow: role monogram */}
               SA
@@ -102,7 +102,7 @@ export function SidebarHeader({
       {/* Staff Badge */}
       {isStaffUser && isStoreAdminWithBranding && (
         <div className="border-b border-border/50 px-4 py-3">
-          <div className="flex items-center gap-2.5 rounded-xl bg-primary/10 px-3 py-2.5">
+          <div className="flex items-center gap-2.5 rounded-md bg-primary/10 px-3 py-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground shadow-sm">
               {/* i18n-gate-allow: role monogram */}
               ST
@@ -118,8 +118,8 @@ export function SidebarHeader({
       {/* Store Admin Badge — actual store_admin role only */}
       {isStoreAdminWithBranding && !isSuperAdminViewingStore && !isStaffUser && (
         <div className="border-b border-border/50 px-4 py-3">
-          <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-3 py-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white shadow-sm">
+          <div className="flex items-center gap-2.5 rounded-md bg-gradient-to-r from-info/10 to-info/10 px-3 py-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-info to-info text-xs font-bold text-white shadow-sm">
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
@@ -140,7 +140,7 @@ export function SidebarHeader({
       {/* Super Admin viewing a store — distinct badge + escape link */}
       {isSuperAdminViewingStore && (
         <div className="border-b border-border/50 px-4 py-3">
-          <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-primary/10 to-primary/10 px-3 py-2.5">
+          <div className="flex items-center gap-2.5 rounded-md bg-gradient-to-r from-primary/10 to-primary/10 px-3 py-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/90 text-xs font-bold text-primary-foreground shadow-sm">
               {/* i18n-gate-allow: role monogram */}
               SA

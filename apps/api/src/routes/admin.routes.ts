@@ -1,5 +1,6 @@
 import { revokeForAccount } from '../lib/wa/consent';
 import { requirePlatformDb } from '../lib/platform-db';
+import { AppError } from '../middleware/error-handler';
 import { d1StoreBriefs, platformDb as platformDirectoryDb } from '../lib/platform-directory';
 import { aiUsageFeatureStats } from '../services/usage-aggregates.service';
 import { platformFamilyOnD1 } from '../services/platform/cutover';
@@ -31,12 +32,13 @@ import { listGrants } from '../services/billing/grants.service';
 import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
 import { searchProductIds } from '../services/product-search.service';
-import { auditLog } from '../middleware/security';
-import { syncSubscriptionFromLegacyPlan } from '../services/plan-sync';
+import { auditLog, auditLogStrict } from '../middleware/security';
 import {
+  listHeldBillingWebhooks,
   listLedger,
   listSubscriptionsForAdmin,
   refundCharge,
+  resolveHeldBillingWebhook,
 } from '../services/billing/subscription-billing.service';
 import {
   listClaimsForAdmin,
@@ -113,6 +115,8 @@ import {
 import { storeDb } from '../lib/repo-factory';
 import { closeClaimsOnSlugGrant } from '../services/trust-grants';
 import { customerRows } from '../lib/customer-directory';
+import { resolveAiCaps } from '../lib/usage-caps';
+import { netRevenue } from '../services/revenue.service';
 
 const router = Router();
 
@@ -273,6 +277,8 @@ const updateStoreAdminSchema = z.object({
     // A platform host (`accounts`, `wa`, `api`...) must never become a merchant store, even by a super admin's slip.
     .refine(s => !isReservedSlug(s), 'This slug is reserved for a platform host')
     .optional(),
+  // Ruling B1-PLAN-SOT-1: the plan tier is DERIVED from the subscription; it is never set here (a direct tier write was
+  // reverted by the daily drift repair with a P1). Kept in the schema only to refuse it with a clear error.
   plan: z.enum(['free', 'starter', 'professional', 'enterprise']).optional(),
   status: z.enum(['active', 'suspended']).optional(),
 });
@@ -424,7 +430,19 @@ router.get(
           ? await (async () => {
               const rec = await (await storeDb(hit.id)).store.findUnique({ where: { id: hit.id } });
               const owner = rec ? (await hubOwners([rec.ownerId])).get(rec.ownerId) : undefined;
-              return rec ? { ...rec, owner: owner ?? null } : null;
+              // Ruling B1-PLAN-SOT-1: D1 `stores.plan` is the authority (NZ-D20; derived from the subscription); a DO store's
+              // own row holds a COPY that can lag. Show the authority, never the copy.
+              const d1 = rec
+                ? ((await (
+                    await requirePlatformDb()
+                  ).store.findUnique({
+                    where: { id: hit.id },
+                    select: { plan: true },
+                  })) as { plan: string } | null)
+                : null;
+              return rec
+                ? { ...rec, ...(d1 ? { plan: d1.plan } : {}), owner: owner ?? null }
+                : null;
             })()
           : await withStore(hit.id, tx =>
               tx.store.findUnique({
@@ -617,6 +635,64 @@ router.get(
         })
         .parse(req.query);
       res.json({ success: true, data: { subscriptions: await listSubscriptionsForAdmin(q) } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * #627: subscription payments a provider reported as SUCCESSFUL that we could not match (unknown order, a different
+ * amount or currency, no amount). The merchant may have paid without being upgraded: listed here until a person resolves.
+ */
+router.get(
+  '/billing/held-webhooks',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const q = z
+        .object({
+          status: z.enum(['open', 'resolved']).default('open'),
+          limit: z.coerce.number().int().min(1).max(200).optional(),
+        })
+        .parse(req.query);
+      res.json({ success: true, data: { held: await listHeldBillingWebhooks(q) } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/billing/held-webhooks/:id/resolve',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = z.string().uuid().parse(req.params.id);
+      const { action, note } = z
+        .object({
+          action: z.enum(['credited', 'refunded', 'not_ours']),
+          note: z.string().trim().min(3).max(500),
+        })
+        .parse(req.body);
+      // the audit row is written BEFORE the resolve changes anything (strict: a failed audit refuses the resolve)
+      await resolveHeldBillingWebhook({
+        id,
+        actorId: req.user!.userId,
+        action,
+        note,
+        audit: () =>
+          auditLogStrict({
+            action: 'billing.held_webhook_resolved',
+            userId: req.user!.userId,
+            resourceType: 'billing_webhook_event',
+            resourceId: id,
+            details: { action, note },
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+          }),
+      });
+      res.json({ success: true });
     } catch (error) {
       next(error);
     }
@@ -865,16 +941,23 @@ router.post(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { amountMinor } = z
-        .object({ amountMinor: z.number().int().positive().optional() })
+      const { amountMinor, keepAccess } = z
+        .object({
+          amountMinor: z.number().int().positive().optional(),
+          keepAccess: z.boolean().optional(),
+        })
         .parse(req.body ?? {});
-      const out = await refundCharge({ eventId: req.params.id, amountMinor });
+      const out = await refundCharge({ eventId: req.params.id, amountMinor, keepAccess });
       await auditLog({
         action: 'billing.refund',
         userId: req.user!.userId,
         resourceType: 'billing_event',
         resourceId: req.params.id,
-        details: { amountMinor: amountMinor ?? null, status: out.status },
+        details: {
+          amountMinor: amountMinor ?? null,
+          keepAccess: keepAccess === true,
+          status: out.status,
+        },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
@@ -960,6 +1043,13 @@ router.put(
     try {
       const { id } = req.params;
       const { name, slug, plan, status } = updateStoreAdminSchema.parse(req.body);
+      if (plan !== undefined) {
+        throw new AppError(
+          400,
+          'PLAN_VIA_SUBSCRIPTION',
+          'Set the plan through PUT /admin/stores/:id/subscription (planCode); the tier follows it'
+        );
+      }
       await closeClaimsOnSlugGrant(req.user!.userId, slug);
 
       // Pre-read so a slug change can bust the OLD slug's cache key too.
@@ -978,7 +1068,6 @@ router.put(
         data: {
           ...(name !== undefined && { name }),
           ...(slug !== undefined && { slug }),
-          ...(plan !== undefined && { plan }),
           ...(status !== undefined && { status }),
         },
         ...(onHub
@@ -1000,17 +1089,9 @@ router.put(
       // fire the storefront revalidate purge on this writer too — it used
       // to write store.status with no invalidation at all.
       //
-      // A plan change ALSO changes the resolved feature map that the public
-      // payload embeds as `enabledFeatures` — and that map is read from
-      // FeatureService's own `features:store:*` cache (300s). Busting only
-      // the public keys made the very next public request re-seed them from
-      // the STALE feature map (issue 2172), so the feature cache is dropped
-      // FIRST, exactly as `featureService.setStorePlan` does.
-      // Keep the subscription (limits) on the same plan the enum now names.
-      if (plan !== undefined) {
-        await withStore(store.id, tx => syncSubscriptionFromLegacyPlan(tx, store.id, plan));
-        await featureService.invalidateCache(store.id);
-      }
+      // A plan change no longer happens here (refused above, Ruling B1-PLAN-SOT-1). Its feature-cache-before-public-caches
+      // ordering (issue 2172) lives on the path that changes plans now, `planService.assignPlan`
+      // (tests/unit/admin-store-plan-cache-order.test.ts drives it through PUT /admin/stores/:id/subscription).
       await bustStoreCaches(store.id, store.slug, store.domain, { slug: before?.slug });
       if (before?.slug && before.slug !== store.slug) {
         await invalidateCached(`public:store:${before.slug}`);
@@ -1024,7 +1105,6 @@ router.put(
         details: {
           ...(name !== undefined && { name }),
           ...(slug !== undefined && { slug }),
-          ...(plan !== undefined && { plan }),
           ...(status !== undefined && { status }),
         },
         ip: req.ip,
@@ -1949,12 +2029,10 @@ router.get(
             async storeId => {
               const [count, revenue] = await Promise.all([
                 (await storeDb(storeId)).order.count({ where: { storeId } }),
-                (await storeDb(storeId)).order.aggregate({
-                  where: { storeId, paymentStatus: 'paid' },
-                  _sum: { total: true },
-                }),
+                // The ONE revenue definition, paid-only (services/revenue.service.ts, STORE-QA-7).
+                netRevenue(storeId, { paidOnly: true }),
               ]);
-              return { count, revenue: revenue._sum.total ?? 0 };
+              return { count, revenue: revenue.revenue };
             },
             { storeIds: dashboardStoreIds, abortOnError: true }
           ),
@@ -2394,8 +2472,7 @@ router.get(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const dailyCap = parseInt(process.env.AI_DAILY_REQUEST_CAP ?? '450', 10);
-      const monthlyCap = parseInt(process.env.AI_MONTHLY_REQUEST_CAP ?? '20000', 10);
+      const { dailyCap, monthlyCap } = resolveAiCaps();
 
       const now = new Date();
       const startOfDay = new Date(now);
@@ -3173,6 +3250,8 @@ router.post(
           tv: target.tokenVersion,
           // Non-standard claim — allows future guards to detect impersonation
           impersonatedBy: req.user!.userId,
+          // TEN-2: ties the token to the admin's identity session; revoking that session (or demoting the admin) kills it.
+          impSid: (req as Request & { accountsSid?: string }).accountsSid,
         },
         config.jwtSecret,
         {

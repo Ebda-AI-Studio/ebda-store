@@ -7,7 +7,7 @@
  *
  *   - a POOL of Prisma clients per isolate, each leased to one request at a time and reused (the
  *     engine, ~3.3 MB, is built once per client, not per request), over a leased driver adapter.
- *     The pg connection (pool of one, over Hyperdrive) is per request and opened lazily: workerd
+ *     The pg connection (pool of one, from the Node-era pooler) is per request and opened lazily: workerd
  *     forbids reusing an I/O object (a socket) from another request (experiment B6/B9). One client
  *     shared by concurrent requests hangs, see packages/database/src/client-pool.ts. The
  *     connection is closed, and the client returned, through `ctx.waitUntil`, after the post-commit
@@ -37,6 +37,7 @@ import { awaitDeferredWork } from './lib/after-tenant-commit';
 import { redis } from './services/redis.service';
 import { SentryService } from './services/sentry.service';
 import logger from './lib/logger';
+import { warnMissingStoreResolveBindings } from './middleware/store-resolve-native';
 import { runWithWaitUntil, setCfBindings, type CfBindings } from './cf/bindings';
 import { instrumentBindings } from './lib/io-tally';
 import { dispatchedEvents, trackDispatches } from './lib/jobs/dispatch';
@@ -63,7 +64,7 @@ import {
   sendNoticeMail,
   type StoreClaim,
 } from './lib/identity-directory';
-import { waBridge } from './lib/wa/bridge';
+import { waBridge, ownerTools } from './lib/wa/bridge';
 import { listStoreMembers, memberRole } from './lib/store-members';
 import { isPlatformOrigin } from './lib/cors-cache';
 import { config } from './config';
@@ -115,7 +116,7 @@ const DRAIN_BUDGET_MS = 25_000;
 let redisReady: Promise<void> | undefined;
 
 /**
- * NEON-ZERO N-17 (Ruling NZ-D23): the Worker has no Postgres (no HYPERDRIVE binding). Anything that still reaches the
+ * NEON-ZERO N-17 (Ruling NZ-D23): the Worker has no Postgres (no Postgres binding). Anything that still reaches the
  * exported `prisma` gets a client that throws POSTGRES_REMOVED at once (no socket, no hang). The first hit per isolate is
  * logged and raises a P1 alert; every hit is also an error response, so a missed path is seen in Sentry and by the caller.
  */
@@ -172,6 +173,7 @@ function prepare(env: CfBindings): void {
     assertCiCaptureConfig(env);
     whatsAppConfigChecked = true;
   }
+  warnMissingStoreResolveBindings(env);
   // No sockets to open: this only flips redis.service to "available" over AuthState + KV.
   redisReady ??= redis.connect();
   const deployment = env.CF_VERSION_METADATA?.id;
@@ -554,8 +556,29 @@ export class WhatsAppBridge extends WorkerEntrypoint<CfBindings> {
   getOrderStatus(storeId: string, orderNumber: string, buyerKey: string, phoneE164?: string) {
     return this.bridge(b => b.getOrderStatus(storeId, orderNumber, buyerKey, phoneE164));
   }
+  getRecommendations(storeId: string, req: unknown) {
+    return this.bridge(b => b.getRecommendations(storeId, req));
+  }
   listCustomerOrders(storeId: string, buyerKey: string, limit: number, phoneE164?: string) {
     return this.bridge(b => b.listCustomerOrders(storeId, buyerKey, limit, phoneE164));
+  }
+  /** Owner assistant (Chat Smart Layer): best sellers for a period. Owner or active staff, authorised live by `asUserId`. */
+  getTopProducts(storeId: string, asUserId: string, req: unknown) {
+    return withWorkerContext(this.env, this.ctx as Ctx, () =>
+      ownerTools().getTopProducts(storeId, asUserId, req)
+    );
+  }
+  /** Owner assistant: order count, collected sales, refunds and average order value for a Cairo-day period (owner only, cached 60 s per store + period). */
+  getOrdersSummary(storeId: string, asUserId: string, req: unknown) {
+    return withWorkerContext(this.env, this.ctx as Ctx, () =>
+      ownerTools().getOrdersSummary(storeId, asUserId, req)
+    );
+  }
+  /** Owner assistant: create a percentage / fixed coupon. OWNER ONLY (live), replay-safe; Chat only calls it after the merchant's confirm press. */
+  createCoupon(storeId: string, asUserId: string, req: unknown) {
+    return withWorkerContext(this.env, this.ctx as Ctx, () =>
+      ownerTools().createCoupon(storeId, asUserId, req)
+    );
   }
   /** Revocation (v1.4): the live role of a user on a store, or null once removed. WhatsApp calls it on each staff request. */
   async memberRole(storeId: string, userId: string) {
