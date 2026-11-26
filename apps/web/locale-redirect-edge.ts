@@ -23,6 +23,7 @@
  * `private, no-store`. Staleness: BOUNDED, <= 300 s in one browser (+ the 60 s isolate) after a merchant changes the
  * default language.
  */
+import { parseStoreHost } from '@ebda/shared';
 import {
   decideLocalePath,
   localePathsOn,
@@ -48,6 +49,69 @@ export const REDIRECT_CACHE_STALE_S = 21_600;
 
 export type DefaultLanguageOf = (host: string) => Promise<'ar' | 'en' | null>;
 
+/**
+ * The apex of a `www.` host that is a custom store domain or the platform's own `www.ebda.app`, else null. The same
+ * classification the middleware's canonical www rule uses (`www.<slug>.ebda.app` is no store: Next 404s it).
+ */
+function wwwApexOf(hostname: string): string | null {
+  const host = hostname.toLowerCase().replace(/\.$/, '');
+  if (!host.startsWith('www.')) return null;
+  const kind = parseStoreHost(host).kind;
+  return kind === 'custom' || kind === 'platform' ? host.slice(4) : null;
+}
+
+/**
+ * Ruling WWW-ONE-HOP-1: `www.<domain>/` went 308 `www.<domain>/ar` and then 301 `<domain>/ar` (two hops, and the first one
+ * on the host that is about to be abandoned). The www -> apex canonical redirect is decided HERE, before locale handling,
+ * and when the path also needs its language prefix the Location carries both (`https://<domain>/ar`): one hop. A path that
+ * needs no prefix gets the plain 301 to the apex with path and query kept. When the resolver cannot say which language
+ * (or locale paths are off), the apex 301 still goes out and the apex does its own prefixing on the next request.
+ */
+async function wwwToApex(
+  request: Request,
+  url: URL,
+  apex: string,
+  env: Record<string, string | undefined>,
+  defaultLanguageOf: DefaultLanguageOf
+): Promise<Response> {
+  const origin = `https://${apex}`;
+  const plain = () =>
+    new Response(null, {
+      status: 301,
+      headers: { location: `${origin}${url.pathname}${url.search}` },
+    });
+  if (!localePathsOn(storeKeyForHost(apex), env)) return plain();
+  const decision = decideLocalePath({
+    pathname: url.pathname,
+    search: url.search,
+    method: request.method,
+  });
+  if (decision.kind !== 'pending') return plain();
+  let defaultLocale: 'ar' | 'en' | null = null;
+  try {
+    defaultLocale = await defaultLanguageOf(apex);
+  } catch {
+    return plain();
+  }
+  if (!defaultLocale) return plain();
+  const cookieLocale = /(?:^|;\s*)force-language=(ar|en)(?:;|$)/.exec(
+    request.headers.get('cookie') ?? ''
+  )?.[1];
+  const target = pendingRedirect({
+    rest: decision.rest,
+    search: url.search,
+    defaultLocale,
+    cookieLocale,
+  });
+  if (!target.location.startsWith('/') || target.location.startsWith('//')) return plain();
+  return new Response(null, {
+    status: target.permanent ? 308 : 307,
+    headers: target.permanent
+      ? permanentHeaders(`${origin}${target.location}`)
+      : { location: `${origin}${target.location}`, 'cache-control': 'private, no-store' },
+  });
+}
+
 export async function edgeLocaleRedirect(
   request: Request,
   env: Record<string, unknown>,
@@ -65,6 +129,8 @@ export async function edgeLocaleRedirect(
         ? env.STOREFRONT_LOCALE_PATHS_STORES
         : undefined,
   };
+  const apex = wwwApexOf(url.hostname);
+  if (apex) return wwwToApex(request, url, apex, strEnv, defaultLanguageOf);
   if (!localePathsOn(storeKeyForHost(url.hostname), strEnv)) return null;
   const decision = decideLocalePath({
     pathname: url.pathname,

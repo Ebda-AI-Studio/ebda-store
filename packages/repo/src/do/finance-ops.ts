@@ -166,6 +166,22 @@ export function bankLedgerSideOp(
 }
 
 /**
+ * Cost coverage of the stock figure (SQLite twin of `STOCK_COST_COVERAGE_SQL`, lib/effective-inventory-sql.ts): how many
+ * products hold on-hand units, and how many of those have a unit with NO cost (variant cost, else the parent's). A stock
+ * value built on such a unit is partial or unknown, never a true 0.
+ */
+export const STOCK_COST_COVERAGE_SQLITE = `
+       COALESCE(SUM(CASE
+         WHEN EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id)
+         THEN EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active AND pv.inventory > 0)
+         ELSE p.inventory > 0 END), 0) AS stocked,
+       COALESCE(SUM(CASE
+         WHEN EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id)
+         THEN EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active AND pv.inventory > 0
+                         AND COALESCE(pv.cost_price, p.cost_price) IS NULL)
+         ELSE (p.inventory > 0 AND p.cost_price IS NULL) END), 0) AS uncosted`;
+
+/**
  * On-hand stock value in piastres (read only), and the value held on DISABLED variants: the twin of `STOCK_VALUE_SQL` /
  * `DISABLED_VARIANT_STOCK_VALUE_SQL` (lib/effective-inventory-sql.ts). A variant product is valued per ACTIVE variant at the
  * variant's own cost, falling back to the parent's.
@@ -173,7 +189,7 @@ export function bankLedgerSideOp(
 export function stockValueOp(
   db: SyncSql,
   storeId: string
-): { value: number; disabledValue: number } {
+): { value: number; disabledValue: number; stockedProducts: number; uncostedProducts: number } {
   const r = db.all(
     `SELECT
        COALESCE(SUM(CASE
@@ -184,9 +200,15 @@ export function stockValueOp(
        END), 0) AS v,
        COALESCE(SUM(COALESCE((SELECT SUM(pv.inventory * COALESCE(pv.cost_price, p.cost_price, 0))
                                 FROM product_variants pv
-                               WHERE pv.product_id = p.id AND NOT pv.is_active AND pv.inventory > 0), 0)), 0) AS dv
+                               WHERE pv.product_id = p.id AND NOT pv.is_active AND pv.inventory > 0), 0)), 0) AS dv,
+       ${STOCK_COST_COVERAGE_SQLITE}
      FROM products p WHERE p.store_id = ? AND p.deleted_at IS NULL`,
     [storeId]
   )[0];
-  return { value: Number(r?.v ?? 0), disabledValue: Number(r?.dv ?? 0) };
+  return {
+    value: Number(r?.v ?? 0),
+    disabledValue: Number(r?.dv ?? 0),
+    stockedProducts: Number(r?.stocked ?? 0),
+    uncostedProducts: Number(r?.uncosted ?? 0),
+  };
 }
