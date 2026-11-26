@@ -19,6 +19,12 @@ export interface IdentityTokenInput {
   emailVerified?: boolean;
   /** Seconds the token lives (default 900, like the identity service). */
   ttlSeconds?: number;
+  /**
+   * When the user signed in (unix seconds). Default: now, so credential-class routes behind `requireRecentLogin` (TEN-4: keys,
+   * provider credentials, staff changes, notification channels) accept the token. A past value makes it stale; `null` omits the
+   * claim (a token that cannot prove a recent sign-in), which those routes refuse the same way.
+   */
+  authTime?: number | null;
 }
 
 function privateJwk(): JWK {
@@ -40,7 +46,7 @@ export async function mintIdentityToken(i: IdentityTokenInput): Promise<string> 
     sid: `t.${i.userId}.${now}.${randomUUID().slice(0, 8)}`,
     stores: i.stores ?? [],
     ...(i.superAdmin ? { pa: 'super_admin' } : {}),
-    auth_time: nowS,
+    ...(i.authTime === null ? {} : { auth_time: i.authTime ?? nowS }),
     ...(i.email ? { email: i.email } : {}),
     email_verified: i.emailVerified ?? true,
   })

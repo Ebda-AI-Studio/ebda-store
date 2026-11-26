@@ -34,6 +34,7 @@ import {
   applyWebhookEvent,
   cancelSubscription,
   changePlan,
+  previewChangePlan,
   findDueSubscriptionIds,
   listLedger,
   listStoreCharges,
@@ -49,6 +50,7 @@ import {
   kashierSignaturePayload,
 } from '../../apps/api/src/services/billing/kashier.provider';
 import { addDays, addInterval } from '../../apps/api/src/services/billing/period';
+import { periodStartFor } from '../../apps/api/src/services/billing/proration';
 import { encryption } from '../../apps/api/src/services/encryption.service';
 import { EmailService } from '../../apps/api/src/services/email.service';
 import { socketService } from '../../apps/api/src/services/socket.service';
@@ -63,9 +65,14 @@ const hasDb =
 const uniq = crypto.randomUUID().slice(0, 8);
 const PRO = `bpro-${uniq}`; // 49900 / 499000
 const LITE = `blite-${uniq}`; // 19999
+const MAXP = `bmax-${uniq}`; // 99900 / 999000
 const NOPRICE = `bnone-${uniq}`;
 const stub = new StubBillingProvider();
-const created = { stores: [] as string[], users: [] as string[], plans: [PRO, LITE, NOPRICE] };
+const created = {
+  stores: [] as string[],
+  users: [] as string[],
+  plans: [PRO, LITE, MAXP, NOPRICE],
+};
 
 const limits = planLimitsSchema.parse({
   maxProducts: 100,
@@ -123,7 +130,7 @@ async function subscribedStore(opts: {
         planCode: opts.planCode ?? PRO,
         status: opts.status ?? 'active',
         billingInterval: opts.interval ?? 'monthly',
-        currentPeriodStart: addInterval(opts.periodEnd ?? T0, 'monthly'),
+        currentPeriodStart: periodStartFor(opts.periodEnd ?? T0, 'monthly'),
         currentPeriodEnd: opts.periodEnd ?? T0,
         trialEndsAt: opts.trialEndsAt ?? null,
         provider: opts.provider === undefined ? 'stub' : opts.provider,
@@ -138,6 +145,26 @@ async function subscribedStore(opts: {
 
 const getSub = (storeId: string) =>
   withRlsBypass(tx => tx.storeSubscription.findUniqueOrThrow({ where: { storeId } }));
+/** A succeeded plan payment for the store's CURRENT period (proration credits only what was paid, #887 review). */
+const paidPeriod = async (storeId: string, subId: string, amountMinor: number, planCode = LITE) => {
+  const sub = await getSub(storeId);
+  return withRlsBypass(tx =>
+    tx.billingEvent.create({
+      data: {
+        storeId,
+        subscriptionId: subId,
+        type: 'renewal',
+        planCode,
+        amountMinor,
+        currency: 'EGP',
+        provider: 'stub',
+        idempotencyKey: `paid-${crypto.randomUUID()}`,
+        status: 'succeeded',
+        createdAt: sub.currentPeriodStart ?? undefined,
+      },
+    })
+  );
+};
 const getSubOrNull = (storeId: string) =>
   withRlsBypass(tx => tx.storeSubscription.findUnique({ where: { storeId } }));
 const ledger = (storeId: string) =>
@@ -185,6 +212,17 @@ beforeAll(async () => {
         limits,
         priceMonthlyMinor: 19999,
         priceYearlyMinor: 199990,
+      },
+      {
+        code: MAXP,
+        nameEn: 'BMax',
+        nameAr: 'أعلى',
+        sort: 903,
+        isPublic: false,
+        featureTier: 'enterprise',
+        limits,
+        priceMonthlyMinor: 99900,
+        priceYearlyMinor: 999000,
       },
       {
         code: NOPRICE,
@@ -406,20 +444,20 @@ describe.skipIf(!hasDb)('webhooks: replay and out-of-order', () => {
     expect((await getSub(storeId)).status).toBe('active');
   });
 
-  it('ignores an event whose amount does not match the ledger row', async () => {
+  it('HOLDS (never ignores) a paid event whose amount does not match the ledger row (#627)', async () => {
     const storeId = await makeStore();
     const { billingEventId } = await startCheckout({ storeId, planCode: PRO, provider: stub });
     const res = await deliver({ id: billingEventId, amountMinor: 49900 }, 'charge.succeeded', {
       amountMinor: 100,
       token: 'tok_x',
     });
-    expect(res).toMatchObject({ outcome: 'ignored', detail: 'amount_mismatch' });
+    expect(res).toMatchObject({ outcome: 'held', detail: 'amount_mismatch' });
     expect((await ledger(storeId))[0].status).toBe('pending');
   });
 
-  it('acknowledges but ignores an event for an unknown order', async () => {
+  it('acknowledges and HOLDS a paid event for an unknown order (#627)', async () => {
     const res = await deliver({ id: crypto.randomUUID(), amountMinor: 100 }, 'charge.succeeded');
-    expect(res).toMatchObject({ outcome: 'ignored', detail: 'unknown_order' });
+    expect(res).toMatchObject({ outcome: 'held', detail: 'unknown_order' });
   });
 });
 
@@ -828,18 +866,189 @@ describe.skipIf(!hasDb)('cancel, upgrade, downgrade', () => {
     });
   });
 
-  it('upgrade charges the full new price immediately and starts a fresh period (no proration)', async () => {
-    const { storeId } = await subscribedStore({ planCode: LITE, periodEnd: addDays(T0, 20) });
+  it('upgrade starts now and charges only the prorated difference; the period keeps its end (G35-PRORATE-1)', async () => {
+    // 20 of the 31 days (Oct 23 -> Nov 23) left: (49900 - 19999) x 20 / 31 = 19290.97 -> 19291 (rounded up), VAT off
+    const end = addDays(T0, 20);
+    const { storeId, subId } = await subscribedStore({ planCode: LITE, periodEnd: end });
+    await paidPeriod(storeId, subId, 19999); // the current period was paid in full
+    const before = await getSub(storeId);
+    const preview = await previewChangePlan({ storeId, planCode: PRO, now: T0 });
+    expect(preview.basis).toBe('prorated');
+    expect(preview.quote).toMatchObject({ kind: 'upgrade', remainingDays: 20, periodDays: 31 });
+    expect(preview.quote.charge.totalMinor).toBe(19291);
     const out = await changePlan({ storeId, planCode: PRO, now: T0, provider: stub });
-    expect(out).toMatchObject({ mode: 'upgraded', status: 'succeeded' });
+    expect(out).toMatchObject({ mode: 'upgraded', status: 'succeeded', amountMinor: 19291 });
     expect(stub.chargeCalls).toHaveLength(1);
-    expect(stub.chargeCalls[0].amountMinor).toBe(49900); // full price, not the difference
+    expect(stub.chargeCalls[0].amountMinor).toBe(19291); // the difference, not the full 49900
+    const sub = await getSub(storeId);
+    expect(sub.planCode).toBe(PRO);
+    expect(sub.currentPeriodStart!.toISOString()).toBe(before.currentPeriodStart!.toISOString());
+    expect(sub.currentPeriodEnd!.toISOString()).toBe(end.toISOString());
+    expect((await storeTier(storeId)).plan).toBe('professional');
+    const rows = await ledger(storeId);
+    expect(rows.find(r => r.type === 'upgrade')).toMatchObject({
+      amountMinor: 19291,
+      status: 'succeeded',
+    });
+  });
+
+  it('refuses an upgrade whose shown amount no longer matches (QUOTE_CHANGED) and charges nothing', async () => {
+    const { storeId, subId } = await subscribedStore({
+      planCode: LITE,
+      periodEnd: addDays(T0, 20),
+    });
+    await paidPeriod(storeId, subId, 19999);
+    const err = await changePlan({
+      storeId,
+      planCode: PRO,
+      expectedAmountMinor: 49900,
+      now: T0,
+      provider: stub,
+    }).catch(e => e);
+    expect(err.code).toBe('QUOTE_CHANGED');
+    expect(stub.chargeCalls).toHaveLength(0);
+    expect((await getSub(storeId)).planCode).toBe(LITE);
+  });
+
+  it('an upgrade with a scheduled downgrade drops the downgrade', async () => {
+    const { storeId } = await subscribedStore({ planCode: LITE, periodEnd: addDays(T0, 10) });
+    await withRlsBypass(tx =>
+      tx.storeSubscription.update({ where: { storeId }, data: { pendingPlanCode: LITE } })
+    );
+    await changePlan({ storeId, planCode: PRO, now: T0, provider: stub });
+    expect(await getSub(storeId)).toMatchObject({ planCode: PRO, pendingPlanCode: null });
+  });
+
+  it('C1: a term the team assigned with no payment pays the FULL new price and starts a fresh period', async () => {
+    const { storeId } = await subscribedStore({ planCode: LITE, periodEnd: addDays(T0, 20) });
+    const preview = await previewChangePlan({ storeId, planCode: PRO, now: T0 });
+    expect(preview.basis).toBe('full');
+    expect(preview.quote.charge.totalMinor).toBe(49900);
+    await changePlan({ storeId, planCode: PRO, now: T0, provider: stub });
+    expect(stub.chargeCalls[0].amountMinor).toBe(49900);
     const sub = await getSub(storeId);
     expect(sub.planCode).toBe(PRO);
     expect(sub.currentPeriodStart!.toISOString()).toBe(T0.toISOString());
     expect(sub.currentPeriodEnd!.toISOString()).toBe(addInterval(T0, 'monthly').toISOString());
-    expect((await storeTier(storeId)).plan).toBe('professional');
-    expect((await ledger(storeId))[0].type).toBe('upgrade');
+  });
+
+  it('C1: a trialing store with a card pays the FULL new price; the trial ends and a paid period starts now', async () => {
+    const { storeId } = await subscribedStore({
+      planCode: LITE,
+      status: 'trialing',
+      periodEnd: addDays(T0, 10),
+      trialEndsAt: addDays(T0, 10),
+    });
+    const out = await changePlan({ storeId, planCode: PRO, now: T0, provider: stub });
+    expect(out).toMatchObject({ mode: 'upgraded', status: 'succeeded', amountMinor: 49900 });
+    expect(await getSub(storeId)).toMatchObject({
+      planCode: PRO,
+      status: 'active',
+      trialEndsAt: null,
+    });
+    expect((await getSub(storeId)).currentPeriodEnd!.toISOString()).toBe(
+      addInterval(T0, 'monthly').toISOString()
+    );
+  });
+
+  it('C2: a period that ended yesterday is never upgraded for free: 409 RENEW_FIRST, nothing charged', async () => {
+    const { storeId, subId } = await subscribedStore({
+      planCode: LITE,
+      periodEnd: addDays(T0, -1),
+    });
+    await paidPeriod(storeId, subId, 19999);
+    const err = await changePlan({ storeId, planCode: PRO, now: T0, provider: stub }).catch(e => e);
+    expect(err.code).toBe('RENEW_FIRST');
+    expect(stub.chargeCalls).toHaveLength(0);
+    expect((await getSub(storeId)).planCode).toBe(LITE);
+    const pastDue = await subscribedStore({
+      planCode: LITE,
+      status: 'past_due',
+      periodEnd: addDays(T0, 5),
+    });
+    expect(
+      (await previewChangePlan({ storeId: pastDue.storeId, planCode: PRO, now: T0 }).catch(e => e))
+        .code
+    ).toBe('RENEW_FIRST');
+  });
+
+  it('C3: the credit is what was PAID for the period when that is less than the catalogue price', async () => {
+    const end = addDays(T0, 20);
+    const { storeId, subId } = await subscribedStore({ planCode: LITE, periodEnd: end });
+    await paidPeriod(storeId, subId, 10000); // a promo: paid 10000, catalogue 19999
+    const q = (await previewChangePlan({ storeId, planCode: PRO, now: T0 })).quote;
+    // (49900 - 10000) x 20 / 31 = 25741.9 -> 25742, not (49900 - 19999) x 20 / 31
+    expect(q.currentTotalMinor).toBe(10000);
+    expect(q.charge.totalMinor).toBe(25742);
+  });
+
+  it("two upgrades in one period: the second credits the current plan's whole total, not base + the first difference (G35-PRORATE-1)", async () => {
+    const end = addDays(T0, 20);
+    const { storeId, subId } = await subscribedStore({ planCode: LITE, periodEnd: end });
+    await paidPeriod(storeId, subId, 19999);
+    const first = await changePlan({ storeId, planCode: PRO, now: T0, provider: stub });
+    expect(first).toMatchObject({ mode: 'upgraded', status: 'succeeded', amountMinor: 19291 });
+    // PRO's period is now paid in full (19999 base + 19291 for the 20 days left = the whole 49900 for the days left).
+    // The second upgrade credits PRO's whole 49900: (99900 - 49900) x 20 / 31 = 32258.06 -> 32259.
+    // Crediting only 19999 + 19291 = 39290 would charge (99900 - 39290) x 20 / 31 = 39103: an overcharge of 6844.
+    const preview = await previewChangePlan({ storeId, planCode: MAXP, now: T0 });
+    expect(preview.quote.currentTotalMinor).toBe(49900);
+    expect(preview.quote.charge.totalMinor).toBe(32259);
+    const second = await changePlan({ storeId, planCode: MAXP, now: T0, provider: stub });
+    expect(second).toMatchObject({ mode: 'upgraded', status: 'succeeded', amountMinor: 32259 });
+    expect(stub.chargeCalls.map(c => c.amountMinor)).toEqual([19291, 32259]);
+  });
+
+  it('C4: a second submit while the first upgrade charge is pending returns the first charge, never charges twice', async () => {
+    const { storeId, subId } = await subscribedStore({
+      planCode: LITE,
+      periodEnd: addDays(T0, 20),
+    });
+    await paidPeriod(storeId, subId, 19999);
+    stub.pendingNextCharges(1);
+    const first = await changePlan({ storeId, planCode: PRO, now: T0, provider: stub });
+    expect(first).toMatchObject({ mode: 'upgraded', status: 'pending' });
+    const second = await changePlan({ storeId, planCode: PRO, now: T0, provider: stub });
+    expect(second).toMatchObject({ mode: 'upgraded', status: 'pending' });
+    if (first.mode === 'upgraded' && second.mode === 'upgraded')
+      expect(second.eventId).toBe(first.eventId);
+    expect(stub.chargeCalls).toHaveLength(1);
+  });
+
+  it('C4: two concurrent submits make ONE charge and both answer with the same event', async () => {
+    const { storeId, subId } = await subscribedStore({
+      planCode: LITE,
+      periodEnd: addDays(T0, 20),
+    });
+    await paidPeriod(storeId, subId, 19999);
+    const [a, b] = await Promise.all([
+      changePlan({ storeId, planCode: PRO, now: T0, provider: stub }),
+      changePlan({ storeId, planCode: PRO, now: T0, provider: stub }).catch(e => e),
+    ]);
+    expect(stub.chargeCalls).toHaveLength(1);
+    const ids = [a, b].filter(r => r?.mode === 'upgraded').map(r => r.eventId);
+    expect(new Set(ids).size).toBe(1);
+    expect((await ledger(storeId)).filter(r => r.type === 'upgrade')).toHaveLength(1);
+  });
+
+  it('C4: a DECLINED prorated upgrade frees the slot: the retry is a new charge, one succeeded upgrade in the end', async () => {
+    const { storeId, subId } = await subscribedStore({
+      planCode: LITE,
+      periodEnd: addDays(T0, 20),
+    });
+    await paidPeriod(storeId, subId, 19999);
+    stub.failNextCharges(1);
+    const first = await changePlan({ storeId, planCode: PRO, now: T0, provider: stub });
+    expect(first).toMatchObject({ mode: 'upgraded', status: 'failed' });
+    const retry = await changePlan({ storeId, planCode: PRO, now: T0, provider: stub });
+    expect(retry).toMatchObject({ mode: 'upgraded', status: 'succeeded', amountMinor: 19291 });
+    if (first.mode === 'upgraded' && retry.mode === 'upgraded')
+      expect(retry.eventId).not.toBe(first.eventId);
+    expect(stub.chargeCalls).toHaveLength(2);
+    const ups = (await ledger(storeId)).filter(r => r.type === 'upgrade');
+    expect(ups.map(r => r.status)).toEqual(['failed', 'succeeded']);
+    expect(new Set(ups.map(r => r.idempotencyKey)).size).toBe(2);
+    expect((await getSub(storeId)).planCode).toBe(PRO);
   });
 
   it('a declined upgrade leaves the plan untouched and can be retried', async () => {

@@ -34,6 +34,7 @@ import { ClaimsPanel } from './_components/ClaimsPanel';
 import { ManualPaymentForm, type ManualPaymentPrefill } from './_components/ManualPaymentForm';
 import { ManualRefundForm, type ManualRefundTarget } from './_components/ManualRefundForm';
 import { GrantsPanel } from './_components/GrantsPanel';
+import { HeldPaymentsPanel } from './_components/HeldPaymentsPanel';
 import { SubscriptionsPanel } from './_components/SubscriptionsPanel';
 
 interface LedgerRow {
@@ -77,7 +78,7 @@ const TYPE_FILTERS = [
   'card_setup',
   'manual_payment',
 ] as const;
-const TABS = ['ledger', 'subscriptions', 'claims', 'grants'] as const;
+const TABS = ['ledger', 'subscriptions', 'claims', 'held', 'grants'] as const;
 
 function statusVariant(s: string): 'success' | 'warning' | 'destructive' | 'default' {
   if (s === 'succeeded') return 'success';
@@ -428,6 +429,15 @@ function BillingEventsInner() {
           <SubscriptionsPanel refreshKey={refreshKey} onRecordPayment={setForm} />
         )}
         {tab === 'grants' && <GrantsPanel refreshKey={refreshKey} />}
+        {tab === 'held' && (
+          <HeldPaymentsPanel
+            refreshKey={refreshKey}
+            onChanged={m => {
+              setMessage(m);
+              setRefreshKey(k => k + 1);
+            }}
+          />
+        )}
         {tab === 'claims' && (
           <ClaimsPanel
             refreshKey={refreshKey}

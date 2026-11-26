@@ -20,6 +20,7 @@ import { getProductPricing } from '../../lib/product-pricing';
 import { canBuyNow } from '../../lib/can-buy-now';
 import { isInCompareList, toggleCompare } from '../../lib/compare';
 import { FactChips } from '../../components/commerce/FactChips';
+import { Model3dChip } from '../../components/commerce/Model3dChip';
 import { soldOutLabel } from '../../templates/shared/ProductCardCta';
 import type { TemplateProduct } from '../../templates/types';
 import type { SectionProductRefs } from './section-products';
@@ -187,6 +188,7 @@ function SpotlightStage({
             </Link>
           </h2>
           <FactChips product={product} className="mt-3" />
+          <Model3dChip product={product} className="mt-3" />
           {showPrice && (
             <p className="mt-4 flex flex-wrap items-baseline gap-x-3 text-xl font-semibold tabular-nums text-foreground">
               <span>
