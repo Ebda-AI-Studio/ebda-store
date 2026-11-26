@@ -4,7 +4,8 @@
  * A store delete is a HARD delete (StoreService.delete removes the row, and the owner's profile with it when it was the last
  * store), so "count the owner's stores including deleted ones" has nothing left to count. The trial is therefore recorded when
  * it starts, in `system_settings` (platform-global, no store_id, survives every store/user delete) under a key derived from
- * the owner's NORMALISED EMAIL: a delete-and-recreate that also re-registers the same address is still the same owner.
+ * the owner's NORMALISED EMAIL (`normalizeTrialEmail`: `+tag` and Gmail dots and googlemail.com fold to one mailbox): a delete-and-recreate that also re-registers the same address, or an alias of it, is still the same owner.
+ * Markers written before the normalisation used the plain lowercased address; lookups check both keys, writes use the new one.
  * Only a sha256 of the address is stored, never the address.
  */
 import crypto from 'node:crypto';
@@ -16,8 +17,47 @@ import { onAccessD1 } from '../platform/access-d1';
 
 const PREFIX = 'ebda.trial-used:';
 
+const keyOf = (address: string): string =>
+  PREFIX + crypto.createHash('sha256').update(address).digest('hex');
+
+/**
+ * The address a trial is counted against: the SAME mailbox must give the same string however it is typed (the trial is one per
+ * owner, and a fresh free trial per alias defeats it). Lowercase and trim; drop a `+tag` from the local part on every domain;
+ * on Gmail also drop the dots in the local part and read googlemail.com as gmail.com (both reach one mailbox). A local part that
+ * would become empty keeps its original form, so `+x@` aliases do not all collapse together.
+ */
+// pq-allow(unused-export): a test seam, tests/unit/trial-eligibility.test.ts pins the alias folding on the pure function
+export function normalizeTrialEmail(email: string): string {
+  const lower = email.trim().toLowerCase();
+  const at = lower.lastIndexOf('@');
+  if (at < 1) return lower;
+  const original = lower.slice(0, at);
+  let domain = lower.slice(at + 1);
+  if (domain === 'googlemail.com') domain = 'gmail.com';
+  let local = original.split('+')[0]!;
+  if (domain === 'gmail.com') local = local.replace(/\./g, '');
+  return `${local || original}@${domain}`;
+}
+
+/** The marker key written from now on (normalised address). */
 function trialUsedKey(email: string): string {
-  return PREFIX + crypto.createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
+  return keyOf(normalizeTrialEmail(email));
+}
+/** The key markers were written under before normalisation (trim + lowercase only): still honoured on lookup, never written. */
+function legacyTrialUsedKey(email: string): string {
+  return keyOf(email.trim().toLowerCase());
+}
+
+async function markerExists(
+  db: NonNullable<Awaited<ReturnType<typeof platformDb>>>,
+  email: string
+): Promise<boolean> {
+  const keys = [...new Set([trialUsedKey(email), legacyTrialUsedKey(email)])];
+  for (const key of keys) {
+    const row = await db.systemSetting.findUnique({ where: { key }, select: { id: true } });
+    if (row) return true;
+  }
+  return false;
 }
 
 /** True when a signup trial was already started for this owner (any store, live or deleted). */
@@ -26,11 +66,7 @@ export async function ownerHasUsedTrial(email: string): Promise<boolean> {
   // = no marker store, so no block.
   const db = await platformDb();
   if (!db) return false;
-  const row = await db.systemSetting.findUnique({
-    where: { key: trialUsedKey(email) },
-    select: { id: true },
-  });
-  return !!row;
+  return markerExists(db, email);
 }
 
 /**
@@ -48,6 +84,15 @@ export async function claimOwnerTrial(email: string): Promise<{ grant: boolean; 
   try {
     const db = await platformDb();
     if (!db) return { grant: true, owned: false };
+    // a marker written under the OLD key (before normalisation) still counts: this owner already had their trial
+    const legacy = legacyTrialUsedKey(email);
+    if (legacy !== trialUsedKey(email)) {
+      const old = await db.systemSetting.findUnique({
+        where: { key: legacy },
+        select: { id: true },
+      });
+      if (old) return { grant: false, owned: false };
+    }
     const { count } = await db.systemSetting.createMany({
       data: [
         {

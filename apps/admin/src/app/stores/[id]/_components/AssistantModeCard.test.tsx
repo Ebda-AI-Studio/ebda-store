@@ -137,4 +137,29 @@ describe('AssistantModeCard', () => {
     fireEvent.click(screen.getByText('Yes, change the mode'));
     await waitFor(() => expect(screen.getAllByRole('alert')[0]!.textContent).toBe('MFA required'));
   });
+
+  it('QA-112: shows why the merchant still sees it off when the saved mode is higher', async () => {
+    apiGet.mockResolvedValue({
+      data: {
+        mode: 'answer-only',
+        effective: { mode: 'off', reason: 'platform_cap_off' },
+        lastChange: null,
+      },
+      error: null,
+    });
+    render(<AssistantModeCard storeId="s1" />);
+    const box = await screen.findByTestId('assistant-mode-effective');
+    expect(box.textContent).toContain('does not see the assistant');
+    expect(box.textContent).toContain('platform-wide cap');
+  });
+
+  it('QA-112: no warning when saved and effective agree', async () => {
+    apiGet.mockResolvedValue({
+      data: { mode: 'off', effective: { mode: 'off', reason: 'store_mode_off' }, lastChange: null },
+      error: null,
+    });
+    render(<AssistantModeCard storeId="s1" />);
+    await screen.findByTestId('assistant-mode-trail');
+    expect(screen.queryByTestId('assistant-mode-effective')).toBeNull();
+  });
 });

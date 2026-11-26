@@ -337,6 +337,14 @@ All errors follow this format:
             allTimeCustomers: { type: 'integer' },
             ordersChange: { type: 'number', format: 'float' },
             revenueChange: { type: 'number', format: 'float' },
+            previousRevenue: {
+              type: 'integer',
+              description:
+                'Previous-period revenue; 0 means the change is "first sales", not a percentage',
+            },
+            previousOrders: { type: 'integer' },
+            previousCustomers: { type: 'integer' },
+            previousProfit: { type: 'integer', nullable: true },
             conversionRate: {
               type: 'number',
               format: 'float',

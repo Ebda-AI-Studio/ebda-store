@@ -264,9 +264,9 @@ export const translations = {
   // Keep copy short — this is the merchant's last impression on a customer
   // when their store is offline, so the page must read as intentional rather
   // than broken.
-  "We'll be back soon": 'سنعود قريباً',
-  'is currently undergoing maintenance. Please check back later.':
-    'عليه صيانة دلوقتي. جرّب تاني بعدين.',
+  'This store is temporarily unavailable': 'المتجر غير متاح مؤقتًا',
+  'is not taking orders right now. Please check back later.':
+    'مش بيستقبل طلبات دلوقتي. جرّب تاني بعدين.',
   'Need to reach us?': 'تحتاج للتواصل معنا؟',
   'Powered by Ebda Store': `مدعوم من ${BRAND.product.nameAr}`,
 

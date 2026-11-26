@@ -3,6 +3,7 @@
 import { useT } from '@/i18n/useT';
 import type { GlWindow } from './types';
 import { formatCurrency } from './types';
+import { ledgerCostsStatus } from '@/lib/money-truth';
 
 interface GlKpiCardsProps {
   gl: GlWindow;
@@ -15,27 +16,43 @@ interface GlKpiCardsProps {
  * Revenue / Gross Profit / Net Income.
  * Includes a "GL" badge and tooltip explaining the data source.
  *
- * Gross profit follows the page's one unknown-state pattern (ruling AN-7, the
+ * Gross profit and net income follow the page's one unknown-state pattern (ruling AN-7, the
  * same as the analytics profit card): when the period has revenue but no cost
  * of goods was booked, "revenue − 0" is not a gross profit — the card says
  * "Unknown" and why, instead of repeating the revenue figure.
  */
-export function glGrossProfitKnown(gl: Pick<GlWindow, 'revenue' | 'cogs'>): boolean {
-  return !(gl.revenue > 0 && gl.cogs === 0);
+export function glGrossProfitKnown(
+  gl: Pick<GlWindow, 'revenue' | 'cogs' | 'costsStatus'>
+): boolean {
+  return ledgerCostsStatus(gl) !== 'unknown';
 }
 
 export function GlKpiCards({ gl, periodLabel }: GlKpiCardsProps) {
   const t = useT('analytics.gl');
 
-  const grossKnown = glGrossProfitKnown(gl);
+  const status = ledgerCostsStatus(gl);
+  const grossKnown = status !== 'unknown';
+  // Unknown: no cost of goods at all. Partial: the figure is shown, with how many sold items lack a cost, because the
+  // real profit is lower than stated (money review M1).
+  const costNote =
+    status === 'unknown'
+      ? t('noCogsBooked')
+      : status === 'partial'
+        ? t('costsPartial', { missing: gl.costsMissing ?? 0, total: gl.costsTotal ?? 0 })
+        : undefined;
   const cards: Array<{ label: string; value: number | null; note?: string }> = [
     { label: t('revenue'), value: gl.revenue },
     {
       label: t('grossProfit'),
       value: grossKnown ? gl.grossProfit : null,
-      note: grossKnown ? undefined : t('noCogsBooked'),
+      note: costNote,
     },
-    { label: t('netIncome'), value: gl.netIncome },
+    // Net income is built on the same missing input as gross profit (QA 2026-11-17 N1).
+    {
+      label: t('netIncome'),
+      value: grossKnown ? gl.netIncome : null,
+      note: costNote,
+    },
   ];
 
   return (

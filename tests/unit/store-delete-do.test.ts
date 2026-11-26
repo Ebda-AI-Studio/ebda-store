@@ -94,9 +94,14 @@ describe('finishStoreDeletion (Rulings NZ-D15, NZ-D17)', () => {
       sqlite.prepare('SELECT COUNT(*) n FROM store_staff WHERE store_id=?').get(A)
     ).toMatchObject({ n: 1 });
   });
-  it('a Postgres store (already hard-deleted there): the D1 row is removed', async () => {
+  it('a Postgres store (already hard-deleted there): the D1 row is TOMBSTONED, never removed (STORE-ROW-TOMBSTONE-1: Ebda billing rows cascade from it)', async () => {
     expect(await finishStoreDeletion({ storeId: A, wasOnDo: false })).toEqual({ directory: true });
-    expect(row()).toBeUndefined();
+    expect(row()).toMatchObject({ status: 'inactive' });
+    expect(row()?.deleted_at).not.toBeNull();
+    expect(await lookupStore({ slug: 'alpha' })).toBeNull(); // the old slug is released and the store no longer resolves
+    expect(sqlite.prepare('SELECT slug FROM stores WHERE id=?').get(A)).toEqual({
+      slug: '~purged~' + A,
+    });
   });
   it('a D1 failure is retried, and a persistent one is a P1 alert (the store would keep resolving)', async () => {
     const alert = vi.fn();

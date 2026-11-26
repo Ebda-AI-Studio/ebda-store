@@ -33,8 +33,9 @@ describe('Arabic UI', () => {
     const out = formatPrice(0);
     expect(out).toMatch(/ج\.م/);
     expect(out).not.toMatch(/EGP/);
-    expect(out).toMatch(/0\.00/);
-    expect(formatPrice(150000)).toMatch(/1,500\.00/);
+    expect(out).toMatch(/^0 /);
+    expect(formatPrice(150000)).toMatch(/1,500 /);
+    expect(formatPrice(485000)).toBe('4,850 ج.م'); // QA O1: one format, grouped, no ".00"
   });
 
   it('formats a count with Western digits', () => {

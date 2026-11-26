@@ -321,7 +321,7 @@
     "id": "page:/lifecycle-emails",
     "kind": "page",
     "route": "/lifecycle-emails",
-    "access": "staff",
+    "access": "owner",
     "en": "Setup emails",
     "ar": "رسائل البداية",
     "synEn": "setup emails onboarding trial reminder referral unsubscribe",

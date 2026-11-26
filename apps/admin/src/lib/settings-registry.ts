@@ -216,7 +216,7 @@ export const PAGES: PageEntry[] = [
     feature: 'payment_abandonment',
     syn: { en: 'failed payment abandoned checkout', ar: 'دفع فاشل تخلي' },
   }),
-  page('/lifecycle-emails', `${HUB}.lifecycleEmails`, 'staff', {
+  page('/lifecycle-emails', `${HUB}.lifecycleEmails`, 'owner', {
     syn: {
       en: 'setup emails onboarding trial reminder referral unsubscribe',
       ar: 'رسائل البداية التجربة تذكير إلغاء اشتراك',

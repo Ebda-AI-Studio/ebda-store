@@ -49,6 +49,7 @@ import {
   profitAndLoss,
   type TrialBalanceRow,
 } from '../../services/accounting/reports.service';
+import { AnalyticsService, cogsFromPnl, ledgerCostsFields } from '../../services/analytics.service';
 import { dashboardStockValues } from '../../services/accounting/dashboard-stock';
 import { generateTaxReport } from '../../services/accounting/tax-report.service';
 import {
@@ -649,17 +650,30 @@ const financeOverview = readTool<{ from?: string; to?: string }>({
   gate: FINANCE_READ,
   read: async (ctx, a) => {
     const { from, to } = await window(ctx.storeId, a, {});
-    const [pnl, bs, stock] = await Promise.all([
+    const [pnl, bs, stock, coverage] = await Promise.all([
       profitAndLoss(ctx.storeId, from, to),
       balanceSheet(ctx.storeId, to),
       dashboardStockValues(ctx.storeId),
+      AnalyticsService.soldLineCostCoverage(ctx.storeId, from, to),
     ]);
+    const costs = ledgerCostsFields(pnl.totalRevenue, cogsFromPnl(pnl), coverage);
     return {
       revenueEgp: money(pnl.totalRevenue),
       expensesEgp: money(pnl.totalExpenses),
-      netProfitEgp: money(pnl.netIncome),
+      // Revenue with no (or only some) cost of goods is not a real profit: say "unknown" / "partial", never the revenue.
+      netProfitEgp: costs.costsStatus === 'unknown' ? null : money(pnl.netIncome),
+      netProfitNote:
+        costs.costsStatus === 'unknown'
+          ? 'Unknown: no cost of goods is booked for this period, so net profit cannot be stated.'
+          : costs.costsStatus === 'partial'
+            ? `Partial: ${costs.costsMissing} of ${costs.costsTotal} sold items have no cost price, so the real profit is lower than stated.`
+            : undefined,
       cash: top(bs.assets.filter(x => x.code.startsWith('10')).map(bsRow)),
-      stockValueEgp: money(stock.stockValue),
+      stockValueEgp:
+        stock.stockedProducts > 0 && stock.uncostedProducts === stock.stockedProducts
+          ? null
+          : money(stock.stockValue),
+      stockValueCoverage: `${stock.stockedProducts - stock.uncostedProducts} of ${stock.stockedProducts} stocked products have a cost price`,
       totalAssetsEgp: money(bs.totalAssets),
       totalLiabilitiesEgp: money(bs.totalLiabilities),
       totalEquityEgp: money(bs.totalEquity),

@@ -298,3 +298,7 @@ A merge group runs the heavy-only jobs (Build, Orphan test coverage, Integration
 `packages/shared|repo|database`, migrations, `.github/`, `scripts/`, `tests/`) and the `ci:full` PR label force the full tier; any error fails
 closed to full. Unit shards, Security Audit, the marketing dry-run, `Repo guards` and `API Worker boots on workerd` always run. The
 `Merge queue gate` accepts `skipped` for exactly the heavy-only jobs and only when heavy=false. The nightly and main-push full lanes are unchanged.
+
+## The slop guard runs before the push, in CI form (SLOP-PREPUSH-1)
+
+The pre-push hook runs `bash scripts/ci/pre-push-slop.sh origin/main HEAD` (also the command to run by hand) whenever a `.ts`/`.tsx` file differs from the merge base. It runs the BASE branch's `slop-guard.mjs` exactly as `.github/workflows/pr-quality.yml` does: `--root` the pushed head, `--base-root` the base, and `--merge-base-root` with the merge-base tree built by the base's `merge-base-tree.sh` (a throwaway `--shared --no-checkout` clone supplies the git checkout that script needs, so nothing is copied and this repo's refs are untouched). About 4 s. An export that only a test file imports is NOT a use, locally as in CI. Evidence: `tests/unit/pre-push-slop.test.ts`.
