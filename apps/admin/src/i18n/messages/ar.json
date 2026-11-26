@@ -9690,9 +9690,19 @@
       "switchingInterval": "التحويل إلى الدفع {interval} اعتبارًا من {date}، بعد تأكيد دفعتك",
       "instapayDueNoAmount": "دفع إنستاباي مستحق بحلول {date} لباقة {plan}",
       "returnsToFree": "باقتك هترجع للمجانية لو ما اتدفعتش لحد ساعتها.",
+      "renewsOn": "ميعاد التجديد",
+      "renewsOnLine": "باقة {plan} بتتجدد يوم {date}: {amount} ({interval}) بإنستاباي",
+      "renewsOnNoAmount": "باقة {plan} بتتجدد يوم {date}",
       "nextRenewal": "التجديد الجاي",
       "renewalLine": "التجديد الجاي يوم {date}: {amount} {interval} لباقة {plan}",
-      "renewalNoAmount": "التجديد الجاي يوم {date} لباقة {plan}"
+      "renewalNoAmount": "التجديد الجاي يوم {date} لباقة {plan}",
+      "termBasis": "الفترة الحالية",
+      "basis": {
+        "paid": "مدفوعة",
+        "assigned": "فريق ابدأ ستور فعّلها من غير دفع",
+        "comped": "هدية من فريق ابدأ ستور",
+        "trial": "تجربة مجانية"
+      }
     },
     "pay": {
       "title": "طريقة الدفع",
