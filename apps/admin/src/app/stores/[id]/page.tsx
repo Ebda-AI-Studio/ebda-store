@@ -17,7 +17,7 @@ import { useDashboardData } from './_hooks/useDashboardData';
 // every row derives from real store data and the merchant can hide it.
 import { SetupGuideCard } from './_components/SetupGuideCard';
 import { StorePulseBlock, TopProductsCard } from './_components/StorePulse';
-import { useStorePulse, type PulsePeriod } from './_hooks/useStorePulse';
+import { useStorePulse, usePulsePeriod } from './_hooks/useStorePulse';
 import { NeedsAction } from './_components/NeedsAction';
 import { NextStepSlot } from './_components/NextStepSlot';
 import { OrderAlertsPromptCard } from '../../../components/OrderAlertsPromptCard';
@@ -68,7 +68,7 @@ export default function StoreDetailPage() {
   } = useDashboardData(storeId);
 
   const [showSuspendModal, setShowSuspendModal] = useState(false);
-  const [period, setPeriod] = useState<PulsePeriod>('last_7');
+  const [period, setPeriod] = usePulsePeriod();
   const { pulse, reload: reloadPulse } = useStorePulse(storeId, period);
   const { requestDelete, dialog: deleteDialog } = useDeleteStore(
     useCallback(() => router.push('/stores'), [router])

@@ -8,6 +8,8 @@ import { useFeatures } from '../../hooks/useFeatures';
 import { navFeatureState } from '../../lib/nav-lock';
 import { LockBadge } from './LockBadge';
 import { SETTINGS_GROUPS } from '../../lib/settings-groups';
+import { useAttention } from '../../hooks/useAttention';
+import { AttentionBadge } from '../attention/AttentionBadge';
 
 /**
  * Inline-start rail of the Settings hub (UX:N-3): the same five groups as the hub page, on every settings page, so
@@ -21,6 +23,7 @@ export function SettingsRail({ storeId }: { storeId: string }) {
   const { isEnabled, isLoading } = useFeatures();
   const ctx = { isEnabled, isLoading, isSuperAdmin: false };
   const base = `/stores/${storeId}`;
+  const { bySection, hasInfoBySection } = useAttention(storeId);
 
   return (
     <nav aria-label={t('rail.label')} className="hidden w-56 shrink-0 lg:block">
@@ -53,6 +56,11 @@ export function SettingsRail({ storeId }: { storeId: string }) {
                       >
                         {tCards(`${i.card}.title`)}
                         {navFeatureState(i.featureKey, ctx) === 'locked' && <LockBadge />}
+                        <AttentionBadge
+                          count={bySection[i.path] ?? 0}
+                          quiet={!!hasInfoBySection[i.path]}
+                          className="ms-auto"
+                        />
                       </Link>
                     </li>
                   );

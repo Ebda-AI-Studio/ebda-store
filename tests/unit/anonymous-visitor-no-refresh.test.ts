@@ -106,6 +106,23 @@ describe('guest mount — /auth/me 401 with no session evidence', () => {
   });
 });
 
+describe('G71 guest probe', () => {
+  it('asks /auth/me with the guest-probe flag and settles a 200 { user: null } quietly', async () => {
+    const fetchMock = vi.fn(async () => res(200, { success: true, data: { user: null } }));
+    globalThis.fetch = fetchMock as never;
+    const { api } = await import('@web/lib/api');
+
+    const result = await api.getProfile();
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/auth/me?probe=guest');
+    expect(result.success).toBe(true);
+    expect(result.data?.user).toBeNull();
+    expect(refreshCalls(fetchMock)).toHaveLength(0);
+    // A guest answer is not a session: no marker is armed.
+    expect(localStorage.getItem('hadSession')).toBeNull();
+  });
+});
+
 describe('a browser that HAS held a session still recovers (#1789)', () => {
   it('refreshes on the /auth/me 401 once a session marker exists', async () => {
     let meCalls = 0;

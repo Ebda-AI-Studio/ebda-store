@@ -3,6 +3,7 @@ import { storeNameOf, sweepStoresDb, withStoreDb } from '../../jobs/store-db';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { stepRunUnlessEmpty } from '../empty-exit';
+import { logSweepRun } from '../sweep-run-log';
 import { sendAlert } from '../../../services/alerts.service';
 import { recordPaymentEventForStore } from '../../../services/payment-event.service';
 
@@ -148,5 +149,6 @@ export const paymentReconcileSweep: JobDef = inngest.createFunction(
     // CADENCE NOTE (Neon autosuspend cost) applies to every DB-polling cron.
     triggers: [{ cron: '17 * * * *' }],
   },
-  async ({ step, event }) => handlePaymentReconcileSweep(step, event)
+  async ({ step, event }) =>
+    logSweepRun('payment-reconcile-sweep', await handlePaymentReconcileSweep(step, event))
 );

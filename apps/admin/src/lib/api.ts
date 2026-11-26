@@ -601,7 +601,27 @@ export async function checkSessionWithMountRetries(
  * Authentication is handled automatically via the HTTP-only cookie sent
  * by the browser when `credentials: 'include'` is set.
  */
+/** Fired after a successful write to a store resource: "needs attention" refetches so a fixed issue clears its badge at once. */
+export const ATTENTION_REFRESH_EVENT = 'ebda:attention-refresh';
+
 export async function apiRequest<T = unknown>(
+  endpoint: string,
+  options: RequestInit & { quietUpsell?: boolean } = {}
+): Promise<{ data: T | null; error: ApiError | null }> {
+  const result = await apiRequestInner<T>(endpoint, options);
+  const method = (options.method || 'GET').toUpperCase();
+  if (
+    method !== 'GET' &&
+    !result.error &&
+    typeof window !== 'undefined' &&
+    /\/stores\/|\/payment-settings\/|\/billing/.test(endpoint)
+  ) {
+    window.dispatchEvent(new Event(ATTENTION_REFRESH_EVENT));
+  }
+  return result;
+}
+
+async function apiRequestInner<T = unknown>(
   endpoint: string,
   options: RequestInit & {
     /** An optional widget call: a plan 402/403 must not open the upgrade dialog (the widget just hides). */

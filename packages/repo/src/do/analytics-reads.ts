@@ -2,6 +2,7 @@
 // apps/api/src/services/analytics.service.ts are raw SQL aggregates (distinct customer keys, profit lines, date_trunc buckets,
 // the on-hand twin); each op here is the SQLite spelling of ONE of them, scoped by the `store_id` the DO holds. All are reads.
 import { MoneyError, type SyncSql } from './sync-sql';
+import { STOCK_COST_COVERAGE_SQLITE } from './finance-ops';
 import {
   netLinesInnerSql,
   netLinesWrapSql,
@@ -252,7 +253,8 @@ export function analyticsStockOp(db: SyncSql, storeId: string) {
         WHEN EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id)
         THEN COALESCE((SELECT SUM(pv.inventory * COALESCE(pv.cost_price, p.cost_price, 0))
                          FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = 1), 0)
-        ELSE p.inventory * COALESCE(p.cost_price, 0) END), 0) AS total
+        ELSE p.inventory * COALESCE(p.cost_price, 0) END), 0) AS total,
+       ${STOCK_COST_COVERAGE_SQLITE}
        FROM products p WHERE p.store_id = ? AND p.deleted_at IS NULL`,
     [storeId]
   )[0] as Record<string, unknown>;
@@ -266,6 +268,8 @@ export function analyticsStockOp(db: SyncSql, storeId: string) {
   )[0] as Record<string, unknown>;
   return {
     stockValue: num(value.total),
+    stockedProducts: num(value.stocked),
+    uncostedProducts: num(value.uncosted),
     backorderCount: num(bo.count),
     backorderValue: num(bo.value),
   };

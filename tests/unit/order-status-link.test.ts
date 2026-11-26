@@ -132,6 +132,30 @@ describe('GET /public/order-status/:token', () => {
       items: [{ name: 'Shirt', variant: 'كبير', quantity: 2 }],
     });
   });
+  it('G54: an InstaPay order waiting for the transfer is payable from the page; any other order is not', async () => {
+    h.order.mockResolvedValue({
+      ...row,
+      status: 'awaiting_payment_confirmation',
+      payments: [{ id: 'p1' }],
+    });
+    expect((await get(signOrderStatusLinkToken(STORE, ORDER))).body.data.instapayPayable).toBe(
+      true
+    );
+    h.order.mockResolvedValue({ ...row, status: 'awaiting_payment_confirmation', payments: [] });
+    expect((await get(signOrderStatusLinkToken(STORE, ORDER))).body.data.instapayPayable).toBe(
+      false
+    );
+    h.order.mockResolvedValue({ ...row, status: 'confirmed', payments: [{ id: 'p1' }] });
+    expect((await get(signOrderStatusLinkToken(STORE, ORDER))).body.data.instapayPayable).toBe(
+      false
+    );
+    // the summary asks only for the order's InstaPay payment id, nothing else of the payment
+    expect(h.order.mock.calls.at(-1)?.[0].select.payments).toEqual({
+      where: { provider: 'instapay' },
+      select: { id: true },
+      take: 1,
+    });
+  });
   it('no phone, email, street or name anywhere in the response', async () => {
     const res = await get(signOrderStatusLinkToken(STORE, ORDER));
     const text = JSON.stringify(res.body);

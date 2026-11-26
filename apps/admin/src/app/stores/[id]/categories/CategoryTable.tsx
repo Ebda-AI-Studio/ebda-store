@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useT } from '@/i18n/useT';
+import { useDndA11y } from '@/hooks/useDndA11y';
 import { RowActions } from '@/components/RowActions';
 
 import { Button, buttonVariants } from '@/components/ui/Button';
@@ -239,6 +240,7 @@ export function CategoryTable({
   const locale = useLocale();
   const isRtl = locale === 'ar';
 
+  const dndA11y = useDndA11y();
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -410,7 +412,12 @@ export function CategoryTable({
   return (
     <>
       {mobileCards}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <DndContext
+        {...dndA11y}
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={onDragEnd}
+      >
         <SortableContext items={categories.map(c => c.id)} strategy={verticalListSortingStrategy}>
           {tableBody}
         </SortableContext>

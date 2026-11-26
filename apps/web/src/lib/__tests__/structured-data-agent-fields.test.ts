@@ -164,3 +164,32 @@ describe('Product JSON-LD images (audit M-170)', () => {
     expect('image' in ld).toBe(false);
   });
 });
+
+describe('productJsonLd — 3D model (subjectOf 3DModel)', () => {
+  const withModel = (model3d: unknown) => ({ ...(product as object), model3d }) as never;
+  it('emits a 3DModel subjectOf with the GLB url', () => {
+    const ld = productJsonLd(withModel({ modelUrl: 'https://media.ebda.app/m.glb' }), store) as {
+      subjectOf: Record<string, string>;
+    };
+    expect(ld.subjectOf).toMatchObject({
+      '@type': '3DModel',
+      encodingFormat: 'model/gltf-binary',
+      contentUrl: 'https://media.ebda.app/m.glb',
+    });
+  });
+  it('adds the USDZ as a second node only when uploaded', () => {
+    const ld = productJsonLd(
+      withModel({ modelUrl: 'https://m/a.glb', usdzUrl: 'https://m/a.usdz' }),
+      store
+    ) as { subjectOf: Array<Record<string, string>> };
+    expect(ld.subjectOf.map(n => n.encodingFormat)).toEqual([
+      'model/gltf-binary',
+      'model/vnd.usdz+zip',
+    ]);
+  });
+  it('omits subjectOf with no model, or a model without a url', () => {
+    expect(productJsonLd(product, store)).not.toHaveProperty('subjectOf');
+    expect(productJsonLd(withModel(null), store)).not.toHaveProperty('subjectOf');
+    expect(productJsonLd(withModel({ modelUrl: '' }), store)).not.toHaveProperty('subjectOf');
+  });
+});

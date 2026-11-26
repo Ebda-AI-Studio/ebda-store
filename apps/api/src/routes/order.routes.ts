@@ -837,7 +837,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
-  // accounting.invoicing is a Professional-tier addon (Egypt-compliant tax
+  // accounting.invoicing is a Professional-tier feature (Egypt-compliant tax
   // invoice + PDF). Previously ungated at every layer — every plan incl. free
   // could generate it. Gate the merchant-facing generation; the customer-facing
   // public receipt route is intentionally left open (don't 403 a paying buyer).

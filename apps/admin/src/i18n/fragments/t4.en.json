@@ -292,7 +292,6 @@
   },
   "floatingWidget": {
     "pageTitle": "Floating WhatsApp button",
-    "premiumSubtitle": "Extra feature",
     "mainSubtitle": "Fixed buttons your customer sees on every page, like WhatsApp and call",
     "saveChanges": "Save the buttons",
     "savedToast": "Buttons saved",

@@ -155,3 +155,32 @@ function fakeRpc() {
     revokeUser: () => Promise<undefined>;
   };
 }
+
+describe('QA-105 diagnostics: which call failed, how long, vs the budget', () => {
+  it('a timeout is tagged with the call, elapsed and budget, and reads as timedOut', async () => {
+    const { identityFailureFields } = await import('@api/lib/identity-timeout');
+    vi.useFakeTimers();
+    let caught: unknown;
+    const p = withIdentityTimeout(new Promise(() => {}), 'isRevoked').catch(e => (caught = e));
+    await vi.advanceTimersByTimeAsync(IDENTITY_LIVE_TIMEOUT_MS + 1);
+    await p;
+    expect(identityFailureFields(caught)).toMatchObject({
+      call: 'isRevoked',
+      budgetMs: IDENTITY_LIVE_TIMEOUT_MS,
+      timedOut: true,
+      errName: 'AppError',
+    });
+  });
+
+  it('a non-timeout failure is tagged with its call and own error name, not timedOut', async () => {
+    const { identityFailureFields } = await import('@api/lib/identity-timeout');
+    const boom = Object.assign(new Error('D1_ERROR: no such table'), { name: 'D1Error' });
+    const caught = await withIdentityTimeout(Promise.reject(boom), 'getAccountState').catch(e => e);
+    expect(identityFailureFields(caught)).toMatchObject({
+      call: 'getAccountState',
+      errName: 'D1Error',
+      timedOut: false,
+    });
+    expect(identityFailureFields(caught)).not.toHaveProperty('token');
+  });
+});

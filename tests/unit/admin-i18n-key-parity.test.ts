@@ -39,6 +39,10 @@ const arFlat = flatten(ar as Messages);
 
 // Reviewed exceptions where en === ar is correct, not a missed translation.
 const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
+  // Pure ICU interpolation: the amount is formatted with its own currency (formatMoney / useLocalePrice, Ruling
+  // MONEY-TRUTH), so the template is `{amount}` in both locales (#890).
+  'orders.list.table.totalValue',
+  'abandonedCarts.stats.baseValue',
   // Spacing control readout: a pure ICU template ({px}px), same in both locales.
   'builder.settings.spacing.px',
   // Language toggle names each language in its own script, same in both locales.

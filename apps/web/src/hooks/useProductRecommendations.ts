@@ -43,6 +43,7 @@ export interface RecommendedProduct {
   options?: TemplateProduct['options'];
   /** Fact chips on the card. */
   facts?: TemplateProduct['facts'];
+  has3d?: boolean;
   /** Feeds the card "New" badge. */
   createdAt?: string | null;
 }
