@@ -1,5 +1,13 @@
 {
   "common": {
+    "dndA11y": {
+      "instructions": "To pick up an item, press the space bar. While dragging, use the arrow keys to move it. Press space again to drop it, or Escape to cancel.",
+      "pickedUp": "Picked up the item.",
+      "movedOver": "The item is over position {position}.",
+      "dropped": "Dropped the item at position {position}.",
+      "droppedBack": "Dropped the item. It is back where it was.",
+      "cancelled": "Cancelled. The item is back where it was."
+    },
     "save": "Save",
     "cancel": "Cancel",
     "storeNotOperational": "This store is suspended, so Ebda AI Studio has paused messages to customers and payouts. Contact support to get it reactivated.",
@@ -204,7 +212,9 @@
         "stockValue": "Stock value",
         "openBackorders": "Open backorders",
         "topRfmSegment": "Top Customer Segment",
-        "error": "Unable to load financial summary"
+        "error": "Unable to load financial summary",
+        "unknown": "Unknown",
+        "netPartial": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower."
       },
       "details": {
         "title": "Store Details",
@@ -362,16 +372,19 @@
         },
         "salesLabel": "Sales",
         "vsPrevious": "vs the previous period",
+        "newBadge": "New",
         "deltaSr": {
           "up": "Up {percent}%",
           "down": "Down {percent}%",
-          "flat": "No change"
+          "flat": "No change",
+          "new": "New: no sales in the previous period"
         },
         "sentence": {
-          "up": "Up {percent}% on the previous period, from {orders} orders.",
-          "down": "Down {percent}% on the previous period, from {orders} orders.",
-          "flat": "Same as the previous period, from {orders} orders.",
-          "unknown": "From {orders} orders."
+          "up": "Up {percent}% on the previous period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "down": "Down {percent}% on the previous period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "new": "First sales in this period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "flat": "Same as the previous period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "unknown": "From {ordersN, plural, one {{orders} order} other {{orders} orders}}."
         },
         "sparkLabel": "Sales per day across this period, latest day highlighted",
         "emptyBody": "No sales in this period yet. Share your store link with your customers to get the first order.",
@@ -444,6 +457,7 @@
     "list": {
       "title": "Stores",
       "subtitleCount": "{count} stores on the platform",
+      "subtitleFiltered": "{count} stores ({status})",
       "createStore": "Create Store",
       "searchPlaceholder": "Search by name, slug, or owner…",
       "search": "Search",
@@ -618,7 +632,11 @@
         "draft": "Draft",
         "archived": "Archived",
         "allCategories": "All categories",
-        "categoryAriaLabel": "Filter products by category"
+        "categoryAriaLabel": "Filter products by category",
+        "model3dAriaLabel": "Filter products by 3D model",
+        "model3dAny": "Any 3D model",
+        "model3dWith": "With a 3D model",
+        "model3dWithout": "Without a 3D model"
       },
       "status": {
         "active": "Active",
@@ -1394,7 +1412,7 @@
         "status": "Status",
         "date": "Date",
         "actions": "Actions",
-        "totalValue": "{amount} EGP",
+        "totalValue": "{amount}",
         "moreItems": "+{count} more",
         "agentBadge": "Agent"
       },
@@ -2210,6 +2228,7 @@
       "totalCustomers": "Total Customers",
       "avgOrderValue": "Avg Order Value",
       "vsLastPeriod": "vs last period",
+      "newVsPrevious": "New",
       "profitUnknown": "Unknown",
       "profitMissingCost": "Profit unknown — cost price missing on {count} sold items",
       "profitPartial": "Excludes {count} sold items with no cost price ({amount} in sales)",
@@ -2264,11 +2283,15 @@
       "netIncome": "Net income (GL)",
       "grossProfitUnknown": "Unknown",
       "noCogsBooked": "No cost of goods was booked for this period, so gross profit cannot be told apart from revenue. Cost is booked for orders whose products had a cost price when sold.",
+      "costsPartial": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower.",
       "window": "General-ledger figures for: {period}"
     },
     "inventorySnapshot": {
       "title": "Inventory snapshot (right now)",
       "stockValue": "Stock value",
+      "stockValueUnknown": "Unknown",
+      "stockValueMissingCost": "{count} stocked products have no cost price, so their value cannot be calculated.",
+      "stockValuePartial": "Calculated for {costed} of {stocked} stocked products — the rest have no cost price.",
       "openBackorders": "Open backorders",
       "backorderedDemandValue": "Backordered demand value",
       "reorderRules": "Reorder rules"
@@ -4178,11 +4201,11 @@
         "AI_STORE_BILLING_SUSPENDED": "Smart tools are paused until your subscription is paid. Pay from the Billing page to turn them back on.",
         "AI_RATE_LIMITED": "Busy right now. Try this file again in a minute.",
         "AI_NOT_CONFIGURED": "Smart tools are not available right now.",
-        "AI_UPSTREAM_ERROR": "Could not read this file. Try again.",
-        "AI_BAD_RESPONSE": "Could not read this file. Try again.",
-        "BAD_RESPONSE": "Could not read this file. Try again.",
-        "FILE_UNREADABLE": "This file could not be opened.",
-        "EXTRACTION_FAILED": "Could not read this file. Try again.",
+        "AI_UPSTREAM_ERROR": "The reading service is busy right now. Try again in a minute (no pages were counted).",
+        "AI_BAD_RESPONSE": "We could not understand this file's content. Try a clearer photo (no pages were counted).",
+        "BAD_RESPONSE": "We could not understand this file's content. Try a clearer photo (its pages were counted).",
+        "FILE_UNREADABLE": "This file itself could not be opened. It may be damaged or in an unsupported format: try another file.",
+        "EXTRACTION_FAILED": "Reading this file failed. Try again (no pages were counted).",
         "TOO_MANY_RETRIES": "This file was tried too many times. Upload it again.",
         "DRAFTS_FAILED": "Some drafts could not be created. Check the items and try again.",
         "NETWORK": "No connection. Try again.",
@@ -4372,7 +4395,7 @@
       "recovered": "Ordered later",
       "recoveryRate": "Ordered-later rate",
       "recoveredRevenue": "Revenue from later orders",
-      "baseValue": "{amount} EGP",
+      "baseValue": "{amount}",
       "recoveryNotTracked": "Not tracked"
     },
     "status": {
@@ -6374,7 +6397,8 @@
       "markAllRead": "Mark all read",
       "clear": "Clear",
       "empty": "No notifications yet",
-      "reconnecting": "Reconnecting to notification server…"
+      "reconnecting": "Reconnecting to notification server…",
+      "needsAttention": "Needs your attention"
     },
     "connectionStatus": {
       "testing": "Testing…",
@@ -6930,7 +6954,7 @@
       "expenses": "Expenses",
       "net": "Net Income",
       "stockValue": "Stock Value",
-      "disabledVariantStockValue": "Held on disabled variants: {amount} EGP — not counted as stock",
+      "disabledVariantStockValue": "Held on disabled variants: {amount} — not counted as stock",
       "cash": "Cash by Account",
       "balanceSheet": "Balance Sheet",
       "assets": "Assets",
@@ -6946,7 +6970,15 @@
       "salesOrdersCount": "Orders Counted",
       "salesOrdersCountUnit": "orders in period",
       "couldntLoad": "Couldn't load",
-      "loadFailedShort": "Could not load the finance dashboard."
+      "loadFailedShort": "Could not load the finance dashboard.",
+      "netUnknown": "Unknown",
+      "netNoCostsNote": "No cost of goods was booked for this period, so profit cannot be told apart from revenue.",
+      "netPartialNote": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower.",
+      "stockValueUnknown": "Unknown",
+      "stockValueMissingCost": "{count} stocked products have no cost price, so their value cannot be calculated.",
+      "stockValuePartial": "Calculated for {costed} of {stocked} stocked products — the rest have no cost price.",
+      "anomaliesNone": "No open anomalies.",
+      "anomaliesLoadFailed": "Could not load the anomalies."
     },
     "anomalies": {
       "title": "Profit Anomalies",
@@ -7095,7 +7127,7 @@
         "equity": "Equity",
         "totalEquity": "Total Equity",
         "balanced": "Balance sheet verified — Assets = Liabilities + Equity",
-        "unbalanced": "Out of balance by {amount} EGP — Assets ≠ Liabilities + Equity",
+        "unbalanced": "Out of balance by {amount} — Assets ≠ Liabilities + Equity",
         "currentEarnings": "Retained & current earnings",
         "currentEarningsHint": "Revenue minus expenses up to this date (not yet closed to an equity account)"
       },
@@ -8150,6 +8182,9 @@
     "seePlansCta": "See plans",
     "contactCta": "Talk to us",
     "requiresFeature": "Requires the “{feature}” feature.",
+    "availableOnOrBuyOne": "Available on the {plan} plan. Upgrade, or add just this feature.",
+    "addJustThisCta": "Add just this feature",
+    "businessOffBody": "“{feature}” is part of your {plan} plan, but it is switched off for this store right now. Contact us and we will turn it on.",
     "alsoIncluded": "Also included in this plan",
     "noSoldPlan": "This feature is not part of a plan you can buy. Our team switches it on for a single store, so get in touch if you need it.",
     "contactOnlyCta": "Talk to our team"
@@ -9242,9 +9277,6 @@
     "common": {
       "loading": "Loading…"
     },
-    "premiumSubtitle": "Extra feature",
-    "featureNotEnabledTitle": "Feature not enabled",
-    "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Ebda Store to request access.",
     "mainSubtitle": "Fixed buttons your customer sees on every page, like WhatsApp and call",
     "showWidgetLabel": "Show widget on storefront",
     "showWidgetHint": "When off, no widget renders even though the feature is enabled.",
@@ -9482,7 +9514,7 @@
     "loading": "Loading plans…",
     "loadError": "Failed to load plans.",
     "edit": "Edit",
-    "editTitle": "Edit plan {code}",
+    "editTitle": "Edit plan {name}",
     "public": "Public",
     "hidden": "Hidden",
     "unlimited": "Unlimited",
@@ -9882,10 +9914,10 @@
         "store": "Name",
         "template": "Look",
         "product": "Product",
-        "payment": "Payment",
+        "payment": "Customer payments",
         "live": "Launch",
         "plan": "Plan",
-        "billing": "Billing"
+        "billing": "Plan payment"
       },
       "back": "Back",
       "next": "Continue",
@@ -12588,6 +12620,16 @@
         "error": "I could not apply it. Nothing was changed, try again."
       }
     }
+  },
+  "attention": {
+    "title": "Needs your attention",
+    "subtitle": "Fix these so your store keeps selling.",
+    "info": "For your information",
+    "fix": "Fix now",
+    "view": "Open",
+    "badge": "{count, plural, =1 {{count, number, latn} thing needs your attention} other {{count, number, latn} things need your attention}}",
+    "infoDot": "Has a note for you",
+    "section": "Section needing attention"
   },
   "refundLines": {
     "legend": "Choose what is being refunded or returned",

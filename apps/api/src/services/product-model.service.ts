@@ -38,6 +38,22 @@ export const PUBLIC_MODEL3D_SELECT = {
   },
 } as const satisfies Prisma.ProductModelSelect;
 
+/**
+ * Card flag: the listing/recommendation/wishlist rows select only `model3d: { id }` and this turns
+ * it into `has3d` (the relation itself never ships on a card). CACHE CLASS: BOUNDED-stale, rides
+ * the listing caches; every model write calls invalidateStoreProductCaches (product-model.routes).
+ * The `product_3d` entitlement is NOT applied here (cosmetic chip; the quick view and PDP read
+ * the gated product, so with the feature off they show no model).
+ */
+export const CARD_MODEL3D_SELECT = { select: { id: true } } as const;
+
+export function withHas3d<T extends { model3d?: unknown }>(
+  row: T
+): Omit<T, 'model3d'> & { has3d: boolean } {
+  const { model3d, ...rest } = row;
+  return { ...rest, has3d: Boolean(model3d) };
+}
+
 type PublicModelRow = Prisma.ProductModelGetPayload<{ select: typeof PUBLIC_MODEL3D_SELECT }>;
 
 /** Storefront shape: bindings keyed by option NAME + value (what the pills know). */
