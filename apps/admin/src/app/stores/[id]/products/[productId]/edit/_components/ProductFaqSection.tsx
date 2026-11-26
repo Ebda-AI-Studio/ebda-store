@@ -299,14 +299,14 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
 
     if (loading) {
       return (
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
-          <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+        <div className="rounded-md border bg-card p-6 shadow-sm">
+          <div className="h-5 w-40 animate-pulse rounded-md bg-muted" />
         </div>
       );
     }
 
     return (
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
+      <div className="rounded-md border bg-card p-6 shadow-sm">
         {/* Section header with collapse toggle */}
         <div className="mb-4 flex items-center justify-between gap-3">
           <Button
