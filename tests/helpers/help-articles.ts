@@ -29,5 +29,20 @@ export function rawArticles(): RawArticle[] {
   return out;
 }
 
-export const helpArticles = (): HelpArticle[] =>
-  rawArticles().map(a => toHelpArticle(a.path, a.lang, a.raw));
+/**
+ * Guides under `whatsapp/` are imported from Ebda Chat and link Chat's capability ids; those ids live in the
+ * ebda-whatsapp registry and are checked by its own guard, so they are not orphans here. Store ids on them still count.
+ */
+export const helpArticles = (): HelpArticle[] => {
+  const storeIds = new Set(
+    readdirSync(join(REPO_ROOT, 'capabilities'))
+      .filter(f => f.endsWith('.capability.json'))
+      .map(f => f.replace(/\.capability\.json$/, ''))
+  );
+  return rawArticles().map(a => {
+    const h = toHelpArticle(a.path, a.lang, a.raw);
+    return a.path.startsWith('whatsapp/')
+      ? { ...h, capabilities: h.capabilities.filter(c => storeIds.has(c.id)) }
+      : h;
+  });
+};
