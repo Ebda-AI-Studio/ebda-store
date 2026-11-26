@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
-import { encodeRpc } from '@ebda-src/repo';
+import { decodeRpc, encodeRpc } from '@ebda-src/repo';
 import type { StoreDO } from '../src/cf/store-do/store-do';
 
 // INFRA-CF-1 PR R4 (Ruling CF-R4-2): the merchant's manual order on real workerd. Postgres serialised its coupon claim with a
@@ -27,7 +27,7 @@ const codes = (a: Answer[]) =>
     return m;
   }, {});
 
-async function seed(store: string, extra = '') {
+async function seed(store: string, extra = '', stock = 10) {
   const stub = stubFor(store);
   await op(stub, store, 'cancel', { orderId: 'nope' }); // binds the store (a refusal, nothing written)
   await runInDurableObject(stub, (_i, s) => {
@@ -37,8 +37,9 @@ async function seed(store: string, extra = '') {
       store
     );
     s.storage.sql.exec(
-      `INSERT INTO products (id, store_id, name, slug, price, inventory, status) VALUES ('p1', ?, 'Widget', 'widget', 1000, 10, 'active')`,
-      store
+      `INSERT INTO products (id, store_id, name, slug, price, inventory, status) VALUES ('p1', ?, 'Widget', 'widget', 1000, ?, 'active')`,
+      store,
+      stock
     );
     if (extra) for (const q of extra.split(';;')) s.storage.sql.exec(q.replaceAll('$S', store));
   });
@@ -58,8 +59,8 @@ describe('StoreDO.moneyOp createAdminOrder', () => {
     expect(codes(answers)).toEqual({ ok: 7, COUPON_LIMIT_REACHED: 33 });
     expect(await num(stub, `SELECT usage_count AS n FROM coupons`)).toBe(7);
     expect(await num(stub, `SELECT count(*) AS n FROM orders WHERE coupon_code = 'SEVEN'`)).toBe(7);
-    // an admin order reserves no stock, refused or not
-    expect(await num(stub, `SELECT inventory AS n FROM products`)).toBe(10);
+    // an admin order reserves its unit; a refused one (coupon limit) rolls back and takes none
+    expect(await num(stub, `SELECT inventory AS n FROM products`)).toBe(3);
   });
 
   it('a per-customer limit of 1, 25 concurrent phone orders for one guest phone: exactly one gets the coupon', async () => {
@@ -74,7 +75,7 @@ describe('StoreDO.moneyOp createAdminOrder', () => {
   });
 
   it('an override races the limit: every permitted override is recorded as an event and counted, none is lost', async () => {
-    const stub = await seed('adm-override', coupon(2));
+    const stub = await seed('adm-override', coupon(2), 100);
     const answers = await Promise.all(
       Array.from({ length: 12 }, () =>
         op(
@@ -104,7 +105,7 @@ describe('StoreDO.moneyOp createAdminOrder', () => {
   });
 
   it('50 concurrent phone orders get 50 consecutive receipt numbers: no gap, no duplicate', async () => {
-    const stub = await seed('adm-gapless');
+    const stub = await seed('adm-gapless', '', 100);
     const answers = await Promise.all(
       Array.from({ length: 50 }, () => op(stub, 'adm-gapless', 'createAdminOrder', admin()))
     );
@@ -119,7 +120,7 @@ describe('StoreDO.moneyOp createAdminOrder', () => {
     expect(await num(stub, `SELECT count(DISTINCT order_number) AS n FROM orders`)).toBe(50);
   });
 
-  it('phone orders racing checkouts of the last items: the checkouts alone decide the stock, phone orders never take any', async () => {
+  it('phone orders racing checkouts of the last items: one stock decides, never an oversell, every refusal is a clean 4xx', async () => {
     const stub = await seed('adm-mixed');
     const calls = [
       ...Array.from({ length: 30 }, () => op(stub, 'adm-mixed', 'createAdminOrder', admin())),
@@ -131,13 +132,15 @@ describe('StoreDO.moneyOp createAdminOrder', () => {
       ),
     ];
     const answers = await Promise.all(calls);
-    expect(codes(answers)).toEqual({ ok: 40, OUT_OF_STOCK: 20 });
+    const c = codes(answers);
+    // 10 units, 60 racers (phone orders now reserve like checkout): exactly 10 win, stock ends at 0, never negative
+    expect(c.ok).toBe(10);
+    expect((c.OUT_OF_STOCK ?? 0) + (c.INSUFFICIENT_STOCK ?? 0)).toBe(50);
     expect(await num(stub, `SELECT inventory AS n FROM products`)).toBe(0);
-    expect(await num(stub, `SELECT count(DISTINCT serial) AS n FROM fiscal_documents`)).toBe(40);
+    expect(await num(stub, `SELECT count(*) AS n FROM orders`)).toBe(10);
+    expect(await num(stub, `SELECT count(DISTINCT serial) AS n FROM fiscal_documents`)).toBe(10);
   });
 
-  // Issue 459: the order number's random suffix collided inside one second (workerd freezes the clock in a burst) and the
-  // INSERT died on orders_order_number_key: MONEY_OP_FAILED 500 for a paying shopper. Force the collision deterministically.
   it('a phone order and a checkout that draw the same order number in one second both succeed, with distinct numbers', async () => {
     const stub = await seed('adm-ordnum');
     const real = crypto.getRandomValues.bind(crypto);
@@ -178,6 +181,44 @@ describe('StoreDO.moneyOp createAdminOrder', () => {
     expect(nums.every(n => /^ORD-[0-9A-Z]{6}-[0-9A-Z]{5}$/.test(n))).toBe(true);
   });
 
+  it('override orders racing checkouts for 6 units: the ledger and the markers equal what was ACTUALLY taken, and a cancel restocks exactly that', async () => {
+    const stub = await seed('adm-override-race', '', 6);
+    const calls = [
+      ...Array.from({ length: 5 }, () =>
+        op(
+          stub,
+          'adm-override-race',
+          'createAdminOrder',
+          admin({
+            lines: [{ productId: 'p1', quantity: 3 }],
+            overrideStock: true,
+            stockOverrideReason: 'phone deal',
+          })
+        )
+      ),
+      ...Array.from({ length: 5 }, () =>
+        op(stub, 'adm-override-race', 'createOrder', {
+          lines: [{ productId: 'p1', quantity: 2 }],
+          shippingAddress: { name: 'A' },
+        })
+      ),
+    ];
+    const answers = await Promise.all(calls);
+    const left = await num(stub, `SELECT inventory AS n FROM products`);
+    const ledger = await num(
+      stub,
+      `SELECT coalesce(-sum(quantity), 0) AS n FROM inventory_history WHERE type = 'sale'`
+    );
+    expect(left).toBe(0); // 6 units all sold, never negative
+    expect(ledger).toBe(6); // ledger == units actually taken, not the units requested
+    for (const a of answers)
+      if (a.ok)
+        await op(stub, 'adm-override-race', 'cancel', {
+          orderId: (decodeRpc(a.json) as { orderId: string }).orderId,
+        });
+    expect(await num(stub, `SELECT inventory AS n FROM products`)).toBe(6); // exactly what was taken comes back
+  });
+
   it('a random source that only ever repeats a taken number: a clean 503 refusal, nothing written, no 500', async () => {
     const stub = await seed('adm-ordnum-dead');
     vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-06T10:00:00.250Z') }); // one second for both orders
@@ -203,6 +244,7 @@ describe('StoreDO.moneyOp createAdminOrder', () => {
     expect(answers[0]!.ok).toBe(true);
     expect(answers[1]).toMatchObject({ ok: false, code: 'ORDER_NUMBER_UNAVAILABLE', status: 503 });
     expect(await num(stub, `SELECT count(*) AS n FROM orders`)).toBe(1);
-    expect(await num(stub, `SELECT inventory AS n FROM products`)).toBe(10);
+    // the first (phone) order took its unit; the refused checkout took none
+    expect(await num(stub, `SELECT inventory AS n FROM products`)).toBe(9);
   });
 });

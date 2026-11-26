@@ -94,7 +94,19 @@ export interface OrderPaymentDetail {
   createdAt: string;
 }
 
+/** WAREHOUSE-ROUTE-1: which warehouse a line's stock was taken from (multi-warehouse stores only). */
+export interface WarehouseAllocation {
+  /** the order line (Ruling WAREHOUSE-ROUTE-3: a line may have one allocation per warehouse); absent on older events */
+  orderItemId?: string;
+  productId: string;
+  variantId: string | null;
+  warehouseId: string;
+  warehouseCode: string;
+  quantity: number;
+}
+
 export interface OrderDetail {
+  warehouseAllocations?: WarehouseAllocation[];
   id: string;
   storeId: string;
   orderNumber: string;

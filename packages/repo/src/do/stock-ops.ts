@@ -154,7 +154,7 @@ const variantCount = (db: SyncSql, productId: string): number =>
     .n as number;
 
 /** Warehouse upsert: the base-product row (variant NULL) and a variant row conflict on different unique indexes. */
-function upsertWarehouseStock(
+export function upsertWarehouseStock(
   db: SyncSql,
   a: {
     storeId: string;
@@ -253,7 +253,9 @@ export function reconcileToAggregate(
       : 'SELECT COALESCE(SUM(quantity), 0) AS s FROM warehouse_stock WHERE store_id = ? AND product_id = ? AND variant_id IS NULL',
     variantId ? [storeId, productId, variantId] : [storeId, productId]
   )[0].s as number;
-  const diff = (authoritative as number) - sum;
+  // A negative aggregate is BACKORDER state (a product without variants sold past zero), not a shortfall: the shadow floors at 0
+  // and nothing is alerted (the deficit is a real order debt that no warehouse row can cover). Ruling WAREHOUSE-ROUTE-2.
+  const diff = Math.max(0, authoritative as number) - sum;
   if (diff === 0) return false;
   if (diff > 0) {
     upsertWarehouseStock(db, {

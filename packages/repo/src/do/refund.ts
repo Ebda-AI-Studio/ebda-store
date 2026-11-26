@@ -7,6 +7,7 @@ import {
 } from './loyalty';
 import { recordTrimmedCredit, refundableBalance } from './refundable';
 import { recordMovement, restock } from './stock';
+import { releaseToWarehouses } from './warehouse-route';
 import { MoneyError, type SyncSql } from './sync-sql';
 
 /**
@@ -293,6 +294,7 @@ export interface RestockedLine {
 function restoreLine(
   db: SyncSql,
   storeId: string,
+  orderId: string,
   item: ItemRow,
   qty: number,
   reference: string,
@@ -324,6 +326,17 @@ function restoreLine(
     reference,
     reason,
   });
+  // WAREHOUSE-ROUTE-1: the units go back to the warehouse(s) the order took them from (no-op without an allocation)
+  releaseToWarehouses(
+    db,
+    storeId,
+    orderId,
+    item.id,
+    item.product_id,
+    item.variant_id ?? null,
+    qty,
+    Date.now()
+  );
   return qty;
 }
 
@@ -441,7 +454,7 @@ function reverseWholeOrder(
     for (const item of loadItems(db, o.id)) {
       const qty = item.quantity - (restored.get(item.id) ?? 0) - (neverTaken.get(item.id) ?? 0);
       if (qty <= 0) continue;
-      if (restoreLine(db, storeId, item, qty, o.id, 'Order refunded') > 0)
+      if (restoreLine(db, storeId, o.id, item, qty, o.id, 'Order refunded') > 0)
         into.restocked.push({
           orderItemId: item.id,
           productId: item.product_id,
@@ -785,7 +798,9 @@ export function refundOrder(
           item.quantity - (already.get(item.id) ?? 0) - (neverTaken.get(item.id) ?? 0)
         );
         if (qty <= 0) continue;
-        if (restoreLine(db, a.storeId, item, qty, key, 'Return completed — partial restore') > 0)
+        if (
+          restoreLine(db, a.storeId, o.id, item, qty, key, 'Return completed — partial restore') > 0
+        )
           out.restocked.push({
             orderItemId: item.id,
             productId: item.product_id,

@@ -101,3 +101,30 @@ export async function forceDecrementVariantInventory(
   const newStock = row?.inventory ?? 0;
   return { ok: true, previousStock: cur?.inventory ?? newStock + qty, newStock };
 }
+
+/**
+ * Takes UP TO `qty` units (never below 0, never raising a negative backorder debt) in ONE atomic statement and reports what
+ * was ACTUALLY taken (`previousStock - newStock`). The row is locked by the sub-select, so a concurrent sale cannot slip
+ * between the read of the stock and the write: the phone-order override books its ledger row and `stock_not_taken` marker from it.
+ */
+export async function takeUpToInventory(
+  tx: Prisma.TransactionClient,
+  target: { productId: string; variantId?: string | null },
+  qty: number
+): Promise<{ previousStock: number; newStock: number }> {
+  const rows = target.variantId
+    ? await tx.$queryRaw<Array<{ previous: number; current: number }>>`
+        UPDATE public.product_variants AS t
+        SET inventory = t.inventory - LEAST(${qty}, GREATEST(t.inventory, 0))
+        FROM (SELECT id, inventory FROM public.product_variants WHERE id = ${target.variantId} FOR UPDATE) AS o
+        WHERE t.id = o.id
+        RETURNING o.inventory AS previous, t.inventory AS current`
+    : await tx.$queryRaw<Array<{ previous: number; current: number }>>`
+        UPDATE public.products AS t
+        SET inventory = t.inventory - LEAST(${qty}, GREATEST(t.inventory, 0))
+        FROM (SELECT id, inventory FROM public.products WHERE id = ${target.productId} FOR UPDATE) AS o
+        WHERE t.id = o.id
+        RETURNING o.inventory AS previous, t.inventory AS current`;
+  if (rows.length !== 1) throw new Error('takeUpToInventory: stock row not found');
+  return { previousStock: rows[0].previous, newStock: rows[0].current };
+}

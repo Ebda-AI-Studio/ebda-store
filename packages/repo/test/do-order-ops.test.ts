@@ -360,27 +360,87 @@ describe('order money operations: the door', () => {
     expect(r.code('createOrder', o('01011111111'))).toBe('no error');
   });
 
-  describe('#633: a manual (phone) order takes no stock, so its cancel / refund puts none back', () => {
-    const admin = (qty: number) => ({
+  describe('phone orders reserve stock (STOCK-SYMMETRY-1 superseded 2026-11-11), so cancel / refund restock symmetrically', () => {
+    const admin = (qty: number, extra: Record<string, unknown> = {}) => ({
       lines: [{ productId: 'sku', quantity: qty }],
       shippingAddress: { firstName: 'A', lastName: 'B', phone: '01012345678' },
       actorId: 'admin',
       actorRole: 'store_admin',
+      ...extra,
     });
     const stock = (r: ReturnType<typeof rig>) =>
       r.n(`SELECT inventory n FROM products WHERE id = 'sku'`);
+    const markers = (r: ReturnType<typeof rig>) =>
+      r.n(`SELECT count(*) n FROM order_events WHERE to_status = 'stock_not_taken'`);
 
-    it('cancel adds nothing back (was +3 phantom units)', () => {
+    it('reserves at placement, writes one ledger row and no marker; cancel gives every unit back', () => {
       const r = rig(10);
       const o = r.op('createAdminOrder', admin(3));
-      expect(stock(r)).toBe(10);
+      expect(stock(r)).toBe(7);
+      expect(
+        r.n(`SELECT count(*) n FROM inventory_history WHERE type = 'sale' AND quantity = -3`)
+      ).toBe(1);
+      expect(markers(r)).toBe(0);
       r.op('cancel', { orderId: o.orderId });
       expect(stock(r)).toBe(10);
     });
 
-    it('a refund after confirming adds nothing back either; a storefront order still restocks', () => {
+    it('refuses 422 INSUFFICIENT_STOCK when short and keeps nothing (order, stock, ledger)', () => {
+      const r = rig(2);
+      expect(r.code('createAdminOrder', admin(3))).toBe('INSUFFICIENT_STOCK');
+      expect(stock(r)).toBe(2);
+      expect(r.n('SELECT count(*) n FROM orders')).toBe(0);
+      expect(r.n('SELECT count(*) n FROM inventory_history')).toBe(0);
+    });
+
+    it('two lines of the same SKU are checked against one running stock', () => {
+      const r = rig(4);
+      const a = admin(3);
+      a.lines = [
+        { productId: 'sku', quantity: 3 },
+        { productId: 'sku', quantity: 3 },
+      ];
+      expect(r.code('createAdminOrder', a)).toBe('INSUFFICIENT_STOCK');
+      expect(stock(r)).toBe(4);
+    });
+
+    it('an override takes what is on hand, marks the missing units and the audit event; cancel restocks only what was taken', () => {
+      const r = rig(2);
+      const o = r.op(
+        'createAdminOrder',
+        admin(3, { overrideStock: true, stockOverrideReason: 'phone deal' })
+      );
+      expect(o.stockOverridden).toBe(true);
+      expect(stock(r)).toBe(0);
+      expect(r.n(`SELECT count(*) n FROM order_events WHERE to_status = 'stock_override'`)).toBe(1);
+      expect(markers(r)).toBe(1);
+      r.op('cancel', { orderId: o.orderId });
+      expect(stock(r)).toBe(2);
+    });
+
+    it('an override on a fully stocked order changes nothing (no marker, no override event)', () => {
+      const r = rig(10);
+      const o = r.op(
+        'createAdminOrder',
+        admin(3, { overrideStock: true, stockOverrideReason: 'x' })
+      );
+      expect(o.stockOverridden).toBe(false);
+      expect(stock(r)).toBe(7);
+      expect(markers(r)).toBe(0);
+    });
+
+    it('a legacy order (marker, nothing taken) restocks nothing on refund; a storefront order still restocks', () => {
       const r = rig(10);
       const o = r.op('createAdminOrder', admin(2));
+      const item = (
+        r.raw.prepare('SELECT id FROM order_items WHERE order_id = ?').get(o.orderId) as {
+          id: string;
+        }
+      ).id;
+      r.raw.exec(`UPDATE products SET inventory = 10 WHERE id = 'sku'`);
+      r.raw.exec(
+        `INSERT INTO order_events (id, store_id, order_id, from_status, to_status, actor_id, metadata, created_at) VALUES ('m1', 's1', '${o.orderId}', NULL, 'stock_not_taken', 'admin', '{"items":[{"orderItemId":"${item}","quantity":2}]}', 1)`
+      );
       r.raw.exec(
         `UPDATE orders SET status = 'confirmed', payment_status = 'paid' WHERE id = '${o.orderId}'`
       );
