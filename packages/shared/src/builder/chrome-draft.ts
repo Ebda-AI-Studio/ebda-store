@@ -36,6 +36,18 @@ const hrefSchema = z
   });
 const textSchema = z.string().max(80);
 
+/**
+ * A draft logo: an http(s) or site-relative image URL (blank = unchanged). mailto:/tel: pass
+ * `isSafeUrl` but are not images, so they are refused here. The API additionally requires the
+ * file to live on our media origin before a draft is saved (a logo is fetched server-side).
+ */
+const logoUrlSchema = z
+  .string()
+  .max(500)
+  .refine(v => v === '' || (isSafeUrl(v) && !/^(mailto|tel):/i.test(v.trim())), {
+    message: 'Logo must be an image URL (relative path or http/https); javascript: is not allowed',
+  });
+
 export const MAX_NAV_ITEMS = 12;
 export const MAX_FOOTER_LINKS_PER_COLUMN = 12;
 export const MAX_UTILITY_LINKS = 8;
@@ -101,6 +113,8 @@ export type FooterBottomBarSettings = z.infer<typeof footerBottomBarSchema>;
 
 export const draftChromeSchema = z
   .object({
+    logo: logoUrlSchema.optional(),
+    logoAr: logoUrlSchema.optional(),
     navMenu: z.array(navItemSchema).max(MAX_NAV_ITEMS).optional(),
     footerLinks: z
       .object({
@@ -204,6 +218,23 @@ export function applyChromePatch(
     if (patch.utilityBar.enabled !== undefined) next.enabled = patch.utilityBar.enabled;
     if (patch.utilityBar.links) next.links = cleanUtility(patch.utilityBar.links);
     out.utilityBar = next;
+  }
+  return out;
+}
+
+/**
+ * The `stores.logo` / `stores.logoAr` COLUMNS a publish writes for `patch`. The logo is not part
+ * of `settings`, so it rides the same `stores` update as a column patch. A blank or absent key
+ * leaves the live logo alone (there is no clear: the classic Branding tab owns removal).
+ */
+export function chromeLogoColumns(patch: DraftChrome | undefined): {
+  logo?: string;
+  logoAr?: string;
+} {
+  const out: { logo?: string; logoAr?: string } = {};
+  for (const key of ['logo', 'logoAr'] as const) {
+    const v = clean(patch?.[key]);
+    if (v && isSafeUrl(v) && !/^(mailto|tel):/i.test(v)) out[key] = v;
   }
   return out;
 }

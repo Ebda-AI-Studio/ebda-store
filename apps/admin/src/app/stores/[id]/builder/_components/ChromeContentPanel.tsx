@@ -28,6 +28,7 @@ import {
   type FooterColumn,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
+import { MediaPicker } from './MediaPicker';
 import { Toggle } from '../../../../../components/Toggle';
 import { apiGet } from '../../../../../lib/api';
 import { DEFAULT_MENU } from '../../../../../components/NavMenuEditor';
@@ -226,6 +227,62 @@ function LinkList({
   );
 }
 
+/** One logo (en or ar): the current value and a picker on the media library. Removal stays in Branding. */
+function LogoPicker({
+  storeId,
+  title,
+  testId,
+  value,
+  onPick,
+}: {
+  storeId: string;
+  title: string;
+  testId: string;
+  value: string;
+  onPick: (url: string) => void;
+}) {
+  const t = useT('builder.settings');
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex items-center gap-2" data-testid={testId}>
+      {value ? (
+        <img
+          src={value}
+          alt=""
+          className="h-12 w-12 rounded-md border border-border object-contain"
+        />
+      ) : (
+        <span
+          className="h-12 w-12 rounded-md border border-dashed border-border"
+          aria-hidden="true"
+        />
+      )}
+      <div className="flex flex-col items-start">
+        <span className="text-xs text-muted-foreground">{title}</span>
+        <Button
+          variant="link"
+          size="sm"
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label={`${value ? t('changeImage') : t('chooseImage')}: ${title}`}
+        >
+          {value ? t('changeImage') : t('chooseImage')}
+        </Button>
+      </div>
+      {open && (
+        <MediaPicker
+          storeId={storeId}
+          onClose={() => setOpen(false)}
+          onPick={url => {
+            onPick(url);
+            setOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 interface Props {
   storeId: string;
   kind: 'header' | 'footer';
@@ -240,16 +297,22 @@ export function ChromeContentPanel({ storeId, kind, chrome, liveVersion, onChang
   const t = useT('builder.settings');
   const locale = useLocale();
   const [live, setLive] = useState<Settings | null>(null);
+  const [liveLogos, setLiveLogos] = useState({ logo: '', logoAr: '' });
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLive(null);
     setFailed(false);
-    void apiGet<{ store: { settings?: Settings } }>(`/api/v1/stores/${storeId}`).then(r => {
+    void apiGet<{ store: { settings?: Settings; logo?: string | null; logoAr?: string | null } }>(
+      `/api/v1/stores/${storeId}`
+    ).then(r => {
       if (cancelled) return;
       if (r.error || !r.data) setFailed(true);
-      else setLive(obj(r.data.store?.settings));
+      else {
+        setLiveLogos({ logo: r.data.store?.logo ?? '', logoAr: r.data.store?.logoAr ?? '' });
+        setLive(obj(r.data.store?.settings));
+      }
     });
     return () => {
       cancelled = true;
@@ -292,6 +355,25 @@ export function ChromeContentPanel({ storeId, kind, chrome, liveVersion, onChang
 
       {kind === 'header' && (
         <>
+          <div className="space-y-2" data-testid="chrome-logo">
+            <p className="text-xs font-semibold text-foreground">{t('chromeLogoTitle')}</p>
+            <LogoPicker
+              key={`logo-${liveVersion}`}
+              storeId={storeId}
+              title={t('chromeLogoEn')}
+              testId="chrome-logo-en"
+              value={current?.logo || liveLogos.logo}
+              onPick={url => onChange({ logo: url })}
+            />
+            <LogoPicker
+              key={`logoAr-${liveVersion}`}
+              storeId={storeId}
+              title={t('chromeLogoAr')}
+              testId="chrome-logo-ar"
+              value={current?.logoAr || liveLogos.logoAr}
+              onPick={url => onChange({ logoAr: url })}
+            />
+          </div>
           <LinkList
             key={`nav-${liveVersion}`}
             title={t('chromeMenuTitle')}
