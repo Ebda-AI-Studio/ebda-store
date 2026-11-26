@@ -11,6 +11,9 @@ import { createHmac, timingSafeEqual } from 'crypto';
  * - A DEDICATED secret, `ORDER_STATUS_LINK_SECRET` (>= 32 chars), never derived from another key and never
  *   shared with the guest view token (`order-view-token.ts`), which stays out of URLs (SEC-15). This token only
  *   opens the minimal read-only summary (`GET /public/order-status/:token`): no phone, no email, no street.
+ * - It is a BEARER URL that gets forwarded (WhatsApp), so it also opens THIS order's InstaPay instructions, receipt upload
+ *   and submit (Ruling INSTAPAY-UPLOAD-1 part b, `requestHoldsOrderStatusLink`), but it NEVER unmasks the receipt
+ *   payer's name / address / mobile / bank: that needs the view token (a header, never a URL, SEC-15).
  * - Constant-time verify. A missing or short secret throws (boot guard: `assertWhatsAppLinkConfig`).
  */
 const ORDER_STATUS_LINK_TTL_MS = 14 * 24 * 60 * 60 * 1000;

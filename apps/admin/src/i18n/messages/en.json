@@ -1,10 +1,21 @@
 {
   "common": {
+    "dndA11y": {
+      "instructions": "To pick up an item, press the space bar. While dragging, use the arrow keys to move it. Press space again to drop it, or Escape to cancel.",
+      "pickedUp": "Picked up the item.",
+      "movedOver": "The item is over position {position}.",
+      "dropped": "Dropped the item at position {position}.",
+      "droppedBack": "Dropped the item. It is back where it was.",
+      "cancelled": "Cancelled. The item is back where it was."
+    },
     "save": "Save",
     "cancel": "Cancel",
     "storeNotOperational": "This store is suspended, so Ebda AI Studio has paused messages to customers and payouts. Contact support to get it reactivated.",
     "storeNotOperationalTitle": "Store suspended",
     "storeNotOperationalAppeal": "Contact support to appeal",
+    "storeNotOperationalAppealForm": "Appeal this suspension",
+    "storeNotOperationalBilling": "This store is suspended for an unpaid invoice, so Ebda AI Studio has paused messages to customers and payouts. Pay the invoice and the store switches back on.",
+    "storeNotOperationalPay": "Pay the invoice",
     "delete": "Delete",
     "edit": "Edit",
     "close": "Close",
@@ -201,7 +212,9 @@
         "stockValue": "Stock value",
         "openBackorders": "Open backorders",
         "topRfmSegment": "Top Customer Segment",
-        "error": "Unable to load financial summary"
+        "error": "Unable to load financial summary",
+        "unknown": "Unknown",
+        "netPartial": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower."
       },
       "details": {
         "title": "Store Details",
@@ -359,16 +372,19 @@
         },
         "salesLabel": "Sales",
         "vsPrevious": "vs the previous period",
+        "newBadge": "New",
         "deltaSr": {
           "up": "Up {percent}%",
           "down": "Down {percent}%",
-          "flat": "No change"
+          "flat": "No change",
+          "new": "New: no sales in the previous period"
         },
         "sentence": {
-          "up": "Up {percent}% on the previous period, from {orders} orders.",
-          "down": "Down {percent}% on the previous period, from {orders} orders.",
-          "flat": "Same as the previous period, from {orders} orders.",
-          "unknown": "From {orders} orders."
+          "up": "Up {percent}% on the previous period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "down": "Down {percent}% on the previous period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "new": "First sales in this period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "flat": "Same as the previous period, from {ordersN, plural, one {{orders} order} other {{orders} orders}}.",
+          "unknown": "From {ordersN, plural, one {{orders} order} other {{orders} orders}}."
         },
         "sparkLabel": "Sales per day across this period, latest day highlighted",
         "emptyBody": "No sales in this period yet. Share your store link with your customers to get the first order.",
@@ -425,12 +441,23 @@
             "label": "Act",
             "meaning": "The merchant can apply changes with one press; sensitive ones still need their confirmation."
           }
+        },
+        "effectiveOff": "The store does not see the assistant right now: {reason}",
+        "effectiveCapped": "The store sees the assistant in \"{mode}\" mode only (lower than saved).",
+        "reasons": {
+          "global_kill": "The assistant is stopped platform-wide (kill switch).",
+          "product_kill": "The Store assistant is stopped platform-wide.",
+          "platform_cap_off": "The platform-wide cap is still \"off\". Open it in platform settings.",
+          "store_ai_off": "The merchant turned AI features off for their store.",
+          "store_mode_off": "The store's own mode is off.",
+          "unreadable": "We could not read the assistant settings, so it is off for now."
         }
       }
     },
     "list": {
       "title": "Stores",
       "subtitleCount": "{count} stores on the platform",
+      "subtitleFiltered": "{count} stores ({status})",
       "createStore": "Create Store",
       "searchPlaceholder": "Search by name, slug, or owner…",
       "search": "Search",
@@ -605,7 +632,11 @@
         "draft": "Draft",
         "archived": "Archived",
         "allCategories": "All categories",
-        "categoryAriaLabel": "Filter products by category"
+        "categoryAriaLabel": "Filter products by category",
+        "model3dAriaLabel": "Filter products by 3D model",
+        "model3dAny": "Any 3D model",
+        "model3dWith": "With a 3D model",
+        "model3dWithout": "Without a 3D model"
       },
       "status": {
         "active": "Active",
@@ -1381,7 +1412,7 @@
         "status": "Status",
         "date": "Date",
         "actions": "Actions",
-        "totalValue": "{amount} EGP",
+        "totalValue": "{amount}",
         "moreItems": "+{count} more",
         "agentBadge": "Agent"
       },
@@ -2197,6 +2228,7 @@
       "totalCustomers": "Total Customers",
       "avgOrderValue": "Avg Order Value",
       "vsLastPeriod": "vs last period",
+      "newVsPrevious": "New",
       "profitUnknown": "Unknown",
       "profitMissingCost": "Profit unknown — cost price missing on {count} sold items",
       "profitPartial": "Excludes {count} sold items with no cost price ({amount} in sales)",
@@ -2251,11 +2283,15 @@
       "netIncome": "Net income (GL)",
       "grossProfitUnknown": "Unknown",
       "noCogsBooked": "No cost of goods was booked for this period, so gross profit cannot be told apart from revenue. Cost is booked for orders whose products had a cost price when sold.",
+      "costsPartial": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower.",
       "window": "General-ledger figures for: {period}"
     },
     "inventorySnapshot": {
       "title": "Inventory snapshot (right now)",
       "stockValue": "Stock value",
+      "stockValueUnknown": "Unknown",
+      "stockValueMissingCost": "{count} stocked products have no cost price, so their value cannot be calculated.",
+      "stockValuePartial": "Calculated for {costed} of {stocked} stocked products — the rest have no cost price.",
       "openBackorders": "Open backorders",
       "backorderedDemandValue": "Backordered demand value",
       "reorderRules": "Reorder rules"
@@ -4165,11 +4201,11 @@
         "AI_STORE_BILLING_SUSPENDED": "Smart tools are paused until your subscription is paid. Pay from the Billing page to turn them back on.",
         "AI_RATE_LIMITED": "Busy right now. Try this file again in a minute.",
         "AI_NOT_CONFIGURED": "Smart tools are not available right now.",
-        "AI_UPSTREAM_ERROR": "Could not read this file. Try again.",
-        "AI_BAD_RESPONSE": "Could not read this file. Try again.",
-        "BAD_RESPONSE": "Could not read this file. Try again.",
-        "FILE_UNREADABLE": "This file could not be opened.",
-        "EXTRACTION_FAILED": "Could not read this file. Try again.",
+        "AI_UPSTREAM_ERROR": "The reading service is busy right now. Try again in a minute (no pages were counted).",
+        "AI_BAD_RESPONSE": "We could not understand this file's content. Try a clearer photo (no pages were counted).",
+        "BAD_RESPONSE": "We could not understand this file's content. Try a clearer photo (its pages were counted).",
+        "FILE_UNREADABLE": "This file itself could not be opened. It may be damaged or in an unsupported format: try another file.",
+        "EXTRACTION_FAILED": "Reading this file failed. Try again (no pages were counted).",
         "TOO_MANY_RETRIES": "This file was tried too many times. Upload it again.",
         "DRAFTS_FAILED": "Some drafts could not be created. Check the items and try again.",
         "NETWORK": "No connection. Try again.",
@@ -4359,7 +4395,7 @@
       "recovered": "Ordered later",
       "recoveryRate": "Ordered-later rate",
       "recoveredRevenue": "Revenue from later orders",
-      "baseValue": "{amount} EGP",
+      "baseValue": "{amount}",
       "recoveryNotTracked": "Not tracked"
     },
     "status": {
@@ -6129,6 +6165,7 @@
   },
   "auth": {
     "login": {
+      "stepUpRequired": "To confirm this change, sign in again. We will bring you back to the page afterwards.",
       "sessionEnded": "Your session ended because the password was changed or you signed out on another device. Please sign in again.",
       "title": "Sign in",
       "subtitle": "Sign in and get back to your store.",
@@ -6360,7 +6397,8 @@
       "markAllRead": "Mark all read",
       "clear": "Clear",
       "empty": "No notifications yet",
-      "reconnecting": "Reconnecting to notification server…"
+      "reconnecting": "Reconnecting to notification server…",
+      "needsAttention": "Needs your attention"
     },
     "connectionStatus": {
       "testing": "Testing…",
@@ -6916,7 +6954,7 @@
       "expenses": "Expenses",
       "net": "Net Income",
       "stockValue": "Stock Value",
-      "disabledVariantStockValue": "Held on disabled variants: {amount} EGP — not counted as stock",
+      "disabledVariantStockValue": "Held on disabled variants: {amount} — not counted as stock",
       "cash": "Cash by Account",
       "balanceSheet": "Balance Sheet",
       "assets": "Assets",
@@ -6932,7 +6970,15 @@
       "salesOrdersCount": "Orders Counted",
       "salesOrdersCountUnit": "orders in period",
       "couldntLoad": "Couldn't load",
-      "loadFailedShort": "Could not load the finance dashboard."
+      "loadFailedShort": "Could not load the finance dashboard.",
+      "netUnknown": "Unknown",
+      "netNoCostsNote": "No cost of goods was booked for this period, so profit cannot be told apart from revenue.",
+      "netPartialNote": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower.",
+      "stockValueUnknown": "Unknown",
+      "stockValueMissingCost": "{count} stocked products have no cost price, so their value cannot be calculated.",
+      "stockValuePartial": "Calculated for {costed} of {stocked} stocked products — the rest have no cost price.",
+      "anomaliesNone": "No open anomalies.",
+      "anomaliesLoadFailed": "Could not load the anomalies."
     },
     "anomalies": {
       "title": "Profit Anomalies",
@@ -7081,7 +7127,7 @@
         "equity": "Equity",
         "totalEquity": "Total Equity",
         "balanced": "Balance sheet verified — Assets = Liabilities + Equity",
-        "unbalanced": "Out of balance by {amount} EGP — Assets ≠ Liabilities + Equity",
+        "unbalanced": "Out of balance by {amount} — Assets ≠ Liabilities + Equity",
         "currentEarnings": "Retained & current earnings",
         "currentEarningsHint": "Revenue minus expenses up to this date (not yet closed to an equity account)"
       },
@@ -7636,6 +7682,10 @@
       "description": "AI-powered reorder suggestions based on velocity + lead time + open backorders.",
       "lastScanned": "Last scanned {time}",
       "rescanNow": "Re-scan now",
+      "scanQueued": "Scan queued and running in the background. We will refresh when it finishes.",
+      "scanDone": "Scan finished and Last scanned is updated.",
+      "scanNoChange": "The scan is still running or found nothing new. Refresh in a moment.",
+      "scanFailed": "Could not start the scan. Try again.",
       "empty": "No reorder suggestions right now. The next AI scan runs tomorrow at 06:00 Cairo time.",
       "comingSoon": "AI-powered reorder suggestions are coming in Batch 3.",
       "explainer": "We'll compute weekly velocity × supplier lead time + safety stock + open backorders to surface 'reorder N units of X' cards. One click to draft a PO pre-filled with quantities and the best supplier.",
@@ -7665,6 +7715,10 @@
       "description": "Slow-moving SKUs with AI-suggested clearance.",
       "lastScanned": "Last scanned {time}",
       "rescanNow": "Re-scan now",
+      "scanQueued": "Scan queued and running in the background. We will refresh when it finishes.",
+      "scanDone": "Scan finished and Last scanned is updated.",
+      "scanNoChange": "The scan is still running or found nothing new. Refresh in a moment.",
+      "scanFailed": "Could not start the scan. Try again.",
       "empty": "No dead stock found. A product is flagged when it is in stock, has not sold for 90+ days (a product that has never sold counts from the day it was added) and is worth at least EGP 5,000 at cost — or has no cost price set, in which case its value is shown as unknown.",
       "comingSoon": "AI-powered dead-stock detection is coming in Batch 3.",
       "explainer": "We'll flag products with 0 sales in 90 days and stock value above EGP 5,000, with AI-generated bilingual clearance copy and suggested discount %.",
@@ -8128,6 +8182,9 @@
     "seePlansCta": "See plans",
     "contactCta": "Talk to us",
     "requiresFeature": "Requires the “{feature}” feature.",
+    "availableOnOrBuyOne": "Available on the {plan} plan. Upgrade, or add just this feature.",
+    "addJustThisCta": "Add just this feature",
+    "businessOffBody": "“{feature}” is part of your {plan} plan, but it is switched off for this store right now. Contact us and we will turn it on.",
     "alsoIncluded": "Also included in this plan",
     "noSoldPlan": "This feature is not part of a plan you can buy. Our team switches it on for a single store, so get in touch if you need it.",
     "contactOnlyCta": "Talk to our team"
@@ -9220,9 +9277,6 @@
     "common": {
       "loading": "Loading…"
     },
-    "premiumSubtitle": "Extra feature",
-    "featureNotEnabledTitle": "Feature not enabled",
-    "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Ebda Store to request access.",
     "mainSubtitle": "Fixed buttons your customer sees on every page, like WhatsApp and call",
     "showWidgetLabel": "Show widget on storefront",
     "showWidgetHint": "When off, no widget renders even though the feature is enabled.",
@@ -9460,7 +9514,7 @@
     "loading": "Loading plans…",
     "loadError": "Failed to load plans.",
     "edit": "Edit",
-    "editTitle": "Edit plan {code}",
+    "editTitle": "Edit plan {name}",
     "public": "Public",
     "hidden": "Hidden",
     "unlimited": "Unlimited",
@@ -9592,6 +9646,12 @@
     "checkoutError": "Could not start the payment",
     "changeError": "Could not change the plan",
     "upgradedToast": "Plan upgraded",
+    "changePlanObject": "Change to the {plan} plan",
+    "confirmUpgradeProrated": "The new plan starts now. Your card is charged {amount} (VAT included): the difference for the {days} days left in the period you already paid. Your renewal date stays the same.",
+    "confirmUpgradeFull": "The new plan starts now. Your card is charged its full price, {amount} (VAT included), and a new billing period starts today. Nothing was paid for your current term, so there is no difference to credit.",
+    "confirmChangeAtPeriodEnd": "The new plan starts on {date}, at the end of the period you already paid. Nothing is charged now and nothing is refunded.",
+    "confirmUpgradeAction": "Upgrade and pay",
+    "confirmChangeAction": "Change plan",
     "upgradeDeclined": "The charge was declined. Your plan was not changed.",
     "upgradePending": "The payment is being confirmed.",
     "scheduledToast": "Change scheduled for the end of the current period.",
@@ -9860,10 +9920,10 @@
         "store": "Name",
         "template": "Look",
         "product": "Product",
-        "payment": "Payment",
+        "payment": "Customer payments",
         "live": "Launch",
         "plan": "Plan",
-        "billing": "Billing"
+        "billing": "Plan payment"
       },
       "back": "Back",
       "next": "Continue",
@@ -10180,7 +10240,8 @@
       "ledger": "Ledger",
       "subscriptions": "Subscriptions",
       "claims": "Payment claims",
-      "grants": "Free months"
+      "grants": "Free months",
+      "held": "Held payments"
     },
     "manual": {
       "title": "Record manual payment for {store}",
@@ -10375,7 +10436,52 @@
       }
     },
     "refundObject": "Refund {amount}",
-    "refundAction": "Refund the payment"
+    "refundAction": "Refund the payment",
+    "held": {
+      "title": "Held payments",
+      "intro": "Subscription payments the provider reported as successful but that don't match what we billed. The merchant may have paid without being upgraded, so settle each one here.",
+      "loading": "Loading held payments...",
+      "failedToLoad": "Could not load the held payments.",
+      "empty": "No held payments.",
+      "statusFilter": "Show",
+      "statuses": {
+        "open": "Needs action",
+        "resolved": "Resolved"
+      },
+      "unknownAmount": "Not reported",
+      "columns": {
+        "date": "Received",
+        "reason": "Why it was held",
+        "expected": "We billed",
+        "got": "Provider reported",
+        "reference": "Reference",
+        "status": "Status",
+        "action": "Action"
+      },
+      "reasons": {
+        "unknown_order": "No matching bill",
+        "amount_mismatch": "Different amount",
+        "currency_mismatch": "Different currency",
+        "amount_missing": "No amount sent",
+        "currency_missing": "No currency sent",
+        "kind_mismatch": "Charge on a card-saving checkout",
+        "row_resolved": "Late payment on a row a person already resolved"
+      },
+      "resolve": "Resolve",
+      "resolveTitle": "Resolve this held payment",
+      "actionLabel": "What did you do?",
+      "creditedHelp": "Resolving as \"activated by hand\" only closes this hold. The original charge row stays failed, so the money reaches the books only when you also record the payment on the manual payment form (it creates its own ledger row).",
+      "actions": {
+        "credited": "Activated the plan by hand",
+        "refunded": "Refunded it at the provider",
+        "not_ours": "Not our payment"
+      },
+      "note": "Note (at least 3 characters)",
+      "noteRequired": "Write a short note about what you did.",
+      "resolveSubmit": "Mark resolved",
+      "resolveFailed": "Could not resolve it. It may have been resolved already; refresh the list.",
+      "resolved": "The held payment was marked resolved."
+    }
   },
   "codReconciliation": {
     "title": "COD reconciliation",
@@ -12578,6 +12684,16 @@
         "error": "I could not apply it. Nothing was changed, try again."
       }
     }
+  },
+  "attention": {
+    "title": "Needs your attention",
+    "subtitle": "Fix these so your store keeps selling.",
+    "info": "For your information",
+    "fix": "Fix now",
+    "view": "Open",
+    "badge": "{count, plural, =1 {{count, number, latn} thing needs your attention} other {{count, number, latn} things need your attention}}",
+    "infoDot": "Has a note for you",
+    "section": "Section needing attention"
   },
   "refundLines": {
     "legend": "Choose what is being refunded or returned",
