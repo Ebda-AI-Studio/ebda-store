@@ -8,7 +8,7 @@ import {
 const t = (en: string) => en;
 
 describe('validateRegistration', () => {
-  it('accepts a matching password that meets the API policy', () => {
+  it('accepts a matching password that meets all five rules', () => {
     expect(
       validateRegistration({ password: 'Abcd123!', confirmPassword: 'Abcd123!' }, t)
     ).toBeNull();
@@ -21,10 +21,15 @@ describe('validateRegistration', () => {
     );
   });
 
-  it('rejects a password shorter than 8 characters', () => {
-    expect(validateRegistration({ password: 'abc1234', confirmPassword: 'abc1234' }, t)).toBe(
-      'Password must be at least 8 characters'
-    );
+  // Each rule alone missing -> that rule is named (the API enforces all five; the form used to check only length).
+  it.each([
+    ['Abc123!', 'Your password still needs: 8 characters or more.'],
+    ['abcd123!', 'Your password still needs: An uppercase letter (A-Z).'],
+    ['ABCD123!', 'Your password still needs: A lowercase letter (a-z).'],
+    ['Abcdefg!', 'Your password still needs: A number (0-9).'],
+    ['Abcd1234', 'Your password still needs: A symbol such as ! @ # $.'],
+  ])('rejects %s and names the missing rule', (pw, message) => {
+    expect(validateRegistration({ password: pw, confirmPassword: pw }, t)).toBe(message);
   });
 
   it('treats exactly 8 characters as valid when the policy is met (boundary)', () => {
@@ -32,16 +37,6 @@ describe('validateRegistration', () => {
       validateRegistration({ password: 'Aa1!aaaa', confirmPassword: 'Aa1!aaaa' }, t)
     ).toBeNull();
   });
-
-  it.each([['abcd1234'], ['ABCD1234!'], ['abcd!@#$'], ['Abcdefg!'], ['12345678']])(
-    'refuses %s before the request: the API (upper, lower, digit, symbol) would answer 400 in English (2026-11-18)',
-    pw => {
-      const ar = (_en: string, arText: string) => arText;
-      expect(validateRegistration({ password: pw, confirmPassword: pw }, ar)).toBe(
-        'كلمة المرور لازم يكون فيها حرف إنجليزي كبير وحرف صغير ورقم ورمز زي ! أو @، و8 حروف على الأقل.'
-      );
-    }
-  );
 
   it('the same policy is what the storefront reset page uses', () => {
     expect(passwordPolicyError('abcd1234', t)).not.toBeNull();
@@ -55,9 +50,9 @@ describe('validateRegistration', () => {
     expect(registrationRefusalText(null, ar)).toBeNull();
   });
 
-  it('rejects two empty passwords — they match but are too short', () => {
+  it('lists every missing rule at once', () => {
     expect(validateRegistration({ password: '', confirmPassword: '' }, t)).toBe(
-      'Password must be at least 8 characters'
+      'Your password still needs: 8 characters or more, An uppercase letter (A-Z), A lowercase letter (a-z), A number (0-9), A symbol such as ! @ # $.'
     );
   });
 

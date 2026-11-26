@@ -7,6 +7,9 @@ import { api, type SmsConsentResponse } from '@/lib/api';
 import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 import PasskeysCard from '../../../components/PasskeysCard';
+import { PasswordChecklist } from '../../../components/PasswordChecklist';
+import { authRefusalText } from '../../../lib/auth-refusal';
+import { isPasswordPolicyMet, passwordUnmetSentence } from '@ebda/shared';
 
 interface User {
   id: string;
@@ -152,37 +155,18 @@ export default function SettingsClient() {
     setMessage(null);
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setMessage({ type: 'error', text: 'Passwords do not match' });
+      setMessage({
+        type: 'error',
+        text: t('Passwords do not match', 'كلمة المرور وتأكيدها مش زي بعض'),
+      });
       setIsSaving(false);
       return;
     }
 
-    if (passwordData.newPassword.length < 8) {
-      setMessage({ type: 'error', text: 'Password must be at least 8 characters' });
-      setIsSaving(false);
-      return;
-    }
-
-    if (!/[A-Z]/.test(passwordData.newPassword)) {
-      setMessage({ type: 'error', text: 'Password must contain at least one uppercase letter' });
-      setIsSaving(false);
-      return;
-    }
-
-    if (!/[a-z]/.test(passwordData.newPassword)) {
-      setMessage({ type: 'error', text: 'Password must contain at least one lowercase letter' });
-      setIsSaving(false);
-      return;
-    }
-
-    if (!/[0-9]/.test(passwordData.newPassword)) {
-      setMessage({ type: 'error', text: 'Password must contain at least one number' });
-      setIsSaving(false);
-      return;
-    }
-
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(passwordData.newPassword)) {
-      setMessage({ type: 'error', text: 'Password must contain at least one special character' });
+    const unmetEn = passwordUnmetSentence(passwordData.newPassword, 'en');
+    const unmetAr = passwordUnmetSentence(passwordData.newPassword, 'ar');
+    if (unmetEn && unmetAr) {
+      setMessage({ type: 'error', text: t(unmetEn, unmetAr) });
       setIsSaving(false);
       return;
     }
@@ -201,7 +185,10 @@ export default function SettingsClient() {
           t('Your password has been changed.', 'كلمة المرور اتغيّرت.')
         );
       } else {
-        const msg = result.error?.message || 'Failed to update password';
+        const msg =
+          authRefusalText(result.error, t) ||
+          result.error?.message ||
+          t('Failed to update password', 'معرفناش نحدّث كلمة المرور');
         setMessage({ type: 'error', text: msg });
         toastError(t('Update failed', 'معرفناش نحدّث'), msg);
       }
@@ -417,8 +404,11 @@ export default function SettingsClient() {
             type="password"
             value={passwordData.newPassword}
             onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+            autoComplete="new-password"
+            aria-describedby="settings-password-rules"
             required
           />
+          <PasswordChecklist id="settings-password-rules" value={passwordData.newPassword} />
 
           <Input
             label={t('Confirm New Password', 'تأكيد كلمة المرور الجديدة')}
@@ -429,7 +419,11 @@ export default function SettingsClient() {
           />
 
           <div className="pt-4">
-            <Button type="submit" isLoading={isSaving}>
+            <Button
+              type="submit"
+              isLoading={isSaving}
+              disabled={!isPasswordPolicyMet(passwordData.newPassword)}
+            >
               {t('Update Password', 'تحديث كلمة المرور')}
             </Button>
           </div>

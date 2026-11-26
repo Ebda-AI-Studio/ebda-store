@@ -26,7 +26,10 @@ vi.mock('../../apps/web/src/contexts/StoreContext', () => ({
   useStore: () => ({ store: { id: 'store-1' } }),
 }));
 vi.mock('../../apps/web/src/contexts/LanguageContext', () => ({
-  useLanguage: () => ({ t: (en: string, ar: string) => (ui.lang === 'ar' ? ar : en) }),
+  useLanguage: () => ({
+    language: ui.lang,
+    t: (en: string, ar: string) => (ui.lang === 'ar' ? ar : en),
+  }),
 }));
 vi.mock('../../apps/web/src/app/auth/register/validate-registration', () => ({
   validateRegistration: () => null,
@@ -49,6 +52,7 @@ vi.mock('../../apps/web/src/hooks/useAuthFormSubmit', () => ({
   }),
 }));
 vi.mock('@ebda/ui', () => ({
+  PasswordRules: () => null,
   Input: ({ label, ...p }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) => (
     <label>
       {label}
@@ -143,5 +147,36 @@ describe('storefront register form', () => {
     fireEvent.submit(screen.getByRole('button', { name: 'إنشاء حساب' }).closest('form')!);
     await waitFor(() => expect(ui.lastError).not.toBe(''));
     expect(ui.lastError).toBe('محاولات كتير. استنى كام دقيقة وجرّب تاني.');
+  });
+
+  it('a 400 VALIDATION_ERROR names the failed password rules in Arabic, not the generic text (2026-11-17)', async () => {
+    ui.lang = 'ar';
+    register.mockResolvedValueOnce({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid request data',
+        details: {
+          password: [
+            'Password must contain at least one uppercase letter',
+            'Password must contain at least one special character',
+          ],
+          messageAr: 'في بيانات مش مظبوطة',
+        },
+      },
+    });
+    render(<RegisterClient />);
+    const set = (label: string, value: string) =>
+      fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    set('الاسم الأول', 'سارة');
+    set('اسم العائلة', 'علي');
+    set('البريد الإلكتروني', 'sara@example.test');
+    set('كلمة المرور', 'Str0ng-pass-word!');
+    set('تأكيد كلمة المرور', 'Str0ng-pass-word!');
+    fireEvent.submit(screen.getByRole('button', { name: 'إنشاء حساب' }).closest('form')!);
+    await waitFor(() => expect(ui.lastError).not.toBe(''));
+    expect(ui.lastError).toBe(
+      'كلمة المرور لسه محتاجة: حرف إنجليزي كبير (A-Z)، رمز واحد على الأقل زي ! @ # $.'
+    );
   });
 });

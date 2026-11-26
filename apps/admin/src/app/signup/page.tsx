@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import { Input } from '@ebda/ui';
+import { Input, PasswordRules } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { PublicShell } from '../../components/onboarding/PublicShell';
 import { apiGet, apiPost } from '../../lib/api';
@@ -292,7 +292,13 @@ export default function SignupPage() {
             placeholder={t('passwordPlaceholder')}
             error={errors.password ? tErr(errors.password) : undefined}
           />
-          <p className="mt-1 text-xs text-muted-foreground">{t('passwordHelp')}</p>
+          <PasswordRules
+            value={fields.password}
+            locale={locale}
+            title={t('passwordRulesTitle')}
+            progressLabel={(met, total) => t('passwordRulesProgress', { met, total })}
+            className="mt-1.5"
+          />
         </div>
         <div>
           <label htmlFor="signup-legal" className="flex items-start gap-2 text-sm text-foreground">

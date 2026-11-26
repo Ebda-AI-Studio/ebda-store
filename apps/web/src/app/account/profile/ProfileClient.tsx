@@ -8,7 +8,9 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 
-import { REGION } from '@ebda/shared';
+import { REGION, isPasswordPolicyMet, passwordUnmetSentence } from '@ebda/shared';
+import { PasswordChecklist } from '../../../components/PasswordChecklist';
+import { authRefusalText } from '../../../lib/auth-refusal';
 export default function ProfileClient() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading, refreshUser } = useAuth();
@@ -88,12 +90,14 @@ export default function ProfileClient() {
     setPasswordError('');
 
     if (passwords.newPassword !== passwords.confirmPassword) {
-      setPasswordError('Passwords do not match');
+      setPasswordError(t('Passwords do not match', 'كلمة المرور وتأكيدها مش زي بعض'));
       return;
     }
 
-    if (passwords.newPassword.length < 8) {
-      setPasswordError('New password must be at least 8 characters');
+    const unmetEn = passwordUnmetSentence(passwords.newPassword, 'en');
+    const unmetAr = passwordUnmetSentence(passwords.newPassword, 'ar');
+    if (unmetEn && unmetAr) {
+      setPasswordError(t(unmetEn, unmetAr));
       return;
     }
 
@@ -113,7 +117,9 @@ export default function ProfileClient() {
         setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
       } else {
         setPasswordError(
-          result.error?.message || t('Failed to change password', 'معرفناش نغيّر كلمة المرور')
+          authRefusalText(result.error, t) ||
+            result.error?.message ||
+            t('Failed to change password', 'معرفناش نغيّر كلمة المرور')
         );
       }
     } catch {
@@ -213,8 +219,11 @@ export default function ProfileClient() {
               type="password"
               value={passwords.newPassword}
               onChange={e => setPasswords({ ...passwords, newPassword: e.target.value })}
+              autoComplete="new-password"
+              aria-describedby="profile-password-rules"
               required
             />
+            <PasswordChecklist id="profile-password-rules" value={passwords.newPassword} />
             <Input
               label={t('Confirm New Password', 'تأكيد كلمة المرور الجديدة')}
               type="password"
@@ -223,7 +232,12 @@ export default function ProfileClient() {
               required
             />
 
-            <Button type="submit" variant="outline" isLoading={isChangingPassword}>
+            <Button
+              type="submit"
+              variant="outline"
+              isLoading={isChangingPassword}
+              disabled={!isPasswordPolicyMet(passwords.newPassword)}
+            >
               {t('Update Password', 'تحديث كلمة المرور')}
             </Button>
           </form>

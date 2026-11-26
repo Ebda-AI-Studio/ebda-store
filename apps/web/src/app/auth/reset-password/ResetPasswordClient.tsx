@@ -10,6 +10,9 @@ import { MinimalChrome } from '../../../components';
 import { passwordPolicyError } from '../register/validate-registration';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { authRefusalText } from '../../../lib/auth-refusal';
+import { PasswordChecklist } from '../../../components/PasswordChecklist';
+import { isPasswordPolicyMet } from '@ebda/shared';
 
 function ResetPasswordForm() {
   const { isLoading, error, setError, submit } = useAuthFormSubmit();
@@ -43,7 +46,7 @@ function ResetPasswordForm() {
       return;
     }
 
-    // The API's full policy, not just the length (a weak password got the server's English 400).
+    // The shared policy, not just the length (a weak password got the server's English 400).
     const weak = passwordPolicyError(formData.newPassword, t);
     if (weak) {
       setError(weak);
@@ -59,14 +62,8 @@ function ResetPasswordForm() {
           // A throttle is "wait and try again", not a failure of the link —
           // and the server's rate-limit message is English-only (#2162's
           // sibling surface).
-          if (result.error?.code === 'RATE_LIMITED') {
-            throw new Error(
-              t(
-                'Too many attempts. Please wait a few minutes, then try again.',
-                'محاولات كتير. استنى كام دقيقة وجرّب تاني.'
-              )
-            );
-          }
+          const refusal = authRefusalText(result.error, t);
+          if (refusal) throw new Error(refusal);
           throw new Error(
             result.error?.message || t('Failed to reset password', 'تغيير كلمة المرور منفعش')
           );
@@ -152,7 +149,9 @@ function ResetPasswordForm() {
                     onChange={e => setFormData({ ...formData, newPassword: e.target.value })}
                     required
                     disabled={!token}
+                    aria-describedby="reset-password-rules"
                   />
+                  <PasswordChecklist id="reset-password-rules" value={formData.newPassword} />
 
                   <Input
                     label={t('Confirm New Password', 'تأكيد كلمة المرور الجديدة')}
@@ -169,7 +168,7 @@ function ResetPasswordForm() {
                     className="w-full"
                     size="lg"
                     isLoading={isLoading}
-                    disabled={!token}
+                    disabled={!token || !isPasswordPolicyMet(formData.newPassword)}
                   >
                     {t('Reset Password', 'إعادة تعيين كلمة المرور')}
                   </Button>

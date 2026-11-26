@@ -14,7 +14,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod/v3';
 import { withUser, type Prisma } from '@ebda/database';
 import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
-import { normalizeEgyptianMobile } from '@ebda/shared';
+import { addPasswordPolicyIssues, normalizeEgyptianMobile } from '@ebda/shared';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
 import { findUserIdByEmail } from '../lib/definer';
@@ -28,14 +28,7 @@ import { buildAcquisition, signupTrackingSchema } from './ebda-ads.service';
 import { signupAcceptanceRows } from './legal-notice.service';
 
 /** Same password policy as `/auth/register` (also used by `/auth/reset-password`). */
-export const passwordSchema = z
-  .string()
-  .min(8, 'Password must be at least 8 characters')
-  .max(128)
-  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-  .regex(/[0-9]/, 'Password must contain at least one number')
-  .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character');
+export const passwordSchema = z.string().max(128).superRefine(addPasswordPolicyIssues);
 
 export const merchantSignupSchema = z.object({
   email: z.string().trim().toLowerCase().email('Invalid email address').max(254),

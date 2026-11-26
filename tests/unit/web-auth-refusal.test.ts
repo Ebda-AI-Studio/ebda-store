@@ -11,6 +11,7 @@ import { authRefusalText } from '../../apps/web/src/lib/auth-refusal';
 import { readTypedBeforeHydration } from '../../apps/web/src/lib/adopt-typed-before-hydration';
 
 const ar = (_en: string, a: string) => a;
+const en = (e: string) => e;
 
 describe('authRefusalText', () => {
   it('throttle codes read Egyptian Arabic', () => {
@@ -22,6 +23,30 @@ describe('authRefusalText', () => {
     expect(authRefusalText({ code: 'INVALID_CREDENTIALS' }, ar)).toBe(
       'الإيميل أو كلمة المرور مش صح.'
     );
+  });
+  it('a VALIDATION_ERROR names each unmet password rule (password and newPassword), in both languages', () => {
+    const details = {
+      newPassword: [
+        'Password must be at least 8 characters',
+        'Password must contain at least one number',
+      ],
+      messageEn: 'Invalid request data',
+    };
+    expect(authRefusalText({ code: 'VALIDATION_ERROR', details }, ar)).toBe(
+      'كلمة المرور لسه محتاجة: 8 حروف أو أكتر، رقم واحد على الأقل (0-9).'
+    );
+    expect(authRefusalText({ code: 'VALIDATION_ERROR', details }, en)).toBe(
+      'Your password still needs: 8 characters or more, A number (0-9).'
+    );
+  });
+  it('a VALIDATION_ERROR with no password rule in details falls through to the form fallback', () => {
+    expect(
+      authRefusalText(
+        { code: 'VALIDATION_ERROR', details: { email: ['Invalid email address'] } },
+        ar
+      )
+    ).toBeNull();
+    expect(authRefusalText({ code: 'VALIDATION_ERROR' }, ar)).toBeNull();
   });
   it('the demo refusal still wins, unknown codes fall through', () => {
     expect(authRefusalText({ code: 'DEMO_STORE' }, ar)).toBeTruthy();

@@ -54,6 +54,7 @@ import {
   JWT_ISSUER,
   REGION,
   zonedLocalToUtc,
+  addPasswordPolicyIssues,
 } from '@ebda/shared';
 import { InstapayReceiptService } from '../services/payment-providers/instapay-receipt.service';
 import { config } from '../config';
@@ -1268,7 +1269,7 @@ router.post(
         firstName: z.string().min(1).max(100),
         lastName: z.string().min(1).max(100),
         /** Ignored: the invitee sets their own password from the mailed link (kept so older clients still validate). */
-        password: z.string().min(8).max(255).optional(),
+        password: z.string().max(255).superRefine(addPasswordPolicyIssues).optional(),
         // Platform administrators are operator-only (Ruling ID-12): this endpoint can only invite merchants.
         role: z.literal('store_admin'),
       });
@@ -1439,7 +1440,7 @@ router.put(
         phone: z.string().max(40).optional().nullable(),
         role: z.enum(['super_admin', 'store_admin', 'customer']).optional(),
         status: z.enum(['active', 'inactive', 'suspended']).optional(),
-        password: z.string().min(8).max(255).optional(),
+        password: z.string().max(255).superRefine(addPasswordPolicyIssues).optional(),
         // N-9: names the store of a customer that exists only in its StoreDO (no Postgres row to find)
         storeId: z.string().uuid().optional(),
       });
