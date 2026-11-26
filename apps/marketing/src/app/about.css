@@ -2,14 +2,14 @@
    calligraphy, no arch: those belong to the home), a gold hairline under each heading, the footer band below. Section
    labels are 19px, body 17px, as on the studio home. Logical properties: the same layout in Arabic RTL and English LTR. */
 .ab-hero {
-  padding-block: clamp(48px, 8vw, 104px) clamp(32px, 5vw, 64px);
+  padding-block: clamp(var(--space-7), 8vw, 104px) clamp(var(--space-6), 5vw, var(--space-8));
 }
 .ab-hero > * {
   max-width: 48rem;
 }
 .ab-eyebrow {
-  margin: 0 0 12px;
-  font-size: 1.1875rem;
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--accent-text);
 }
@@ -25,13 +25,13 @@ html[lang='en'] .ab-eyebrow {
 .ab-lead {
   font-size: clamp(1.125rem, 2.2vw, 1.4rem);
   line-height: 1.8;
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-4);
 }
 .ab-sec {
   position: relative;
   border-top: 1px solid var(--line);
-  padding-block: clamp(56px, 8vw, 96px) clamp(40px, 6vw, 72px);
-  font-size: 1.0625rem;
+  padding-block: clamp(56px, 8vw, var(--space-9)) clamp(40px, 6vw, 72px);
+  font-size: var(--fs-md);
 }
 .ab-sec::before {
   content: '';
@@ -54,7 +54,7 @@ html[lang='en'] .ab-eyebrow {
 }
 .ab-h2 {
   margin: 0 0 28px;
-  font-size: 1.1875rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--accent-text);
 }
@@ -67,7 +67,7 @@ html[lang='en'] .ab-h2 {
   display: block;
   width: 72px;
   height: 1px;
-  margin-top: 12px;
+  margin-top: var(--space-3);
   background: linear-gradient(to right, var(--gold), transparent);
 }
 html[dir='rtl'] .ab-h2::after {
@@ -94,8 +94,8 @@ html[dir='rtl'] .ab-h2::after {
   }
 }
 .ab-grid h3 {
-  margin: 0 0 8px;
-  font-size: 1.25rem;
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-lg);
 }
 .ab-grid p {
   margin: 0;
@@ -105,7 +105,7 @@ html[dir='rtl'] .ab-h2::after {
 .ab-card {
   display: grid;
   align-content: start;
-  gap: 4px;
+  gap: var(--space-1);
   padding: 28px;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -122,12 +122,12 @@ html[dir='rtl'] .ab-h2::after {
   line-height: 1.9;
 }
 .ab-close {
-  font-size: 1.5rem;
+  font-size: var(--fs-xl);
   font-weight: 600;
   color: var(--accent-text);
 }
 .ab-legal {
-  padding-block: 32px;
+  padding-block: var(--space-6);
   border-top: 1px solid var(--line);
 }
 
@@ -135,11 +135,11 @@ html[dir='rtl'] .ab-h2::after {
 .office address {
   font-style: normal;
   line-height: 1.8;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 .office h3 {
-  margin: 0 0 8px;
-  font-size: 1.0625rem;
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-md);
 }
 
 /* services grid (BRAND.services): the studio home and About. One small motif per card; benefit lines only. */
@@ -158,7 +158,7 @@ html[dir='rtl'] .ab-h2::after {
   }
 }
 .svc {
-  padding: 24px;
+  padding: var(--space-5);
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -181,12 +181,12 @@ html[dir='rtl'] .ab-h2::after {
   --svc-motif: url(/motifs/mq.svg);
 }
 .svc h3 {
-  margin: 0 0 8px;
-  font-size: 1.25rem;
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-lg);
 }
 .svc p {
   margin: 0;
-  font-size: 1.0625rem;
+  font-size: var(--fs-md);
   line-height: 1.8;
   color: var(--muted);
 }
@@ -194,16 +194,16 @@ html[dir='rtl'] .ab-h2::after {
 /* the sub-items of a service category: quiet gold-ruled list under the benefit line */
 .svc-items {
   list-style: none;
-  margin: 16px 0 0;
-  padding: 12px 0 0;
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3) 0 0;
   border-top: 1px solid var(--line);
   display: grid;
   gap: 6px;
 }
 .svc-items li {
   position: relative;
-  padding-inline-start: 16px;
-  font-size: 0.9375rem;
+  padding-inline-start: var(--space-4);
+  font-size: var(--fs-base);
   line-height: 1.6;
   color: var(--fg);
 }
@@ -219,7 +219,7 @@ html[dir='rtl'] .ab-h2::after {
 }
 /* /en only: the gloss after the Arabic «ابدأ.» (C17), quieter than the word itself */
 .ab-close-gloss {
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 400;
   color: var(--muted);
 }
