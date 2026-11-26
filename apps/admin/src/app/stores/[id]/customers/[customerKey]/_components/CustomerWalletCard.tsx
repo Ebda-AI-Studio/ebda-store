@@ -102,7 +102,7 @@ export function CustomerWalletCard({
   const money = (piastres: number) => formatPrice(piastres, { locale });
 
   return (
-    <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+    <div className="rounded-md border bg-card shadow-sm overflow-hidden">
       <div className="flex flex-col gap-3 border-b bg-muted/40 px-6 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-sm font-semibold text-foreground">{t('title')}</h2>
@@ -139,19 +139,19 @@ export function CustomerWalletCard({
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/20">
               <tr>
-                <th className="px-4 py-2 text-start text-xs font-medium text-muted-foreground">
+                <th className="px-4 py-2 text-start text-sm font-medium text-muted-foreground">
                   {t('colDate')}
                 </th>
-                <th className="px-4 py-2 text-start text-xs font-medium text-muted-foreground">
+                <th className="px-4 py-2 text-start text-sm font-medium text-muted-foreground">
                   {t('colType')}
                 </th>
-                <th className="px-4 py-2 text-start text-xs font-medium text-muted-foreground hidden md:table-cell">
+                <th className="px-4 py-2 text-start text-sm font-medium text-muted-foreground hidden md:table-cell">
                   {t('colReference')}
                 </th>
-                <th className="px-4 py-2 text-end text-xs font-medium text-muted-foreground">
+                <th className="px-4 py-2 text-end text-sm font-medium text-muted-foreground">
                   {t('colAmount')}
                 </th>
-                <th className="px-4 py-2 text-end text-xs font-medium text-muted-foreground hidden sm:table-cell">
+                <th className="px-4 py-2 text-end text-sm font-medium text-muted-foreground hidden sm:table-cell">
                   {t('colBalance')}
                 </th>
               </tr>

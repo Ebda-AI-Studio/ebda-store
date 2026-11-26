@@ -24,7 +24,11 @@
   },
   "helpArticle": "coupons-bundles-and-recommendations",
   "questions": {
-    "ar": ["ازاي اظهر منتجات مقترحة؟", "اللي اشتروا ده اشتروا ده"],
+    "ar": [
+      "ازاي اظهر منتجات مقترحة؟",
+      "اللي اشتروا ده اشتروا ده",
+      "ازاي اضيف منتجات مرتبطة بالمنتج؟"
+    ],
     "en": ["Show related products"]
   },
   "steps": ["Product > Recommendations."],
