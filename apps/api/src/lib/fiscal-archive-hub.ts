@@ -1,9 +1,8 @@
 /**
  * NEON-ZERO (Ruling NZ-C-4): the super-admin fiscal archive without Postgres. A store's fiscal documents are rows of that
  * store (its DO, or Postgres for a store not yet moved), so the archive view reads them through `storeDb`; the store list is D1.
- * RESIDUAL: the Postgres definers also listed archives of stores already DELETED (retention); a deleted store has no D1 row nor
- * DO any more, so the hub view lists live stores only. Cost if wrong: a super-admin cannot open the archive of a deleted store
- * from this view (the retention copy is the R2 / backup export).
+ * A DELETED DO store has no D1 directory row nor reachable DO any more, so this view lists live stores only; the routes add
+ * deleted DO stores from the platform archive (lib/fiscal-archive-store.ts, Ruling FISCAL-ARCHIVE-1).
  */
 import { storeDb } from './repo-factory';
 import { hubFanout, hubFanoutStoreIds, hubStoresById } from './platform-hub';
