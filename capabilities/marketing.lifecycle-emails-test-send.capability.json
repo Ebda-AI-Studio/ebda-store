@@ -1,0 +1,38 @@
+{
+  "id": "marketing.lifecycle-emails-test-send",
+  "status": "live",
+  "area": "marketing",
+  "version": 1,
+  "versionDate": "2026-11-24",
+  "titleAr": "ابعت لنفسي ايميل تجريبي من رسايل البداية",
+  "titleEn": "Send a lifecycle email to myself as a test",
+  "screens": ["/stores/[id]/lifecycle-emails"],
+  "api": ["POST /stores/:storeId/lifecycle-emails/test-send"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "none",
+    "note": "A test email goes only to the signed-in owner's own address; nothing to undo."
+  },
+  "helpArticle": "setup-lifecycle-emails",
+  "questions": {
+    "ar": [
+      "ابعتلي نسخة تجريبية من ايميل الترحيب",
+      "عايز اشوف الايميل اللي بيوصل للعميل",
+      "جرب الايميل على ايميلي"
+    ],
+    "en": ["Send me a test of the welcome email"]
+  },
+  "steps": [
+    "Open Setup emails.",
+    "Press Send test to me on the row (owner only): the email arrives at your own address."
+  ],
+  "edgeCases": [
+    "Owner only: a staff member gets 403 and the assistant says the store owner can send the test",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

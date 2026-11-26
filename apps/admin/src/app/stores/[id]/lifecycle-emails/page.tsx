@@ -5,8 +5,10 @@ import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { Button } from '@/components/ui/Button';
 import { ErrorState } from '../../../../components/ErrorState';
-import { apiGet } from '../../../../lib/api';
+import { useToast } from '@ebda/ui';
+import { apiGet, apiPost } from '../../../../lib/api';
 import { formatDateTime } from '../../../../lib/format';
 
 type Status = 'sent' | 'skipped' | 'failed' | 'pending';
@@ -28,6 +30,8 @@ export default function LifecycleEmailsPage() {
   const t = useT('lifecycleEmails');
   const [log, setLog] = useState<Log | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+  const [sending, setSending] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -37,6 +41,18 @@ export default function LifecycleEmailsPage() {
     if (apiError) setError(apiError.message ?? '');
     else if (data) setLog(data);
   }, [storeId]);
+
+  /** Owner-only: mail this one message to the owner's own address (never a customer), to see it and check the unsubscribe header. */
+  const sendTest = async (kind: string) => {
+    setSending(kind);
+    const { data, error: apiError } = await apiPost<{ to: string }>(
+      `/api/v1/stores/${storeId}/lifecycle-emails/test-send`,
+      { kind }
+    );
+    setSending(null);
+    if (apiError) toast.error(apiError.message || t('testSendFailed'));
+    else toast.success(t('testSent', { to: data?.to ?? '' }));
+  };
 
   useEffect(() => {
     void load();
@@ -63,6 +79,7 @@ export default function LifecycleEmailsPage() {
                   <th className="p-3 text-start font-medium">{t('colStatus')}</th>
                   <th className="p-3 text-start font-medium">{t('colWhen')}</th>
                   <th className="p-3 text-start font-medium">{t('colNote')}</th>
+                  <th className="p-3 text-start font-medium">{t('colTest')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -75,6 +92,17 @@ export default function LifecycleEmailsPage() {
                     <td className="p-3 whitespace-nowrap">{e.at ? formatDateTime(e.at) : '-'}</td>
                     <td className="p-3 text-muted-foreground">
                       {e.reason ? t(`reason.${e.reason}`) : ''}
+                    </td>
+                    <td className="p-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        onClick={() => void sendTest(e.kind)}
+                        disabled={sending !== null}
+                      >
+                        {sending === e.kind ? t('testSending') : t('testSend')}
+                      </Button>
                     </td>
                   </tr>
                 ))}
