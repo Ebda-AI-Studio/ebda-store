@@ -6,14 +6,16 @@ import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { apiGet, apiPost } from '@/lib/api';
-import { formatPrice, minorToMajor } from '@/lib/format';
+import { formatPrice, minorToMajor, formatDate } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { RowActions } from '@/components/RowActions';
 import { PageState } from '@/components/PageState';
 import { useConfirm } from '@/hooks/useConfirm';
 
-import { minorToDecimalString, withNumerals } from '@ebda/shared';
+import { minorToDecimalString } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface POItem {
@@ -42,14 +44,6 @@ interface PurchaseOrder {
 }
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
-
-const STATUS_CLASSES: Record<string, string> = {
-  draft: 'bg-muted text-foreground',
-  sent: 'bg-info/10 text-info-ink',
-  partial: 'bg-warning/10 text-warning-ink',
-  received: 'bg-success/10 text-success-ink',
-  cancelled: 'bg-destructive/10 text-destructive-ink',
-};
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -198,7 +192,7 @@ export default function PurchaseOrderDetailPage() {
       header: tDetail('qtyReceived'),
       alignEnd: true,
       className: 'w-24',
-      cell: item => <span className="font-mono text-xs text-green-700">{item.qtyReceived}</span>,
+      cell: item => <span className="font-mono text-xs text-success-ink">{item.qtyReceived}</span>,
     },
     {
       header: tDetail('qtyRemaining'),
@@ -246,7 +240,7 @@ export default function PurchaseOrderDetailPage() {
                   step="1"
                   value={receiptQtys[item.id] ?? ''}
                   onChange={e => setReceiptQtys(cur => ({ ...cur, [item.id]: e.target.value }))}
-                  className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+                  className={`${FIELD_CLASSES} text-end font-mono`}
                 />
               );
             },
@@ -290,25 +284,17 @@ export default function PurchaseOrderDetailPage() {
           <div className="max-w-4xl space-y-6">
             {/* Header summary */}
             <div className="flex flex-wrap gap-4 items-start">
-              <span
-                className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                  STATUS_CLASSES[po.status] ?? 'bg-muted text-muted-ink'
-                }`}
-              >
-                {t(`statuses.${po.status}`)}
-              </span>
+              <OrderStatusBadge family="purchaseOrder" status={po.status} />
 
               <div className="text-sm text-muted-foreground space-x-4">
                 {po.expectedDate && (
                   <span>
-                    {t('expectedDate')}:{' '}
-                    {new Date(po.expectedDate).toLocaleDateString(undefined, withNumerals())}
+                    {t('expectedDate')}: {formatDate(po.expectedDate)}
                   </span>
                 )}
                 {po.receivedDate && (
                   <span>
-                    {t('receivedDate')}:{' '}
-                    {new Date(po.receivedDate).toLocaleDateString(undefined, withNumerals())}
+                    {t('receivedDate')}: {formatDate(po.receivedDate)}
                   </span>
                 )}
                 <span>
@@ -327,7 +313,7 @@ export default function PurchaseOrderDetailPage() {
               />
               {/* DataTable has no footer concept, so the total is a summary bar
               right below the table — visible on both layouts. */}
-              <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
+              <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
                 <span>{tDetail('totalLabel')}</span>
                 <span className="font-mono font-semibold">{formatPrice(po.totalCost)}</span>
               </div>

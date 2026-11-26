@@ -3,7 +3,9 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { resolveDefaultLanguage } from '@ebda/shared';
 import { API_URL } from '../lib/api';
-import { hideTags, hidesFromSearch } from '../lib/hide-from-search';
+import { hidesFromSearch } from '../lib/hide-from-search';
+import { classifyResolve } from '../lib/store-indexing';
+import { resolveStoreByDomain, StoreTemporarilyUnavailableError } from '../lib/store-resolver';
 import {
   localePathsOn,
   localeAlternates,
@@ -30,6 +32,8 @@ const STORE_STATIC_PAGES: Array<{ path: string; priority: number; freq: 'monthly
 type StoreListEntry = {
   id: string;
   slug: string;
+  /** Store status: a suspended store serves the maintenance page, so its sitemap is a 404 (Ruling ROBOTS-CLOSED-1). */
+  status?: string;
   /** The demo showroom (Ruling B1-14): listed nowhere. */
   isDemo?: boolean;
   /** The merchant switched on "hide from search engines": nothing to submit. */
@@ -66,30 +70,30 @@ class SitemapSourceUnavailableError extends Error {
  */
 async function resolveStoreByHost(host: string): Promise<StoreListEntry | null> {
   if (!host) return null;
+  // R1 (2026-11-17): this used to call `/public/store/resolve` with a bare fetch, so a cold API (3-8 s, or a 429 / 5xx on the
+  // first hit after an idle gap) failed the render with a 500 on a custom domain's FIRST sitemap request, while the nine
+  // that followed were fine. The storefront's own resolver is the one owner of host resolution (Ruling
+  // RESOLVE-BULLETPROOF-1): memory + durable last-known-good copy (epoch-checked, so a purged or suspended store is never
+  // served), one retry, stale-if-error. A definitive 404 still means "no store owns this host" (null); "could not ask" is
+  // still a failed render, never an empty or platform sitemap (#2127), and the edge answers it 503 + Retry-After.
   try {
-    const res = await fetch(`${API_URL}/public/store/resolve`, {
-      next: { revalidate: 3600, tags: hideTags(host) },
-      headers: { 'Content-Type': 'application/json', 'x-store-domain': host },
-    });
-    // 404 is the API's definitive "no store owns this host" (platform path,
-    // preview host). Anything else is "could not ask" (#2127): falling through
-    // to the master branch would serve a merchant's custom domain the
-    // PLATFORM's URLs, so fail the render instead.
-    if (res.status === 404) return null;
-    if (!res.ok) throw new SitemapSourceUnavailableError(`host resolve → HTTP ${res.status}`);
-    const data = await res.json();
-    const store = data?.data?.store;
-    if (!store?.id || !store?.slug) return null;
+    const store = await resolveStoreByDomain(host);
+    if (!store) return null;
+    if (!store.id || !store.slug) return null;
     return {
       id: store.id,
       slug: store.slug,
+      status: typeof store.status === 'string' ? store.status : undefined,
       isDemo: store.isDemo === true,
       hidden: hidesFromSearch(store),
-      defaultLanguage: store.settings?.defaultLanguage,
+      defaultLanguage: (store.settings as { defaultLanguage?: string } | undefined)
+        ?.defaultLanguage,
     };
   } catch (error) {
     if (error instanceof SitemapSourceUnavailableError) throw error;
-    throw new SitemapSourceUnavailableError('host resolve → network error');
+    const detail =
+      error instanceof StoreTemporarilyUnavailableError ? error.message : 'network error';
+    throw new SitemapSourceUnavailableError(`host resolve → ${detail}`);
   }
 }
 
@@ -298,7 +302,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // not ask" throws (SitemapSourceUnavailableError → 5xx, so Google keeps its
   // last-good copy).
   const tenant = await resolveStoreByHost(storeHost);
-  if (!tenant) notFound();
+  if (!tenant || classifyResolve(200, { status: tenant.status }) === 'closed') notFound();
   // The demo showroom is noindex (Ruling B1-14): nothing to submit.
   // A store hidden from search engines by its merchant lists no URLs either.
   if (tenant.isDemo || tenant.hidden) return [];
