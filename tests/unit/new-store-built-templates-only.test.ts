@@ -38,6 +38,11 @@ vi.mock('@ebda/database', () => ({
       },
     }),
 }));
+vi.mock('@api/services/billing/trial-eligibility', () => ({
+  ownerHasUsedTrial: async () => false,
+  claimOwnerTrial: async () => ({ grant: true, owned: false }),
+  releaseOwnerTrial: async () => undefined,
+}));
 vi.mock('@api/lib/definer', () => ({ storeIdBySlug: m.findUnique }));
 vi.mock('@api/services/provisioning.service', () => ({
   ProvisioningService: { provisionStore: m.provision },

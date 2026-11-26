@@ -63,7 +63,7 @@ export function FiscalDocumentViewer({ endpoint, backHref }: FiscalDocumentViewe
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6">
-      <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-background/95 p-2 backdrop-blur print:hidden">
+      <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-background/95 p-2 backdrop-blur print:hidden">
         <Button
           variant="secondary"
           type="button"
@@ -90,7 +90,7 @@ export function FiscalDocumentViewer({ endpoint, backHref }: FiscalDocumentViewe
           <div
             role="group"
             aria-label={t('language')}
-            className="flex rounded-xl border border-border bg-card p-0.5"
+            className="flex rounded-md border border-border bg-card p-0.5"
           >
             {(['ar', 'en'] as const).map(l => (
               <Button
@@ -119,22 +119,26 @@ export function FiscalDocumentViewer({ endpoint, backHref }: FiscalDocumentViewe
       {error && (
         <div
           role="alert"
-          className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center"
+          className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center"
         >
           <p className="text-sm text-destructive-ink">{error}</p>
         </div>
       )}
       {!error && !html && (
-        <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
           {t('loading')}
         </div>
       )}
       {!error && html && (
-        <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none">
+        <div className="overflow-hidden rounded-lg border border-border bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none">
           <iframe
             ref={iframeRef}
             title={t('title')}
             srcDoc={html}
+            // The document is inert markup: NO allow-scripts, so nothing in it can execute. `allow-same-origin` lets the
+            // parent call contentWindow.print() (cross-origin print() throws); it is safe because scripts stay off.
+            // `allow-modals` is what the browser requires for print() inside a sandboxed frame. Nothing else is granted.
+            sandbox="allow-same-origin allow-modals"
             className="w-full"
             style={{ height: '85vh', border: 0 }}
           />

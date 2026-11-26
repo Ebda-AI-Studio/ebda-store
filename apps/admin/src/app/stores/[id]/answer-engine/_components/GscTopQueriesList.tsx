@@ -18,7 +18,7 @@ export function GscTopQueriesList({ topQueries }: GscTopQueriesListProps) {
   }
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-card rounded-md border border-border shadow-sm overflow-hidden">
       <h2 className="text-lg font-semibold text-foreground px-6 pt-6">{t('topQueriesTitle')}</h2>
       <ul className="divide-y divide-border mt-3">
         {topQueries.map(q => (

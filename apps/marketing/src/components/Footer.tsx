@@ -47,6 +47,15 @@ export function Footer({ locale }: { locale: Locale; page?: PageSlug }) {
                 </div>
               ))}
             </dl>
+            <ul className="sf-social">
+              {f.brand.social.map(a => (
+                <li key={a.id}>
+                  <SiteLink href={a.href} locale={locale} aria-label={a.ariaLabel}>
+                    {a.label}
+                  </SiteLink>
+                </li>
+              ))}
+            </ul>
           </div>
           {f.columns.map(col => (
             <nav key={col.id} className="sf-col" aria-labelledby={`sf-${col.id}`}>

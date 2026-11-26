@@ -15,6 +15,7 @@ export async function withIdentityTimeout<T>(
   ms: number = IDENTITY_LIVE_TIMEOUT_MS
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const start = performance.now();
   try {
     return await Promise.race([
       p,
@@ -28,7 +29,35 @@ export async function withIdentityTimeout<T>(
         );
       }),
     ]);
+  } catch (e) {
+    // QA-105 diagnostics: say WHICH call failed and how long it took, so a log line can tell a timeout from a binding / D1 error.
+    if (e && typeof e === 'object') {
+      Object.assign(e, {
+        identityCall: label,
+        identityElapsedMs: Math.round(performance.now() - start),
+        identityBudgetMs: ms,
+      });
+    }
+    throw e;
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+/** The structured, PII-free log fields for a failed identity call (name, call, elapsed vs budget). Never the message of a token or id. */
+export function identityFailureFields(err: unknown): Record<string, unknown> {
+  const e = (err ?? {}) as {
+    name?: string;
+    message?: string;
+    identityCall?: string;
+    identityElapsedMs?: number;
+    identityBudgetMs?: number;
+  };
+  return {
+    errName: e.name ?? typeof err,
+    call: e.identityCall ?? 'unknown',
+    elapsedMs: e.identityElapsedMs,
+    budgetMs: e.identityBudgetMs,
+    timedOut: /timed out/.test(e.message ?? ''),
+  };
 }
