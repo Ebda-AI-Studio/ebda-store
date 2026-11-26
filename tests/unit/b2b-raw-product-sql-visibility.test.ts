@@ -55,9 +55,10 @@ const CLASSIFIED: Record<
       'productSearchSql (storefront scope) and the vector leg of the hybrid ranking both carry p.audience = public in the WHERE, before their LIMIT (the SECURITY DEFINER id function only returns candidate ids; the outer statement filters); the SKU variant lookup is warehouse-admin only',
   },
   'lib/effective-inventory-sql.ts': {
-    statements: 1,
+    statements: 2,
     kind: 'admin',
-    reason: 'stock valuation SQL fragment used by merchant inventory reports',
+    reason:
+      'stock valuation and its cost coverage (#890), merchant inventory/finance reports only, never storefront',
   },
   'services/inventory.service.ts': {
     statements: 5,

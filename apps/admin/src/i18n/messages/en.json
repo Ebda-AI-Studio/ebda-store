@@ -212,7 +212,9 @@
         "stockValue": "Stock value",
         "openBackorders": "Open backorders",
         "topRfmSegment": "Top Customer Segment",
-        "error": "Unable to load financial summary"
+        "error": "Unable to load financial summary",
+        "unknown": "Unknown",
+        "netPartial": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower."
       },
       "details": {
         "title": "Store Details",
@@ -1410,7 +1412,7 @@
         "status": "Status",
         "date": "Date",
         "actions": "Actions",
-        "totalValue": "{amount} EGP",
+        "totalValue": "{amount}",
         "moreItems": "+{count} more",
         "agentBadge": "Agent"
       },
@@ -2281,11 +2283,15 @@
       "netIncome": "Net income (GL)",
       "grossProfitUnknown": "Unknown",
       "noCogsBooked": "No cost of goods was booked for this period, so gross profit cannot be told apart from revenue. Cost is booked for orders whose products had a cost price when sold.",
+      "costsPartial": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower.",
       "window": "General-ledger figures for: {period}"
     },
     "inventorySnapshot": {
       "title": "Inventory snapshot (right now)",
       "stockValue": "Stock value",
+      "stockValueUnknown": "Unknown",
+      "stockValueMissingCost": "{count} stocked products have no cost price, so their value cannot be calculated.",
+      "stockValuePartial": "Calculated for {costed} of {stocked} stocked products — the rest have no cost price.",
       "openBackorders": "Open backorders",
       "backorderedDemandValue": "Backordered demand value",
       "reorderRules": "Reorder rules"
@@ -4389,7 +4395,7 @@
       "recovered": "Ordered later",
       "recoveryRate": "Ordered-later rate",
       "recoveredRevenue": "Revenue from later orders",
-      "baseValue": "{amount} EGP",
+      "baseValue": "{amount}",
       "recoveryNotTracked": "Not tracked"
     },
     "status": {
@@ -6948,7 +6954,7 @@
       "expenses": "Expenses",
       "net": "Net Income",
       "stockValue": "Stock Value",
-      "disabledVariantStockValue": "Held on disabled variants: {amount} EGP — not counted as stock",
+      "disabledVariantStockValue": "Held on disabled variants: {amount} — not counted as stock",
       "cash": "Cash by Account",
       "balanceSheet": "Balance Sheet",
       "assets": "Assets",
@@ -6964,7 +6970,15 @@
       "salesOrdersCount": "Orders Counted",
       "salesOrdersCountUnit": "orders in period",
       "couldntLoad": "Couldn't load",
-      "loadFailedShort": "Could not load the finance dashboard."
+      "loadFailedShort": "Could not load the finance dashboard.",
+      "netUnknown": "Unknown",
+      "netNoCostsNote": "No cost of goods was booked for this period, so profit cannot be told apart from revenue.",
+      "netPartialNote": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower.",
+      "stockValueUnknown": "Unknown",
+      "stockValueMissingCost": "{count} stocked products have no cost price, so their value cannot be calculated.",
+      "stockValuePartial": "Calculated for {costed} of {stocked} stocked products — the rest have no cost price.",
+      "anomaliesNone": "No open anomalies.",
+      "anomaliesLoadFailed": "Could not load the anomalies."
     },
     "anomalies": {
       "title": "Profit Anomalies",
@@ -7113,7 +7127,7 @@
         "equity": "Equity",
         "totalEquity": "Total Equity",
         "balanced": "Balance sheet verified — Assets = Liabilities + Equity",
-        "unbalanced": "Out of balance by {amount} EGP — Assets ≠ Liabilities + Equity",
+        "unbalanced": "Out of balance by {amount} — Assets ≠ Liabilities + Equity",
         "currentEarnings": "Retained & current earnings",
         "currentEarningsHint": "Revenue minus expenses up to this date (not yet closed to an equity account)"
       },
@@ -9632,6 +9646,12 @@
     "checkoutError": "Could not start the payment",
     "changeError": "Could not change the plan",
     "upgradedToast": "Plan upgraded",
+    "changePlanObject": "Change to the {plan} plan",
+    "confirmUpgradeProrated": "The new plan starts now. Your card is charged {amount} (VAT included): the difference for the {days} days left in the period you already paid. Your renewal date stays the same.",
+    "confirmUpgradeFull": "The new plan starts now. Your card is charged its full price, {amount} (VAT included), and a new billing period starts today. Nothing was paid for your current term, so there is no difference to credit.",
+    "confirmChangeAtPeriodEnd": "The new plan starts on {date}, at the end of the period you already paid. Nothing is charged now and nothing is refunded.",
+    "confirmUpgradeAction": "Upgrade and pay",
+    "confirmChangeAction": "Change plan",
     "upgradeDeclined": "The charge was declined. Your plan was not changed.",
     "upgradePending": "The payment is being confirmed.",
     "scheduledToast": "Change scheduled for the end of the current period.",
@@ -9900,10 +9920,10 @@
         "store": "Name",
         "template": "Look",
         "product": "Product",
-        "payment": "Payment",
+        "payment": "Customer payments",
         "live": "Launch",
         "plan": "Plan",
-        "billing": "Billing"
+        "billing": "Plan payment"
       },
       "back": "Back",
       "next": "Continue",
