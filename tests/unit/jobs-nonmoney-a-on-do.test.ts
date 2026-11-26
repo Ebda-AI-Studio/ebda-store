@@ -724,7 +724,7 @@ describe('watchers, scans and rollups on the DO', () => {
 });
 
 describe('jobs that touch only platform rows run for a DO store', () => {
-  it('contact-form-send mails the store its message: the address comes from the platform `stores` row', async () => {
+  it("contact-form-send mails the store its message: the address comes from the store's own record (storeDb), the owner from identity", async () => {
     const { handleContactFormSubmitted } =
       await import('@api/lib/inngest/functions/contact-form-send');
     h.platformStore.findUnique.mockResolvedValue({
@@ -732,8 +732,12 @@ describe('jobs that touch only platform rows run for a DO store', () => {
       isDemo: false,
       slug: 'acme',
       deletedAt: null,
-      owner: null,
+      ownerId: 'owner-1',
     });
+    // the store record is read through the store's own backend; an address on the record means identity is never asked
+    (h.doBox.current.db as unknown as { store: unknown }).store = {
+      findUnique: h.platformStore.findUnique,
+    };
     await handleContactFormSubmitted({
       event: {
         name: 'contact/form.submitted',
@@ -746,7 +750,6 @@ describe('jobs that touch only platform rows run for a DO store', () => {
       'shop@acme.example',
       expect.objectContaining({ subject: 's' })
     );
-    expect(h.doBox.current.reads).toEqual([]); // not one store-do read
   });
 
   it('domain-claim-sweep lists claims through the platform directory, which a "none" job sees in full', async () => {

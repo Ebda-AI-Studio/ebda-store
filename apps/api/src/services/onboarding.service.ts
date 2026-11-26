@@ -38,6 +38,7 @@ import { readInStoreContext } from '../lib/store-scoped-read';
 import { storeIdBySlug } from '../lib/definer';
 import { assertOwnerMayCreateStore, ownerStoreAllowance } from './plan-limit.service';
 import { countOwnerStores, storeCreateOnDo } from '../lib/store-create-do';
+import { claimOwnerTrial, ownerHasUsedTrial, releaseOwnerTrial } from './billing/trial-eligibility';
 import { MAX_SELF_SERVE_STORES_PER_OWNER, ownerStoreLimit } from './owner-store-limit';
 import { assertStoreCreationBudget, withStoreCreationLock } from './store-creation-limit';
 import { assertStoreMayGoLive } from './billing/go-live-gate';
@@ -302,6 +303,17 @@ export class OnboardingService {
           tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
         )
       );
+      // R-TRIAL-ONCE-1: one signup trial per owner, even after their earlier store was deleted.
+      // The marker is CLAIMED atomically before the store is provisioned (only the request that created it gets the trial);
+      // a failed provision gives it back below.
+      let trialEligible = ownedNow === 0 && !(await ownerHasUsedTrial(user.email));
+      let claimedMarker = false;
+      if (trialEligible) {
+        const claim = await claimOwnerTrial(user.email);
+        trialEligible = claim.grant;
+        claimedMarker = claim.owned;
+      }
+      let provisioned = false;
       try {
         const result = await ProvisioningService.provisionStore({
           storeName: input.name,
@@ -310,7 +322,7 @@ export class OnboardingService {
           // The first store starts the 14-day Growth trial. An additional store
           // (only reachable on a plan that allows it) is covered by the owner's
           // Business plan and starts on it, with no second trial.
-          plan: ownedNow > 0 ? 'enterprise' : 'professional',
+          plan: ownedNow > 0 ? 'enterprise' : trialEligible ? 'professional' : 'starter',
           // The effective cap is min(paid plan allowance or unlimited, the owner's abuse cap): a staff grant only raises the
           // abuse cap and never the plan allowance (owner-store-limit.ts), so a 1-store plan still stops at 1.
           maxOwnedStores:
@@ -320,7 +332,7 @@ export class OnboardingService {
                   storeLimit,
                   (await ownerStoreAllowance(owner.userId)).allowance ?? storeLimit
                 ),
-          growthTrial: ownedNow === 0,
+          growthTrial: trialEligible,
           trialChoice,
           status: 'inactive',
           template: look.skin as SelfServeTemplate,
@@ -328,6 +340,7 @@ export class OnboardingService {
           ownerName: `${user.firstName} ${user.lastName}`.trim() || user.email,
           settings: { defaultLanguage: input.language ?? 'ar' },
         });
+        provisioned = true;
         // Ebda's own ads funnel: the browser fires StoreCreated with the same id. Fail-open.
         if (!owner.isSuperAdmin) {
           await emitEbdaConversion({
@@ -351,6 +364,8 @@ export class OnboardingService {
         const lookApplied = await this.applyChosenLook(result.store.id, look.id, owner.userId);
         return { store: result.store, lookApplied };
       } catch (err) {
+        // the store was never created: give back the trial marker THIS request claimed
+        if (claimedMarker && !provisioned) await releaseOwnerTrial(user.email);
         // Lost the slug race between the check above and the insert.
         if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
           throw new AppError(409, 'SLUG_TAKEN', 'This store address is already taken');

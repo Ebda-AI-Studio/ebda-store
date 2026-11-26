@@ -36,7 +36,7 @@ export function FulfilmentCard({
 }: Props) {
   const t = useT('products.edit.fulfilment');
   return (
-    <div className="rounded-xl border bg-card p-6 shadow-sm">
+    <div className="rounded-md border bg-card p-6 shadow-sm">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
         <p className="text-xs text-muted-foreground">{t('hint')}</p>

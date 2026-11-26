@@ -101,6 +101,7 @@ const billingOverview = readTool(
         usage,
         billing: {
           interval: billing.billingInterval,
+          pendingInterval: billing.pendingBillingInterval,
           pendingPlanCode: billing.pendingPlanCode,
           method: billing.billingMethod,
           hasPaymentMethod: billing.hasPaymentMethod,

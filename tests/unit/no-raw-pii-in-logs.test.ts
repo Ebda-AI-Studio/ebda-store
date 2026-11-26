@@ -71,6 +71,8 @@ const SAFE_CALL = /^(mask|redact|hash)/i;
  * adding a line.
  */
 const REVIEWED_SPREADS: Record<string, string> = {
+  'apps/api/src/lib/inngest/sweep-run-log.ts|numbers':
+    'sweep run counts → only fields whose value is a finite number are copied in, so no id, name or contact can be logged (tests/unit/sweep-run-summary-log.test.ts)',
   'apps/api/src/lib/inngest/functions/audit-log-archive.ts|cf':
     'archive-cloudflare-audit step result → { skipped, d1, stores, storeRows } counts only',
   'apps/api/src/services/billing/payments-reconcile.service.ts|report':

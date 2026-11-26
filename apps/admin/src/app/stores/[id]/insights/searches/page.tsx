@@ -203,11 +203,11 @@ export default function InsightsSearchesPage() {
 
         <dl className="grid grid-cols-2 gap-4 sm:max-w-md">
           <div className="rounded-lg border border-border bg-card p-4">
-            <dt className="text-xs text-muted-foreground">{t('totalSearches')}</dt>
+            <dt className="text-sm text-muted-foreground">{t('totalSearches')}</dt>
             <dd className="mt-1 text-2xl font-semibold tabular-nums">{data.totals.searches}</dd>
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
-            <dt className="text-xs text-muted-foreground">{t('rate')}</dt>
+            <dt className="text-sm text-muted-foreground">{t('rate')}</dt>
             <dd className="mt-1 text-2xl font-semibold tabular-nums">
               {percent(data.totals.zeroResultRate)}
             </dd>
@@ -221,7 +221,7 @@ export default function InsightsSearchesPage() {
             rows={data.terms}
             rowKey={row => row.term}
             emptyState={
-              <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
+              <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
                 {nothingSearched ? t('empty') : t('emptyZero')}
               </div>
             }

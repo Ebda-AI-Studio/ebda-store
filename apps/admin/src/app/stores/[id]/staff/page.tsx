@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Badge, Modal, ModalBody, ModalFooter, Input, Label, useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { PlanLimitNotice } from '@/components/billing/PlanLimitNotice';
 import { apiGet, apiPost, apiDelete } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
 import { useRouter } from 'next/navigation';
@@ -266,8 +267,10 @@ export default function StoreStaffPage() {
         </Button>
       }
     >
+      <PlanLimitNotice storeId={storeId} keys={['maxStaff']} />
+
       {error && !isLoading && (
-        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-ink">
+        <div className="mb-6 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-ink">
           {error}
         </div>
       )}
@@ -275,12 +278,12 @@ export default function StoreStaffPage() {
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div key={i} className="rounded-md border border-border bg-card p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 bg-muted rounded-full animate-pulse" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-32 bg-muted rounded animate-pulse" />
-                  <div className="h-3 w-40 bg-muted rounded animate-pulse" />
+                  <div className="h-4 w-32 bg-muted rounded-md animate-pulse" />
+                  <div className="h-3 w-40 bg-muted rounded-md animate-pulse" />
                 </div>
               </div>
             </div>
@@ -293,7 +296,7 @@ export default function StoreStaffPage() {
           rows={staff}
           rowKey={member => member.membershipId}
           emptyState={
-            <div className="rounded-xl border bg-card shadow-sm px-6 py-12 text-center">
+            <div className="rounded-md border bg-card shadow-sm px-6 py-12 text-center">
               <div className="flex flex-col items-center">
                 <svg
                   className="h-12 w-12 text-muted-foreground"
@@ -322,7 +325,7 @@ export default function StoreStaffPage() {
             {t('invites.title')}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">{t('invites.description')}</p>
-          <ul className="mt-3 divide-y divide-border rounded-xl border border-border bg-card">
+          <ul className="mt-3 divide-y divide-border rounded-md border border-border bg-card">
             {invites.map(inv => (
               <li key={inv.id} className="flex items-center justify-between gap-3 p-4">
                 <div className="min-w-0">
