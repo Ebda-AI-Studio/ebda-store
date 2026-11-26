@@ -6,8 +6,10 @@ import {
   renewSubscription,
 } from '../../../services/billing/subscription-billing.service';
 import {
+  findGraceEndingCandidates,
   findReminderCandidates,
   sendDueReminder,
+  sendGraceEndingNotice,
 } from '../../../services/billing/reminders.service';
 
 /**
@@ -16,6 +18,8 @@ import {
  *
  * 1. Reminders (7/3/1 days before and on the due day) — one `billing_reminders`
  *    row per (subscription, due date, kind), so a re-run sends nothing twice.
+ * 1b. Grace notices (Ruling BILL-NOTICE-1): grace start, 1 day before suspension and suspension are each
+ *    claimed once per stage in `billing_reminders` BEFORE the email/bell goes out.
  * 2. Renewals: card subscriptions are charged on the due day (dunning on
  *    failure); InstaPay subscriptions go past_due on the due day and the store is
  *    suspended after the grace period (INSTAPAY_GRACE_DAYS); cancel-at-period-end
@@ -50,6 +54,17 @@ export const billingRenewalDaily: JobDef = inngest.createFunction(
     let reminders = 0;
     for (const id of reminderIds) {
       const r = await step.run(`remind-${id}`, () => sendDueReminder(id, new Date(nowIso)));
+      if (r.sent) reminders++;
+    }
+    // Ruling BILL-NOTICE-1: one day before an unpaid InstaPay store is paused (grace start + suspension
+    // notices are claimed inside the renewal step below).
+    const graceIds = await step.run('find-grace-ending', () =>
+      findGraceEndingCandidates(new Date(nowIso))
+    );
+    for (const id of graceIds) {
+      const r = await step.run(`grace-ending-${id}`, () =>
+        sendGraceEndingNotice(id, new Date(nowIso))
+      );
       if (r.sent) reminders++;
     }
     const ids = await step.run('find-due', () => findDueSubscriptionIds(new Date(nowIso)));

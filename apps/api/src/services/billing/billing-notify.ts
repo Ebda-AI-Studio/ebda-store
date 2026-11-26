@@ -31,6 +31,10 @@ export type BillingEffect =
   | { kind: 'subscription_paid'; storeId: string; billingEventId: string }
   /** The daily job suspended an unpaid InstaPay store (`applied` = this run did it). */
   | { kind: 'store_suspended'; storeId: string; applied: boolean }
+  /** Ruling BILL-NOTICE-1: an InstaPay payment went overdue; the store is paused at `suspendAt`. */
+  | { kind: 'grace_started'; storeId: string; suspendAt: Date }
+  /** Ruling BILL-NOTICE-1: one day (or less) of grace left before the store is paused. */
+  | { kind: 'grace_ending'; storeId: string; suspendAt: Date }
   | {
       kind: 'payment_failed';
       storeId: string;
@@ -204,6 +208,51 @@ async function runOne(effect: BillingEffect): Promise<void> {
           reason: effect.kind === 'payment_rejected' ? effect.note : undefined,
           barcode,
           paymentNumber,
+          whatsappUrl: supportContact(store.name).whatsappUrl,
+          supportEmail: supportContact(store.name).email,
+        },
+        lang
+      );
+    }
+    return;
+  }
+
+  if (effect.kind === 'grace_started' || effect.kind === 'grace_ending') {
+    const suspendOn = effect.suspendAt.toISOString().slice(0, 10);
+    const starting = effect.kind === 'grace_started';
+    socketService.notifyStore(effect.storeId, {
+      type: starting ? 'billing_grace_started' : 'billing_grace_ending',
+      title:
+        lang === 'ar'
+          ? starting
+            ? 'دفعتك متأخرة'
+            : 'متجرك هيتوقف بكرة'
+          : starting
+            ? 'Your payment is overdue'
+            : 'Your store pauses tomorrow',
+      message:
+        lang === 'ar'
+          ? `هنوقف متجرك في ${suspendOn} لو الدفعة ما اتسجلتش. ادفع دلوقتي.`
+          : `We will pause your store on ${suspendOn} unless the payment is recorded. Pay now.`,
+      data: { storeId: effect.storeId, url, suspendOn },
+      createdAt: new Date(),
+    });
+    if (store.owner?.email) {
+      const ip = await instapayDetails(effect.storeId);
+      await EmailService.sendSubscriptionBillingNotice(
+        effect.storeId,
+        {
+          kind: effect.kind,
+          to: store.owner.email,
+          storeName: store.name,
+          planName,
+          amountMinor: ip?.amountMinor ?? 0,
+          vat: ip?.vat ?? null,
+          billingUrl: `${config.adminUrl ?? ''}${url}`,
+          suspendOn,
+          method: 'instapay',
+          instapayHandle: ip?.handle ?? null,
+          paymentReference: ip?.reference ?? null,
           whatsappUrl: supportContact(store.name).whatsappUrl,
           supportEmail: supportContact(store.name).email,
         },
