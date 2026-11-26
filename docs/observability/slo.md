@@ -15,6 +15,8 @@ cost, caching) is what closes it. Until it is met, every Telegram probe alert is
 
 **Status page window (Ruling STATUS-WINDOW-1).** status.ebda.app headlines the LAST 30 DAYS per component and shows the 90-day figure beside it; `/api/status.json` has `uptime30d` next to `uptime` (90 days). The SLO tables below are measured on the 30-day figure.
 
+**Probe coverage (audited 2026-11-17).** Probers: the status Worker (`apps/status`, cron every 5 min, Telegram on open/recover) and the AI OS brain Worker (prod-watch on its cron, every 10 min, same host list). Both run INSIDE Cloudflare, so a Cloudflare-wide outage is invisible to them; the outside-in GitHub-hosted Prod watch is disabled (no GitHub-hosted runners, by decision), and the Mac cannot be the external vantage (the Egyptian ISP blocks Cloudflare's 188.114.96/97 range). Storefront coverage was two demo stores on `*.ebda.app`; the custom-domain path of a live merchant store (ameliaaurum.com) had NO probe until the `storefront-custom-domain` component (measured 0.7-4.6 s first byte on a bare curl before it existed). 7-day status results (2026-11-11..17): api, admin, orders, accounts, marketing, docs, help 100 %; chat 100 %; storefront 98.06 %; storefront product 96.8 %, all misses on 11-11..15 and none from 11-16 (before the store-resolve fix deployed; re-measure after it).
+
 ## 1. api — `ebda-api` (Worker, D1 + Durable Objects)
 
 | SLO                         | Target       | Error budget (30 d) | Measurement                                                     |
