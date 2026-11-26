@@ -4,7 +4,10 @@ import { priceLineLabel, struckListPrice } from '../lib/order-pricing';
 import { groupOrderLinesForDisplay, mulDivRound, orderAddressLines } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
+import { sendAlert } from './alerts.service';
 import { storeDb } from '../lib/repo-factory';
+import { allocateLineVat } from './fiscal-document-lines';
+import { listFiscalDocuments, type FiscalListFilters } from './fiscal-document-list';
 
 /**
  * Fiscal documents (rulings MONEYB-1, MONEYB-4).
@@ -70,6 +73,13 @@ export interface FiscalLine {
   priceLabel?: string | null;
   priceLabelAr?: string | null;
   listPrice?: number | null;
+  /** v2: the line's own VAT rate / VAT share (minor units), see `allocateLineVat`. Absent on v1 payloads. */
+  vatRateBps?: number | null;
+  vatAmount?: number | null;
+  /** v2: ETA item identity of the line (internal code = SKU; EGS code from the store's ETA connection). */
+  internalCode?: string | null;
+  etaItemType?: 'EGS' | null;
+  etaItemCode?: string | null;
 }
 
 export interface FiscalDiscount {
@@ -78,8 +88,17 @@ export interface FiscalDiscount {
   amount: number;
 }
 
+/**
+ * Payload versions (the stored payload of an issued document is NEVER rewritten):
+ *  v1  seller (name, legal name, TRN, contact), buyer, lines, discounts, totals, paymentMethod.
+ *  v2  + seller.branchCode / activityCode / posSerial / branchAddress (ETA connection), per-line VAT rate +
+ *      amount, per-line internal/EGS item code, paymentStatus. Documents issued before v2 render the
+ *      missing fields as "not recorded at issue".
+ */
+const FISCAL_PAYLOAD_VERSION = 2;
+
 export interface SaleDocumentPayload {
-  version: 1;
+  version: 1 | 2;
   orderNumber: string;
   orderDate: string;
   currency: string;
@@ -91,6 +110,11 @@ export interface SaleDocumentPayload {
     address: string | null;
     phone: string | null;
     email: string | null;
+    /** v2, only when the store has an ETA connection. */
+    branchCode?: string | null;
+    activityCode?: string | null;
+    posSerial?: string | null;
+    branchAddress?: Record<string, unknown> | null;
   };
   buyer: {
     name: string;
@@ -113,10 +137,12 @@ export interface SaleDocumentPayload {
     total: number;
   };
   paymentMethod: string | null;
+  /** v2: the order's payment status when the document was issued (unpaid | paid | ...). */
+  paymentStatus?: string | null;
 }
 
 export interface RefundDocumentPayload {
-  version: 1;
+  version: 1 | 2;
   orderNumber: string;
   currency: string;
   isTaxInvoice: boolean;
@@ -126,6 +152,8 @@ export interface RefundDocumentPayload {
   reason: string | null;
   scope: 'full' | 'partial';
   totals: { net: number; vat: number; total: number; vatRateBps: number | null };
+  /** v2: copied from the sale document. */
+  paymentMethod?: string | null;
 }
 
 type SaleOrder = Prisma.OrderGetPayload<{
@@ -251,6 +279,49 @@ export function documentBalance(input: {
   return computed - input.total;
 }
 
+/** v2 line identity + VAT (post-discount bases, see `allocateLineVat`). Goods lines use the SKU as the internal code; fee lines have none of their own. */
+function withLineTax(
+  lines: FiscalLine[],
+  tax_: { discount: number; vat: number; vatRateBps: number | null; taxIncludedInPrice: boolean },
+  etaItemCode: string | null,
+  ids: { storeId: string; orderId: string }
+): FiscalLine[] {
+  const { shares: tax, fallback } = allocateLineVat(
+    lines,
+    tax_.discount,
+    tax_.vat,
+    tax_.vatRateBps,
+    tax_.taxIncludedInPrice
+  );
+  if (!tax) {
+    // Never abort the order / refund that is issuing this document: ids only in the log, a p1 alert, and the
+    // document is issued WITHOUT per-line VAT (the viewer prints "not recorded at issue").
+    logger.error(
+      { storeId: ids.storeId, orderId: ids.orderId },
+      '[FISCAL] line VAT invariant breached - issuing the document without per-line VAT'
+    );
+    void sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'fiscal.line_vat_breach',
+      title: 'Fiscal document issued without per-line VAT',
+      body: `store ${ids.storeId} order ${ids.orderId}: line VAT split broke its invariant`,
+    }).catch(() => undefined);
+  } else if (fallback)
+    logger.warn(
+      { storeId: ids.storeId, orderId: ids.orderId },
+      '[FISCAL] line VAT split fell back to proportional (line figures disagree with the order VAT)'
+    );
+  return lines.map((l, i) => ({
+    ...l,
+    ...(tax ? { vatRateBps: tax[i].vatRateBps, vatAmount: tax[i].vatAmount } : {}),
+    internalCode: l.sku ?? null,
+    etaItemType:
+      etaItemCode && (l.kind === 'item' || l.kind === 'bundle') ? ('EGS' as const) : null,
+    etaItemCode: etaItemCode && (l.kind === 'item' || l.kind === 'bundle') ? etaItemCode : null,
+  }));
+}
+
 async function allocateSerial(
   tx: Prisma.TransactionClient,
   storeId: string,
@@ -330,9 +401,34 @@ export class FiscalDocumentService {
     });
     if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
 
+    // etaConnection lives on the store's own database (a Durable Object for moved stores), so it is read through
+    // storeDb, not this transaction. It is configuration, not money: nothing here needs it atomic with the sale.
+    const eta = await (
+      await storeDb(storeId)
+    ).etaConnection.findFirst({
+      where: { storeId },
+      select: {
+        branchCode: true,
+        activityCode: true,
+        posSerial: true,
+        defaultItemCode: true,
+        address: true,
+      },
+    });
     const isTaxInvoice = !!order.sellerTaxRegistrationNumber;
     const docType = isTaxInvoice ? 'tax_invoice' : 'receipt';
-    const { lines, discounts } = buildSaleLines(order);
+    const { lines: baseLines, discounts } = buildSaleLines(order);
+    const lines = withLineTax(
+      baseLines,
+      {
+        discount: order.discount,
+        vat: order.tax,
+        vatRateBps: order.taxRateBps,
+        taxIncludedInPrice: order.taxIncludedInPrice,
+      },
+      eta?.defaultItemCode ?? null,
+      { storeId, orderId }
+    );
     const off = documentBalance({
       lines,
       discounts,
@@ -366,12 +462,22 @@ export class FiscalDocumentService {
     const serial = await allocateSerial(tx, storeId, docType);
     const shipping = order.shippingAddress as Record<string, unknown> | null;
     const payload: SaleDocumentPayload = {
-      version: 1,
+      version: FISCAL_PAYLOAD_VERSION,
       orderNumber: order.orderNumber,
       orderDate: order.createdAt.toISOString(),
       currency: order.currency,
       isTaxInvoice,
-      seller: sellerOf(store, order),
+      seller: {
+        ...sellerOf(store, order),
+        ...(eta
+          ? {
+              branchCode: eta.branchCode,
+              activityCode: eta.activityCode,
+              posSerial: eta.posSerial,
+              branchAddress: (eta.address ?? null) as Record<string, unknown> | null,
+            }
+          : {}),
+      },
       // PDPL minimisation (ruling MONEYB-4): a tax invoice must name the buyer
       // and address (UTPL Art. 37); a plain consumer receipt does not, so its
       // archived copy carries no buyer data at all.
@@ -397,6 +503,7 @@ export class FiscalDocumentService {
         total: order.total,
       },
       paymentMethod: order.payments[0]?.provider ?? null,
+      paymentStatus: order.paymentStatus,
     };
     return tx.fiscalDocument.create({
       data: {
@@ -514,7 +621,7 @@ export class FiscalDocumentService {
     const serial = await allocateSerial(tx, storeId, docType);
     const issuedAt = new Date();
     const payload: RefundDocumentPayload = {
-      version: 1,
+      version: FISCAL_PAYLOAD_VERSION,
       orderNumber: salePayload.orderNumber,
       currency: sale.currency,
       isTaxInvoice: sale.docType === 'tax_invoice',
@@ -529,6 +636,7 @@ export class FiscalDocumentService {
       reason: input.reason ?? null,
       scope: total === sale.totalAmount ? 'full' : 'partial',
       totals: { net: total - vat, vat, total, vatRateBps: sale.vatRateBps },
+      paymentMethod: salePayload.paymentMethod ?? null,
     };
     return tx.fiscalDocument.create({
       data: {
@@ -554,56 +662,9 @@ export class FiscalDocumentService {
     });
   }
 
-  /** Paged list for the merchant's Invoices page. */
-  static async list(
-    storeId: string,
-    opts: { cursor?: string; limit?: number; docType?: FiscalDocTypeValue; q?: string } = {}
-  ) {
-    const limit = Math.min(100, Math.max(1, opts.limit ?? 50));
-    const rows = await (
-      await storeDb(storeId)
-    ).fiscalDocument.findMany({
-      where: {
-        storeId,
-        ...(opts.docType ? { docType: opts.docType } : {}),
-        // Document numbers are issued upper-case (INV-000042), so an upper-cased substring needs no case-insensitive mode.
-        ...(opts.q
-          ? {
-              OR: [
-                { number: { contains: opts.q.toUpperCase() } },
-                { originalNumber: { contains: opts.q.toUpperCase() } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: [{ issuedAt: 'desc' }, { id: 'desc' }],
-      take: limit + 1,
-      ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
-      select: {
-        id: true,
-        orderId: true,
-        docType: true,
-        number: true,
-        status: true,
-        issuedAt: true,
-        cancelledAt: true,
-        originalNumber: true,
-        netAmount: true,
-        vatAmount: true,
-        totalAmount: true,
-        currency: true,
-        payload: true,
-      },
-    });
-    const hasMore = rows.length > limit;
-    const page = hasMore ? rows.slice(0, limit) : rows;
-    return {
-      documents: page.map(({ payload, ...d }) => ({
-        ...d,
-        orderNumber: (payload as { orderNumber?: string } | null)?.orderNumber ?? null,
-      })),
-      nextCursor: hasMore ? page[page.length - 1]!.id : null,
-    };
+  /** Paged list for the merchant's Invoices page (keyset, filters and enrichment in `fiscal-document-list.ts`). */
+  static async list(storeId: string, opts: FiscalListFilters = {}) {
+    return listFiscalDocuments(storeId, opts);
   }
 
   static async getById(storeId: string, id: string) {

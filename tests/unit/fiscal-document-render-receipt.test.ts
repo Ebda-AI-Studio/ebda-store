@@ -47,19 +47,20 @@ const doc = (over: Partial<RenderableDocument> = {}): RenderableDocument => ({
 
 describe('renderFiscalDocumentHtml', () => {
   it('prints the configured order barcode (QA-69)', () => {
-    const html = renderFiscalDocumentHtml(doc(), 'ar', 'Africa/Cairo', 'plain');
+    const html = renderFiscalDocumentHtml(doc(), 'ar', 'Africa/Cairo', null, 'plain');
     expect(html).toContain('class="doc-barcode"');
     expect(html).toContain('<svg');
   });
   it('prints the barcode by default and not when the store turned it off', () => {
     expect(renderFiscalDocumentHtml(doc(), 'en')).toContain('doc-barcode"');
-    expect(renderFiscalDocumentHtml(doc(), 'en', 'Africa/Cairo', 'off')).not.toContain(
+    expect(renderFiscalDocumentHtml(doc(), 'en', 'Africa/Cairo', null, 'off')).not.toContain(
       'class="doc-barcode"'
     );
   });
   it('Arabic: ج.م, shipping as a totals line, sign isolated with its number (QA-70)', () => {
     const html = renderFiscalDocumentHtml(doc(), 'ar');
-    expect(html).not.toContain('EGP');
+    // prices print «ج.م»; the ISO code may only appear in the labelled currency field of the header (tax archive)
+    expect(html.replace('العملة <span dir="ltr">EGP</span>', '')).not.toContain('EGP');
     expect(html).toContain('ج.م');
     expect(html).toContain('<bdi dir="ltr">−20</bdi>');
     // shipping is a colspan totals row, never an item row with qty and unit price

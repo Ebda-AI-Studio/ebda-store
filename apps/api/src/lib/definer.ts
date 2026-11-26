@@ -1538,6 +1538,8 @@ export interface FiscalArchiveRow {
   sellerTrn: string | null;
   payload: unknown;
   retainUntil: Date;
+  /** Only the live-database (hub) reader fills it; the definer's fixed column list does not carry it. */
+  refundRef?: string | null;
 }
 
 export async function fiscalArchive(storeId: string): Promise<FiscalArchiveRow[]> {
