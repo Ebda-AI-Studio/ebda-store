@@ -84,6 +84,18 @@ export const COMPONENTS: readonly ComponentConfig[] = [
     expectBody: 'data-zone=',
   },
   {
+    id: 'storefront-custom-domain',
+    product: 'store',
+    name: { en: 'Storefronts on a merchant domain', ar: 'المتاجر على دومين التاجر' },
+    // A LIVE merchant store on its own domain (ameliaaurum.com, active custom domain in the platform D1, 2026-11-17). The demo stores above
+    // all live on `*.ebda.app`, so they say nothing about the custom-domain path (host -> store resolve by domain, a different cache key and
+    // route) that real merchants use; a 4.1 s first byte there went unseen for lack of a probe. `/ar` for the same reason as `storefront`.
+    // MAINTENANCE: when this store leaves or another store goes live on a custom domain, edit this entry (one host per probe).
+    url: 'https://ameliaaurum.com/ar',
+    expectStatus: 200,
+    expectBody: 'data-zone=',
+  },
+  {
     id: 'chat',
     product: 'chat',
     name: { en: 'Ebda Chat app', ar: 'تطبيق ابدأ شات' },
