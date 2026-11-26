@@ -123,12 +123,19 @@ export const COMPONENTS: readonly ComponentConfig[] = [
 ];
 
 /**
- * Hard deadline for one probe. 15 s, not 8 s: in quiet hours a cold isolate answers a storefront page in 2-12 s
- * (measured 2026-11-14/15, worker ebda-web: p50 2-4 s, p99 6-12 s), which is SLOW, not DOWN.
+ * Hard deadline for one probe: past 15 s the probe is aborted and counts as a failure (DOWN). Between 8 and 15 s the page
+ * did answer, so it is `degraded` and never pages on its own, but (Ruling STATUS-PROBE-1) it is NOT counted as an available
+ * check in the daily uptime: a shopper waiting 8+ s does not feel an available site. #814 had raised this deadline from 8 to
+ * 15 s and counted those probes as fully up, which made the page greener without making visitors faster.
  */
 export const DEFAULT_TIMEOUT_MS = 15000;
-/** A successful probe slower than this is `degraded` (shown, never paged); two in a row open an incident. */
+/**
+ * A successful probe slower than this is `degraded` (shown, never paged), counts AGAINST the daily uptime, and two in a
+ * row open an incident.
+ */
 export const SLOW_THRESHOLD_MS = 8000;
+/** Above this a probe is labelled "slower than usual" on the page (shown only: still counted available, never degraded). */
+export const DEGRADED_LABEL_MS = 3000;
 /** Consecutive slow probes that count as one failure. */
 export const SLOW_STREAK_FAILS = 2;
 export const DEFAULT_FAIL_THRESHOLD = 2;
