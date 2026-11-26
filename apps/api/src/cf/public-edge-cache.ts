@@ -5,8 +5,8 @@
  * cache and the `Cache-Control: public, s-maxage` the public routes already send was honoured by nothing
  * (measured: no cf-cache-status, ~1 s per read, 503 OVERLOADED under one light client). A hit here answers before
  * Express, the database lease and the role check, so it also takes load off the connection pool that sheds the 503.
- * The layer sits above the data path, so it is the same code on Postgres/Hyperdrive and on the Durable Object / D1
- * backend after the cutover.
+ * The layer sits above the data path, so it is the same code on the Durable Object / D1 backend (and on the
+ * Node shell's local Postgres).
  *
  * WHAT IS CACHED: anonymous GET /public/products, /public/products/:slugOrId, /public/categories, /public/tags for a
  * store selected by `x-store-domain`, and only a 200 the route itself marked cacheable (`setEdgeCache` stamps the

@@ -19,7 +19,13 @@ const ROOT = path.resolve(__dirname, '../../apps/api/src');
  * the helpers themselves hold the one real `db.store.update(`; the reconciler's raw statement writes the D1 DIRECTORY row of a `do`
  * store (restrictive direction only, Ruling NZ-D14), never the Postgres Store row this gate protects
  */
-const ALLOWLIST = new Set(['lib/repo-factory.ts', 'lib/store-directory-reconcile.ts']);
+// store-tombstone.ts: the D1 DIRECTORY tombstone of a purged store (clears identifying columns, releases slug and domain); it writes no
+// store setting, the Durable Object is already wiped (Ruling NZ-D15B).
+const ALLOWLIST = new Set([
+  'lib/repo-factory.ts',
+  'lib/store-directory-reconcile.ts',
+  'lib/store-tombstone.ts',
+]);
 const WRITES = new Set(['update', 'updateMany', 'upsert']);
 
 function files(dir: string): string[] {

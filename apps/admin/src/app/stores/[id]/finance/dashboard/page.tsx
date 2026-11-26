@@ -1,5 +1,6 @@
 'use client';
 
+import { useLocale } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -9,7 +10,9 @@ import { apiGet, apiGetPage } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
-import { reportRangeQueryString, minorToDecimalString, withNumerals } from '@ebda/shared';
+import { reportRangeQueryString, withNumerals } from '@ebda/shared';
+import { formatPrice } from '@/lib/format';
+import { ledgerCostsStatus, stockValueState } from '@/lib/money-truth';
 
 import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -28,9 +31,16 @@ interface DashboardData {
     revenue: number;
     expenses: number;
     net: number;
+    /** unknown: no cost of goods booked; partial: some sold lines have no cost. `net` is then not a real profit. */
+    costsStatus?: 'known' | 'partial' | 'unknown';
+    costsMissing?: number;
+    costsTotal?: number;
   };
   cash: CashAccountRow[];
   stockValue: number;
+  /** Stocked products / how many have no cost price (the value skips those). */
+  stockedProducts?: number;
+  uncostedProducts?: number;
   /** Value held on DISABLED variants — excluded from stockValue (issue 2146). */
   disabledVariantStockValue?: number;
   balanceSheet: {
@@ -62,9 +72,10 @@ interface SalesStats {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function major(piastres: number | null | undefined): string {
-  if (typeof piastres !== 'number' || !Number.isFinite(piastres)) return '0.00';
-  return minorToDecimalString(piastres);
+/** One money format (house style, lib/format.ts): `4,850 ج.م` in Arabic, `EGP 4,850` in English. */
+function money(piastres: number | null | undefined): string {
+  if (typeof piastres !== 'number' || !Number.isFinite(piastres)) return formatPrice(0);
+  return formatPrice(piastres);
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -74,6 +85,7 @@ export default function FinanceDashboardPage() {
   const router = useRouter();
   const storeId = params?.id as string;
   const t = useT('finance.dashboard');
+  const adminLocale = useLocale() === 'ar' ? 'ar' : 'en';
   const tc = useT('common');
 
   const [period, setPeriod] = useState<Period>('this_month');
@@ -87,6 +99,8 @@ export default function FinanceDashboardPage() {
   // Anomalies + OCR sections are already defensive — untouched.
   const [dashboardErr, setDashboardErr] = useState<string | null>(null);
   const [recentAnomalies, setRecentAnomalies] = useState<ProfitAnomaly[]>([]);
+  // null = still loading, 'failed' = the load failed (shown as an error, never as an ambiguous empty dash)
+  const [anomaliesState, setAnomaliesState] = useState<'loading' | 'ready' | 'failed'>('loading');
   const [pendingOcrCount, setPendingOcrCount] = useState<number | null>(null);
   /**
    * Sales revenue from actual paid orders (analytics endpoint). Shown alongside
@@ -103,6 +117,8 @@ export default function FinanceDashboardPage() {
 
     setData(null);
     setDashboardErr(null);
+    setAnomaliesState('loading');
+    setRecentAnomalies([]);
 
     const resolved = resolveDateRange(period, customRange);
     // Use ISO timestamps (UTC) for both finance and analytics so "today"
@@ -152,11 +168,23 @@ export default function FinanceDashboardPage() {
     // Recent unacknowledged anomalies (top 3) — defensive against missing
     // `data` field on the API response (e.g. anomalies feature not yet
     // enabled for this store, error responses, partial shape).
+    // The route answers `{ success, data: { data: rows, meta } }`; a failed load is an error state, an empty list a
+    // message, never one ambiguous dash (QA N5).
     apiGet<{ data?: ProfitAnomaly[]; meta?: { total: number } }>(
       `/api/v1/stores/${storeId}/finance/anomalies?acknowledged=false&perPage=3&page=1`
-    ).then(({ data: ad }) => {
-      if (!stale && ad?.data && Array.isArray(ad.data)) setRecentAnomalies(ad.data);
-    });
+    )
+      .then(({ data: ad, error: anomaliesErr }) => {
+        if (stale) return;
+        if (anomaliesErr || !ad || !Array.isArray(ad.data)) {
+          setAnomaliesState('failed');
+          return;
+        }
+        setRecentAnomalies(ad.data);
+        setAnomaliesState('ready');
+      })
+      .catch(() => {
+        if (!stale) setAnomaliesState('failed');
+      });
 
     // Pending OCR drafts count. `apiGet` drops the route's sibling `meta`
     // (so `ed.meta.total` was always undefined and the card never left
@@ -187,6 +215,18 @@ export default function FinanceDashboardPage() {
     totalEquity: 0,
   };
   const netPositive = thisMonth.net >= 0;
+  // Net income built on a missing cost of goods is unknown, not the revenue (QA 2026-11-17 N1).
+  const costsStatus = ledgerCostsStatus({
+    revenue: thisMonth.revenue,
+    cogs: 0,
+    costsStatus: data?.thisMonth?.costsStatus ?? 'known',
+  });
+  const netKnown = costsStatus !== 'unknown';
+  const stockState = stockValueState({
+    stockValue,
+    stockedProducts: data?.stockedProducts,
+    uncostedProducts: data?.uncostedProducts,
+  });
 
   const cashColumns: DataTableColumn<CashAccountRow>[] = [
     {
@@ -198,16 +238,8 @@ export default function FinanceDashboardPage() {
     {
       header: '',
       primaryOnMobile: true,
-      cell: row => (
-        <>
-          {row.nameEn}
-          {row.nameAr && (
-            <span className="text-muted-foreground ms-2 text-xs" dir="rtl">
-              — {row.nameAr}
-            </span>
-          )}
-        </>
-      ),
+      // STORE-QA-11: one name in the page language, never "English— Arabic" glued together.
+      cell: row => <>{(adminLocale === 'ar' && row.nameAr) || row.nameEn}</>,
     },
     {
       header: '',
@@ -217,15 +249,15 @@ export default function FinanceDashboardPage() {
         const isNeg = row.balance < 0;
         return (
           <span
-            className={isNeg ? 'font-mono text-red-600' : 'font-mono'}
+            className={isNeg ? 'font-mono text-destructive-ink' : 'font-mono'}
             title={isNeg ? t('negativeBalanceTooltip') : undefined}
           >
             {isNeg && (
-              <span className="inline-flex items-center me-1 px-1 py-0.5 text-xs bg-red-100 text-red-700 rounded">
+              <span className="inline-flex items-center me-1 px-1 py-0.5 text-xs bg-destructive/10 text-destructive-ink rounded-md">
                 !
               </span>
             )}
-            {major(row.balance)} {tc('egp')}
+            {money(row.balance)}
           </span>
         );
       },
@@ -258,78 +290,85 @@ export default function FinanceDashboardPage() {
             <h2 className="text-base font-semibold mb-3">{t('thisMonth')}</h2>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Revenue */}
-              <div className="rounded-xl border border-border p-4 space-y-1">
+              <div className="rounded-md border border-border p-4 space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">
                   {t('revenue')}
                 </p>
                 <p
                   className={`text-2xl font-semibold font-mono ${
-                    dashboardErr ? 'text-muted-foreground' : 'text-green-700'
+                    dashboardErr ? 'text-muted-foreground' : 'text-success-ink'
                   }`}
                   title={dashboardErr ?? undefined}
                 >
-                  {dashboardErr ? '—' : major(thisMonth.revenue)}
+                  {dashboardErr ? '—' : money(thisMonth.revenue)}
                 </p>
                 {dashboardErr ? (
                   <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                     {t('couldntLoad')}
                   </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
-                )}
+                ) : null}
               </div>
 
               {/* Expenses */}
-              <div className="rounded-xl border border-border p-4 space-y-1">
+              <div className="rounded-md border border-border p-4 space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">
                   {t('expenses')}
                 </p>
                 <p
                   className={`text-2xl font-semibold font-mono ${
-                    dashboardErr ? 'text-muted-foreground' : 'text-red-600'
+                    dashboardErr ? 'text-muted-foreground' : 'text-destructive-ink'
                   }`}
                   title={dashboardErr ?? undefined}
                 >
-                  {dashboardErr ? '—' : major(thisMonth.expenses)}
+                  {dashboardErr ? '—' : money(thisMonth.expenses)}
                 </p>
                 {dashboardErr ? (
                   <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                     {t('couldntLoad')}
                   </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
-                )}
+                ) : null}
               </div>
 
               {/* Net Income */}
-              <div className="rounded-xl border border-border p-4 space-y-1">
+              <div className="rounded-md border border-border p-4 space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('net')}</p>
                 <p
                   className={`text-2xl font-semibold font-mono ${
-                    dashboardErr
+                    dashboardErr || !netKnown
                       ? 'text-muted-foreground'
                       : netPositive
-                        ? 'text-green-700'
-                        : 'text-red-600'
+                        ? 'text-success-ink'
+                        : 'text-destructive-ink'
                   }`}
                   title={dashboardErr ?? undefined}
                 >
                   {dashboardErr ? (
                     '—'
+                  ) : !netKnown ? (
+                    t('netUnknown')
                   ) : (
                     <>
                       {netPositive ? '' : '−'}
-                      {major(Math.abs(thisMonth.net))}
+                      {money(Math.abs(thisMonth.net))}
                     </>
                   )}
                 </p>
+                {!dashboardErr && costsStatus === 'unknown' && (
+                  <p className="text-sm text-muted-foreground">{t('netNoCostsNote')}</p>
+                )}
+                {!dashboardErr && costsStatus === 'partial' && (
+                  <p className="text-sm text-muted-foreground">
+                    {t('netPartialNote', {
+                      missing: data?.thisMonth?.costsMissing ?? 0,
+                      total: data?.thisMonth?.costsTotal ?? 0,
+                    })}
+                  </p>
+                )}
                 {dashboardErr ? (
                   <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                     {t('couldntLoad')}
                   </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
-                )}
+                ) : null}
               </div>
             </div>
           </section>
@@ -337,7 +376,8 @@ export default function FinanceDashboardPage() {
           {/* ── Sales Orders reconciliation ──────────────────────────────
                Canonical order-based revenue from the analytics endpoint.
                This matches the numbers shown in the Analytics hub and is
-               based on PAID orders in the orders table — completely separate
+               the NET SALES population of the orders table (REVENUE-DEF-1: all orders except
+               cancelled, refunded and failed/refunded payments; unpaid COD counts, so it is NOT labelled "paid" - STORE-QA-54) — completely separate
                from the double-entry journal entries above.
                When journal entries haven't been posted yet, this panel is
                the source of truth for actual sales. Both panels are shown
@@ -352,16 +392,15 @@ export default function FinanceDashboardPage() {
                 </span>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="rounded-xl border border-border p-4 space-y-1">
+                <div className="rounded-md border border-border p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
                     {t('salesOrdersRevenue')}
                   </p>
-                  <p className="text-2xl font-semibold font-mono text-green-700">
-                    {major(salesStats.totalRevenue)}
+                  <p className="text-2xl font-semibold font-mono text-success-ink">
+                    {money(salesStats.totalRevenue)}
                   </p>
-                  <p className="text-xs text-muted-foreground">{tc('egp')}</p>
                 </div>
-                <div className="rounded-xl border border-border p-4 space-y-1">
+                <div className="rounded-md border border-border p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
                     {t('salesOrdersCount')}
                   </p>
@@ -378,7 +417,7 @@ export default function FinanceDashboardPage() {
             {/* Stock Value */}
             <section>
               <h2 className="text-base font-semibold mb-3">{t('stockValue')}</h2>
-              <div className="rounded-xl border border-border p-6 flex items-center justify-center">
+              <div className="rounded-md border border-border p-6 flex items-center justify-center">
                 <div className="text-center space-y-1">
                   <p
                     className={`text-3xl font-semibold font-mono ${
@@ -386,21 +425,36 @@ export default function FinanceDashboardPage() {
                     }`}
                     title={dashboardErr ?? undefined}
                   >
-                    {dashboardErr ? '—' : major(stockValue)}
+                    {dashboardErr
+                      ? '—'
+                      : stockState.kind === 'unknown'
+                        ? t('stockValueUnknown')
+                        : money(stockState.value)}
                   </p>
                   {dashboardErr ? (
                     <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                       {t('couldntLoad')}
                     </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">{tc('egp')}</p>
+                  ) : null}
+                  {!dashboardErr && stockState.kind === 'unknown' && (
+                    <p className="text-sm text-muted-foreground">
+                      {t('stockValueMissingCost', { count: data?.uncostedProducts ?? 0 })}
+                    </p>
+                  )}
+                  {!dashboardErr && stockState.kind === 'partial' && (
+                    <p className="text-sm text-muted-foreground">
+                      {t('stockValuePartial', {
+                        costed: stockState.costed,
+                        stocked: stockState.stocked,
+                      })}
+                    </p>
                   )}
                   {!dashboardErr &&
                     disabledVariantStockValue !== null &&
                     disabledVariantStockValue > 0 && (
                       <p className="text-xs text-muted-foreground pt-1">
                         {t('disabledVariantStockValue', {
-                          amount: major(disabledVariantStockValue),
+                          amount: money(disabledVariantStockValue),
                         })}
                       </p>
                     )}
@@ -413,13 +467,13 @@ export default function FinanceDashboardPage() {
               <h2 className="text-base font-semibold mb-3">{t('cash')}</h2>
               {dashboardErr ? (
                 <div
-                  className="rounded-xl border border-border overflow-hidden p-4 text-sm text-muted-foreground"
+                  className="rounded-md border border-border overflow-hidden p-4 text-sm text-muted-foreground"
                   title={dashboardErr}
                 >
                   — <span className="text-xs text-destructive-ink">{t('couldntLoad')}</span>
                 </div>
               ) : cash.length === 0 ? (
-                <div className="rounded-xl border border-border overflow-hidden p-4 text-sm text-muted-foreground">
+                <div className="rounded-md border border-border overflow-hidden p-4 text-sm text-muted-foreground">
                   —
                 </div>
               ) : (
@@ -443,7 +497,7 @@ export default function FinanceDashboardPage() {
                     { labelKey: 'equity', val: balanceSheet.totalEquity },
                   ] as { labelKey: 'assets' | 'liabilities' | 'equity'; val: number }[]
                 ).map(({ labelKey, val }) => (
-                  <div key={labelKey} className="rounded-xl border border-border p-4 space-y-1">
+                  <div key={labelKey} className="rounded-md border border-border p-4 space-y-1">
                     <p className="text-xs text-muted-foreground uppercase tracking-wide">
                       {t(labelKey)}
                     </p>
@@ -453,15 +507,13 @@ export default function FinanceDashboardPage() {
                       }`}
                       title={dashboardErr ?? undefined}
                     >
-                      {dashboardErr ? '—' : major(val)}
+                      {dashboardErr ? '—' : money(val)}
                     </p>
                     {dashboardErr ? (
                       <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                         {t('couldntLoad')}
                       </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">{tc('egp')}</p>
-                    )}
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -483,9 +535,15 @@ export default function FinanceDashboardPage() {
                   {t('viewAll')}
                 </Button>
               </div>
-              <div className="rounded-xl border border-border overflow-hidden">
-                {recentAnomalies.length === 0 ? (
-                  <div className="p-4 text-sm text-muted-foreground">—</div>
+              <div className="rounded-md border border-border overflow-hidden">
+                {anomaliesState === 'loading' ? (
+                  <div className="p-4 text-sm text-muted-foreground">{tc('loading')}</div>
+                ) : anomaliesState === 'failed' ? (
+                  <div className="p-4 text-sm text-destructive-ink" role="alert">
+                    {t('anomaliesLoadFailed')}
+                  </div>
+                ) : recentAnomalies.length === 0 ? (
+                  <div className="p-4 text-sm text-muted-foreground">{t('anomaliesNone')}</div>
                 ) : (
                   <div className="divide-y divide-border/40">
                     {recentAnomalies.map(a => {
@@ -497,9 +555,9 @@ export default function FinanceDashboardPage() {
                         <div key={a.id} className="px-3 py-2 space-y-0.5">
                           <div className="flex items-center gap-2">
                             <span
-                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-medium ${
                                 a.severity === 'p0'
-                                  ? 'bg-red-100 text-red-700'
+                                  ? 'bg-destructive/10 text-destructive-ink'
                                   : 'bg-warning/10 text-warning-ink'
                               }`}
                             >
@@ -510,7 +568,7 @@ export default function FinanceDashboardPage() {
                             </span>
                             <span
                               className={`text-xs font-mono ms-auto ${
-                                a.deltaPercent < 0 ? 'text-red-600' : 'text-green-700'
+                                a.deltaPercent < 0 ? 'text-destructive-ink' : 'text-success-ink'
                               }`}
                             >
                               {sign}
@@ -543,7 +601,7 @@ export default function FinanceDashboardPage() {
                   {t('viewAll')}
                 </Button>
               </div>
-              <div className="rounded-xl border border-border p-6 flex items-center justify-center">
+              <div className="rounded-md border border-border p-6 flex items-center justify-center">
                 <div className="text-center space-y-1">
                   {pendingOcrCount === null ? (
                     <p className="text-sm text-muted-foreground">{tc('loading')}</p>

@@ -2,6 +2,9 @@
  * Storefront POST /public/contact names the store the shopper wrote on (Ruling FU46-1), runs as
  * production does (guarded ebda_app client per request), refuses a demo store and drops a
  * honeypot submission silently.
+ *
+ * The recipient cases (store email, else the owner's account; suspended owner; platform address) moved to
+ * tests/unit/store-contact-target-on-do.test.ts when `storeContactTarget` moved to storeDb + the identity service.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
@@ -15,8 +18,6 @@ import { publicStoreContext } from '@api/middleware/tenant-context';
 import { errorHandler } from '@api/middleware/error-handler';
 import { inngest } from '@api/lib/inngest/client';
 import { redis } from '@api/services/redis.service';
-import { config } from '@api/config';
-import { storeContactTarget } from '@api/services/store-contact.service';
 import { hasDb, seedStoreWithoutBundlesFeature } from '../helpers/bundle-fixtures';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
@@ -62,33 +63,20 @@ const MESSAGE = {
 describe.skipIf(!hasDb)('storefront contact routing (FU46-1)', () => {
   let app: Express;
   let shop: { storeId: string; ownerId: string };
-  let noEmail: { storeId: string; ownerId: string };
   let demo: { storeId: string; ownerId: string };
   let capped: { storeId: string; ownerId: string };
   let other: { storeId: string; ownerId: string };
-  let suspended: { storeId: string; ownerId: string };
-  let platformAddr: { storeId: string; ownerId: string };
   let send: ReturnType<typeof vi.spyOn<typeof inngest, 'send'>>;
 
   beforeAll(async () => {
     app = buildApp();
     await redis.connect();
     shop = await seedStoreWithoutBundlesFeature(`contact-${run}-shop`);
-    noEmail = await seedStoreWithoutBundlesFeature(`contact-${run}-noemail`);
     demo = await seedStoreWithoutBundlesFeature(`contact-${run}-demo`);
     capped = await seedStoreWithoutBundlesFeature(`contact-${run}-capped`);
     other = await seedStoreWithoutBundlesFeature(`contact-${run}-other`);
-    suspended = await seedStoreWithoutBundlesFeature(`contact-${run}-susp`);
-    platformAddr = await seedStoreWithoutBundlesFeature(`contact-${run}-plat`);
     await withRlsBypass(async tx => {
-      await tx.store.update({ where: { id: suspended.storeId }, data: { email: null } });
-      await tx.user.update({ where: { id: suspended.ownerId }, data: { status: 'suspended' } });
-      await tx.store.update({
-        where: { id: platformAddr.storeId },
-        data: { email: config.smtpFromEmail.toUpperCase() },
-      });
       await tx.store.update({ where: { id: shop.storeId }, data: { email: 'shop@example.test' } });
-      await tx.store.update({ where: { id: noEmail.storeId }, data: { email: null } });
       await tx.store.update({ where: { id: demo.storeId }, data: { isDemo: true } });
     });
   });
@@ -139,17 +127,6 @@ describe.skipIf(!hasDb)('storefront contact routing (FU46-1)', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("recipient: the store's contact email, else the owner's account email (as ebda_app)", async () => {
-    expect(await asApp(() => storeContactTarget(shop.storeId))).toMatchObject({
-      to: 'shop@example.test',
-      isDemo: false,
-    });
-    expect(await asApp(() => storeContactTarget(noEmail.storeId))).toMatchObject({
-      to: `bundle-fixture-nofeature-owner-contact-${run}-noemail@example.com`,
-    });
-    expect(await asApp(() => storeContactTarget(demo.storeId))).toMatchObject({ isDemo: true });
-  });
-
   it('honeypot of any length is a silent success, never a 400', async () => {
     const res = await post(shop.storeId, {
       ...MESSAGE,
@@ -185,23 +162,6 @@ describe.skipIf(!hasDb)('storefront contact routing (FU46-1)', () => {
       name: 'contact/form.submitted',
       data: { storeId: other.storeId, ...MESSAGE },
     });
-  });
-
-  it('recipient: a suspended owner is not mailed, and the platform sender address is never a target', async () => {
-    expect((await asApp(() => storeContactTarget(suspended.storeId)))?.to).toBeNull();
-    // stores.email equal to the platform sender is skipped, and the ACTIVE owner is tried next
-    // (FU46 M-5); it never becomes the target itself.
-    const plat = (await asApp(() => storeContactTarget(platformAddr.storeId)))?.to;
-    expect(plat).toBe(`bundle-fixture-nofeature-owner-contact-${run}-plat@example.com`);
-    expect(plat?.toLowerCase()).not.toBe(config.smtpFromEmail.toLowerCase());
-    // ... and with the owner suspended too there is nobody: null.
-    await withRlsBypass(tx =>
-      tx.user.update({ where: { id: platformAddr.ownerId }, data: { status: 'suspended' } })
-    );
-    expect((await asApp(() => storeContactTarget(platformAddr.storeId)))?.to).toBeNull();
-    await withRlsBypass(tx =>
-      tx.user.update({ where: { id: platformAddr.ownerId }, data: { status: 'active' } })
-    );
   });
 
   it('the cap window is FIXED: over-cap hits never extend the TTL, and the count resets after it', async () => {

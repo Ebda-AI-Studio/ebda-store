@@ -6,14 +6,14 @@ order: 9
 appPath: /stores
 keywords: plans pricing basic growth business billing subscription
 capabilities:
-  - billing.change-plan@1
+  - billing.change-plan@2
   - billing.pay-card@1
   - billing.plans-compare@1
   - billing.platform-fee-vat@1
   - billing.view@1
 ---
 
-Try Growth for 14 days. There is no public free plan. Ebda Store takes no commission on your orders; payment gateway fees are separate, and cash on delivery never carries a fee.
+Try Growth for 14 days, once per account: deleting your store and creating a new one does not start another trial. There is no public free plan. Ebda Store takes no commission on your orders; payment gateway fees are separate, and cash on delivery never carries a fee.
 
 |                                           |     Basic |    Growth |  Business |
 | ----------------------------------------- | --------: | --------: | --------: |
@@ -42,4 +42,4 @@ The listed prices are final amounts. Ebda AI Studio is not registered for VAT an
 ## Ask the assistant to change your plan
 
 - **Downgrade:** the assistant shows a card with what changes (limits you lose) and starts the new plan at the end of the period you paid for. Nothing is charged.
-- **Upgrade:** the assistant shows the price before VAT, the VAT and the total, then gives you a link to the payment screen. You confirm the charge there. The assistant never charges your saved card itself.
+- **Upgrade:** the new plan starts at once and you pay only the price difference for the days left in the period you already paid (VAT included, rounded up to the piastre). Your renewal date does not change; from it you pay the new plan's full price. This applies only when you paid for the current period: during a free trial, or on a plan the Ebda Store team set for you without a payment, an upgrade charges the new plan's full price and a new billing period starts that day. Once a period has ended, renew it before upgrading. The billing screen (and the assistant's card) shows that amount before anything is charged; the assistant then gives you a link to the payment screen, where you confirm it. The assistant never charges your saved card itself.

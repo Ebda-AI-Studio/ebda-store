@@ -139,10 +139,10 @@ describe('ci.yml lanes', () => {
   it('Integration Tests: the full tier in the main lane, and on a PR only the files the planner selects (#227)', () => {
     const j = ci.jobs['test-integration'];
     const cond = j.if ?? '';
-    expect(([] as string[]).concat(j.needs ?? []).sort()).toEqual(['build', 'changes']);
-    // main lane: after a successful build, never on a PR
+    expect(([] as string[]).concat(j.needs ?? []).sort()).toEqual(['changes', 'tested-tree']);
+    // main lane: in parallel with Build (CRITICAL-PATH-1: it needs no Build artifact), never on a PR, skipped on a light merge group
     expect(cond).toMatch(
-      /github\.event_name != 'pull_request' && needs\.build\.result == 'success'/
+      /github\.event_name != 'pull_request' && needs\.tested-tree\.outputs\.skip != 'true' && needs\.tested-tree\.outputs\.heavy != 'false'/
     );
     // PR lane: only when the planner says so
     expect(cond).toMatch(
@@ -184,6 +184,10 @@ describe('ci.yml lanes', () => {
           .replace(/needs\.([\w-]+)\.result == 'success'/g, (_, n) => String(run(n)))
           // MERGE-QUEUE-1 part B: `tested-tree` answers skip=false unless a merge group proved the tree, so the evaluator's world (no such evidence) is `true`
           .replace(/needs\.tested-tree\.outputs\.skip != 'true'/g, 'true')
+          // MQ-SCOPE-1: `heavy` is only ever 'false' on a light merge group; every other event (and the evaluator's world) is heavy
+          .replace(/needs\.tested-tree\.outputs\.heavy != 'false'/g, 'true')
+          // CRITICAL-PATH-1: `docs_only` is only ever 'true' on a strictly docs-only merge group; every other event is not docs-only
+          .replace(/needs\.tested-tree\.outputs\.docs_only != 'true'/g, 'true')
           .replace(/needs\.[\w-]+\.outputs\.\w+ (==|!=) '[^']*'/g, (_, op) =>
             String(op === '!=' ? false : false)
           )
