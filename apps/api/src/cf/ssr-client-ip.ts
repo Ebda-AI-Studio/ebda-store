@@ -17,6 +17,13 @@ import { isIP } from '../lib/safe-fetch';
 
 export const CLIENT_IP_HEADER = 'x-ebda-client-ip';
 export const SSR_AUTH_HEADER = 'x-ebda-ssr-auth';
+/**
+ * Set by the storefront's same-origin `/api/v1` proxy (apps/web/src/app/api/v1/[...path]/route.ts) on a BROWSER request it relays
+ * (sign-in, refresh, cart, account...). It widens the signed-address rule from the anonymous-read list to any route: without it
+ * every shopper's login would share the storefront Worker's egress bucket (the IP-wide auth failure limiter would lock the platform).
+ * Only meaningful together with a valid signature; always stripped from the request that reaches Express.
+ */
+export const PROXY_HOP_HEADER = 'x-ebda-proxy-hop';
 /** Signed by the storefront for a render with no shopper behind it (background revalidation): no per-address bucket. */
 export const NO_SHOPPER_ADDRESS = 'none';
 /**
@@ -145,6 +152,8 @@ export async function resolveClientAddress(
   headers.delete(CLIENT_IP_HEADER);
   headers.delete(SSR_AUTH_HEADER);
   headers.delete(NO_CLIENT_ADDRESS_HEADER);
+  headers.delete(PROXY_HOP_HEADER);
+  const proxied = incoming.headers.get(PROXY_HOP_HEADER) === '1';
 
   let ip = seen;
   let forwarded = false;
@@ -154,7 +163,7 @@ export async function resolveClientAddress(
     typeof secret === 'string' &&
     secret.length > 0 &&
     (isIP(claimed) !== 0 || claimed === NO_SHOPPER_ADDRESS) &&
-    isForwardableRead(incoming.method, new URL(incoming.url).pathname)
+    (proxied || isForwardableRead(incoming.method, new URL(incoming.url).pathname))
   ) {
     try {
       if (await verifyClientIpSignature(secret, claimed, auth)) {
@@ -170,6 +179,7 @@ export async function resolveClientAddress(
   const hadInternal =
     incoming.headers.has(CLIENT_IP_HEADER) ||
     incoming.headers.has(SSR_AUTH_HEADER) ||
+    incoming.headers.has(PROXY_HOP_HEADER) ||
     incoming.headers.has(NO_CLIENT_ADDRESS_HEADER);
   if (ip && !hadInternal && incoming.headers.get('x-forwarded-for') === ip) {
     return { request: incoming, ip, forwarded };
