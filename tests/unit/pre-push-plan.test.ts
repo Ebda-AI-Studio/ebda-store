@@ -149,6 +149,16 @@ describe('scanner tests are always in the pre-push run (PREPUSH-3)', () => {
     expect(found).toContain('tests/unit/rulings-index.test.ts');
   });
 
+  it('includes the whole-router walkers, which `related` cannot reach from a changed *.routes.ts (PREPUSH-7)', () => {
+    expect(found).toContain('tests/unit/route-table-manifest.test.ts');
+    expect(found).toContain('tests/unit/auth-sensitivity-routes.test.ts');
+    expect(found).toContain('tests/unit/public-mount-admin-route-guard.test.ts');
+    expect(SCANNER_RULE.test("const { default: apiRoutes } = await import('@api/routes');")).toBe(
+      true
+    );
+    expect(SCANNER_RULE.test("import { x } from '@api/routes/order.routes';")).toBe(false);
+  });
+
   it('is by content: the rule matches walkers and greps, not a plain fixture read', () => {
     expect(SCANNER_RULE.test('const files = readdirSync(dir)')).toBe(true);
     expect(SCANNER_RULE.test("execSync('git grep -n foo')")).toBe(true);
