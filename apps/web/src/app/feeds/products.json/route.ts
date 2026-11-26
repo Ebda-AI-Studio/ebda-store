@@ -1,5 +1,11 @@
 import { resolveDefaultLanguage, storeOrigin } from '@ebda/shared';
-import { localePathsOn, localizeJsonLdUrls, storeKeyForHost } from '../../../lib/locale-paths';
+import {
+  LOCALE_PATH_HEADER,
+  localePathsOn,
+  localizeJsonLdUrls,
+  machineFileLocale,
+  storeKeyForHost,
+} from '../../../lib/locale-paths';
 import { headers } from 'next/headers';
 import { API_URL } from '../../../lib/api';
 
@@ -59,7 +65,8 @@ async function resolveStoreFromDomain(domain: string): Promise<{
 async function localizedFeed(
   text: string,
   host: string,
-  store: { slug: string | null; domain: string | null; defaultLanguage: string | undefined }
+  store: { slug: string | null; domain: string | null; defaultLanguage: string | undefined },
+  urlLocale: 'ar' | 'en' | null = null
 ): Promise<string> {
   if (!localePathsOn(storeKeyForHost(host))) return text;
   try {
@@ -69,7 +76,11 @@ async function localizedFeed(
       ...(store.slug ? [storeOrigin(store.slug)] : []),
     ];
     return JSON.stringify(
-      localizeJsonLdUrls(JSON.parse(text), origins, resolveDefaultLanguage(store.defaultLanguage))
+      localizeJsonLdUrls(
+        JSON.parse(text),
+        origins,
+        urlLocale ?? resolveDefaultLanguage(store.defaultLanguage)
+      )
     );
   } catch {
     return text;
@@ -113,13 +124,21 @@ export async function GET() {
   // feed's own cache, so the window is what keeps a displayed price within a minute of the rate.
   // Checkout re-prices from the database, so no one is charged the old figure. Other stores: unchanged.
   const gold = upstream.headers.get('x-gold-pricing') === '1';
-  return new Response(await localizedFeed(await upstream.text(), domain, resolved), {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': gold
-        ? 'public, s-maxage=60'
-        : 'public, s-maxage=600, stale-while-revalidate=86400',
-    },
-  });
+  return new Response(
+    await localizedFeed(
+      await upstream.text(),
+      domain,
+      resolved,
+      machineFileLocale(h.get(LOCALE_PATH_HEADER))
+    ),
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': gold
+          ? 'public, s-maxage=60'
+          : 'public, s-maxage=600, stale-while-revalidate=86400',
+      },
+    }
+  );
 }

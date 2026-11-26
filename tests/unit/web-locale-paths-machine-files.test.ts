@@ -4,7 +4,7 @@
  * Off, both are byte-for-byte what they were. The default language is the store's own `settings.defaultLanguage`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { localizeUrlsInText } from '../../apps/web/src/lib/locale-paths';
+import { decideLocalePath, localizeUrlsInText } from '../../apps/web/src/lib/locale-paths';
 
 const headerBag = new Map<string, string>();
 vi.mock('next/headers', () => ({
@@ -124,6 +124,15 @@ describe('GET /llms.txt on a locale-path store', () => {
     expect(indexable).toEqual([]);
   });
 
+  it('on: /en/llms.txt (x-locale-path=en) lists /en/ URLs even when the store default is ar', async () => {
+    on();
+    stub('ar');
+    headerBag.set('x-locale-path', 'en');
+    const body = await get();
+    expect(body).toContain('https://p.example/en/products/gold-ring');
+    expect(body).not.toContain('https://p.example/ar/');
+  });
+
   it("on: the language is the store's own setting, so it follows a change with no env edit", async () => {
     on();
     stub('en');
@@ -173,11 +182,51 @@ describe('GET /feeds/products.json on a locale-path store', () => {
     expect(out.home).toBe('https://p.example/ar');
   });
 
+  it('on: /ar/feeds/products.json (x-locale-path=ar) wins over an English default', async () => {
+    on();
+    stub('en');
+    headerBag.set('x-locale-path', 'ar');
+    expect(JSON.parse(await get()).products[0].link).toBe(
+      'https://p.example/ar/products/gold-ring'
+    );
+  });
+
+  it('on: /en/feeds/products.json (x-locale-path=en) lists /en/ links under an ar default', async () => {
+    on();
+    stub('ar');
+    headerBag.set('x-locale-path', 'en');
+    expect(JSON.parse(await get()).products[0].link).toBe(
+      'https://p.example/en/products/gold-ring'
+    );
+  });
+
   it('on: follows the store default language', async () => {
     on();
     stub('en');
     expect(JSON.parse(await get()).products[0].link).toBe(
       'https://p.example/en/products/gold-ring'
     );
+  });
+});
+
+describe('the middleware decision for a prefixed machine file', () => {
+  const d = (pathname: string) => decideLocalePath({ pathname, search: '', method: 'GET' });
+  it.each([
+    '/llms.txt',
+    '/feeds/products.json',
+    '/feeds/google.xml',
+    '/feeds/meta.xml',
+    '/feeds/tiktok.csv',
+  ])(
+    '/en%s and /ar%s are served in their language, not redirected to the unprefixed path',
+    rest => {
+      expect(d(`/en${rest}`)).toEqual({ kind: 'machine', locale: 'en', rest });
+      expect(d(`/ar${rest}`)).toEqual({ kind: 'machine', locale: 'ar', rest });
+    }
+  );
+  it('other prefixed non-routes still redirect, and the unprefixed file is untouched', () => {
+    expect(d('/en/robots.txt')).toEqual({ kind: 'redirect', location: '/robots.txt' });
+    expect(d('/llms.txt')).toEqual({ kind: 'none' });
+    expect(d('/en/feeds/other.json')).toEqual({ kind: 'redirect', location: '/feeds/other.json' });
   });
 });

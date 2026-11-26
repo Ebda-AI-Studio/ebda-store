@@ -35,7 +35,7 @@ Behind `STOREFRONT_LOCALE_PATHS` + `STOREFRONT_LOCALE_PATHS_STORES` (`docs/ENVIR
 
 ## Known follow-ups (not built)
 
-- `/llms.txt`, `/feeds/*` and other machine files still list unprefixed URLs (they redirect to the canonical).
+- DONE 2026-11-23 (Amelia QA, register row 238): `/llms.txt` and `/feeds/*` list the canonical prefixed URLs, and `/ar|/en/llms.txt` and `/ar|/en/feeds/{products.json,google.xml,meta.xml,tiktok.csv}` now answer in their own language (middleware decision `machine`, language on `x-locale-path`, no cookie) instead of a 301 to the unprefixed file, which kept the store default. Other prefixed non-routes still redirect.
 - Merchant-facing: Search Console needs the new sitemap re-submitted per store.
 
 ## Rollout

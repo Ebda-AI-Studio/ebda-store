@@ -1,4 +1,10 @@
-import { localePathsOn, localizeUrlsInText, storeKeyForHost } from '../../lib/locale-paths';
+import {
+  LOCALE_PATH_HEADER,
+  localePathsOn,
+  localizeUrlsInText,
+  machineFileLocale,
+  storeKeyForHost,
+} from '../../lib/locale-paths';
 import { headers } from 'next/headers';
 import { API_URL } from '../../lib/api';
 import { hidesFromSearch } from '../../lib/hide-from-search';
@@ -509,7 +515,9 @@ export async function perStoreResponse(
   store: PublicStore,
   viaCookie = false,
   /** The request host (`x-store-domain`): the language-in-URL allowlist is keyed by it. */
-  requestHost?: string
+  requestHost?: string,
+  /** `/en/llms.txt`: the language the URL named; absent = the store's default language. */
+  urlLocale?: 'ar' | 'en' | null
 ): Promise<Response> {
   // The public store endpoint always includes id, so this should never fall
   // back to slug — but we guard anyway.
@@ -585,7 +593,7 @@ export async function perStoreResponse(
     body = localizeUrlsInText(
       body,
       [storeBaseUrl(store), ...(requestHost ? [`https://${requestHost}`] : [])],
-      resolveDefaultLanguage(store.settings?.defaultLanguage as string | undefined)
+      urlLocale ?? resolveDefaultLanguage(store.settings?.defaultLanguage as string | undefined)
     );
   }
 
@@ -627,7 +635,12 @@ export async function GET() {
       return new Response('Not Found', { status: 404 });
     }
     // Host-based resolution, never cookie-based.
-    return perStoreResponse(store, viaCookie, storeDomain);
+    return perStoreResponse(
+      store,
+      viaCookie,
+      storeDomain,
+      machineFileLocale(headersList.get(LOCALE_PATH_HEADER))
+    );
   }
 
   // ── Platform mode (ebda.app/llms.txt + the Ebda landing) ───────
