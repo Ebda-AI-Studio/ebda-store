@@ -6,6 +6,7 @@ import { useToast } from '@ebda/ui';
 import { apiGet, apiPut } from '../lib/api';
 import { useT } from '@/i18n/useT';
 import type { FooterBottomBarSettings } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Reusable footer links + utility bar editor. Extracted from
@@ -191,7 +192,7 @@ function SectionShell({
   const showBody = !collapsedWhenDisabled || enabled !== false;
   return (
     <section
-      className={`rounded-xl border ${
+      className={`rounded-md border ${
         embedded ? 'border-border/60 bg-background' : 'border-border bg-card shadow-sm'
       } overflow-hidden`}
     >
@@ -276,7 +277,7 @@ function LinkRow({
           type="checkbox"
           checked={enabled}
           onChange={e => onToggle(e.target.checked)}
-          className="mt-2.5 h-4 w-4 shrink-0 rounded border-border text-primary focus:ring-primary"
+          className="mt-2.5 h-5 w-5 shrink-0 rounded-md border-border text-primary focus:ring-primary"
           aria-label={primaryLabel}
         />
         <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -285,7 +286,7 @@ function LinkRow({
             value={primaryValue}
             onChange={e => onPrimaryChange(e.target.value)}
             placeholder={primaryPlaceholder}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
           <input
             type="text"
@@ -294,14 +295,14 @@ function LinkRow({
             placeholder={arabicPlaceholder}
             lang="ar"
             dir="rtl"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
           <input
             type="text"
             value={pathValue}
             onChange={e => onPathChange(e.target.value)}
             placeholder={pathPlaceholder}
-            className="sm:col-span-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-muted-foreground focus:border-primary focus:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            className={`${FIELD_CLASSES} sm:col-span-2 font-mono`}
           />
         </div>
         <Button
@@ -749,7 +750,7 @@ export function FooterLinksEditor({
                   type="checkbox"
                   checked={bottomBar[key] !== false}
                   onChange={e => setBottomBar(b => ({ ...b, [key]: e.target.checked }))}
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
                 />
                 {t(label)}
               </label>
@@ -762,7 +763,7 @@ export function FooterLinksEditor({
                 onChange={e => setBottomBar(b => ({ ...b, copyrightOverride: e.target.value }))}
                 placeholder={t('legalRowCopyrightPlaceholder')}
                 aria-label={t('legalRowCopyrightPlaceholder')}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               />
               <input
                 type="text"
@@ -773,7 +774,7 @@ export function FooterLinksEditor({
                 aria-label={t('legalRowCopyrightArPlaceholder')}
                 lang="ar"
                 dir="rtl"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               />
             </div>
           </div>
@@ -789,7 +790,7 @@ export function FooterLinksEditor({
           main Save button persists footer + utility links via the registered
           saver. Otherwise the standalone editor keeps its own sticky save. */}
       {!saveRef && (
-        <div className="sticky bottom-0 -mx-1 mt-2 flex items-center justify-end gap-3 rounded-xl border border-border/60 bg-card/95 px-4 py-3 shadow-md backdrop-blur supports-[backdrop-filter]:bg-card/85">
+        <div className="sticky bottom-0 -mx-1 mt-2 flex items-center justify-end gap-3 rounded-md border border-border/60 bg-card/95 px-4 py-3 shadow-md backdrop-blur supports-[backdrop-filter]:bg-card/85">
           <p className="text-xs text-muted-foreground hidden sm:block">{t('saveHintEmpty')}</p>
           <Button
             type="button"

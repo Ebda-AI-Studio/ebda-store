@@ -26,10 +26,13 @@ describe('echoesBrand (UI audit 2026-11-11)', () => {
     renderToStaticMarkup(
       <CompactHeroBand title="Amelia Aurum" ctaText="Shop" ctaLink="/products" {...extra} />
     );
-  it('keeps the h1 for screen readers but hides it and shrinks the band when the title is the store name', () => {
+  it('a no-image hero never renders an empty strip: the store name stays a VISIBLE h1 beside the CTA (live QA 2026-11-17)', () => {
     const out = html({ echoesBrand: true });
-    expect(out).toMatch(/<h1[^>]*sr-only/);
+    expect(out).toMatch(/<h1[^>]*>Amelia Aurum<\/h1>/);
+    expect(out).not.toMatch(/sr-only/);
     expect(out).toContain('data-hero-quiet');
+    expect(out).toMatch(/text-xl sm:text-2xl/); // compact, not the 30-36 px title
+    expect(out).toMatch(/<a [^>]*href="\/products"[^>]*>Shop<\/a>/);
   });
   it('a subtitle keeps the title visible', () => {
     const out = html({ echoesBrand: true, subtitle: 'Gold, handmade' });

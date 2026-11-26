@@ -4,7 +4,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
-import { LATE_COLUMN_MIGRATIONS, extraColumns } from '../scripts/cf-additions.mjs';
+import {
+  LATE_COLUMN_MIGRATIONS,
+  extraColumns,
+  latePrismaColumns,
+} from '../scripts/cf-additions.mjs';
 import { PKG, migrationFiles, readJson } from './helpers';
 
 const files = migrationFiles('platform');
@@ -51,11 +55,33 @@ const snapshot = (db: DatabaseSync) => ({
   ).map(r => `${r.type}:${r.name}`),
 });
 
-const late = Object.entries(
-  extraColumns as Record<string, Array<{ column: string; cfSince?: number }>>
-).flatMap(([model, cols]) =>
-  cols.filter(c => c.cfSince).map(c => ({ model, column: c.column, since: c.cfSince! }))
-);
+const TABLES: Record<string, string> = {
+  Store: 'stores',
+  BillingEvent: 'billing_events',
+  StoreSubscription: 'store_subscriptions',
+};
+const tableOf = (model: string) => {
+  const t = TABLES[model];
+  if (!t) throw new Error(`late-columns: no table mapping for model ${model}`);
+  return t;
+};
+
+const late = [
+  ...Object.entries(
+    extraColumns as Record<string, Array<{ column: string; cfSince?: number }>>
+  ).flatMap(([model, cols]) =>
+    cols.filter(c => c.cfSince).map(c => ({ model, column: c.column, since: c.cfSince! }))
+  ),
+  // columns that ARE in schema.prisma but reached production D1 after 0001 (latePrismaColumns)
+  ...Object.entries(latePrismaColumns as Record<string, Record<string, number>>).flatMap(
+    ([model, cols]) =>
+      Object.entries(cols).map(([field, since]) => ({
+        model,
+        column: field.replace(/[A-Z]/g, ch => `_${ch.toLowerCase()}`),
+        since,
+      }))
+  ),
+];
 
 describe('late columns (declared once, applied once)', () => {
   it('every late column is declared in cf-additions, absent from 0001, and added by exactly one numbered migration', () => {
@@ -68,7 +94,12 @@ describe('late columns (declared once, applied once)', () => {
       ])
     );
     for (const c of late) {
-      expect(init, `0001 must not carry ${c.column}`).not.toMatch(new RegExp(`"${c.column}"`));
+      // scoped to the column's own table: a common name legitimately exists on other tables
+      const block = init.match(
+        new RegExp(`CREATE TABLE IF NOT EXISTS "${tableOf(c.model)}" \\(([\\s\\S]*?)\\n\\);`)
+      )?.[1];
+      expect(block, `0001 has a CREATE TABLE for ${c.model}`).toBeDefined();
+      expect(block, `0001 must not carry ${c.column}`).not.toMatch(new RegExp(`"${c.column}"`));
       const hits = Object.values(numbered).filter(sql => sql.includes(`ADD COLUMN "${c.column}"`));
       expect(hits, c.column).toHaveLength(1);
       expect(numbered[c.since], c.column).toContain(`ADD COLUMN "${c.column}"`);
@@ -93,7 +124,7 @@ describe('late columns (declared once, applied once)', () => {
     );
     expect(counts).toEqual(manifest.databases.d1.columnCounts);
     for (const c of late) {
-      const table = c.model === 'Store' ? 'stores' : 'billing_events';
+      const table = tableOf(c.model);
       const names = (db.prepare(`PRAGMA table_info("${table}")`).all() as { name: string }[]).map(
         x => x.name
       );
