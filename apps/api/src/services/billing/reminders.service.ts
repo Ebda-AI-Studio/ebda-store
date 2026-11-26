@@ -8,8 +8,8 @@
  * run the same day sends nothing. Only the most specific due offset is sent: a
  * job that missed days does not replay the older reminders.
  */
-import { prisma, withStore } from '@ebda/database';
-import { acrossBilling } from '../platform/billing-d1';
+import { prisma, withStore, type Prisma } from '@ebda/database';
+import { acrossBilling, d1All, d1Run, onD1 } from '../platform/billing-d1';
 import { config } from '../../config';
 import { getEntityStoreId } from '../../lib/definer';
 import logger from '../../lib/logger';
@@ -19,13 +19,16 @@ import { socketService } from '../socket.service';
 import {
   FREE_PLAN_CODE,
   GRANTED_PLAN_CODES,
+  INSTAPAY_GRACE_DAYS,
   REMINDER_OFFSETS,
+  addDays,
   isInterval,
   priceFor,
 } from './period';
 import { instapayHandle, supportContact } from './manual-config';
 import { chargeFor, ledgerVat } from './charge-amount';
 import { isBillableStoreId } from './account.service';
+import { deliverBillingEffect, type BillingEffect } from './billing-notify';
 
 const DAY = 86_400_000;
 export type ReminderKind = 'd7' | 'd3' | 'd1' | 'd0';
@@ -54,33 +57,40 @@ export function reminderKindAt(dueAt: Date, now: Date): ReminderKind | null {
   return null;
 }
 
-/** Subscriptions with a reminder window open at `now` (one row per store). */
-export async function findReminderCandidates(now: Date): Promise<string[]> {
-  const horizon = new Date(now.getTime() + 7 * DAY);
-  const floor = new Date(now.getTime() - DAY);
+/** Subscription ids matching `where`, per store scope (the ONE prisma site of this file's scans). */
+async function scanSubscriptionIds(
+  where: Prisma.StoreSubscriptionWhereInput,
+  what: string
+): Promise<string[]> {
   const parts = await acrossBilling(
     storeId =>
       prisma.storeSubscription.findMany({
-        where: {
-          ...(storeId ? { storeId } : {}),
-          planCode: { notIn: [...GRANTED_PLAN_CODES, FREE_PLAN_CODE] },
-          cancelAtPeriodEnd: false,
-          OR: [
-            { status: 'trialing', trialEndsAt: { gt: floor, lte: horizon } },
-            {
-              status: { in: ['active', 'past_due'] },
-              currentPeriodEnd: { gt: floor, lte: horizon },
-            },
-          ],
-        },
+        where: { ...(storeId ? { storeId } : {}), ...where },
         select: { id: true },
       }),
     {
       onStoreError: (storeId, err) =>
-        logger.error({ err, storeId }, '[billing] reminder scan failed'),
+        logger.error({ err, storeId }, `[billing] ${what} scan failed`),
     }
   );
   return parts.flatMap(p => p.value.map(r => r.id));
+}
+
+/** Subscriptions with a reminder window open at `now` (one row per store). */
+export async function findReminderCandidates(now: Date): Promise<string[]> {
+  const horizon = new Date(now.getTime() + 7 * DAY);
+  const floor = new Date(now.getTime() - DAY);
+  return scanSubscriptionIds(
+    {
+      planCode: { notIn: [...GRANTED_PLAN_CODES, FREE_PLAN_CODE] },
+      cancelAtPeriodEnd: false,
+      OR: [
+        { status: 'trialing', trialEndsAt: { gt: floor, lte: horizon } },
+        { status: { in: ['active', 'past_due'] }, currentPeriodEnd: { gt: floor, lte: horizon } },
+      ],
+    },
+    'reminder'
+  );
 }
 
 export type ReminderResult = { sent: false; reason: string } | { sent: true; kind: ReminderKind };
@@ -174,4 +184,214 @@ async function sendDueReminderInner(subscriptionId: string, now: Date): Promise<
     ).catch(err => logger.warn({ err, storeId }, '[billing] reminder email failed'));
   }
   return { sent: true, kind };
+}
+
+/**
+ * Grace-period notice stages (Ruling BILL-NOTICE-1). Same `billing_reminders` table and unique key as the
+ * payment reminders, with three more kinds: `grace_start` (InstaPay payment went overdue), `grace_d1`
+ * (one day or less before the store is paused) and `suspended`. A stage is owned by WHOEVER WINS this insert,
+ * and it is won BEFORE anything is sent (inside the transaction that takes the decision where there is one),
+ * so a retry, a re-run or a second worker sends nothing twice. `dueAt` is the period end the grace counts from.
+ */
+type GraceStage = 'grace_start' | 'grace_d1' | 'suspended';
+
+export async function claimGraceStage(
+  tx: Pick<typeof prisma, 'billingReminder'>,
+  args: { storeId: string; subscriptionId: string; dueAt: Date; kind: GraceStage }
+): Promise<boolean> {
+  const { count } = await tx.billingReminder.createMany({
+    data: [args],
+    skipDuplicates: true,
+  });
+  // d1-exact-ok: prisma-lite createMany count is the inserted-row count of a single-row insert (no trigger rows)
+  return count === 1;
+}
+
+type StageKey = { storeId: string; subscriptionId: string; dueAt: Date; kind: GraceStage };
+type OutboxRow = StageKey & { id: string; createdAt: Date };
+
+/*
+ * `billing_reminders.notice_sent_at` is a D1-only column (platform migration 0014): it is not in the Prisma model, so the outbox
+ * state is read and written with raw D1 SQL (billing-d1.ts). Off D1 (no such column) the outbox is a no-op and a stage is
+ * as before: claimed, sent once.
+ */
+const stampSql = `UPDATE billing_reminders SET notice_sent_at = ?1
+  WHERE store_id = ?2 AND subscription_id = ?3 AND due_at = ?4 AND kind = ?5 AND notice_sent_at IS NULL`;
+const stampSent = async (r: StageKey, at = new Date()) =>
+  (await onD1()) &&
+  (await d1Run(stampSql, at.getTime(), r.storeId, r.subscriptionId, r.dueAt.getTime(), r.kind)) > 0;
+
+/**
+ * Ruling BILL-NOTICE-3 (outbox): the claim row IS the outbox entry (`notice_sent_at` NULL). Send the stage's notice, and only a
+ * confirmed delivery stamps `notice_sent_at`; a run killed (or an effect that failed) between the claim and the send leaves it
+ * NULL for `resendUnsentGraceNotices` to finish. At-least-once by design, deduplicated by the stamp. (No provider-side
+ * idempotency key: `EmailService` and the bell take none.)
+ */
+export async function deliverGraceStage(stage: StageKey, effect: BillingEffect): Promise<boolean> {
+  if (!(await deliverBillingEffect(effect))) return false;
+  await stampSent(stage);
+  return true;
+}
+
+/**
+ * A claimed-but-unsent stage is re-sent only after this long (the first run is still in its send), and not forever:
+ * never once it is older than RESEND_GIVE_UP_MS, nor after RESEND_MAX_ATTEMPTS resends. `created_at` is immutable.
+ */
+const RESEND_AFTER_MS = 5 * 60_000;
+const RESEND_GIVE_UP_MS = 2 * DAY;
+// pq-allow(unused-export): test seam, imported by tests/unit/billing-grace-suspension-d1.test.ts
+export const RESEND_MAX_ATTEMPTS = 5;
+/** How long one worker holds a row it is re-sending. */
+const RESEND_LEASE_MS = 5 * 60_000;
+const GRACE_STAGES = ['grace_start', 'grace_d1', 'suspended'] as const;
+
+/**
+ * Re-send every grace stage claimed but not confirmed sent (see `deliverGraceStage`). A lease (`notice_lease_until` +
+ * `notice_attempts`, taken with one conditional UPDATE so exactly one worker wins) keeps two workers from re-sending the
+ * same row, and the attempts cap stops a notice that keeps failing. A stage whose moment has passed (the store paid, so the
+ * subscription is no longer past_due) is stamped without sending. Returns how many notices went out.
+ */
+export async function resendUnsentGraceNotices(now: Date = new Date()): Promise<number> {
+  if (!(await onD1())) return 0;
+  const found = await d1All<{
+    id: string;
+    store_id: string;
+    subscription_id: string;
+    due_at: number;
+    kind: GraceStage;
+    created_at: number;
+    notice_attempts: number;
+  }>(
+    `SELECT id, store_id, subscription_id, due_at, kind, created_at, notice_attempts FROM billing_reminders
+     WHERE kind IN (${GRACE_STAGES.map(() => '?').join(', ')}) AND notice_sent_at IS NULL
+       AND created_at BETWEEN ? AND ? AND notice_attempts < ?
+       AND (notice_lease_until IS NULL OR notice_lease_until <= ?)
+     ORDER BY created_at LIMIT 200`,
+    ...GRACE_STAGES,
+    now.getTime() - RESEND_GIVE_UP_MS,
+    now.getTime() - RESEND_AFTER_MS,
+    RESEND_MAX_ATTEMPTS,
+    now.getTime()
+  );
+  let sent = 0;
+  for (const f of found) {
+    const row: OutboxRow = {
+      id: f.id,
+      storeId: f.store_id,
+      subscriptionId: f.subscription_id,
+      dueAt: new Date(f.due_at),
+      kind: f.kind,
+      createdAt: new Date(f.created_at),
+    };
+    try {
+      const leased = await leaseGraceStage(row.id, f.notice_attempts, now);
+      if (leased !== 1) continue;
+      const sub = await withStore(row.storeId, tx =>
+        tx.storeSubscription.findUnique({
+          where: { id: row.subscriptionId, storeId: row.storeId },
+        })
+      );
+      // Stale = the moment has passed (the store paid). `grace_start` / `grace_d1` are only true while the row is past_due.
+      // The `suspended` notice stays true after the grace-over lapse (#836) has moved the row to free / `canceled`: only a
+      // payment (the row is active/trialing again) makes it stale, otherwise the merchant is never told the store paused.
+      const stale =
+        !sub ||
+        (row.kind === 'suspended'
+          ? sub.status === 'active' || sub.status === 'trialing'
+          : sub.status !== 'past_due');
+      if (stale) {
+        await stampSent(row, now);
+        continue;
+      }
+      const suspendAt = sub.nextRetryAt ?? addDays(row.dueAt, INSTAPAY_GRACE_DAYS);
+      const effect: BillingEffect =
+        row.kind === 'grace_start'
+          ? { kind: 'grace_started', storeId: row.storeId, suspendAt }
+          : row.kind === 'grace_d1'
+            ? { kind: 'grace_ending', storeId: row.storeId, suspendAt }
+            : { kind: 'store_suspended', storeId: row.storeId, applied: true };
+      if (await deliverGraceStage(row, effect)) sent++;
+    } catch (err) {
+      if (!isStoreGoneError(err))
+        logger.error({ err, reminderId: row.id }, '[billing] grace resend failed');
+    }
+  }
+  return sent;
+}
+
+/**
+ * Take the resend lease on one outbox row: ONE conditional UPDATE, so of any number of concurrent workers exactly one sees
+ * `changes = 1`. It re-checks everything the scan filtered on (still unsent, no live lease, under the attempts cap, the
+ * attempts value it read) and never touches `created_at`.
+ */
+// pq-allow(unused-export): test seam, imported by tests/unit/billing-grace-suspension-d1.test.ts
+export async function leaseGraceStage(
+  id: string,
+  attemptsSeen: number,
+  now: Date
+): Promise<number> {
+  return d1Run(
+    `UPDATE billing_reminders SET notice_lease_until = ?1, notice_attempts = notice_attempts + 1
+     WHERE id = ?2 AND notice_sent_at IS NULL AND notice_attempts = ?3 AND notice_attempts < ?4
+       AND (notice_lease_until IS NULL OR notice_lease_until <= ?5)`,
+    now.getTime() + RESEND_LEASE_MS,
+    id,
+    attemptsSeen,
+    RESEND_MAX_ATTEMPTS,
+    now.getTime()
+  );
+}
+
+/** InstaPay subscriptions in grace whose suspension is within the next day. */
+export async function findGraceEndingCandidates(now: Date): Promise<string[]> {
+  return scanSubscriptionIds(
+    {
+      status: 'past_due',
+      billingMethod: 'instapay',
+      nextRetryAt: { gt: now, lte: new Date(now.getTime() + DAY) },
+    },
+    'grace-ending'
+  );
+}
+
+/** The one-day-left notice for one subscription: claim `grace_d1`, then email + bell. */
+export async function sendGraceEndingNotice(
+  subscriptionId: string,
+  now: Date = new Date()
+): Promise<ReminderResult | { sent: false; reason: string }> {
+  try {
+    const storeId = await getEntityStoreId('store_subscription', subscriptionId);
+    if (!storeId) return { sent: false, reason: 'not_found' };
+    const claimed = await withStore(storeId, async tx => {
+      const sub = await tx.storeSubscription.findUnique({ where: { id: subscriptionId, storeId } });
+      if (
+        !sub ||
+        sub.status !== 'past_due' ||
+        sub.billingMethod !== 'instapay' ||
+        !sub.nextRetryAt ||
+        !sub.currentPeriodEnd ||
+        sub.nextRetryAt.getTime() <= now.getTime() ||
+        sub.nextRetryAt.getTime() - now.getTime() > DAY
+      ) {
+        return null;
+      }
+      const won = await claimGraceStage(tx, {
+        storeId,
+        subscriptionId,
+        dueAt: sub.currentPeriodEnd,
+        kind: 'grace_d1',
+      });
+      return { won, suspendAt: sub.nextRetryAt, dueAt: sub.currentPeriodEnd };
+    });
+    if (!claimed) return { sent: false, reason: 'no_window' };
+    if (!claimed.won) return { sent: false, reason: 'already_sent' };
+    await deliverGraceStage(
+      { storeId, subscriptionId, dueAt: claimed.dueAt, kind: 'grace_d1' },
+      { kind: 'grace_ending', storeId, suspendAt: claimed.suspendAt }
+    );
+    return { sent: true, kind: 'd1' };
+  } catch (err) {
+    if (!isStoreGoneError(err)) throw err;
+    return { sent: false, reason: 'store_gone' };
+  }
 }

@@ -58,6 +58,7 @@ const snapshot = (db: DatabaseSync) => ({
 const TABLES: Record<string, string> = {
   Store: 'stores',
   BillingEvent: 'billing_events',
+  BillingReminder: 'billing_reminders',
   StoreSubscription: 'store_subscriptions',
 };
 const tableOf = (model: string) => {

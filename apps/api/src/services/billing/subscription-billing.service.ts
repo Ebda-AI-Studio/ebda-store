@@ -90,10 +90,21 @@ import {
   shiftedByGrants,
   sweepFreeMonthGrants,
 } from './grants.service';
-import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
+import {
+  assertPayableStore,
+  isBillableStoreId,
+  restoreFromBilling,
+  suspendForBilling,
+} from './account.service';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
-import { findReminderCandidates, sendDueReminder } from './reminders.service';
+import {
+  claimGraceStage,
+  deliverGraceStage,
+  findReminderCandidates,
+  resendUnsentGraceNotices,
+  sendDueReminder,
+} from './reminders.service';
 import {
   chargeFor,
   ledgerVat,
@@ -1370,16 +1381,25 @@ type SubRow = NonNullable<Awaited<ReturnType<typeof loadSub>>>;
  */
 async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<RenewalResult> {
   if (sub.status !== 'past_due') {
-    const { count } = await withStore(sub.storeId, tx =>
-      tx.storeSubscription.updateMany({
+    const suspendAt = addDays(periodEnd, INSTAPAY_GRACE_DAYS);
+    // Ruling BILL-NOTICE-1: the grace-start notice stage is claimed in the SAME transaction as the
+    // past_due decision, BEFORE anything is sent; a re-run finds the row taken and sends nothing.
+    const { count, claimed } = await withStore(sub.storeId, async tx => {
+      const upd = await tx.storeSubscription.updateMany({
         where: { id: sub.id, storeId: sub.storeId, status: sub.status, billingMethod: 'instapay' },
-        data: {
-          status: 'past_due',
-          currentPeriodEnd: periodEnd,
-          nextRetryAt: addDays(periodEnd, INSTAPAY_GRACE_DAYS),
-        },
-      })
-    );
+        data: { status: 'past_due', currentPeriodEnd: periodEnd, nextRetryAt: suspendAt },
+      });
+      const won =
+        // d1-exact-ok: prisma-lite updateMany count is a row count; the where is keyed by id (at most one row)
+        upd.count === 1 &&
+        (await claimGraceStage(tx, {
+          storeId: sub.storeId,
+          subscriptionId: sub.id,
+          dueAt: periodEnd,
+          kind: 'grace_start',
+        }));
+      return { count: upd.count, claimed: won };
+    });
     if (count === 1) {
       await auditLog({
         action: 'billing.manual_payment_overdue',
@@ -1389,6 +1409,12 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
         details: { dueAt: periodEnd.toISOString(), graceDays: INSTAPAY_GRACE_DAYS },
       });
     }
+    if (claimed) {
+      await deliverGraceStage(
+        { storeId: sub.storeId, subscriptionId: sub.id, dueAt: periodEnd, kind: 'grace_start' },
+        { kind: 'grace_started', storeId: sub.storeId, suspendAt }
+      );
+    }
     return {
       action: 'skipped',
       reason: count === 1 ? 'awaiting_manual_payment' : 'already_advanced',
@@ -1397,14 +1423,49 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
   if (!sub.nextRetryAt || sub.nextRetryAt.getTime() > now.getTime()) {
     return { action: 'skipped', reason: 'not_due' };
   }
+  // Ruling BILL-NOTICE-2: D1 has no interactive transaction, so the writes below are NOT atomic. The ORDER makes a crash
+  // between any two of them self-healing, because the retry (what keeps the row in the due scan) is cleared LAST:
+  // (1) suspend the store (idempotent: only an `active` store flips); (2) claim the `suspended` notice stage (once-only
+  // insert); (3) clear the retry. A failure after (1) or (2) leaves the row due, so the next cycle re-runs (1) as a no-op,
+  // (2) as a no-op and finishes (3). Clearing the retry first (the old order) stranded the store: the row left the due
+  // scan and nothing ever suspended it.
+  const suspended = await suspendForBilling(sub.storeId, 'unpaid', now);
+  const claimed = await withStore(sub.storeId, tx =>
+    claimGraceStage(tx, {
+      storeId: sub.storeId,
+      subscriptionId: sub.id,
+      dueAt: periodEnd,
+      kind: 'suspended',
+    })
+  );
   const { count } = await withStore(sub.storeId, tx =>
     tx.storeSubscription.updateMany({
       where: { id: sub.id, storeId: sub.storeId, status: 'past_due', nextRetryAt: sub.nextRetryAt },
       data: { nextRetryAt: null },
     })
   );
-  if (count === 0) return { action: 'skipped', reason: 'already_advanced' };
-  return lapseManualSubscription(sub, now);
+  if (count === 0) {
+    // Lost the compare-and-set. If a payment landed between (1) and now the row is `active` again: undo OUR suspension.
+    // (A row another run already lapsed is `canceled`, and a canceled row must keep its `unpaid` suspension.)
+    if (suspended) {
+      const cur = await withStore(sub.storeId, tx =>
+        tx.storeSubscription.findUnique({ where: { id: sub.id, storeId: sub.storeId } })
+      );
+      if (cur && cur.status === 'active') await restoreFromBilling(sub.storeId, 'unpaid');
+    }
+    return { action: 'skipped', reason: 'already_advanced' };
+  }
+  // The suspension and the `suspended` notice stage are already done above (BILL-NOTICE-2); the lapse now downgrades the row
+  // (#836) and, when this run claimed the stage, delivers the notice through the outbox (BILL-NOTICE-3).
+  const lapsed = await lapseManualSubscription(sub, now, { periodEnd, claimed });
+  if (lapsed.action === 'skipped' && suspended) {
+    // The downgrade lost its compare-and-set (a payment landed after the retry was cleared): undo OUR suspension.
+    const cur = await withStore(sub.storeId, tx =>
+      tx.storeSubscription.findUnique({ where: { id: sub.id, storeId: sub.storeId } })
+    );
+    if (cur && cur.status === 'active') await restoreFromBilling(sub.storeId, 'unpaid');
+  }
+  return lapsed;
 }
 
 /**
@@ -1412,8 +1473,14 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
  * `canceled`. Also the self-heal for rows an earlier build left `past_due` with `nextRetryAt = null` (the due scan
  * selects them; see findDueSubscriptionIds). Idempotent: the downgrade only applies to a row that is still the same
  * InstaPay `past_due` subscription, and suspendForBilling is compare-and-set.
+ * `grace` is passed by the normal grace-over path, which has ALREADY suspended the store and claimed the `suspended`
+ * notice stage (BILL-NOTICE-2/3); the self-heal call has neither, so it keeps the plain `store_suspended` effect.
  */
-async function lapseManualSubscription(sub: SubRow, now: Date): Promise<RenewalResult> {
+async function lapseManualSubscription(
+  sub: SubRow,
+  now: Date,
+  grace?: { periodEnd: Date; claimed: boolean }
+): Promise<RenewalResult> {
   const effects: BillingEffect[] = [];
   const downgraded = await withStore(sub.storeId, async tx => {
     const cur = await tx.storeSubscription.findUnique({ where: { storeId: sub.storeId } });
@@ -1433,10 +1500,20 @@ async function lapseManualSubscription(sub: SubRow, now: Date): Promise<RenewalR
     storeId: sub.storeId,
     details: { planCode: sub.planCode, graceDays: INSTAPAY_GRACE_DAYS },
   });
-  await runBillingEffects([
-    { kind: 'store_suspended', storeId: sub.storeId, applied: suspended },
-    ...effects,
-  ]);
+  if (grace) {
+    await runBillingEffects(effects);
+    // `applied` = this run owns the notice (the stage row is claimed once), even when a previous run did the suspension.
+    if (grace.claimed)
+      await deliverGraceStage(
+        { storeId: sub.storeId, subscriptionId: sub.id, dueAt: grace.periodEnd, kind: 'suspended' },
+        { kind: 'store_suspended', storeId: sub.storeId, applied: true }
+      );
+  } else {
+    await runBillingEffects([
+      { kind: 'store_suspended', storeId: sub.storeId, applied: suspended },
+      ...effects,
+    ]);
+  }
   return { action: 'suspended' };
 }
 
@@ -1750,6 +1827,15 @@ export async function runBillingCycle(
         summary.errors++;
         logger.error({ err, subscriptionId: id }, '[billing] reminder threw');
       }
+    }
+  }
+  if (!only) {
+    // BILL-NOTICE-3: finish grace notices claimed by a run that died (or failed) before sending them.
+    try {
+      summary.reminders += await resendUnsentGraceNotices(now);
+    } catch (err) {
+      summary.errors++;
+      logger.error({ err }, '[billing] grace notice resend threw');
     }
   }
   if (!only) {
