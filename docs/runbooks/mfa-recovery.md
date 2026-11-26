@@ -14,7 +14,11 @@ At enrollment every admin receives 10 one-time backup codes. If the user saved t
 4. The code is consumed immediately — it cannot be reused.
 5. Once in, go to **Account → Security** and re-enroll a new authenticator or save the remaining codes.
 
-If all backup codes are exhausted, proceed to Option 2 or 3.
+### Making a new set (self-service, no staff)
+
+While signed in (or right after using a code to get in), the admin opens **Account → Security → Recovery codes**, enters their password and a CURRENT authenticator code, and presses **Make new recovery codes** (`POST /mfa/recovery-codes/regenerate` on the identity service, `apps/accounts`). The old set dies in the same statement; the new 10 codes are shown once and stored only as bcrypt hashes. A recovery code is refused as the step-up, so someone holding only a code cannot mint more. `GET /mfa/recovery-codes` returns only the count left. Each regeneration leaves BOTH a queryable `admin_audit` row (`event = 'mfa_recovery_codes_regenerated'`, `actor = 'self'`, no code or hash) and a structured Worker-log line `{event, userId}` (Ruling ACCT-RC-3: the row is the record, the log line is the live-tail/Logpush signal; they are written by the same request and never replace each other), and the owner gets a "recovery codes changed" email. Each regeneration logs `mfa_recovery_codes_regenerated` (user id only) in the Worker log.
+
+If all backup codes are exhausted AND the authenticator is lost, the user cannot regenerate: proceed to Option 2 or 3 (staff, after verifying identity).
 
 ---
 
@@ -45,7 +49,7 @@ After this call the locked-out user's `mfaEnabled` is `false`, their `tokenVersi
 
 ## Option 3 — Last resort: CLI reset (requires server/DB access)
 
-Use only when no other super-admin is available.
+**Last resort only.** Since recovery codes became self-service (regenerate with step-up, above), staff should not need this for a user who still has a working authenticator or unused codes. Use it only when the user has lost BOTH and no other super-admin is available. Check first that the account's MFA state lives in the table the script edits (the Postgres `users` row); the identity service (`apps/accounts`, D1) holds its own `mfa_*` columns.
 
 **Local dev (reads `DATABASE_URL` from `apps/api/.env`):**
 

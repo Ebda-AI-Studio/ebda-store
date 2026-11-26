@@ -55,7 +55,7 @@ export function CatalogImportPanel({ storeId }: { storeId: string }) {
 
   if (loaded && allowance && !allowance.enabled) {
     return (
-      <div className="rounded-xl border bg-card p-6" role="status">
+      <div className="rounded-md border bg-card p-6" role="status">
         <h3 className="font-semibold text-foreground">{t('upgradeTitle')}</h3>
         <p className="mt-1 text-sm text-muted-foreground">{t('upgradeBody')}</p>
       </div>
@@ -69,7 +69,7 @@ export function CatalogImportPanel({ storeId }: { storeId: string }) {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border bg-card p-6">
+      <section className="rounded-md border bg-card p-6">
         <h3 className="font-semibold text-foreground">{t('title')}</h3>
         <p className="mt-1 text-sm text-muted-foreground">{t('intro')}</p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -103,11 +103,11 @@ export function CatalogImportPanel({ storeId }: { storeId: string }) {
       <section>
         <h3 className="mb-2 text-sm font-semibold text-foreground">{t('jobsTitle')}</h3>
         {loaded && jobs.length === 0 ? (
-          <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+          <p className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
             {t('noJobs')}
           </p>
         ) : (
-          <ul className="divide-y rounded-xl border bg-card">
+          <ul className="divide-y rounded-md border bg-card">
             {jobs.map(j => (
               <li
                 key={j.id}

@@ -7,7 +7,7 @@ import { useT } from '@/i18n/useT';
 import { apiGetQuiet } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
 
-import { formatMoney, REGION } from '@ebda/shared';
+import { formatPrice } from '@/lib/format';
 interface FinanceDashboard {
   thisMonth: { revenue: number; expenses: number; net: number };
   cash: Array<{ id: string; code: string; nameEn: string; balance: number }>;
@@ -42,7 +42,7 @@ interface Props {
 }
 
 function fmtMoney(minor: number) {
-  return formatMoney(minor, 'en', { hideSymbol: true, fixedDecimals: true });
+  return formatPrice(minor);
 }
 
 /**
@@ -120,21 +120,21 @@ export function DashboardAccountingSummary({ storeId }: Props) {
       href: `/stores/${storeId}/finance/dashboard`,
       label: t('revenueThisMonth'),
       value: fmtMoney(fin.thisMonth.revenue),
-      unit: REGION.currency,
+      unit: '',
       tone: 'primary' as const,
     },
     fin && {
       href: `/stores/${storeId}/finance/dashboard`,
       label: t('netThisMonth'),
       value: fmtMoney(fin.thisMonth.net),
-      unit: REGION.currency,
+      unit: '',
       tone: netPositive ? ('success' as const) : ('danger' as const),
     },
     (fin || stock) && {
       href: `/stores/${storeId}/stock/dashboard`,
       label: t('stockValue'),
       value: fmtMoney(stock?.stockValue ?? fin?.stockValue ?? 0),
-      unit: REGION.currency,
+      unit: '',
       tone: 'info' as const,
     },
     stock && {
@@ -178,7 +178,7 @@ export function DashboardAccountingSummary({ storeId }: Props) {
           <Link
             key={tile.label}
             href={tile.href}
-            className={`block rounded-2xl border p-4 transition-colors bg-card ${toneClass[tile.tone]}`}
+            className={`block rounded-lg border p-4 transition-colors bg-card ${toneClass[tile.tone]}`}
           >
             <p className="text-xs font-medium text-muted-foreground">{tile.label}</p>
             <p className="mt-2 text-2xl font-bold tracking-tight">

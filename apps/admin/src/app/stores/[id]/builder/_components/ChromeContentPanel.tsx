@@ -128,7 +128,7 @@ function LinkList({
   const input = fieldControlClasses();
   return (
     <fieldset className="space-y-2" data-testid={testId}>
-      <legend className="text-xs font-semibold text-foreground">{title}</legend>
+      <legend className="text-sm font-semibold text-foreground">{title}</legend>
       {rows.map((r, i) => {
         const bad = r.href !== '' && !isSafeUrl(r.href);
         return (
@@ -392,6 +392,7 @@ export function ChromeContentPanel({ storeId, kind, chrome, liveVersion, onChang
               <Toggle
                 checked={current?.utilityBar?.enabled ?? liveUtility.enabled !== false}
                 onChange={on => utility({ enabled: on })}
+                label={t('chromeUtilityEnabled')}
               />
             </label>
             <LinkList
@@ -433,6 +434,7 @@ export function ChromeContentPanel({ storeId, kind, chrome, liveVersion, onChang
                 current?.footerLinks?.newsletterEnabled ?? liveFooter.newsletterEnabled !== false
               }
               onChange={on => footer({ newsletterEnabled: on })}
+              label={t('chromeNewsletter')}
             />
           </label>
         </>
