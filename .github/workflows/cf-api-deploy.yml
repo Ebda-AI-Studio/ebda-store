@@ -115,7 +115,9 @@ jobs:
         # Ruling DEPLOY-TIMEOUT-1: a hung wrangler/OpenNext R2 populate must fail the step, not hold the runner.
         timeout-minutes: 10
         working-directory: apps/api
-        run: npx wrangler deploy --config .wrangler.deploy.jsonc --var BUILD_COMMIT_SHA:$GITHUB_SHA
+        # DO_COLO_ECHO (Ruling PERF-AUTHSTATE-1/DO-COLO-ECHO-1): a plain Worker var from the repo variable of the same name, `off` when unset
+        # (the placement echo route 404s unless it is exactly `on`); same pattern as EBDA_SERVICE_LINES in cf-status-deploy.yml.
+        run: npx wrangler deploy --config .wrangler.deploy.jsonc --var BUILD_COMMIT_SHA:$GITHUB_SHA --var DO_COLO_ECHO:"${{ vars.DO_COLO_ECHO || 'off' }}"
       - name: Verify the live API, roll back automatically if it is unhealthy
         # M-007: `wrangler deploy` can upload the new version and still exit non-zero ("Some triggers failed to deploy"). The
         # verify/rollback step MUST still run then, or a half-deployed Worker is neither verified nor rolled back.

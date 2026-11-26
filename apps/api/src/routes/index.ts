@@ -38,6 +38,7 @@ import shippingRoutes from './shipping.routes';
 import taxRoutes from './tax.routes';
 import etaRoutes from './eta.routes';
 import { fiscalArchiveRoutes, fiscalDocumentRoutes } from './fiscal-document.routes';
+import { adminDoColoRoutes } from './admin-do-colo.routes';
 import customerGroupRoutes from './customer-groups.routes';
 import priceTierRoutes from './price-tier.routes';
 import { publicWholesaleRouter, merchantWholesaleRouter } from './wholesale.routes';
@@ -206,6 +207,8 @@ router.use('/admin', tenantContext, adminAnswerEngineRoutes);
 // carries its own authenticate → requireMfaEnrolled → authorize('super_admin').
 router.use('/admin', platformTaxRoutes);
 router.use('/admin', fiscalArchiveRoutes);
+// Super-admin placement echo (Ruling PERF-AUTHSTATE-1, off unless DO_COLO_ECHO=on): own auth chain, BEFORE adminRoutes' catch-all gate.
+router.use('/admin', adminDoColoRoutes);
 
 // Super-admin policy updates (Ruling LEGAL-4). BEFORE adminRoutes' catch-all MFA gate; it
 // carries its own authenticate -> MFA -> super_admin chain.
