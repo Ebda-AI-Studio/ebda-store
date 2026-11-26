@@ -35,5 +35,6 @@ describe('cf-api-deploy.yml auto-deploy', () => {
     expect(apply).toBeGreaterThan(-1);
     expect(apply).toBeLessThan(wf.indexOf('npx wrangler deploy --config'));
     expect(wf).toContain('EBDA_PLATFORM_D1_ID: ${{ vars.EBDA_PLATFORM_D1_ID }}');
+    expect(wf).toContain('EBDA_INSTAPAY_DEDUPE_D1_ID: ${{ vars.EBDA_INSTAPAY_DEDUPE_D1_ID }}');
   });
 });
