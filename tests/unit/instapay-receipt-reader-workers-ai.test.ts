@@ -53,14 +53,18 @@ describe('what is asked of the model', () => {
     expect(INSTAPAY_RECEIPT_PROMPT).toMatch(/Do not read, copy or return any person's name/);
   });
 
-  it('the JSON schema allows exactly six keys, none personal', () => {
+  it('the JSON schema allows exactly these keys (the six values + their printed copies), none personal', () => {
     expect(Object.keys(INSTAPAY_RECEIPT_JSON_SCHEMA.properties).sort()).toEqual([
       'amount',
+      'amountText',
       'confidence',
       'date',
+      'dateText',
       'looksEdited',
       'reference',
+      'referenceText',
       'time',
+      'timeText',
     ]);
     expect(INSTAPAY_RECEIPT_JSON_SCHEMA.additionalProperties).toBe(false);
   });
@@ -256,5 +260,46 @@ describe('RECEIVER-CHECK-1: the model returns only a yes / no for the receiver',
         expectedReceivers: EXPECTED,
       })
     ).rejects.toThrow(/workers ai 500/);
+  });
+});
+
+describe('QA-120 Arabic-UI receipts: digits, markers and printed text are normalised before parsing', () => {
+  const read = (o: Record<string, unknown>) =>
+    normalizeReceiptExtraction({ amount: null, reference: null, date: null, time: null, ...o });
+  it('the printed Arabic-Indic time wins over a wrong model conversion (٤:٣١ م, model said 20:21)', () => {
+    expect(read({ time: '20:21', timeText: '٤:٣١ م' }).transferTime).toBe('16:31');
+  });
+  it.each([
+    ['٤:٣١ م', '16:31'],
+    ['٤:٣١ ص', '04:31'],
+    ['م ٤:٣١', '16:31'],
+    ['۴:۳۱ PM', '16:31'],
+    ['٤:٣١ مساءً', '16:31'],
+    ['٩:٠٥ صباحًا', '09:05'],
+    ['١٢:١٠ م', '12:10'],
+    ['١٢:١٠ ص', '00:10'],
+    ['\u200f٤:٣١\u200e م', '16:31'],
+    ['١٦:٣١', '16:31'],
+    ['٤٫٣١ م', '16:31'],
+  ])('time %s -> %s', (printed, want) => {
+    expect(read({ timeText: printed }).transferTime).toBe(want ? want : null);
+  });
+  it('dates: Arabic-Indic digits, d/m/y and Arabic or English month names', () => {
+    expect(read({ dateText: '٢٠٢٦-١١-٢٠' }).transferDate).toBe('2026-11-20');
+    expect(read({ dateText: '٢٠/١١/٢٠٢٦' }).transferDate).toBe('2026-11-20');
+    expect(read({ dateText: '٢٠ نوفمبر ٢٠٢٦' }).transferDate).toBe('2026-11-20');
+    expect(read({ dateText: 'Nov 20, 2026' }).transferDate).toBe('2026-11-20');
+    expect(read({ date: '20 Nov 2026' }).transferDate).toBe('2026-11-20');
+  });
+  it('amount: Arabic separators and currency words; reference: Arabic-Indic digits', () => {
+    expect(read({ amountText: '١٬٤٩٠٫٠٠ ج.م' }).amountMinor).toBe(149000);
+    expect(read({ amountText: '1,490.00 EGP' }).amountMinor).toBe(149000);
+    expect(read({ amount: 1490, amountText: 'غير واضح' }).amountMinor).toBe(149000);
+    expect(read({ referenceText: '١٧٢٢٥٢٢٦٩٣٠٤' }).reference).toBe('172252269304');
+    expect(read({ reference: '۱۷۲۲۵۲۲۶۹۳۰۴' }).reference).toBe('172252269304');
+  });
+  it('the prompt carries the digit table and the status-bar rule', () => {
+    expect(INSTAPAY_RECEIPT_PROMPT).toContain('4:31 with م is 16:31');
+    expect(INSTAPAY_RECEIPT_PROMPT).toMatch(/status bar/);
   });
 });

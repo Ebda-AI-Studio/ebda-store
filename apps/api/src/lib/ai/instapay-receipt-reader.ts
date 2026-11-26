@@ -38,10 +38,11 @@ Return ONLY a JSON object with exactly these keys (null when the screenshot does
 - "reference": the transaction reference / reference number exactly as printed (digits only).
 - "date": the transfer date as YYYY-MM-DD, as shown on the screen (local Egypt time).
 - "time": the transfer time as HH:mm in 24-hour format, as shown on the screen (local Egypt time).
+- "timeText", "dateText", "amountText", "referenceText": the SAME four values copied character by character exactly as printed on the receipt (Arabic-Indic digits and AM/PM or ص/م markers included), so a wrong conversion in the fields above can be corrected. Never take the time from the phone's status bar (top of the screen) or the battery percentage: use the receipt's own date and time.
 - "looksEdited": true if the image looks edited, pasted together, cropped to hide parts, or not a genuine app screenshot.
 - "confidence": a number from 0 to 1 for how sure you are that amount, reference and date are read correctly.
 Do not read, copy or return any person's name, phone number, bank, account or InstaPay address.
-Convert Arabic-Indic digits to 0-9.`;
+Convert Arabic-Indic digits (U+0660 to U+0669, in order) to 0-9 digit by digit. A 12-hour time with the Arabic marker م (PM) or ص (AM) must be converted to 24-hour: 4:31 with م is 16:31.`;
 
 /**
  * The prompt for one read. With the store's expected receiver(s) (its InstaPay address and/or mobile: the MERCHANT's own
@@ -72,6 +73,10 @@ export const INSTAPAY_RECEIPT_JSON_SCHEMA = {
     reference: { type: ['string', 'null'] },
     date: { type: ['string', 'null'] },
     time: { type: ['string', 'null'] },
+    timeText: { type: ['string', 'null'] },
+    dateText: { type: ['string', 'null'] },
+    amountText: { type: ['string', 'null'] },
+    referenceText: { type: ['string', 'null'] },
     looksEdited: { type: 'boolean' },
     confidence: { type: 'number' },
   },
@@ -97,6 +102,10 @@ const loose = z
     reference: z.union([z.string(), z.number()]).nullable().optional(),
     date: z.string().nullable().optional(),
     time: z.string().nullable().optional(),
+    timeText: z.union([z.string(), z.number()]).nullable().optional(),
+    dateText: z.union([z.string(), z.number()]).nullable().optional(),
+    amountText: z.union([z.string(), z.number()]).nullable().optional(),
+    referenceText: z.union([z.string(), z.number()]).nullable().optional(),
     looksEdited: z.union([z.boolean(), z.string()]).nullable().optional(),
     confidence: z.union([z.number(), z.string()]).nullable().optional(),
     receiverMatches: z.unknown().optional(),
@@ -110,55 +119,128 @@ const text = (v: unknown, max: number): string | null => {
   return s ? s.slice(0, max) : null;
 };
 
-/** EGP amount (number or "1,200.50" / "١٬٢٠٠") to piastres; null when unreadable. */
+/**
+ * One comparable form of any receipt text (QA-120): bidi/format marks removed (they break every regex), Arabic-Indic
+ * (٠-٩) and Persian (۰-۹) digits to 0-9, Arabic decimal / thousands / time separators to ASCII, tatweel dropped.
+ */
+export function normalizeReceiptText(v: unknown): string {
+  return toAsciiDigits(String(v ?? ''))
+    .replace(/[\u064b-\u0652\u200e\u200f\u202a-\u202e\u2066-\u2069\u061c\ufeff\u0640]/g, '')
+    .replace(/\u066b/g, '.')
+    .replace(/[\u066c\u060c]/g, ',')
+    .replace(/\uff1a/g, ':')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** EGP amount (number or "1,200.50" / "١٬٢٠٠٫٥٠ ج.م") to piastres; null when unreadable. */
 export function amountToMinor(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null;
-  const raw = typeof v === 'number' ? String(v) : toAsciiDigits(String(v));
+  const raw = typeof v === 'number' ? String(v) : normalizeReceiptText(v);
   const cleaned = raw
-    .replace(/[٬,\s]/g, '')
-    .replace('٫', '.')
-    .replace(/[^\d.]/g, '');
+    .replace(/[,\s]/g, '')
+    .replace(/[^\d.]/g, '')
+    .replace(/^\.+|\.+$/g, '');
   if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
   const minor = Math.round(Number(cleaned) * 100);
   return Number.isSafeInteger(minor) && minor > 0 ? minor : null;
 }
 
+const AR_MONTHS: Record<string, number> = {
+  يناير: 1,
+  فبراير: 2,
+  مارس: 3,
+  أبريل: 4,
+  ابريل: 4,
+  مايو: 5,
+  يونيو: 6,
+  يوليو: 7,
+  أغسطس: 8,
+  اغسطس: 8,
+  سبتمبر: 9,
+  أكتوبر: 10,
+  اكتوبر: 10,
+  نوفمبر: 11,
+  ديسمبر: 12,
+};
+const EN_MONTHS = [
+  'jan',
+  'feb',
+  'mar',
+  'apr',
+  'may',
+  'jun',
+  'jul',
+  'aug',
+  'sep',
+  'oct',
+  'nov',
+  'dec',
+];
+
 function isoDate(v: unknown): string | null {
-  const s = text(v, 20);
+  const s = text(v, 40);
   if (!s) return null;
-  const d = toAsciiDigits(s);
+  const d = normalizeReceiptText(s);
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d) ?? null;
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
   const dmy = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(d);
   if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+  // "20 نوفمبر 2026" / "20 Nov 2026" / "Nov 20, 2026" as printed by the app
+  const word = /^(\d{1,2})\s+(\S+?),?\s+(\d{4})/.exec(d);
+  const wordFirst = /^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})/.exec(d);
+  const [day, mon, year] = word
+    ? [word[1], word[2], word[3]]
+    : wordFirst
+      ? [wordFirst[2], wordFirst[1], wordFirst[3]]
+      : [null, null, null];
+  if (day && mon && year) {
+    const n = AR_MONTHS[mon] ?? EN_MONTHS.indexOf(mon.slice(0, 3).toLowerCase()) + 1;
+    if (n >= 1 && n <= 12 && Number(day) >= 1 && Number(day) <= 31) {
+      return `${year}-${String(n).padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+  }
   return null;
 }
 
+const PM_WORDS = /^(pm|p\.m\.?|م|مساء|مساءا|ظهر|ظهرا|عصر|عصرا)$/i;
+const AM_WORDS = /^(am|a\.m\.?|ص|صباح|صباحا|فجر|فجرا)$/i;
+
 function hhmm(v: unknown): string | null {
-  const s = text(v, 20);
+  const s = text(v, 30);
   if (!s) return null;
-  const m = /^(\d{1,2}):(\d{2})(?::\d{2})?\s*(am|pm|ص|م)?$/i.exec(toAsciiDigits(s));
+  // the 12-hour marker may follow ("٤:٣١ م") or lead ("م ٤:٣١") the clock
+  const n = normalizeReceiptText(s).replace(/(\d)[.](\d{2})(?!\d)/, '$1:$2');
+  const m = /^(?:(\S+)\s+)?(\d{1,2}):(\d{2})(?::\d{2})?(?:\s*(\S+))?$/.exec(n);
   if (!m) return null;
-  let h = Number(m[1]);
-  const suffix = m[3]?.toLowerCase();
-  if (suffix === 'pm' || suffix === 'م') h = h % 12 === 0 ? 12 : (h % 12) + 12;
-  if (suffix === 'am' || suffix === 'ص') h = h % 12;
-  if (h > 23 || Number(m[2]) > 59) return null;
-  return `${String(h).padStart(2, '0')}:${m[2]}`;
+  const marker = m[1] ?? m[4];
+  let h = Number(m[2]);
+  if (marker) {
+    if (PM_WORDS.test(marker)) h = h % 12 === 0 ? 12 : (h % 12) + 12;
+    else if (AM_WORDS.test(marker)) h = h % 12;
+    else return null;
+  }
+  if (h > 23 || Number(m[3]) > 59) return null;
+  return `${String(h).padStart(2, '0')}:${m[3]}`;
 }
 
 /** Normalise whatever the model answered into the stored extraction (pure; unit-tested). */
 export function normalizeReceiptExtraction(raw: unknown): InstapayReceiptExtraction {
   const p = loose.safeParse(raw);
   const r = p.success ? p.data : {};
-  const referenceRaw = text(r.reference, INSTAPAY_RECEIPT_REFERENCE_MAX * 2);
+  // The model also copies the four values as printed: the printed text is parsed HERE (deterministic), and when it
+  // reads and differs from the model's own conversion it wins (QA-120: ٤:٣١ م was converted to 20:21).
+  const referenceRaw =
+    (normalizeInstapayReference(normalizeReceiptText(r.referenceText))
+      ? normalizeReceiptText(r.referenceText)
+      : null) ?? text(r.reference, INSTAPAY_RECEIPT_REFERENCE_MAX * 2);
   const conf = Number(r.confidence);
   const edited = r.looksEdited === true || String(r.looksEdited).toLowerCase() === 'true';
   return {
-    amountMinor: amountToMinor(r.amount),
+    amountMinor: amountToMinor(r.amountText) ?? amountToMinor(r.amount),
     reference: normalizeInstapayReference(referenceRaw) ?? (referenceRaw ? referenceRaw : null),
-    transferDate: isoDate(r.date),
-    transferTime: hhmm(r.time),
+    transferDate: isoDate(r.dateText) ?? isoDate(r.date),
+    transferTime: hhmm(r.timeText) ?? hhmm(r.time),
     // personal fields are never asked of the model and never taken from it (M-003)
     payerName: null,
     payerAddress: null,
