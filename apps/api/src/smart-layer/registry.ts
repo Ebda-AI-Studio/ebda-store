@@ -1,4 +1,4 @@
-/** The capability registry as the engine reads it. `registry.generated.json` is built by `apps/api/scripts/build-help-corpus.mjs` through the engine's own `toRegistryView`; a test fails when it is stale. */
+/** The capability registry as the engine reads it. `registry.generated.json` is a git-ignored BUILD OUTPUT of `apps/api/scripts/build-help-corpus.mjs` (through the engine's own `toRegistryView`), generated before every build, deploy, test and typecheck (docs/plans/2026-11-24-help-corpus-build-time.md); `npm run gen:assistant-assets` writes it by hand. */
 import type { RegistryCap, RegistryView } from '@ebda/shared/smart-layer';
 import generated from './registry.generated.json';
 

@@ -38,6 +38,7 @@ import {
   isSectionPageKind,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
+import { useDndA11y } from '@/hooks/useDndA11y';
 import { useIsCanvasHovered } from '../_lib/canvas-hover-store';
 
 export interface Selection {
@@ -111,7 +112,7 @@ function Row({
         <button
           data-ui="handle"
           type="button"
-          className="min-h-6 min-w-6 cursor-grab touch-none rounded px-1 text-muted-foreground hover:text-foreground"
+          className="min-h-6 min-w-6 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11 [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:items-center [@media(pointer:coarse)]:justify-center cursor-grab touch-none rounded-md px-1 text-muted-foreground hover:text-foreground"
           aria-label={t('drag', { name })}
           {...attributes}
           {...listeners}
@@ -229,7 +230,7 @@ function Row({
                     onSelect({ sectionId: node.id, blockId: b.id });
                     onFocusCanvas({ sectionId: node.id, blockId: b.id });
                   }}
-                  className={`min-w-0 flex-1 truncate rounded px-2 py-1 text-start text-xs ${
+                  className={`min-w-0 flex-1 truncate rounded-md px-2 py-1 text-start text-xs ${
                     bSelected ? 'bg-primary/15 ring-1 ring-primary' : 'hover:bg-muted'
                   } ${b.hidden ? 'text-muted-foreground line-through' : ''}`}
                 >
@@ -327,6 +328,7 @@ function Group({
   ...rest
 }: Omit<Props, 'doc'> & { list: SectionList; title: string; nodes: SectionNode[] }) {
   const t = useT('builder.tree');
+  const dndA11y = useDndA11y();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -341,7 +343,12 @@ function Group({
       <h2 className="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </h2>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <DndContext
+        {...dndA11y}
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={onDragEnd}
+      >
         <SortableContext items={nodes.map(n => n.id)} strategy={verticalListSortingStrategy}>
           <ul className="space-y-0.5">
             {nodes.map((n, i) => (

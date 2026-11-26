@@ -91,13 +91,13 @@ export function OrderAlertsModal({
         </span>
         <h2
           id="order-alerts-prompt-title"
-          className="relative mt-5 text-balance text-[22px] font-bold sm:text-[26px] leading-tight text-[#f1f5f3]"
+          className="relative mt-5 text-balance text-xl font-bold sm:text-2xl leading-tight text-[#f1f5f3]"
         >
           {t('title')}
         </h2>
         <p
           id="order-alerts-prompt-body"
-          className="relative mx-auto mt-2 max-w-[40ch] text-balance text-[15px] leading-[1.6] text-[#a6b0ac]"
+          className="relative mx-auto mt-2 max-w-[40ch] text-balance text-base leading-[1.6] text-[#a6b0ac]"
         >
           {t('body')}
         </p>
