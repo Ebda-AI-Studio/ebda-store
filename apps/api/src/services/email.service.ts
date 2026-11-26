@@ -182,12 +182,14 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
   const font = isArabic ? EMAIL_FONT_AR : EMAIL_FONT;
   const displayName = isArabic && store.nameAr ? store.nameAr : store.name;
   const storeName = escapeHtml(displayName);
-  const platformMark = store.logo === BRAND_EMAIL_LOGO_URL;
+  // A relative / non-https logo cannot load in a mail client (it paints as an empty square): fall back to the wordmark.
+  const logoSrc = store.logo && /^https:\/\//i.test(store.logo.trim()) ? store.logo.trim() : null;
+  const platformMark = logoSrc === BRAND_EMAIL_LOGO_URL;
   // Merchant logos retain their own identity. The platform mark is abbreviated,
   // so it also displays the full localized product name.
-  const header = store.logo
+  const header = logoSrc
     ? emailImage({
-        src: store.logo,
+        src: logoSrc,
         alt: displayName,
         // The platform mark is portrait (135x256 PNG): width 34 = 64 * 135/256, so Outlook (which reads only the
         // width attribute) renders it at the same 34x64 every other client scales it to.

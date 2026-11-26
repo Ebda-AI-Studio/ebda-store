@@ -19,7 +19,7 @@ export default function RegisterClient() {
   const router = useRouter();
   const storeUrl = useStoreUrl();
   const { store } = useStore();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -70,6 +70,7 @@ export default function RegisterClient() {
           firstName: formData.firstName,
           lastName: formData.lastName,
           storeId: store?.id,
+          language,
         });
 
         if (!result.success) {

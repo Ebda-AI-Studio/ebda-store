@@ -1091,6 +1091,8 @@ class ApiClient {
      * API treats the request as an admin-side registration.
      */
     storeId?: string;
+    /** The shopper's current storefront language: the verification email is sent in it. */
+    language?: 'en' | 'ar';
   }) {
     // T1-4: register issues NO session — no user, tokens, cookies or
     // csrfToken — and answers identically for new and existing emails. The
